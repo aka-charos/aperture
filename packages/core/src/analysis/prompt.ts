@@ -128,7 +128,99 @@ import { PROMPT_VARIANTS } from './promptVariants.js'
  *    sentence says something about the film, where 14's example of a banned
  *    opener was being echoed in paraphrase.
  */
-export const ANALYSIS_PROMPT_VERSION = 17
+/**
+ * Version 18: THE NAMES ARE NOISE.
+ *
+ * MEASURED ON 42 LIVE ROWS, not on a bench. `altworld_hemmingway-1` in two
+ * quantizations, every one written under version 17, read with the bench's own
+ * instrument:
+ *
+ *  - The reception answers carry **83 distinct capitalised names** across 42
+ *    articles, and **26 of 42** attach a name to a verb of opinion. Almost
+ *    every one is a singleton: Adrian Martin, Kenneth Turan, Mick LaSalle,
+ *    Jourdain Searles, Owen Gleiberman, Leah Greenblatt, James Berardinelli,
+ *    Monica Castillo, each appearing ONCE in the whole corpus. One Mass
+ *    paragraph names three critics in three consecutive sentences.
+ *  - Roger Ebert appears six times and is the only name that recurs.
+ *
+ * A NAME THAT APPEARS ONCE IN FORTY-TWO ARTICLES IS NOISE. The reader is
+ * someone choosing a film, not a reader of criticism, and a byline they would
+ * have to be told about carries nothing that "a critic" does not. Version 16
+ * dropped the naming ban on the argument that naming the critic is what
+ * criticism normally does; that is true of criticism and not of this, and the
+ * operator's call reverses it on evidence version 16 did not have.
+ *
+ * THE BAN IS NARROW THIS TIME, WHICH IS WHY IT IS NOT VERSION 13's. That one
+ * forbade every name and failed on every model, because it fought the
+ * legitimate uses: the same 42 rows carry 297 distinct names OUTSIDE reception
+ * and they are makers and films - Polanski's Repulsion, Altman's Images, the
+ * Catalan crew on The Teacher Who Promised the Sea. Those are wanted. The line
+ * is not "no names", it is WHO MADE IT AGAINST WHO WROTE ABOUT IT, which is a
+ * distinction the writer always knows and the old ban never drew.
+ *
+ * THE BAN HAD ONE EXCEPTION - ROGER EBERT - AND THE FIRST BENCH OF THIS DRAFT
+ * SHOWED THE EXCEPTION MANUFACTURING A FALSE ATTRIBUTION. Suspiria, same
+ * documents, 17 against 18. Version 17, with naming permitted, named two
+ * critics and got BOTH right: Janet Maslin and Gary Arnold, each matching the
+ * byline Metacritic prints beside the blurb quoted. Version 18 named three and
+ * invented one - "Roger Ebert read it as an adult fairy tale whose dream logic
+ * holds together better than its plot does", where the reading is real, the
+ * document is real, and the document is by PETER SOBCZYNSKI. Metacritic
+ * carried that byline in the same retrieval, so the model had the right answer
+ * in front of it and overrode it with the one name the rule had blessed.
+ *
+ * So the exception is gone and A SITE IS NOT ITS WRITER is back. Both were my
+ * errors, and they are the same error twice: the clause was deleted here as
+ * "moot once names go", which it would have been had any name gone. One
+ * permitted name is a licence, and the licence landed on the site the
+ * retrieval was full of. Version 13's blanket ban failed on every model, but
+ * it never fabricated - and an accuracy requirement cannot police a name the
+ * rule itself supplied. A rule with one exception is enforced at the
+ * exception.
+ *
+ * THE SAME BENCH FOUND THE SHAPE REGRESSING, and the cause is mine as well.
+ * Softening the per-question allocation from "at most four" to "up to four"
+ * alongside every length figure went further than the operator asked: the
+ * TOTAL was what should drift, and the allocation came with it. Measured on
+ * that pair: work 218 -> 364 words, `told twice` 1 -> 3, `split` 0 -> 1,
+ * sections running tradition work work work work+circ work circumstances
+ * reception. So LENGTH stays loose and SHAPE goes back to maximums, with the
+ * adjacency constraint stated outright - the three consumers that read the
+ * paragraph map need a question's answer to be one findable run (F-124's rule
+ * 3), and nothing in the length rule had ever said so.
+ *
+ * WHAT 18 WON ON THAT BENCH, and keeps unchanged: the closing influence
+ * paragraph is gone, and its material survived inside the tradition answer
+ * ("the three-mother mythology Argento later spun into two follow-up films").
+ * That is the change the 42 rows asked for and it worked first time.
+ *
+ * THE OTHER FOUR CHANGES follow the one principle the 42 rows establish:
+ * ceilings are obeyed and flat bans are not. Compliance measured per rule -
+ * paragraph count 98%, paragraph words 67%, word total 62%, sentence cap 55%,
+ * and then "no semicolons" at 2% and "no rather than" at 0%.
+ *
+ *  - LENGTH IS RELAXED ON THE OPERATOR'S CALL, not tightened. 38% of rows ran
+ *    over 650 words and the prose was not worse for it; a number nobody wants
+ *    enforced should not be written as a maximum. Every figure is "about" now.
+ *  - THE TWO STYLE BANS GO. One row in 42 obeyed the semicolon ban and none
+ *    obeyed "rather than". They are house style, they cost a bench round every
+ *    version, and a reader does not see them. The guidance they sat on - say
+ *    what a choice does, not what it avoids - stays as guidance.
+ *  - THE TRADITION QUESTION STOPS QUOTING ITS OWN TARGET. Version 17 forbade
+ *    "a viewer sits down to" by printing it, and 19 of 42 rows carry the exact
+ *    string - 11 of them somewhere other than the opening. The ban relocated
+ *    the phrase into the body rather than removing it, so the instruction now
+ *    names the SHAPE (an imagined person watching) and prints no example.
+ *  - THE MAKERS WHO MAY BE NAMED ARE LISTED, since the rule named three and the
+ *    operator wants the editor, the composer and the cast as well.
+ *
+ * NOT CHANGED, deliberately: the question ids; the spoiler discipline; the
+ * source weighting; version 17's own mechanical test for who is speaking,
+ * which is what the making answer turns on; and the no-invention rule, which
+ * is not what "fine to drift on fact-checking" asked to loosen - it asked for
+ * no NEW accuracy machinery, and this version adds none.
+ */
+export const ANALYSIS_PROMPT_VERSION = 18
 
 /**
  * The oldest prompt version whose prose is still worth keeping.
@@ -369,9 +461,9 @@ interface AnalysisQuestion {
  * Benched once before promotion, on Suspiria against version 15, two models.
  * See F-124 for what that measured and what it did not.
  */
-const TRADITION_QUESTION_MOVIE = "What kind of film is this, and what is it in conversation with? Say what its mode and its register are first, so a viewer knows what to bring to it, and write that in your own words - \"a viewer sits down to\" is this question's phrasing, not a sentence. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier film a maker took from, a collaborator's earlier work this one departs from. EACH HAS TO EARN ITS PLACE IN THE SENTENCE THAT NAMES IT - a name with nothing attached is a credit. Do not open on who directed, wrote or starred in it, and never copy a listing page's genre labels or mood tags. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
+const TRADITION_QUESTION_MOVIE = "What kind of film is this, and what is it in conversation with? Say what its mode and its register are first, so a viewer knows what to bring to it, and open on the film itself rather than on an imagined person sitting down to watch it. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier film a maker took from, a collaborator's earlier work this one departs from. EACH HAS TO EARN ITS PLACE IN THE SENTENCE THAT NAMES IT - a name with nothing attached is a credit. Do not open on who directed, wrote or starred in it, and never copy a listing page's genre labels or mood tags. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
 
-const TRADITION_QUESTION_SERIES = "What kind of series is this, and what is it in conversation with? Say what its mode and its register are first, so a viewer knows what to bring to it, and write that in your own words - \"a viewer sits down to\" is this question's phrasing, not a sentence. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier work a maker took from, a collaborator's earlier work this one departs from. EACH HAS TO EARN ITS PLACE IN THE SENTENCE THAT NAMES IT - a name with nothing attached is a credit. Do not open on who created, wrote or starred in it, and never copy a listing page's genre labels or mood tags. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
+const TRADITION_QUESTION_SERIES = "What kind of series is this, and what is it in conversation with? Say what its mode and its register are first, so a viewer knows what to bring to it, and open on the series itself rather than on an imagined person sitting down to watch it. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier work a maker took from, a collaborator's earlier work this one departs from. EACH HAS TO EARN ITS PLACE IN THE SENTENCE THAT NAMES IT - a name with nothing attached is a credit. Do not open on who created, wrote or starred in it, and never copy a listing page's genre labels or mood tags. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
 
 /**
  * THE ONE SPOILER-SHAPED QUESTION, and the closing sentence is the whole of its
@@ -414,9 +506,31 @@ const WORK_QUESTION_SERIES = "What should a viewer watch and listen for? Go thro
  * defeat four versions of a negative list, and that list now lives once, in the
  * rule that governs every answer.
  */
-const CIRCUMSTANCES_QUESTION_MOVIE = "What should a viewer know before they start? Two things belong here. First, what a maker SAID they were trying to do. Before writing that somebody said something, find the sentence in which they are the one speaking: a sentence about what they did, wanted, decided or set out to do is the page describing them, and so is a list of what an interview covered. WHO IS ASKED IS WHO SPEAKS - one page can carry an essay about the director and an interview with an actor, and what the actor says about the director is the actor's remark, never the director on themselves. Second, a condition of the making or the first release that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the form it was first shown in, who was allowed to see it. How it was received, and what anyone did afterwards, belong elsewhere."
+/**
+ * A REMARK BELONGS TO WHOEVER WAS ASKED, AND TO NOBODY ELSE ON THE PAGE.
+ *
+ * Version 16 found an actress's description of the director printed as the
+ * director on himself, and version 17's mechanical test - find the sentence in
+ * which the maker is the one speaking - was written for it and is why 17 was
+ * promoted. Draft 18's first bench broke the same rule by a DIFFERENT ROUTE:
+ * Jessica Harper's answer about first reading the screenplay ("The screenplay
+ * provided a loose structure") came out as "Nicolodi described the screenplay
+ * as only a loose structure" - the co-writer, who is named earlier in the same
+ * article and in two other documents, and who did not say it.
+ *
+ * Verified rather than assumed: "loose structure" appears on the rogerebert.com
+ * page and on none of the other documents reachable from the run, and there it
+ * sits inside an interview the piece introduces as being with Harper. Version
+ * 17, on the identical eight documents, attributed it to Harper correctly.
+ *
+ * So the clause is widened rather than restated. Its example was
+ * ONE-DIRECTIONAL - it warns that the actor's remark is not the director's -
+ * and the failure went sideways instead, to a third maker the article names
+ * nearby. Two instances of one class on one page shape is a shape.
+ */
+const CIRCUMSTANCES_QUESTION_MOVIE = "What should a viewer know before they start? Two things belong here. First, what a maker SAID they were trying to do. Before writing that somebody said something, find the sentence in which they are the one speaking: a sentence about what they did, wanted, decided or set out to do is the page describing them, and so is a list of what an interview covered. WHO IS ASKED IS WHO SPEAKS - one page can carry an essay about the director and an interview with an actor, and what the actor says about the director is the actor's remark, never the director on themselves. IT IS NOBODY ELSE'S EITHER: a remark belongs to the person who was asked, not to whichever maker the article happens to name nearest it, so check the name against the question it answers before you attach it. Second, a condition of the making or the first release that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the form it was first shown in, who was allowed to see it. How it was received, and what anyone did afterwards, belong elsewhere."
 
-const CIRCUMSTANCES_QUESTION_SERIES = "What should a viewer know before they start? Two things belong here. First, what a maker SAID they were trying to do. Before writing that somebody said something, find the sentence in which they are the one speaking: a sentence about what they did, wanted, decided or set out to do is the page describing them, and so is a list of what an interview covered. WHO IS ASKED IS WHO SPEAKS - one page can carry an essay about the creator and an interview with an actor, and what the actor says about the creator is the actor's remark, never the creator on themselves. Second, a condition of the making or the first broadcast that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the slot or the form it first went out in, who was allowed to see it. How it was received, and what anyone did afterwards, belong elsewhere."
+const CIRCUMSTANCES_QUESTION_SERIES = "What should a viewer know before they start? Two things belong here. First, what a maker SAID they were trying to do. Before writing that somebody said something, find the sentence in which they are the one speaking: a sentence about what they did, wanted, decided or set out to do is the page describing them, and so is a list of what an interview covered. WHO IS ASKED IS WHO SPEAKS - one page can carry an essay about the creator and an interview with an actor, and what the actor says about the creator is the actor's remark, never the creator on themselves. IT IS NOBODY ELSE'S EITHER: a remark belongs to the person who was asked, not to whichever maker the article happens to name nearest it, so check the name against the question it answers before you attach it. Second, a condition of the making or the first broadcast that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the slot or the form it first went out in, who was allowed to see it. How it was received, and what anyone did afterwards, belong elsewhere."
 
 /**
  * The shortest answer, capped against the work answer since version 11.
@@ -429,9 +543,29 @@ const CIRCUMSTANCES_QUESTION_SERIES = "What should a viewer know before they sta
  * with remakes, sequels and cast lists, which tell a viewer nothing about the
  * film in front of them.
  */
-const RECEPTION_QUESTION_MOVIE = "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the film itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for - a sentence per critic is the list an aggregator prints, not a paragraph. One sentence may give a reading of what the film means, where a critic's reading shaped how it is watched, and ordinary viewers get one sentence at most. Add a second paragraph only where a document names something specific this film passed on AND knowing it teaches a way of watching - a technique a viewer can recognise elsewhere. A remake, a sequel and a cast list are never that. No scores of any kind and no verdict of your own."
+/**
+ * Reception keeps the influence MATERIAL and loses the paragraph it had to
+ * itself.
+ *
+ * Measured on the 42 live rows: **19 of 42 close with it**, in thirteen
+ * paraphrases of one opener - "One technique travels with this film", "One
+ * inheritance teaches a way of watching", "One transferable technique", "One
+ * thing worth carrying elsewhere". Version 17 makes the paragraph conditional
+ * on a document naming something specific AND it teaching a way of watching,
+ * and it fires anyway, half the time, ending the article by setting the reader
+ * an exercise.
+ *
+ * DELETING IT OUTRIGHT WOULD COST SOMETHING REAL. The Zone of Interest closing
+ * carries the Haneke comparison and the Resnais lineage, which is the best
+ * material in that answer. It is the dedicated paragraph and its formulaic
+ * opener that are the fault, not the content - so the content moves into the
+ * one reception paragraph as a sentence, and the shape is named rather than the
+ * phrasing, because 19 of 42 is a habit with thirteen wordings and naming one
+ * of them would move it to the fourteenth.
+ */
+const RECEPTION_QUESTION_MOVIE = "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the film itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for - a sentence per critic is the list an aggregator prints, not a paragraph. One sentence may give a reading of what the film means, where a critic's reading shaped how it is watched, and ordinary viewers get one sentence at most. Where a document names something specific this film passed on, say it in a sentence inside that same paragraph - it never gets a closing paragraph of its own, and never opens by telling a reader what it will teach them. A remake, a sequel and a cast list are never that. No scores of any kind and no verdict of your own."
 
-const RECEPTION_QUESTION_SERIES = "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the series itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for - a sentence per critic is the list an aggregator prints, not a paragraph. One sentence may give a reading of what it means, where a critic's reading shaped how it is watched, and ordinary viewers get one sentence at most. Add a second paragraph only where a document names something specific it passed on AND knowing it teaches a way of watching - a technique a viewer can recognise elsewhere. A remake, a spin-off and a cast list are never that. No scores of any kind and no verdict of your own."
+const RECEPTION_QUESTION_SERIES = "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the series itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for - a sentence per critic is the list an aggregator prints, not a paragraph. One sentence may give a reading of what it means, where a critic's reading shaped how it is watched, and ordinary viewers get one sentence at most. Where a document names something specific it passed on, say it in a sentence inside that same paragraph - it never gets a closing paragraph of its own, and never opens by telling a reader what it will teach them. A remake, a spin-off and a cast list are never that. No scores of any kind and no verdict of your own."
 
 /**
  * Series get one extra question: a show's identity is often in how it is built
@@ -550,7 +684,28 @@ const GROUNDED_RULE =
  */
 const EARNS_ITS_PLACE_RULE = "You are writing for somebody who has NOT seen this and is deciding whether to, and what to look for when they do. Every fact has to earn its place by changing how they watch: ask what a viewer does differently for knowing it, say that in the same sentence, and cut the fact where you cannot. This is not the line between criticism and history - a literary source that tells a viewer how to hear the title belongs, and so does a cinematographer's earlier work when it says the strangeness on screen was chosen. THESE NEVER EARN IT, in any answer: a process, camera, lens or film-stock name, a song title, a date, a certificate, an award, a box office or budget figure, money, rights, a schedule, a job list, a crew count, a filming location, a remake's cast."
 
-const SPOILER_RULE = "Describe how it works, never what happens in it. No endings, no reveals, nothing about what a character, creature or image turns out to be, and nothing about which character gets out. Someone who has not seen it must be able to read this safely."
+/**
+ * A VERDICT ON THE ENDING IS REPORTABLE; A DESCRIPTION OF IT IS NOT.
+ *
+ * Draft 18's first Suspiria bench closed its reception answer on "a conclusion
+ * that snaps shut abruptly after all that buildup" - which discloses no
+ * outcome and does disclose how the ending behaves, against a rule whose words
+ * are "No endings". A definite breach, and found by a reader rather than by any
+ * column.
+ *
+ * Patched by NARROWING the rule in the same change, because the strict reading
+ * costs something real: a sudden ending is the commonest complaint about this
+ * film, reception exists so "a viewer can calibrate what they are in for", and
+ * a rule that forbids reporting the main criticism of a work has stopped being
+ * a spoiler rule. The line is mechanical for the same reason every other
+ * ending test here is - how it LANDS is somebody's judgement, how it BEHAVES is
+ * part of the thing itself.
+ *
+ * No example of the banned phrasing is quoted, deliberately: draft 18 is the
+ * version that found a ban which prints its target supplies the target (19 of
+ * 42 rows carried version 17's quoted opener, 11 outside the opening).
+ */
+const SPOILER_RULE = "Describe how it works, never what happens in it. No endings, no reveals, nothing about what a character, creature or image turns out to be, and nothing about which character gets out. A critic's verdict on the ending may be reported - that it satisfied them or disappointed them - and nothing else about the ending may: not what it resolves, and not its pace, its length or its shape. How it lands is a judgement; how it behaves is the ending itself. Someone who has not seen it must be able to read this safely."
 
 /**
  * Every number here is a MAXIMUM, and the sentence cap names what it loses to.
@@ -568,15 +723,15 @@ const SPOILER_RULE = "Describe how it works, never what happens in it. No ending
  * than shortens, and ./response.ts rejects a truncated answer and throws rather
  * than storing, so lowering it buys failed titles.
  */
-const LENGTH_RULE = "Write at most eight paragraphs, separated by blank lines, and at most 650 words in all. There is no minimum - thin documents should produce a short piece, and padding to reach a length is worse than stopping early. Spend at most two paragraphs on what kind of film it is, at most four on what to watch and listen for, one on what to know going in, and one on how it has been taken, last. Every paragraph is three or four sentences and never five, and runs to about a hundred words - one half as long again is carrying too much and needs splitting."
+const LENGTH_RULE = "Write eight paragraphs at most, separated by blank lines, and around 600 words in all. A WORD COUNT A LITTLE OVER IS FINE; an extra paragraph is not, and padding to reach a length is not either, so thin documents should produce a short piece and stopping early is always right. THE WORD COUNT IS LOOSE AND THE SHAPE IS NOT: at most two paragraphs on what kind of film it is, at most four on what to watch and listen for, one on what to know going in, and one on how it has been taken, last. Answer each of those once, in paragraphs that sit next to each other, and then leave it - a question picked up again later is the same point made twice. Keep paragraphs short - three or four sentences - so one point can be followed to its end before the next begins."
 
 const ORDER_RULE = "Answer the questions in the order given, each in one unbroken run of paragraphs. Say each fact once, under the question it belongs to. Leave out a question the documents cannot answer, and if none of them can be answered, say so in two sentences and stop."
 
-const OWN_WORDS_RULE = "Write every sentence in your own words. Never copy a phrase out of a document: anything reading like a crew note, a caption or a list of items has to be turned into English first. Say what a choice does, not what it avoids, so no \"rather than\" and no \"not X but Y\". No semicolons. Plain prose only - no headings, no bullet points, no numbered lists, no bold."
+const OWN_WORDS_RULE = "Write every sentence in your own words. Never copy a phrase out of a document: anything reading like a crew note, a caption or a list of items has to be turned into English first. Say what a choice does, not what it avoids. Plain prose only - no headings, no bullet points, no numbered lists, no bold."
 
 const OPENING_RULE = "Open each answer with a fact about the work, never by announcing what the answer covers - not \"The film sits in\", not \"Critics disagree about\"."
 
-const NAMING_RULE = "Name the person who made the choice you are describing - the director, the writer, the cinematographer - never \"the creative team\". Name a person for what they chose, never to record what their job was, and never with the job in front of the name: \"Cinematographer Tovoli lit\" is the credit again, where \"Tovoli lit\" is the choice."
+const NAMING_RULE = "Name the people who MADE it, and name them for the choice you are describing - the director, the writer, the cinematographer, the editor, the composer, the actors - never \"the creative team\". Never name a person to record what their job was, and never with the job in front of the name: \"Cinematographer Tovoli lit\" is the credit again, where \"Tovoli lit\" is the choice."
 
 /**
  * WHO OWNS A CLAIM, and version 16 dropped the naming ban that had been in
@@ -602,7 +757,7 @@ const NAMING_RULE = "Name the person who made the choice you are describing - th
  * the publication RogerEbert.com and bylined Peter Sobczynski. ./proseSignals.ts
  * reads document bylines now, so that shape is at least counted.
  */
-const ATTRIBUTION_RULE = "The first answers speak in your own voice: state facts, what is on screen and what it does to a viewer plainly, with nobody attached, even where a critic is who you read it from. What belongs to somebody else is a judgement of QUALITY or a claim about what the film MEANS, and both go to the reception answer with a person behind them - a named critic, or \"a critic\", \"a scholar\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\", and never hidden inside \"is regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". You may name a critic or the publication that ran them, and the name must be the one printed beside that very claim in the document you took it from - where a document does not make that plain, write \"a critic\". A SITE IS NOT ITS WRITER, even where it is named after one: a piece with no byline in front of you is by \"a critic\", whatever the site is called. \"Critics\" means more than one, and two remarks by one critic are one critic."
+const ATTRIBUTION_RULE = "The first answers speak in your own voice: state facts, what is on screen and what it does to a viewer plainly, with nobody attached, even where a critic is who you read it from. What belongs to somebody else is a judgement of QUALITY or a claim about what the film MEANS, and both go to the reception answer with a holder - \"a critic\", \"critics\", \"a scholar\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\", and never hidden inside \"is regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". DO NOT NAME THE PEOPLE WHO WROTE ABOUT IT, and do not name the publications they wrote for: a byline the reader would have to be told about tells them nothing, and \"a critic\" carries the same weight in fewer words. There is no exception, however well known the name. A SITE IS NOT ITS WRITER: a site named after a critic is a publication like any other, and a piece published on it is by \"a critic\" whoever the site is named after. Names belong to the people who MADE something - this film, or an earlier film you are naming. \"Critics\" means more than one, and two remarks by one critic are one critic."
 
 /**
  * Weighing a document by WHO IS SPEAKING IN IT, not by the kind of page.
@@ -749,244 +904,9 @@ const CURRENT_EDITION: PromptEdition = {
  * `: PromptEdition | null = null` narrows to null at the use site, and
  * DRAFT_EDITION?.version is then an access on never that tsc refuses.
  */
-/**
- * Version 18's texts: THE NAMES ARE NOISE.
- *
- * MEASURED ON 42 LIVE ROWS, not on a bench. `altworld_hemmingway-1` in two
- * quantizations, every one written under version 17, read with the bench's own
- * instrument:
- *
- *  - The reception answers carry **83 distinct capitalised names** across 42
- *    articles, and **26 of 42** attach a name to a verb of opinion. Almost
- *    every one is a singleton: Adrian Martin, Kenneth Turan, Mick LaSalle,
- *    Jourdain Searles, Owen Gleiberman, Leah Greenblatt, James Berardinelli,
- *    Monica Castillo, each appearing ONCE in the whole corpus. One Mass
- *    paragraph names three critics in three consecutive sentences.
- *  - Roger Ebert appears six times and is the only name that recurs.
- *
- * A NAME THAT APPEARS ONCE IN FORTY-TWO ARTICLES IS NOISE. The reader is
- * someone choosing a film, not a reader of criticism, and a byline they would
- * have to be told about carries nothing that "a critic" does not. Version 16
- * dropped the naming ban on the argument that naming the critic is what
- * criticism normally does; that is true of criticism and not of this, and the
- * operator's call reverses it on evidence version 16 did not have.
- *
- * THE BAN IS NARROW THIS TIME, WHICH IS WHY IT IS NOT VERSION 13's. That one
- * forbade every name and failed on every model, because it fought the
- * legitimate uses: the same 42 rows carry 297 distinct names OUTSIDE reception
- * and they are makers and films - Polanski's Repulsion, Altman's Images, the
- * Catalan crew on The Teacher Who Promised the Sea. Those are wanted. The line
- * is not "no names", it is WHO MADE IT AGAINST WHO WROTE ABOUT IT, which is a
- * distinction the writer always knows and the old ban never drew.
- *
- * THE BAN HAD ONE EXCEPTION - ROGER EBERT - AND THE FIRST BENCH OF THIS DRAFT
- * SHOWED THE EXCEPTION MANUFACTURING A FALSE ATTRIBUTION. Suspiria, same
- * documents, 17 against 18. Version 17, with naming permitted, named two
- * critics and got BOTH right: Janet Maslin and Gary Arnold, each matching the
- * byline Metacritic prints beside the blurb quoted. Version 18 named three and
- * invented one - "Roger Ebert read it as an adult fairy tale whose dream logic
- * holds together better than its plot does", where the reading is real, the
- * document is real, and the document is by PETER SOBCZYNSKI. Metacritic
- * carried that byline in the same retrieval, so the model had the right answer
- * in front of it and overrode it with the one name the rule had blessed.
- *
- * So the exception is gone and A SITE IS NOT ITS WRITER is back. Both were my
- * errors, and they are the same error twice: the clause was deleted here as
- * "moot once names go", which it would have been had any name gone. One
- * permitted name is a licence, and the licence landed on the site the
- * retrieval was full of. Version 13's blanket ban failed on every model, but
- * it never fabricated - and an accuracy requirement cannot police a name the
- * rule itself supplied. A rule with one exception is enforced at the
- * exception.
- *
- * THE SAME BENCH FOUND THE SHAPE REGRESSING, and the cause is mine as well.
- * Softening the per-question allocation from "at most four" to "up to four"
- * alongside every length figure went further than the operator asked: the
- * TOTAL was what should drift, and the allocation came with it. Measured on
- * that pair: work 218 -> 364 words, `told twice` 1 -> 3, `split` 0 -> 1,
- * sections running tradition work work work work+circ work circumstances
- * reception. So LENGTH stays loose and SHAPE goes back to maximums, with the
- * adjacency constraint stated outright - the three consumers that read the
- * paragraph map need a question's answer to be one findable run (F-124's rule
- * 3), and nothing in the length rule had ever said so.
- *
- * WHAT 18 WON ON THAT BENCH, and keeps unchanged: the closing influence
- * paragraph is gone, and its material survived inside the tradition answer
- * ("the three-mother mythology Argento later spun into two follow-up films").
- * That is the change the 42 rows asked for and it worked first time.
- *
- * THE OTHER FOUR CHANGES follow the one principle the 42 rows establish:
- * ceilings are obeyed and flat bans are not. Compliance measured per rule -
- * paragraph count 98%, paragraph words 67%, word total 62%, sentence cap 55%,
- * and then "no semicolons" at 2% and "no rather than" at 0%.
- *
- *  - LENGTH IS RELAXED ON THE OPERATOR'S CALL, not tightened. 38% of rows ran
- *    over 650 words and the prose was not worse for it; a number nobody wants
- *    enforced should not be written as a maximum. Every figure is "about" now.
- *  - THE TWO STYLE BANS GO. One row in 42 obeyed the semicolon ban and none
- *    obeyed "rather than". They are house style, they cost a bench round every
- *    version, and a reader does not see them. The guidance they sat on - say
- *    what a choice does, not what it avoids - stays as guidance.
- *  - THE TRADITION QUESTION STOPS QUOTING ITS OWN TARGET. Version 17 forbade
- *    "a viewer sits down to" by printing it, and 19 of 42 rows carry the exact
- *    string - 11 of them somewhere other than the opening. The ban relocated
- *    the phrase into the body rather than removing it, so the instruction now
- *    names the SHAPE (an imagined person watching) and prints no example.
- *  - THE MAKERS WHO MAY BE NAMED ARE LISTED, since the rule named three and the
- *    operator wants the editor, the composer and the cast as well.
- *
- * NOT CHANGED, deliberately: the question ids; the spoiler discipline; the
- * source weighting; version 17's own mechanical test for who is speaking,
- * which is what the making answer turns on; and the no-invention rule, which
- * is not what "fine to drift on fact-checking" asked to loosen - it asked for
- * no NEW accuracy machinery, and this version adds none.
- */
-const DRAFT_ATTRIBUTION_RULE_18 =
-  "The first answers speak in your own voice: state facts, what is on screen and what it does to a viewer plainly, with nobody attached, even where a critic is who you read it from. What belongs to somebody else is a judgement of QUALITY or a claim about what the film MEANS, and both go to the reception answer with a holder - \"a critic\", \"critics\", \"a scholar\", \"some viewers\" - never \"a reading\", \"an account\" or \"the press\", and never hidden inside \"is regarded as\", \"is described as\", \"has been called\", \"is said to\" or \"reportedly\". DO NOT NAME THE PEOPLE WHO WROTE ABOUT IT, and do not name the publications they wrote for: a byline the reader would have to be told about tells them nothing, and \"a critic\" carries the same weight in fewer words. There is no exception, however well known the name. A SITE IS NOT ITS WRITER: a site named after a critic is a publication like any other, and a piece published on it is by \"a critic\" whoever the site is named after. Names belong to the people who MADE something - this film, or an earlier film you are naming. \"Critics\" means more than one, and two remarks by one critic are one critic."
 
-/**
- * A VERDICT ON THE ENDING IS REPORTABLE; A DESCRIPTION OF IT IS NOT.
- *
- * Draft 18's first Suspiria bench closed its reception answer on "a conclusion
- * that snaps shut abruptly after all that buildup" - which discloses no
- * outcome and does disclose how the ending behaves, against a rule whose words
- * are "No endings". A definite breach, and found by a reader rather than by any
- * column.
- *
- * Patched by NARROWING the rule in the same change, because the strict reading
- * costs something real: a sudden ending is the commonest complaint about this
- * film, reception exists so "a viewer can calibrate what they are in for", and
- * a rule that forbids reporting the main criticism of a work has stopped being
- * a spoiler rule. The line is mechanical for the same reason every other
- * ending test here is - how it LANDS is somebody's judgement, how it BEHAVES is
- * part of the thing itself.
- *
- * No example of the banned phrasing is quoted, deliberately: draft 18 is the
- * version that found a ban which prints its target supplies the target (19 of
- * 42 rows carried version 17's quoted opener, 11 outside the opening).
- */
-const DRAFT_SPOILER_RULE_18 =
-  "Describe how it works, never what happens in it. No endings, no reveals, nothing about what a character, creature or image turns out to be, and nothing about which character gets out. A critic's verdict on the ending may be reported - that it satisfied them or disappointed them - and nothing else about the ending may: not what it resolves, and not its pace, its length or its shape. How it lands is a judgement; how it behaves is the ending itself. Someone who has not seen it must be able to read this safely."
 
-/**
- * A REMARK BELONGS TO WHOEVER WAS ASKED, AND TO NOBODY ELSE ON THE PAGE.
- *
- * Version 16 found an actress's description of the director printed as the
- * director on himself, and version 17's mechanical test - find the sentence in
- * which the maker is the one speaking - was written for it and is why 17 was
- * promoted. Draft 18's first bench broke the same rule by a DIFFERENT ROUTE:
- * Jessica Harper's answer about first reading the screenplay ("The screenplay
- * provided a loose structure") came out as "Nicolodi described the screenplay
- * as only a loose structure" - the co-writer, who is named earlier in the same
- * article and in two other documents, and who did not say it.
- *
- * Verified rather than assumed: "loose structure" appears on the rogerebert.com
- * page and on none of the other documents reachable from the run, and there it
- * sits inside an interview the piece introduces as being with Harper. Version
- * 17, on the identical eight documents, attributed it to Harper correctly.
- *
- * So the clause is widened rather than restated. Its example was
- * ONE-DIRECTIONAL - it warns that the actor's remark is not the director's -
- * and the failure went sideways instead, to a third maker the article names
- * nearby. Two instances of one class on one page shape is a shape.
- */
-const DRAFT_CIRCUMSTANCES_MOVIE_18 =
-  "What should a viewer know before they start? Two things belong here. First, what a maker SAID they were trying to do. Before writing that somebody said something, find the sentence in which they are the one speaking: a sentence about what they did, wanted, decided or set out to do is the page describing them, and so is a list of what an interview covered. WHO IS ASKED IS WHO SPEAKS - one page can carry an essay about the director and an interview with an actor, and what the actor says about the director is the actor's remark, never the director on themselves. IT IS NOBODY ELSE'S EITHER: a remark belongs to the person who was asked, not to whichever maker the article happens to name nearest it, so check the name against the question it answers before you attach it. Second, a condition of the making or the first release that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the form it was first shown in, who was allowed to see it. How it was received, and what anyone did afterwards, belong elsewhere."
-
-const DRAFT_CIRCUMSTANCES_SERIES_18 =
-  "What should a viewer know before they start? Two things belong here. First, what a maker SAID they were trying to do. Before writing that somebody said something, find the sentence in which they are the one speaking: a sentence about what they did, wanted, decided or set out to do is the page describing them, and so is a list of what an interview covered. WHO IS ASKED IS WHO SPEAKS - one page can carry an essay about the creator and an interview with an actor, and what the actor says about the creator is the actor's remark, never the creator on themselves. IT IS NOBODY ELSE'S EITHER: a remark belongs to the person who was asked, not to whichever maker the article happens to name nearest it, so check the name against the question it answers before you attach it. Second, a condition of the making or the first broadcast that a viewer would FEEL while watching, or that explains something they would otherwise take for a fault - how the sound was got, a cut somebody required, the slot or the form it first went out in, who was allowed to see it. How it was received, and what anyone did afterwards, belong elsewhere."
-
-const DRAFT_NAMING_RULE_18 =
-  "Name the people who MADE it, and name them for the choice you are describing - the director, the writer, the cinematographer, the editor, the composer, the actors - never \"the creative team\". Never name a person to record what their job was, and never with the job in front of the name: \"Cinematographer Tovoli lit\" is the credit again, where \"Tovoli lit\" is the choice."
-
-const DRAFT_LENGTH_RULE_18 =
-  "Write eight paragraphs at most, separated by blank lines, and around 600 words in all. A WORD COUNT A LITTLE OVER IS FINE; an extra paragraph is not, and padding to reach a length is not either, so thin documents should produce a short piece and stopping early is always right. THE WORD COUNT IS LOOSE AND THE SHAPE IS NOT: at most two paragraphs on what kind of film it is, at most four on what to watch and listen for, one on what to know going in, and one on how it has been taken, last. Answer each of those once, in paragraphs that sit next to each other, and then leave it - a question picked up again later is the same point made twice. Keep paragraphs short - three or four sentences - so one point can be followed to its end before the next begins."
-
-const DRAFT_OWN_WORDS_RULE_18 =
-  "Write every sentence in your own words. Never copy a phrase out of a document: anything reading like a crew note, a caption or a list of items has to be turned into English first. Say what a choice does, not what it avoids. Plain prose only - no headings, no bullet points, no numbered lists, no bold."
-
-/**
- * Reception keeps the influence MATERIAL and loses the paragraph it had to
- * itself.
- *
- * Measured on the 42 live rows: **19 of 42 close with it**, in thirteen
- * paraphrases of one opener - "One technique travels with this film", "One
- * inheritance teaches a way of watching", "One transferable technique", "One
- * thing worth carrying elsewhere". Version 17 makes the paragraph conditional
- * on a document naming something specific AND it teaching a way of watching,
- * and it fires anyway, half the time, ending the article by setting the reader
- * an exercise.
- *
- * DELETING IT OUTRIGHT WOULD COST SOMETHING REAL. The Zone of Interest closing
- * carries the Haneke comparison and the Resnais lineage, which is the best
- * material in that answer. It is the dedicated paragraph and its formulaic
- * opener that are the fault, not the content - so the content moves into the
- * one reception paragraph as a sentence, and the shape is named rather than the
- * phrasing, because 19 of 42 is a habit with thirteen wordings and naming one
- * of them would move it to the fourteenth.
- */
-const DRAFT_RECEPTION_MOVIE_18 =
-  "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the film itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for - a sentence per critic is the list an aggregator prints, not a paragraph. One sentence may give a reading of what the film means, where a critic's reading shaped how it is watched, and ordinary viewers get one sentence at most. Where a document names something specific this film passed on, say it in a sentence inside that same paragraph - it never gets a closing paragraph of its own, and never opens by telling a reader what it will teach them. A remake, a sequel and a cast list are never that. No scores of any kind and no verdict of your own."
-
-const DRAFT_RECEPTION_SERIES_18 =
-  "How has it been taken, and who is it for? One paragraph, and never longer than what you wrote about the series itself. Say what critics valued and what they faulted, everyone making the same point in one sentence, so a viewer can calibrate what they are in for - a sentence per critic is the list an aggregator prints, not a paragraph. One sentence may give a reading of what it means, where a critic's reading shaped how it is watched, and ordinary viewers get one sentence at most. Where a document names something specific it passed on, say it in a sentence inside that same paragraph - it never gets a closing paragraph of its own, and never opens by telling a reader what it will teach them. A remake, a spin-off and a cast list are never that. No scores of any kind and no verdict of your own."
-
-const DRAFT_TRADITION_MOVIE_18 =
-  "What kind of film is this, and what is it in conversation with? Say what its mode and its register are first, so a viewer knows what to bring to it, and open on the film itself rather than on an imagined person sitting down to watch it. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier film a maker took from, a collaborator's earlier work this one departs from. EACH HAS TO EARN ITS PLACE IN THE SENTENCE THAT NAMES IT - a name with nothing attached is a credit. Do not open on who directed, wrote or starred in it, and never copy a listing page's genre labels or mood tags. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
-
-const DRAFT_TRADITION_SERIES_18 =
-  "What kind of series is this, and what is it in conversation with? Say what its mode and its register are first, so a viewer knows what to bring to it, and open on the series itself rather than on an imagined person sitting down to watch it. Then name what it draws on: a source it adapts, a tradition a document places it in, an earlier work a maker took from, a collaborator's earlier work this one departs from. EACH HAS TO EARN ITS PLACE IN THE SENTENCE THAT NAMES IT - a name with nothing attached is a credit. Do not open on who created, wrote or starred in it, and never copy a listing page's genre labels or mood tags. Naming an earlier work is safe only when knowing how that one ends tells a viewer nothing about how this one ends."
-
-/** Questions with named texts replaced, so the rest cannot drift from the base. */
-const draftQuestions = (
-  questions: readonly { id: AnalysisQuestionId; text: string }[],
-  replacements: Partial<Record<AnalysisQuestionId, string>>
-): { id: AnalysisQuestionId; text: string }[] =>
-  questions.map((question) => ({ ...question, text: replacements[question.id] ?? question.text }))
-
-/**
- * Rules with named texts replaced, matched on the base's exact wording.
- *
- * THROWS WHEN A REPLACEMENT NO LONGER MATCHES: a silent miss would ship a draft
- * that quietly IS its base, and a bench would then credit a change nobody made.
- * prompt.test.ts builds the draft, so the throw lands in CI.
- */
-const draftRules = (
-  rules: readonly string[],
-  replacements: readonly (readonly [string, string])[]
-): string[] => {
-  const next = [...rules]
-  for (const [from, to] of replacements) {
-    const at = next.indexOf(from)
-    if (at < 0) {
-      throw new Error('Draft rule replacement no longer matches its base: ' + from.slice(0, 60))
-    }
-    next[at] = to
-  }
-  return next
-}
-
-const DRAFT_EDITION: PromptEdition | null = {
-  version: ANALYSIS_PROMPT_VERSION + 1,
-  movieQuestions: draftQuestions(CURRENT_EDITION.movieQuestions, {
-    tradition: DRAFT_TRADITION_MOVIE_18,
-    reception: DRAFT_RECEPTION_MOVIE_18,
-    circumstances: DRAFT_CIRCUMSTANCES_MOVIE_18,
-  }),
-  seriesQuestions: draftQuestions(CURRENT_EDITION.seriesQuestions, {
-    tradition: DRAFT_TRADITION_SERIES_18,
-    reception: DRAFT_RECEPTION_SERIES_18,
-    circumstances: DRAFT_CIRCUMSTANCES_SERIES_18,
-  }),
-  // Swapped by identity against the named constant, never by index.
-  rules: draftRules(CURRENT_EDITION.rules, [
-    [LENGTH_RULE, DRAFT_LENGTH_RULE_18],
-    [OWN_WORDS_RULE, DRAFT_OWN_WORDS_RULE_18],
-    [NAMING_RULE, DRAFT_NAMING_RULE_18],
-    [ATTRIBUTION_RULE, DRAFT_ATTRIBUTION_RULE_18],
-    [SPOILER_RULE, DRAFT_SPOILER_RULE_18],
-  ]),
-}
+const DRAFT_EDITION = null as PromptEdition | null
 
 /** The draft's version number, or null when there is no draft. */
 export const DRAFT_PROMPT_VERSION: number | null = DRAFT_EDITION?.version ?? null

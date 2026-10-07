@@ -703,7 +703,12 @@ test('version 16 aims every question at a viewer who has not seen the film', () 
 })
 
 /**
- * VERSION 17, the current edition: WHO SAID IT.
+ * VERSION 17, ARCHIVED: WHO SAID IT.
+ *
+ * REPOINTED AT ITS OWN NUMBER when 18 was promoted, which is step 4 of the
+ * procedure on DRAFT_EDITION: read against `editionFor(ANALYSIS_PROMPT_VERSION)`
+ * this failed honestly the moment 18 landed, and the archive is now what it
+ * guards - an archived edition may never be edited, so this is the freeze.
  *
  * `altworld_hemmingway-1` produced a maker attribution error in BOTH of its
  * Suspiria answers under version 16 - once turning an actress's description of
@@ -721,12 +726,12 @@ test('version 16 aims every question at a viewer who has not seen the film', () 
  * argued to be.
  */
 test('version 17 decides who is speaking before it reports a maker', () => {
-  const current = editionFor(ANALYSIS_PROMPT_VERSION)
+  const current = editionFor(17)
   const previous = editionFor(16)
   const rulesText = current.rules.join('\n')
   const question = (id: string) => current.movieQuestions.find((q) => q.id === id)!.text
 
-  assert.equal(ANALYSIS_PROMPT_VERSION, 17)
+  assert.ok(ANALYSIS_PROMPT_VERSION >= 17, '17 is current or archived, never missing')
   // This asserted `DRAFT_PROMPT_VERSION === null` while 17 was the newest
   // thing in the build, which was true at its promotion and is a fact about
   // THAT MOMENT rather than about version 17. Drafting 18 made it fail
@@ -799,7 +804,7 @@ test('version 17 decides who is speaking before it reports a maker', () => {
 })
 
 /**
- * DRAFT 18: THE NAMES ARE NOISE.
+ * VERSION 18, THE CURRENT EDITION: THE NAMES ARE NOISE.
  *
  * The first version drafted from LIVE ROWS rather than from a bench. 42
  * articles written under version 17 carry 83 distinct names in their reception
@@ -812,18 +817,27 @@ test('version 17 decides who is speaking before it reports a maker', () => {
  * the people who wrote about it do not. The same 42 rows carry 297 distinct
  * names outside reception and they are makers and films.
  *
- * The replacement helper throws when a base text moves, so merely building the
- * draft - which importing this module does - is half the test.
+ * PROMOTED, AND THIS TEST CAME WITH IT. While 18 was a draft the body opened
+ * with `if (DRAFT_PROMPT_VERSION == null) return`, which is a test that goes
+ * GREEN WHILE ASSERTING NOTHING the moment the draft is nulled - the exact
+ * failure the procedure on DRAFT_EDITION names as step 4, and the one the
+ * version-17 test shipped with until it was caught. It reads the edition by
+ * NUMBER now, so nulling a future draft cannot silence it.
  */
-test('draft 18 names the makers and stops naming the critics', () => {
-  if (DRAFT_PROMPT_VERSION == null) return
-  const draft = editionFor(DRAFT_PROMPT_VERSION)
-  const current = editionFor(ANALYSIS_PROMPT_VERSION)
+test('version 18 names the makers and stops naming the critics', () => {
+  const draft = editionFor(18)
+  // THE EDITION 18 REPLACED, NAMED BY NUMBER. This read
+  // `editionFor(ANALYSIS_PROMPT_VERSION)` while 18 was the draft, and leaving
+  // it there through the promotion would compare 18 against itself - so every
+  // assertion below about what changed would pass on any two identical
+  // editions, including a promotion that moved nothing at all.
+  const current = editionFor(17)
   const rulesText = draft.rules.join('\n')
   const currentRules = current.rules.join('\n')
   const question = (id: string) => draft.movieQuestions.find((q) => q.id === id)!.text
 
-  assert.equal(DRAFT_PROMPT_VERSION, ANALYSIS_PROMPT_VERSION + 1)
+  assert.equal(ANALYSIS_PROMPT_VERSION, 18, '18 is the current edition')
+  assert.equal(DRAFT_PROMPT_VERSION, null, 'and there is no draft above it')
 
   // The ids are untouched, or parseParagraphMap discards every label and the
   // panel loses its headings in fifteen locales.

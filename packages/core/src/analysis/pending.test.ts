@@ -130,8 +130,8 @@ test('the JS staleness check agrees with the SQL predicate above it', () => {
  * cost, with every row looking correct in isolation.
  *
  * At or below it, a bump is free unless somebody decides otherwise, which is
- * the whole point. 17 == 17 today, because version 18 changes naming and length
- * and leaves every stored article perfectly readable.
+ * the whole point. The floor is 17 against a current 18, because version 18
+ * changes naming and length and leaves every stored article perfectly readable.
  */
 test('the staleness floor never rises above the prompt that writes', () => {
   assert.ok(
@@ -143,4 +143,24 @@ test('the staleness floor never rises above the prompt that writes', () => {
   // that fails if somebody moves the floor and the version together out of
   // habit, which is the mistake the two constants exist to make visible.
   assert.equal(isAnalysisStale(ANALYSIS_PROMPT_VERSION), false)
+})
+
+/**
+ * VERSION 18 WENT LIVE AND THE STORED VERSION-17 LIBRARY STAYED, by decision.
+ *
+ * Pinned on the literal numbers, not relative to the constants, because the
+ * relative tests above pass for ANY pair - including a floor moved to 18, which
+ * is what retires 42 stored articles, re-queues the whole library ahead of
+ * titles never analysed, and clears every stored DECLINE. That is a decision
+ * somebody has to take deliberately, and taking it should break this test and
+ * make them say why.
+ *
+ * Version 18 stops naming critics and loosens length. A version-17 article that
+ * names Janet Maslin is still a perfectly good article.
+ */
+test('promoting 18 did not retire the version-17 library', () => {
+  assert.equal(ANALYSIS_PROMPT_VERSION, 18, 'version 18 is what writes now')
+  assert.equal(ANALYSIS_STALE_BELOW, 17, 'and 17 is still worth keeping')
+  assert.equal(isAnalysisStale(17), false, 'so the batch job leaves a v17 row alone')
+  assert.equal(isAnalysisStale(16), true, 'while 16 and below stay stale')
 })
