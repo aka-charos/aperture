@@ -34,6 +34,7 @@ import {
   sanitizeTranslationConfig,
   setTranslationConfig,
   translateText,
+  TranslationError,
   type AppLocaleCode,
   type TranslationConfig,
 } from '@aperture/core'
@@ -135,13 +136,27 @@ function validate(body: UpdateBody): string | null {
   return null
 }
 
+/**
+ * The key a SAVE keeps. Omitted means "keep the stored key" — but only while
+ * the endpoint stays the same. Saved against a different endpoint, the old key
+ * would be sent to that server on every job call: an OpenRouter key handed to
+ * whatever now answers, which is the leak {@link storedKeyFor} exists to stop
+ * on Test and the model list. A changed endpoint therefore starts without one
+ * unless a key is typed with it.
+ */
+function keyToStore(current: TranslationConfig, body: UpdateBody, nextBaseUrl: string): string {
+  if (body.apiKey !== undefined) return body.apiKey
+  return storedKeyFor(current, nextBaseUrl)
+}
+
 function merge(current: TranslationConfig, body: UpdateBody): TranslationConfig {
+  const baseUrl = sanitizeTranslationConfig({ baseUrl: body.baseUrl ?? current.baseUrl }).baseUrl
   return sanitizeTranslationConfig({
     enabled: body.enabled ?? current.enabled,
     promptStyle: isTranslationPromptStyle(body.promptStyle) ? body.promptStyle : current.promptStyle,
-    baseUrl: body.baseUrl ?? current.baseUrl,
+    baseUrl,
     model: body.model ?? current.model,
-    apiKey: body.apiKey === undefined ? current.apiKey : body.apiKey,
+    apiKey: keyToStore(current, body, baseUrl),
     sourceLanguage: isValidAppLocale(body.sourceLanguage) ? body.sourceLanguage : current.sourceLanguage,
     targetLanguages:
       body.targetLanguages === undefined
@@ -239,19 +254,25 @@ export function registerSynopsisTranslationHandlers(fastify: FastifyInstance) {
             error: 'Pick a language other than the source language to test with.',
           })
         }
-        const result = await translateText(config, TRANSLATION_TEST_TEXT, language)
-        return reply.send({
-          success: true,
-          language,
-          source: TRANSLATION_TEST_TEXT,
-          text: result.text,
-          model: result.model,
-          latencyMs: result.latencyMs,
-        })
+        try {
+          const result = await translateText(config, TRANSLATION_TEST_TEXT, language)
+          return reply.send({
+            success: true,
+            language,
+            source: TRANSLATION_TEST_TEXT,
+            text: result.text,
+            model: result.model,
+            latencyMs: result.latencyMs,
+          })
+        } catch (err) {
+          // A failed translation is the answer to the question, not a server
+          // fault: 200 with the provider's words, the decision-model Test shape.
+          if (err instanceof TranslationError) return reply.send({ success: false, error: err.message })
+          throw err
+        }
       } catch (err) {
-        // A failed translation is the answer to the question, not a server
-        // fault: 200 with the provider's words, the decision-model Test shape.
-        return reply.send({ success: false, error: err instanceof Error ? err.message : String(err) })
+        fastify.log.error({ err }, 'Failed to test synopsis translation')
+        return reply.status(500).send({ success: false, error: 'Failed to run the translation test' })
       }
     }
   )

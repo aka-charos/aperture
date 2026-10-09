@@ -5,7 +5,12 @@
  *
  * 1. EVERY PAIR IS ATTEMPTED AT MOST ONCE PER RUN. A failure writes no row, so
  *    the pair stays pending; a loop reading until the selection empties would
- *    spin on it forever (the `enrichMetadata` `while (true)` lesson).
+ *    spin on it forever (the `enrichMetadata` `while (true)` lesson). Only a
+ *    pair LEFT pending is sent back to SQL as an exclusion — a stored pair
+ *    has already left the pending set, and an exclusion array of every pair
+ *    tried is a `<> ALL` over thousands of entries on every row of every batch
+ *    late in a large run. A JS set is the guarantee; the SQL list keeps the
+ *    selection from spending its LIMIT on rows the set would skip.
  * 2. CANCELLATION IS POLLED BETWEEN CALLS, and inside the pacing wait.
  * 3. THE CAP COUNTS ATTEMPTED PAIRS, not stored rows — a failure costs the
  *    same wall-clock time as a success.
@@ -178,7 +183,10 @@ export async function generateTitleTranslations(
   const cancelled = async () => (options.shouldCancel ? (await options.shouldCancel()) === true : false)
 
   for (const mediaType of mediaTypes) {
-    const attempted: string[] = []
+    // Every pair tried this run (the guarantee), and the subset still pending
+    // after its attempt (what SQL must skip).
+    const attempted = new Set<string>()
+    const leftPending: string[] = []
 
     while (result.processed < budget) {
       if (await cancelled()) {
@@ -190,32 +198,47 @@ export async function generateTitleTranslations(
         fields,
         targets,
         Math.min(SELECT_BATCH, budget - result.processed),
-        attempted
+        leftPending
       )
       if (pairs.length === 0) break
+      // A pair already tried can come back only if its translation went stale
+      // again mid-run (the source changed under the job). It is not translated
+      // twice: it joins the SQL exclusion and the batch is read again, which
+      // always progresses because the exclusion list only grows.
+      const fresh = pairs.filter((p) => !attempted.has(pairKey(p.mediaId, p.language)))
+      if (fresh.length < pairs.length) {
+        for (const p of pairs) {
+          const key = pairKey(p.mediaId, p.language)
+          if (attempted.has(key) && !leftPending.includes(key)) leftPending.push(key)
+        }
+        if (fresh.length === 0) continue
+      }
 
-      for (const pair of pairs) {
+      for (const pair of fresh) {
         if (result.processed >= budget) break
-        attempted.push(pairKey(pair.mediaId, pair.language))
+        const key = pairKey(pair.mediaId, pair.language)
+        attempted.add(key)
+        let calls = 0
+        let pairFailed = false
         const label = `${pair.year ? `${pair.title} (${pair.year})` : pair.title} → ${pair.language}`
         report(label)
         result.processed++
 
+        // Stopping before a pair's first call un-counts it; stopping between
+        // its two fields does not, since one field was already stored and the
+        // count is of pairs attempted.
+        const stop = () => {
+          if (calls === 0) result.processed--
+          result.cancelled = true
+          say('info', `🛑 Stopped during "${label}" — what was not translated stays pending`)
+          report()
+          return result
+        }
         for (const item of pair.work) {
-          if (await cancelled()) {
-            result.processed--
-            result.cancelled = true
-            say('info', `🛑 Stopped during "${label}" — it stays pending`)
-            report()
-            return result
-          }
+          if (await cancelled()) return stop()
           const paced = await waitForCallSlot(pacingKey, spacingMs, { shouldCancel: options.shouldCancel })
-          if (paced.cancelled) {
-            result.processed--
-            result.cancelled = true
-            report()
-            return result
-          }
+          if (paced.cancelled) return stop()
+          calls++
 
           try {
             const translation = await translateText(config, item.text, pair.language)
@@ -237,6 +260,7 @@ export async function generateTitleTranslations(
             )
           } catch (err) {
             result.failed++
+            pairFailed = true
             const reason = err instanceof Error ? err.message : String(err)
             logger.warn(
               { err, mediaType, mediaId: pair.mediaId, language: pair.language, field: item.field },
@@ -254,6 +278,7 @@ export async function generateTitleTranslations(
             }
           }
         }
+        if (pairFailed) leftPending.push(key)
         report()
       }
     }

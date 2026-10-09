@@ -442,7 +442,9 @@ export function SynopsisTranslationSection() {
               setApiKey(e.target.value)
               changed()
             }}
-            placeholder={described?.config.hasApiKey ? '••••••••' : ''}
+            // The server drops a stored key when the endpoint changes, so the
+            // dots only promise a key that a save would actually keep.
+            placeholder={described?.config.hasApiKey && baseUrl.trim() === described.config.baseUrl ? '••••••••' : ''}
             helperText={t('settingsSynopsisTranslation.apiKeyHelp')}
             slotProps={{
               input: {
@@ -543,7 +545,7 @@ export function SynopsisTranslationSection() {
                 changed()
               }}
             >
-              {Object.keys(labels).map((code) => (
+              {(Object.keys(labels).length > 0 ? Object.keys(labels) : [sourceLanguage]).map((code) => (
                 <MenuItem key={code} value={code}>
                   {label(code)}
                 </MenuItem>

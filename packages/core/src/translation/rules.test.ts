@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { APP_LOCALE_OPTIONS } from '../lib/locales.js'
 import {
   DEFAULT_TRANSLATION_CONFIG,
+  ECHO_CHECK_MIN_CHARS,
   INDEX_TRANSLATE_BASE_URL,
   buildChatCompletionBody,
   buildIndexTranslatePrompt,
@@ -92,9 +93,15 @@ test('a truncated answer is refused even though it has text', () => {
   assert.equal(r.ok, false)
 })
 
-test('an echo of the source is refused — it would be stored as the translation', () => {
-  const r = readCompletion(answer('  a HEIST   goes wrong. '), 'A heist goes wrong.')
+test('an echo of a sentence is refused — it would be stored as the translation', () => {
+  const source = 'A heist goes wrong and the crew scatters across Marseille.'
+  assert.ok(source.length >= ECHO_CHECK_MIN_CHARS)
+  const r = readCompletion(answer(`  ${source.toUpperCase()}   `), source)
   assert.equal(r.ok, false)
+})
+
+test('a short source that is the same in both languages is accepted, not retried forever', () => {
+  assert.deepEqual(readCompletion(answer('TBA'), 'TBA'), { ok: true, text: 'TBA' })
 })
 
 test('empty, missing and malformed answers are refused, never stored', () => {
@@ -122,6 +129,13 @@ test('any pasted form of the base URL reaches /v1/chat/completions exactly once'
     assert.equal(chatCompletionsUrl(pasted), want, pasted)
   }
   assert.equal(modelsUrl('http://host.docker.internal:1234'), 'http://host.docker.internal:1234/v1/models')
+  // A path that is not /vN is the root as given: appending /v1 would 404.
+  assert.equal(
+    chatCompletionsUrl('https://generativelanguage.googleapis.com/v1beta/openai/'),
+    'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
+  )
+  assert.equal(chatCompletionsUrl('https://api.z.ai/api/paas/v4'), 'https://api.z.ai/api/paas/v4/chat/completions')
+  assert.equal(chatCompletionsUrl('https://openrouter.ai/api/v1'), 'https://openrouter.ai/api/v1/chat/completions')
   assert.equal(chatCompletionsUrl('index-translate.bilibili.com'), null)
   assert.equal(chatCompletionsUrl(''), null)
 })

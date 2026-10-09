@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   currentTranslationsSql,
+  enabledLibrarySql,
   fieldPendingSql,
   pendingTranslationsFromSql,
   sourceColumnsSql,
@@ -36,7 +37,18 @@ test('a blank overview is no source at all', () => {
 })
 
 test('no field switched on is FALSE, not a syntax error', () => {
-  assert.match(pendingTranslationsFromSql('series', [], '$1'), /WHERE \(FALSE\)$/)
+  assert.match(pendingTranslationsFromSql('series', [], '$1'), /WHERE \(FALSE\)\s+AND /)
+})
+
+test('a title in a switched-off library is never pending (the embedding jobs\' rule)', () => {
+  for (const mediaType of ['movie', 'series'] as const) {
+    const sql = pendingTranslationsFromSql(mediaType, ['overview'], '$1')
+    assert.ok(sql.includes(enabledLibrarySql(mediaType)), mediaType)
+  }
+  assert.match(enabledLibrarySql('movie'), /NOT EXISTS \(SELECT 1 FROM library_config\)/)
+  assert.match(enabledLibrarySql('movie'), /lc\.is_enabled = true/)
+  // A movie library's row must not switch every show off.
+  assert.match(enabledLibrarySql('series'), /NOT EXISTS \(SELECT 1 FROM library_config WHERE collection_type = 'tvshows'\)/)
 })
 
 test('pending crosses every title with every language and scopes rows by media type', () => {

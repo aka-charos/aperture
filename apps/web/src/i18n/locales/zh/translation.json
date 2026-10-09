@@ -5850,7 +5850,7 @@
     "baseUrlLabel": "Endpoint base URL",
     "baseUrlHelp": "OpenAI-compatible root, for example https://index-translate.bilibili.com/v1 — /v1 is added if missing.",
     "apiKeyLabel": "API key (optional)",
-    "apiKeyHelp": "The free Index-Translate API needs none. Leave blank to keep the stored key.",
+    "apiKeyHelp": "The free Index-Translate API needs none. Leave blank to keep the stored key; saving a different endpoint drops it, so a key is never sent to a server it was not entered for.",
     "modelLabel": "Model",
     "modelHelp": "The model id as the endpoint names it. Press the refresh button to list what the endpoint offers.",
     "modelsUnreachable": "The endpoint did not list its models — type the id instead.",

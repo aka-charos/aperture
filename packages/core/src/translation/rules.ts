@@ -193,9 +193,13 @@ export function resolveTargetLanguages(
  *
  * Accepts the root, `<root>/v1`, or the full endpoint, because the README
  * gives `/v1` and an operator copying a curl line gives the whole path; a
- * doubled path 404s, which reads exactly like a server that is not there. A
- * root with no `/v1` gets one, since every server this targets (vLLM, LM
- * Studio, llama.cpp, the public endpoint) serves the OpenAI API under it.
+ * doubled path 404s, which reads exactly like a server that is not there.
+ *
+ * `/v1` is added ONLY to a bare host (`http://gpu-box:8000`), where every
+ * server this targets (vLLM, LM Studio, llama.cpp, the public endpoint) serves
+ * the OpenAI API. A URL that already carries a path is used as given: the
+ * OpenAI-compatible root is not always `/vN` — Google's is `…/v1beta/openai`,
+ * Z.AI's `…/api/paas/v4` — and appending to those builds a URL that 404s.
  * Returns null for anything that is not an http(s) URL.
  */
 export function chatCompletionsUrl(baseUrl: string): string | null {
@@ -212,9 +216,15 @@ export function modelsUrl(baseUrl: string): string | null {
 function apiRoot(baseUrl: string): string | null {
   const trimmed = baseUrl.trim()
   if (!/^https?:\/\/[^/\s]+/i.test(trimmed)) return null
-  let root = trimmed.replace(/\/+$/, '').replace(/\/chat\/completions$/i, '').replace(/\/models$/i, '')
-  if (!/\/v\d+$/i.test(root)) root = `${root}/v1`
-  return root
+  let parsed: URL
+  try {
+    parsed = new URL(trimmed)
+  } catch {
+    return null
+  }
+  const root = trimmed.replace(/\/+$/, '').replace(/\/chat\/completions$/i, '').replace(/\/models$/i, '')
+  const bareHost = parsed.pathname.replace(/\/+$/, '') === '' && !parsed.search
+  return bareHost ? `${root}/v1` : root
 }
 
 /**
@@ -394,9 +404,10 @@ export type CompletionReading =
  * Read one chat-completion response into a translation, or the reason it is
  * not one. A truncated answer is refused even when it has text — storing a
  * synopsis that stops mid-sentence would retire the title until its source
- * changes, the short-text lesson (F-137). An answer identical to the source is
- * refused too: a model that echoes its input has not translated anything, and
- * stored, that echo would be shown as the translation.
+ * changes, the short-text lesson (F-137). An answer identical to a
+ * sentence-length source is refused too: a model that echoes its input has not
+ * translated anything, and stored, that echo would be shown as the translation
+ * ({@link ECHO_CHECK_MIN_CHARS} for why a short source is exempt).
  */
 export function readCompletion(json: unknown, sourceText: string): CompletionReading {
   const choice = (json as { choices?: unknown[] } | null)?.choices?.[0] as
@@ -410,11 +421,19 @@ export function readCompletion(json: unknown, sourceText: string): CompletionRea
   }
   const text = stripThink(content)
   if (!text) return { ok: false, reason: 'The model returned an empty translation' }
-  if (normalizeForEcho(text) === normalizeForEcho(sourceText)) {
+  if (sourceText.trim().length >= ECHO_CHECK_MIN_CHARS && normalizeForEcho(text) === normalizeForEcho(sourceText)) {
     return { ok: false, reason: 'The model returned the source text unchanged' }
   }
   return { ok: true, text }
 }
+
+/**
+ * Below this, an answer identical to its source is accepted. A sentence that
+ * comes back unchanged was not translated; a one-word or very short overview
+ * ("TBA", a title, a name) can legitimately be the same in both languages, and
+ * refusing it would leave it pending and re-send it on every run, forever.
+ */
+export const ECHO_CHECK_MIN_CHARS = 40
 
 function normalizeForEcho(text: string): string {
   return text.trim().replace(/\s+/g, ' ').toLowerCase()

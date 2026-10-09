@@ -56,6 +56,21 @@ export function fieldPendingSql(
 }
 
 /**
+ * Titles in a library the operator switched off are not translated — the same
+ * rule the embedding jobs apply: once any library is configured, only enabled
+ * ones count; with none configured, everything does. Series look only at TV
+ * library rows, exactly as `recommender/series/embeddings.ts` does, so a movie
+ * library's row cannot switch every show off.
+ */
+export function enabledLibrarySql(mediaType: 'movie' | 'series', alias = 'm'): string {
+  const scope = mediaType === 'series' ? ` WHERE collection_type = 'tvshows'` : ''
+  return `(NOT EXISTS (SELECT 1 FROM library_config${scope})
+           OR EXISTS (SELECT 1 FROM library_config lc
+                       WHERE lc.provider_library_id = ${alias}.provider_library_id
+                         AND lc.is_enabled = true))`
+}
+
+/**
  * FROM/JOIN/WHERE for pending pairs: every title crossed with every target
  * language, kept where any switched-on field is pending. Shared by the count
  * and the selection so the progress bar describes the total the loop reaches.
@@ -76,7 +91,8 @@ export function pendingTranslationsFromSql(
   const picks = options.withPicks ? `\n    ${selectedPicksJoinSql(mediaType, 'm')}` : ''
   return `FROM ${MEDIA_TABLE[mediaType]} m
     CROSS JOIN unnest(${languagesParam}::text[]) AS lang(code)${picks}
-    WHERE (${predicate})`
+    WHERE (${predicate})
+      AND ${enabledLibrarySql(mediaType)}`
 }
 
 /**
