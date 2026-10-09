@@ -25,6 +25,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import NotesIcon from '@mui/icons-material/Notes'
+import TranslateIcon from '@mui/icons-material/Translate'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
 import VisibilityIcon from '@mui/icons-material/Visibility'
@@ -172,6 +173,20 @@ export function MediaHero({
   const hasLongerPlot = Boolean(
     media.plot_full && (!media.overview || media.plot_full.length > media.overview.length)
   )
+  // A machine translation of the synopsis into the language this page is shown
+  // in, when the server has one (core translation/). Shown by default, labelled
+  // as machine-translated, with the original one click away — a translation is
+  // a reading of the text, and the reader gets to check it. Each field falls
+  // back to the original on its own, and the caption only appears over text
+  // that actually is translated.
+  const localized = media.localized_synopsis ?? null
+  const [showOriginal, setShowOriginal] = useState(false)
+  const preferTranslated = !!localized && !showOriginal
+  const shownShort = preferTranslated && localized?.overview ? localized.overview : media.overview
+  const shownLong = preferTranslated && localized?.plot_full ? localized.plot_full : media.plot_full
+  const shownIsTranslated =
+    preferTranslated &&
+    (showFullPlot && media.plot_full ? !!localized?.plot_full : !!localized?.overview)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [marking, setMarking] = useState(false)
   const [markingWatched, setMarkingWatched] = useState(false)
@@ -993,18 +1008,39 @@ export function MediaHero({
           {(media.overview || media.plot_full) && (
             <Box sx={{ maxWidth: 600 }}>
               <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-                {showFullPlot && media.plot_full ? media.plot_full : media.overview}
+                {showFullPlot && media.plot_full ? shownLong : shownShort}
               </Typography>
-              {hasLongerPlot && (
-                <Button
-                  size="small"
-                  startIcon={showFullPlot ? <ExpandLessIcon /> : <NotesIcon />}
-                  onClick={() => setShowFullPlot((shown) => !shown)}
-                  sx={{ mt: 0.5, ml: -1, textTransform: 'none' }}
-                >
-                  {showFullPlot ? t('mediaDetail.hero.showShortPlot') : t('mediaDetail.hero.showFullPlot')}
-                </Button>
-              )}
+              <Box display="flex" alignItems="center" flexWrap="wrap" columnGap={1}>
+                {hasLongerPlot && (
+                  <Button
+                    size="small"
+                    startIcon={showFullPlot ? <ExpandLessIcon /> : <NotesIcon />}
+                    onClick={() => setShowFullPlot((shown) => !shown)}
+                    sx={{ mt: 0.5, ml: -1, textTransform: 'none' }}
+                  >
+                    {showFullPlot ? t('mediaDetail.hero.showShortPlot') : t('mediaDetail.hero.showFullPlot')}
+                  </Button>
+                )}
+                {localized && (
+                  <>
+                    {shownIsTranslated && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                        {t('mediaDetail.hero.machineTranslated')}
+                      </Typography>
+                    )}
+                    <Button
+                      size="small"
+                      startIcon={<TranslateIcon />}
+                      onClick={() => setShowOriginal((shown) => !shown)}
+                      sx={{ mt: 0.5, textTransform: 'none' }}
+                    >
+                      {showOriginal
+                        ? t('mediaDetail.hero.showTranslation')
+                        : t('mediaDetail.hero.showOriginal')}
+                    </Button>
+                  </>
+                )}
+              </Box>
             </Box>
           )}
         </Box>

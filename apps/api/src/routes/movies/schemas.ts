@@ -84,6 +84,19 @@ export const getMovieSchema = {
     },
     required: ['id'] as string[],
   },
+  querystring: {
+    type: 'object' as const,
+    properties: {
+      lang: {
+        type: 'string' as const,
+        // No length or pattern limit on purpose: an unrecognised value falls
+        // back to the viewer's interface language, and refusing it here would
+        // fail the whole detail page over an optional caption.
+        description:
+          'The language the page is displayed in. When a machine translation of the synopsis into it exists, it is returned as localized_synopsis. An unrecognised value falls back to the viewer\'s interface language.',
+      },
+    },
+  },
   // Note: Response schema intentionally omitted to allow snake_case DB fields (poster_url, etc.)
   // to pass through without Fastify serialization filtering them out
 }

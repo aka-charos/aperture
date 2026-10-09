@@ -220,6 +220,9 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
   // fetches and a model call, so a cadence is an operator's decision about
   // their hardware (or their bill), never a default someone inherits.
   'generate-title-analysis': { scheduleType: 'manual', hour: 0, minute: 0 },
+  // Same reasoning: each pair is up to two model calls, and the default
+  // endpoint is somebody's free public service, so a cadence is opted into.
+  'translate-title-synopses': { scheduleType: 'manual', hour: 0, minute: 0 },
 }
 
 const CONFIG_COLUMNS = `job_name, schedule_type, schedule_hour, schedule_minute,

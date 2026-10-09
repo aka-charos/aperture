@@ -3,7 +3,7 @@
  * Central registry of all background jobs
  */
 
-import { DEFAULT_MAX_TITLES_PER_RUN } from '@aperture/core'
+import { DEFAULT_MAX_TITLES_PER_RUN, DEFAULT_MAX_TRANSLATIONS_PER_RUN } from '@aperture/core'
 import type { JobDefinition } from './types.js'
 
 export const jobDefinitions: JobDefinition[] = [
@@ -114,6 +114,22 @@ export const jobDefinitions: JobDefinition[] = [
       // the whole library, which a schedule reaches anyway by running again.
       max: 5000,
       unit: 'titles',
+    },
+  },
+  // === Synopsis translation (per title and language, shared by all users) ===
+  // Same shape as title analysis: schedulable, seeded manual, an operator cap
+  // per run. The unit is a title × language PAIR, up to two calls each (plot
+  // and full synopsis), which is what "translations" means in the dialog.
+  {
+    name: 'translate-title-synopses',
+    description:
+      'Machine-translates each title\'s plot and full synopsis into the enabled interface languages, current recommendations first, up to the per-run limit set in this job\'s schedule. Only text that has changed since it was last translated is sent again. Needs the endpoint switched on in Admin > AI > Synopsis translation; the default is the free public Index-Translate API.',
+    cron: null,
+    runLimit: {
+      default: DEFAULT_MAX_TRANSLATIONS_PER_RUN,
+      min: 1,
+      max: 20000,
+      unit: 'translations',
     },
   },
   // === Evaluation (both media types) ===

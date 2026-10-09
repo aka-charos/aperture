@@ -41,6 +41,17 @@ export interface BaseMedia {
   metacritic_score?: number | null
   awards_summary?: string | null
   plot_full?: string | null
+  /**
+   * Machine translation of the synopsis into the language the page is shown
+   * in, decided by the server; absent or null when there is none. Either field
+   * may be null on its own — then that text shows in the original.
+   */
+  localized_synopsis?: {
+    language: string
+    source_language: string
+    overview: string | null
+    plot_full: string | null
+  } | null
   tmdb_rating?: number | null
   tmdb_vote_count?: number | null
   imdb_rating?: number | null

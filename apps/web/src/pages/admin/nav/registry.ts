@@ -374,6 +374,34 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
       { anchor: 'decision-base-url', labelKey: 'settingsDecisionModel.baseUrlLabel', aliases: ['self-hosted', 'local'] },
     ],
   },
+  {
+    // A model choice, so the AI group. Deliberately NOT named "translations":
+    // Appearance → Translations edits the interface's own strings, and this
+    // translates library metadata (plot and full synopsis).
+    id: 'synopsis-translation',
+    group: 'ai',
+    segment: 'synopsis-translation',
+    titleKey: 'adminNav.synopsisTranslation.title',
+    blurbKey: 'adminNav.synopsisTranslation.blurb',
+    aliases: [
+      'translate',
+      'translation',
+      'localize',
+      'localization',
+      'plot',
+      'synopsis',
+      'overview',
+      'index-translate',
+      'bilibili',
+      'openai compatible',
+    ],
+    fields: [
+      { anchor: 'synopsis-translation-enabled', labelKey: 'settingsSynopsisTranslation.enabledLabel' },
+      { anchor: 'synopsis-translation-base-url', labelKey: 'settingsSynopsisTranslation.baseUrlLabel', aliases: ['endpoint', 'api url'] },
+      { anchor: 'synopsis-translation-model', labelKey: 'settingsSynopsisTranslation.modelLabel' },
+      { anchor: 'synopsis-translation-targets', labelKey: 'settingsSynopsisTranslation.targetsLabel', aliases: ['languages', 'greek'] },
+    ],
+  },
 
   // --------------------------------------------------------- recommendations
   {

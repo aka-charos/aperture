@@ -35,6 +35,7 @@ import {
   registerTavilyHandlers,
   registerCrwHandlers,
   registerDecisionModelHandlers,
+  registerSynopsisTranslationHandlers,
   registerRatingsHandlers,
   registerSystemHandlers,
   registerDeploymentHandlers,
@@ -64,6 +65,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   registerTavilyHandlers(fastify)
   registerCrwHandlers(fastify)
   registerDecisionModelHandlers(fastify)
+  registerSynopsisTranslationHandlers(fastify)
   registerRatingsHandlers(fastify)
   registerSystemHandlers(fastify)
   registerDeploymentHandlers(fastify)

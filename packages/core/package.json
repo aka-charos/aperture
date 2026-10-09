@@ -91,6 +91,7 @@
     "test:seerr": "node --import tsx --test src/seerr/userMapping.test.ts",
     "test:local-models": "node --import tsx --test src/lib/localModelDiscovery.test.ts src/lib/lmstudioChat.test.ts",
     "test:inference": "node --import tsx --test src/lib/usageFetch.test.ts src/lib/zai-usage.test.ts",
+    "test:translation": "node --import tsx --test src/translation/rules.test.ts src/translation/pending.test.ts",
     "test:collections": "node --import tsx --test src/tmdb/collectionParts.test.ts",
     "test:library-scope": "node --import tsx --test src/lib/libraryScope.test.ts",
     "test:social": "node --import tsx --test src/social/rules.test.ts",

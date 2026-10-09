@@ -109,8 +109,13 @@ export function needsAnalysisSql(
  * pool per user rather than a top slice. This form scans the selected rows once
  * (they are a few hundred, and `is_selected = TRUE` has a partial index) and
  * hashes them.
+ *
+ * Exported for the synopsis translation job (translation/pending.ts), which
+ * orders its work the same way: one definition of "somebody's current pick"
+ * rather than a second copy that drifts. Joins as `picks`, so a caller orders
+ * on `picks.id IS NOT NULL`.
  */
-function selectedPicksJoinSql(mediaType: 'movie' | 'series', mediaAlias: string): string {
+export function selectedPicksJoinSql(mediaType: 'movie' | 'series', mediaAlias: string): string {
   const idColumn = mediaType === 'movie' ? 'movie_id' : 'series_id'
   return `LEFT JOIN (
               SELECT DISTINCT rc.${idColumn} AS id

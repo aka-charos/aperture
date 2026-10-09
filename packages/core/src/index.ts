@@ -1836,6 +1836,12 @@ export {
   testSourceFilter,
 } from './analysis/index.js'
 
+// Synopsis translation (./translation) — overview and plot_full machine-
+// translated into the enabled UI languages by a model at any OpenAI-compatible
+// endpoint, by default bilibili's free Index-Translate. Library METADATA; the
+// UI's own strings are ./i18nOverrides.js, a different thing.
+export * from './translation/index.js'
+
 // Ratings refresh (./ratings) — kept apart from ./enrichment because metadata
 // does not move and ratings do; one predicate governing both is what froze
 // every rating on the install date.

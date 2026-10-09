@@ -109,6 +109,14 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     color: '#e91e63',
     jobs: ['generate-title-analysis'],
   },
+  // Its own category: it writes no analysis and reads none — it translates the
+  // plot and full synopsis the library already holds.
+  {
+    titleKey: 'admin.jobsPage.categories.globalSynopsisTranslation.title',
+    descriptionKey: 'admin.jobsPage.categories.globalSynopsisTranslation.description',
+    color: '#0d9488',
+    jobs: ['translate-title-synopses'],
+  },
   // Its own category rather than a line inside Metadata Enrichment, because
   // the distinction is the entire point of the job: metadata is written once
   // and stays correct, ratings move every week, and filing this under

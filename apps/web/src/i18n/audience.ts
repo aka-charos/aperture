@@ -118,6 +118,7 @@ export const ADMIN_ONLY_NAMESPACES: readonly string[] = [
   'settingsRecAlgo',
   'settingsSeerr',
   'settingsStreamingDiscovery',
+  'settingsSynopsisTranslation',
   'settingsTavily',
   'settingsThemeColors',
   'settingsTmdb',

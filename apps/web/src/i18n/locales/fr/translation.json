@@ -487,6 +487,10 @@
         "globalLegacy": {
           "title": "Legacy Library Output",
           "description": "Removes the STRM / symlink libraries once their output is switched off — run once, on purpose, when phasing them out"
+        },
+        "globalSynopsisTranslation": {
+          "title": "Synopsis Translation",
+          "description": "Machine-translate plots and full synopses into the enabled interface languages"
         }
       },
       "jobNames": {
@@ -633,7 +637,11 @@
         "runLimitCaption_one": "Up to {{count}} item per run",
         "runLimitCaption_other": "Up to {{count}} items per run",
         "runLimitCaption_titles_one": "Up to {{count}} title per run",
-        "runLimitCaption_titles_other": "Up to {{count}} titles per run"
+        "runLimitCaption_titles_other": "Up to {{count}} titles per run",
+        "configRunLimit_translations": "Translations per run",
+        "configRunLimitHint_translations": "The most title × language pairs one run will attempt, scheduled or manual. Each pair is one or two short model calls. Leave blank for the default ({{default}}).",
+        "runLimitCaption_translations_one": "Up to {{count}} translation per run",
+        "runLimitCaption_translations_other": "Up to {{count}} translations per run"
       }
     },
     "translations": "Translations",
@@ -776,7 +784,10 @@
       "genreEnjoyedTooltip": "A genre you already watch a lot of",
       "genreNewTooltip": "New to you — this would be a first",
       "recommend": "Recommander à…",
-      "recommendTooltip": "Envoyer ce titre à vos connexions"
+      "recommendTooltip": "Envoyer ce titre à vos connexions",
+      "machineTranslated": "Traduction automatique",
+      "showOriginal": "Voir l'original",
+      "showTranslation": "Voir la traduction"
     },
     "insights": {
       "recommendedForYou": "Recommandé pour vous",
@@ -5249,6 +5260,10 @@
     "decisionModel": {
       "title": "Decision model",
       "blurb": "Optional second opinion on why a pick was recommended"
+    },
+    "synopsisTranslation": {
+      "title": "Synopsis translation",
+      "blurb": "Machine-translate plots into the interface languages"
     }
   },
   "settingsEvaluation": {
@@ -5824,5 +5839,67 @@
     "sourceFilterTestNotDiscriminating": "Source filter: {{model}} read {{documents}} documents ({{chars}} characters of excerpt) and answered {{answered}}, but did not separate a review from a podcast note with no transcript — the review scored {{article}}%, the note {{noise}}%. It is unlikely to drop the right pages.",
     "filterSourcesHelpBasic": "Before each analysis is written, ask the model which retrieved pages carry writing about the title and drop the ones that carry none. Costs one short call per title, and keeps everything if the call fails.",
     "filterSourcesNeedsIntegration": "Turn the decision model on above to use this. It weeds the pages retrieved for each title analysis, dropping the ones that carry no writing about it."
+  },
+  "settingsSynopsisTranslation": {
+    "title": "Synopsis translation",
+    "description": "Translates each title's plot and full synopsis — usually English, from the media server, TMDb and IMDb — into the interface languages enabled for this instance, so a viewer reading {{appName}} in Greek reads the plot in Greek too. A job does the work in the background; the detail page shows the translation with the original one click away. Any OpenAI-compatible endpoint works; the default is bilibili's free public Index-Translate API. This is not the Translations page, which edits {{appName}}'s own interface text.",
+    "chipOn": "On",
+    "chipOff": "Off",
+    "chipNotReady": "On, not ready",
+    "enabledLabel": "Translate synopses",
+    "promptStyleLabel": "Model type",
+    "styleIndexTranslate": "Index-Translate",
+    "styleInstruction": "Any chat model",
+    "styleIndexTranslateHelp": "Prompts the model exactly as Index-Translate's own client does and switches its reasoning off. Use this for the free public API or a self-hosted Index-Translate (vLLM, llama.cpp, LM Studio).",
+    "styleInstructionHelp": "A plain translation instruction for any general chat model behind an OpenAI-compatible endpoint — LM Studio, vLLM, OpenRouter, a local Qwen.",
+    "useFreeEndpoint": "Use the free Index-Translate API",
+    "baseUrlLabel": "Endpoint base URL",
+    "baseUrlHelp": "OpenAI-compatible root, for example https://index-translate.bilibili.com/v1 — /v1 is added if missing.",
+    "apiKeyLabel": "API key (optional)",
+    "apiKeyHelp": "The free Index-Translate API needs none. Leave blank to keep the stored key.",
+    "modelLabel": "Model",
+    "modelHelp": "The model id as the endpoint names it. Press the refresh button to list what the endpoint offers.",
+    "modelsUnreachable": "The endpoint did not list its models — type the id instead.",
+    "loadModels": "List models from the endpoint",
+    "targetsLabel": "Translate into",
+    "targetsFollowHelp": "Following the interface languages: a language enabled under Language defaults later is translated into automatically. Click a language to narrow the list.",
+    "targetsListHelp": "Only the languages highlighted here are translated into. A language not enabled for the interface is never a target, since nobody could be shown it.",
+    "noCandidates": "Only one interface language is enabled. Enable another under Appearance → Language defaults to have something to translate into.",
+    "followInterface": "Follow the interface languages",
+    "sourceLabel": "Metadata is written in",
+    "fieldsLabel": "What to translate",
+    "fieldOverview": "Plot (the short overview)",
+    "fieldPlotFull": "Full synopsis (only when it is longer than the plot)",
+    "instructionLabel": "Extra instruction (optional)",
+    "instructionHelp": "One constraint per line, e.g. \"keep character names in Latin script\". Sent as an instruction-following constraint to Index-Translate.",
+    "timeoutLabel": "Timeout (seconds)",
+    "spacingLabel": "Pause between calls (seconds)",
+    "spacingHelp": "Be gentle with a free public service. 0 sends calls back to back.",
+    "save": "Save",
+    "test": "Test translation",
+    "testOk": "Translated into {{language}} by {{model}} in {{seconds}}s",
+    "testFailed": "The test did not return an answer.",
+    "statusTitle": "{{pending}} pending · {{stored}} stored",
+    "statusHelp": "Pending counts title × language pairs that still need at least one text. A text whose source changes becomes pending again on its own.",
+    "statusEmpty": "Nothing to translate yet.",
+    "openJob": "Open the job",
+    "colLanguage": "Language",
+    "colMoviesPending": "Movies pending",
+    "colSeriesPending": "Series pending",
+    "colStored": "Stored",
+    "notTarget": "no longer a target",
+    "clearAll": "Clear all",
+    "clearLanguage": "Clear the {{language}} translations",
+    "clearConfirmTitle": "Clear translations?",
+    "clearConfirmAll": "Every stored translation will be deleted and the detail pages will show the original text until the job runs again.",
+    "clearConfirmLanguage": "Every stored {{language}} translation will be deleted and the detail pages will show the original text until the job runs again.",
+    "clearConfirm": "Clear",
+    "cleared_one": "Cleared {{count}} translation.",
+    "cleared_other": "Cleared {{count}} translations.",
+    "clearError": "Could not clear the translations.",
+    "saved": "Synopsis translation settings saved.",
+    "saveError": "Could not save the settings.",
+    "loadError": "Could not load the synopsis translation settings.",
+    "connectError": "Could not reach the server."
   }
 }

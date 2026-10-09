@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import type {
   Media,
   MediaType,
@@ -79,6 +80,8 @@ export function useMediaDetail(
   id: string | undefined,
   userId: string | undefined
 ): UseMediaDetailReturn {
+  const { i18n } = useTranslation()
+  const displayLanguage = i18n.resolvedLanguage ?? i18n.language
   const [media, setMedia] = useState<Media | null>(null)
   const [similar, setSimilar] = useState<SimilarItem[]>([])
   const [insights, setInsights] = useState<RecommendationInsights | null>(null)
@@ -106,7 +109,12 @@ export function useMediaDetail(
       setError(null)
 
       try {
-        const endpoint = mediaType === 'movie' ? `/api/movies/${id}` : `/api/series/${id}`
+        // The language the page is displayed in rides along, so the server can
+        // attach a machine translation of the synopsis in that language
+        // (`localized_synopsis`) — only the client knows which one it rendered.
+        const lang = encodeURIComponent(displayLanguage)
+        const endpoint =
+          mediaType === 'movie' ? `/api/movies/${id}?lang=${lang}` : `/api/series/${id}?lang=${lang}`
 
         // Fetch media and media server info in parallel
         const fetchPromises: Promise<Response>[] = [
@@ -257,7 +265,7 @@ export function useMediaDetail(
     }
 
     fetchMedia()
-  }, [mediaType, id, userId])
+  }, [mediaType, id, userId, displayLanguage])
 
   // Favorite status lives on the media server, not in our DB — fetched separately.
   useEffect(() => {

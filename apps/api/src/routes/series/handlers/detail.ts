@@ -4,6 +4,7 @@
  * GET /api/series/:id - Get series by ID with full metadata
  */
 import type { FastifyInstance } from 'fastify'
+import { resolveLocalizedSynopsis } from '@aperture/core'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { titleInScope } from '../../../lib/viewerScope.js'
@@ -12,7 +13,7 @@ import { getSeriesSchema } from '../schemas.js'
 import type { SeriesDetailRow } from '../types.js'
 
 export function registerDetailHandler(fastify: FastifyInstance) {
-  fastify.get<{ Params: { id: string }; Reply: SeriesDetailRow }>(
+  fastify.get<{ Params: { id: string }; Querystring: { lang?: string }; Reply: SeriesDetailRow }>(
     '/api/series/:id',
     {
       preHandler: requireAuth,
@@ -57,7 +58,17 @@ export function registerDetailHandler(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Series not found' } as never)
       }
 
-      return reply.send(series)
+      // A machine translation of the synopsis into the language the page is
+      // shown in, when one exists for the text the title carries now. Null
+      // otherwise, and never an error (core translation/store.ts).
+      const localized_synopsis = await resolveLocalizedSynopsis(
+        'series',
+        id,
+        request.query.lang,
+        request.user!.id
+      )
+
+      return reply.send({ ...series, localized_synopsis })
     }
   )
 }

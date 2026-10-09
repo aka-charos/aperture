@@ -4,6 +4,8 @@
  * TypeScript interfaces for series-related API endpoints.
  */
 
+import type { LocalizedSynopsis } from '@aperture/core'
+
 export interface SeriesRow {
   id: string
   provider_item_id: string
@@ -57,6 +59,8 @@ export interface SeriesDetailRow extends SeriesRow {
   metacritic_score: number | null
   awards_summary: string | null
   plot_full: string | null
+  /** Machine translation of overview/plot_full into the viewer's language (core translation/). */
+  localized_synopsis?: LocalizedSynopsis | null
   tmdb_rating: number | null
   tmdb_vote_count: number | null
   imdb_rating: number | null

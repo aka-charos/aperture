@@ -37,6 +37,7 @@ import {
   isJobCancelled,
   updateJobProgress,
   generateTitleAnalyses,
+  generateTitleTranslations,
   getJobConfig,
   refreshRatings,
   RATING_SOURCE_IDS,
@@ -369,6 +370,32 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
         // cancelled: `cancelJob` has already filed the row, and completing over
         // it would flip a cancelled run to 'completed' — the exact double
         // transition `hasFinished` exists to refuse.
+        if (!result.cancelled) {
+          completeJob(jobId, { ...result })
+        }
+        break
+      }
+      // === Synopsis translation (per title × language, cached until the source changes) ===
+      // Owns its progress record here, like title analysis: without
+      // createJobProgress every progress call no-ops and Stop cannot work.
+      case 'translate-title-synopses': {
+        createJobProgress(jobId, name, 1)
+        setJobStep(jobId, 0, 'Translating synopses')
+
+        const runLimit = jobDefinitions.find((j) => j.name === name)?.runLimit
+        const maxPairs = runLimit
+          ? resolveRunLimit(runLimit, (await getJobConfig(name)).maxItemsPerRun)
+          : undefined
+
+        const result = await generateTitleTranslations({
+          maxPairs,
+          onLog: (level, message) => addLog(jobId, level, message),
+          shouldCancel: () => isJobCancelled(jobId),
+          onProgress: ({ processed, total, current }) =>
+            updateJobProgress(jobId, processed, total, current),
+        })
+        logger.info({ job: name, jobId, ...result }, `✅ Synopsis translation pass complete`)
+        // Skipped when cancelled: cancelJob has already filed the run.
         if (!result.cancelled) {
           completeJob(jobId, { ...result })
         }
