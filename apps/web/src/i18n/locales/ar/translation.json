@@ -5919,6 +5919,16 @@
     "connectError": "Could not reach the server.",
     "instructionsLabel": "Translation instructions (optional)",
     "instructionsHelpIndexTranslate": "Your standing instructions to the model, one per line, e.g. \"Keep character names in Latin script\". Index-Translate takes no system prompt, so this is the closest thing to one: each line is sent inside every request as one of the 【注意】 constraints the model was trained to follow.",
-    "instructionsHelpChat": "Added to the end of the system prompt {{appName}} sends with every request, which already tells the model it translates film and TV synopses, keeps every name exact and returns only the translation. Use this for anything beyond that, e.g. \"Keep character names in Latin script\"."
+    "instructionsHelpChat": "Added to the end of the system prompt {{appName}} sends with every request, which already tells the model it translates film and TV synopses, keeps every name exact and returns only the translation. Use this for anything beyond that, e.g. \"Keep character names in Latin script\".",
+    "analysisHeading": "Film analyses",
+    "analysisIntro": "Translates each stored film analysis — the article on a title's detail page — into the same languages, as its own job with its own schedule (Translate Title Analyses). The whole analysis goes as one request so names and pronouns stay consistent, and the translation keeps the paragraphs its section headings are drawn from. Uses the endpoint, model, languages, timeout and pause above.",
+    "analysisEnabledLabel": "Translate film analyses",
+    "analysisInstructionsLabel": "Analysis translation instructions (optional)",
+    "analysisInstructionsHelpIndexTranslate": "Standing instructions for film analyses only, one per line, e.g. \"Keep the titles of other films in their original language\". Like the synopsis instructions, each line is sent inside every request as one of the 【注意】 constraints Index-Translate was trained to follow; the synopsis instructions do not apply here.",
+    "analysisInstructionsHelpChat": "Added to the end of the analysis system prompt {{appName}} sends, which already tells the model it translates film criticism, keeps every name and title exact and returns the paragraphs one for one. The synopsis instructions do not apply here.",
+    "analysisStatusTitle": "Film analyses: {{pending}} pending · {{stored}} stored",
+    "analysisStatusHelp": "Pending counts analysis × language pairs. An analysis that is rewritten is hidden in translation at once and translated again on the next run.",
+    "analysisClearConfirmAll": "Every stored film analysis translation will be deleted and the detail pages will show the original analysis until the analysis job runs again.",
+    "analysisClearConfirmLanguage": "Every stored {{language}} film analysis translation will be deleted and the detail pages will show the original analysis until the analysis job runs again."
   }
 }

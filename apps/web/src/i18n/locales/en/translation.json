@@ -535,7 +535,7 @@
         },
         "globalSynopsisTranslation": {
           "title": "Synopsis Translation",
-          "description": "Machine-translate plots and full synopses into the enabled interface languages"
+          "description": "Machine-translate plots, full synopses and film analyses into the enabled interface languages"
         }
       },
       "jobNames": {
@@ -2809,8 +2809,8 @@
     "clearAll": "Clear all",
     "clearLanguage": "Clear the {{language}} translations",
     "clearConfirmTitle": "Clear translations?",
-    "clearConfirmAll": "Every stored translation will be deleted and the detail pages will show the original text until the job runs again.",
-    "clearConfirmLanguage": "Every stored {{language}} translation will be deleted and the detail pages will show the original text until the job runs again.",
+    "clearConfirmAll": "Every stored synopsis translation will be deleted and the detail pages will show the original plot until the job runs again.",
+    "clearConfirmLanguage": "Every stored {{language}} synopsis translation will be deleted and the detail pages will show the original plot until the job runs again.",
     "clearConfirm": "Clear",
     "cleared_one": "Cleared {{count}} translation.",
     "cleared_other": "Cleared {{count}} translations.",
@@ -2818,7 +2818,17 @@
     "saved": "Synopsis translation settings saved.",
     "saveError": "Could not save the settings.",
     "loadError": "Could not load the synopsis translation settings.",
-    "connectError": "Could not reach the server."
+    "connectError": "Could not reach the server.",
+    "analysisHeading": "Film analyses",
+    "analysisIntro": "Translates each stored film analysis — the article on a title's detail page — into the same languages, as its own job with its own schedule (Translate Title Analyses). The whole analysis goes as one request so names and pronouns stay consistent, and the translation keeps the paragraphs its section headings are drawn from. Uses the endpoint, model, languages, timeout and pause above.",
+    "analysisEnabledLabel": "Translate film analyses",
+    "analysisInstructionsLabel": "Analysis translation instructions (optional)",
+    "analysisInstructionsHelpIndexTranslate": "Standing instructions for film analyses only, one per line, e.g. \"Keep the titles of other films in their original language\". Like the synopsis instructions, each line is sent inside every request as one of the 【注意】 constraints Index-Translate was trained to follow; the synopsis instructions do not apply here.",
+    "analysisInstructionsHelpChat": "Added to the end of the analysis system prompt {{appName}} sends, which already tells the model it translates film criticism, keeps every name and title exact and returns the paragraphs one for one. The synopsis instructions do not apply here.",
+    "analysisStatusTitle": "Film analyses: {{pending}} pending · {{stored}} stored",
+    "analysisStatusHelp": "Pending counts analysis × language pairs. An analysis that is rewritten is hidden in translation at once and translated again on the next run.",
+    "analysisClearConfirmAll": "Every stored film analysis translation will be deleted and the detail pages will show the original analysis until the analysis job runs again.",
+    "analysisClearConfirmLanguage": "Every stored {{language}} film analysis translation will be deleted and the detail pages will show the original analysis until the analysis job runs again."
   },
   "settingsRatings": {
     "title": "Ratings Refresh",

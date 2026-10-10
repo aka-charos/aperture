@@ -22,6 +22,7 @@ import {
   loadAnalysisSubject,
   buildAnalysisSegments,
   createChildLogger,
+  resolveLocalizedAnalysis,
   describeAiError,
   type StoredAnalysis,
 } from '@aperture/core'
@@ -231,7 +232,7 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
    * and that early return used to drop both fields, which is exactly the case
    * the poll exists for.
    */
-  fastify.get<{ Params: { mediaType: string; id: string } }>(
+  fastify.get<{ Params: { mediaType: string; id: string }; Querystring: { lang?: string } }>(
     '/api/analysis/:mediaType/:id',
     { preHandler: requireAuth, schema: { tags: ['analysis'] } },
     async (request, reply) => {
@@ -255,8 +256,19 @@ const analysisRoutes: FastifyPluginAsync = async (fastify) => {
         if (!stored) {
           return reply.send({ attempted: false, analysis: null, generating, failure })
         }
+        // A machine translation into the language the page is displayed in,
+        // when one exists for the analysis as it stands now: the translated
+        // text already cut into the same labelled sections (core
+        // translation/store.ts). Absent otherwise, which the panel reads as
+        // "show the original" — exactly what it did before translations.
+        // Never throws; a reader never loses the analysis over its caption.
+        const translation =
+          stored.analysis && request.user
+            ? await resolveLocalizedAnalysis(mediaType, request.params.id, request.query.lang, request.user.id)
+            : null
         return reply.send({
           ...analysisPayload(stored, false, admin),
+          translation: translation ?? undefined,
           generating,
           failure,
         })

@@ -60,6 +60,7 @@ import {
   AutoStories as AutoStoriesIcon,
   Autorenew as AutorenewIcon,
   ExpandMore as ExpandMoreIcon,
+  Translate as TranslateIcon,
 } from '@mui/icons-material'
 import type { TFunction } from 'i18next'
 import { useAuth } from '../../../hooks/useAuth'
@@ -114,8 +115,23 @@ interface AnalysisSegment {
   questions: AnalysisQuestionId[]
 }
 
+/**
+ * A machine translation of the analysis into the language the page is shown
+ * in, already cut into the same labelled sections as the original (the server
+ * reuses the original's paragraph index; core translation/store.ts). Absent
+ * when there is none, or from an older server — the panel then shows the
+ * original, exactly as before translations existed.
+ */
+interface AnalysisTranslation {
+  language: string
+  source_language: string
+  text: string
+  paragraphs: AnalysisSegment[]
+}
+
 interface AnalysisResponse {
   attempted: boolean
+  translation?: AnalysisTranslation
   analysis: string | null
   /**
    * Absent from an older server, and empty for a declined row. Either way the
@@ -172,20 +188,29 @@ interface TitleAnalysisProps {
 }
 
 export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { user } = useAuth()
+  // The language the page is displayed in rides along so the server can attach
+  // a translation in it — only the client knows which one it rendered (the
+  // synopsis does the same, `useMediaDetail`).
+  const displayLanguage = i18n.resolvedLanguage ?? i18n.language
+  const analysisUrl = `/api/analysis/${mediaType}/${mediaId}?lang=${encodeURIComponent(displayLanguage)}`
+  const [showOriginal, setShowOriginal] = useState(false)
   const isAdmin = user?.isAdmin === true
   const [data, setData] = useState<AnalysisResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // `analysisUrl` carries the title and the display language, so a change of
+  // either reloads — and a new title starts on its translation again.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
     setGenerating(false)
-    fetch(`/api/analysis/${mediaType}/${mediaId}`, { credentials: 'include' })
+    setShowOriginal(false)
+    fetch(analysisUrl, { credentials: 'include' })
       .then((res) => (res.ok ? res.json() : null))
       .then((json: AnalysisResponse | null) => {
         if (cancelled) return
@@ -210,7 +235,7 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
     return () => {
       cancelled = true
     }
-  }, [mediaType, mediaId])
+  }, [analysisUrl])
 
   /**
    * THE WAIT LIVES HERE, NOT IN THE REQUEST.
@@ -234,7 +259,7 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
 
     const tick = async () => {
       try {
-        const res = await fetch(`/api/analysis/${mediaType}/${mediaId}`, {
+        const res = await fetch(analysisUrl, {
           credentials: 'include',
         })
         if (!res.ok) throw new Error(String(res.status))
@@ -271,7 +296,7 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
       cancelled = true
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [generating, mediaType, mediaId, t])
+  }, [generating, analysisUrl, t])
 
   /**
    * `force` re-runs a title that already has a row, and is admin-only on the
@@ -322,12 +347,17 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   // One open run holding everything is the fallback, not a special case: it is
   // what an ungated analysis produces anyway, so an older server and a row with
   // no usable paragraph map both land on the path that was here before.
-  const segments: AnalysisSegment[] =
+  const original: AnalysisSegment[] =
     data?.paragraphs && data.paragraphs.length > 0
       ? data.paragraphs
       : data?.analysis
         ? [{ text: data.analysis, questions: [] }]
         : []
+  // The translation, when there is one and the reader has not asked for the
+  // original. It arrives already sectioned, under the same headings.
+  const translation = data?.translation && data.translation.paragraphs.length > 0 ? data.translation : null
+  const showingTranslation = translation !== null && !showOriginal
+  const segments: AnalysisSegment[] = showingTranslation ? translation.paragraphs : original
   // WHETHER TO REBUILD THE PARAGRAPHS IS A FACT ABOUT THE WHOLE ANALYSIS, and
   // it has to be decided here because a segment cannot answer it. `toParagraphs`
   // reflows by sentence count when it finds no blank line, which is right for a
@@ -335,7 +365,9 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   // single paragraph never contains a blank line, so every paragraph would be
   // reflowed and cut at four sentences. That shipped, and it split a six-
   // sentence opening into four sentences plus a stranded two-sentence stub.
-  const reflow = !/\n{2,}/.test(data?.analysis ?? '')
+  // Decided on the text actually shown: a translation keeps the original's
+  // paragraph breaks, but it is the shown text the sections were cut from.
+  const reflow = !/\n{2,}/.test((showingTranslation ? translation.text : data?.analysis) ?? '')
   const provenanceLine = data ? describeProvenance(data, t) : null
   const chip = analysisChip(data, t)
 
@@ -446,6 +478,25 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                 }}
               >
                 <Box sx={{ flex: '1 1 26rem', maxWidth: '84ch' }}>
+                  {/* The same control the synopsis has, with its strings, so
+                      a reader meets one convention for machine translation. */}
+                  {translation && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                      {showingTranslation && (
+                        <Typography variant="caption" color="text.secondary">
+                          {t('mediaDetail.hero.machineTranslated')}
+                        </Typography>
+                      )}
+                      <Button
+                        size="small"
+                        startIcon={<TranslateIcon />}
+                        onClick={() => setShowOriginal((shown) => !shown)}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        {showOriginal ? t('mediaDetail.hero.showTranslation') : t('mediaDetail.hero.showOriginal')}
+                      </Button>
+                    </Box>
+                  )}
                   {segments.map((segment, i) => (
                     <AnalysisSection
                       key={i}

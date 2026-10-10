@@ -12,7 +12,7 @@
  * count-versus-selection drift `enrichment/pending.ts` exists to prevent.
  */
 import { selectedPicksJoinSql } from '../analysis/pending.js'
-import { TRANSLATABLE_FIELDS, type TranslatableField } from './rules.js'
+import { ANALYSIS_TRANSLATION_FIELD, TRANSLATABLE_FIELDS, type TranslatableField } from './rules.js'
 
 const MEDIA_TABLE = { movie: 'movies', series: 'series' } as const
 
@@ -164,4 +164,84 @@ export function currentTranslationsSql(mediaType: 'movie' | 'series'): string {
              AND tt.source_hash = md5(CASE tt.field
                    ${TRANSLATABLE_FIELDS.map((f) => `WHEN '${f}' THEN ${sourceTextSql(f)}`).join('\n                   ')}
                  END)`
+}
+
+// ---------------------------------------------------------------- film analyses
+
+/**
+ * The text an analysis translation is OF: the stored analysis, or NULL for a
+ * declined row (which has none). Read from `title_analysis`, aliased `ta`.
+ *
+ * Same contract as {@link sourceTextSql}: the pending check, the job's
+ * selection (which returns the hash) and the read all hash THIS expression, so
+ * a rewritten analysis hides its old translation at once and is translated
+ * again on the next run — no version bump, no sweep.
+ */
+export function analysisSourceSql(alias = 'ta'): string {
+  return `NULLIF(btrim(${alias}.analysis), '')`
+}
+
+/**
+ * The most recent failure recorded for this analysis × language, as
+ * `failed.last_failed_at`, applying only while it is a failure of the text the
+ * title carries now. Same shape and alias as {@link failedPairJoinSql}, so the
+ * synopsis ORDER BY ({@link translationPriorityOrderSql}) serves both.
+ */
+export function failedAnalysisJoinSql(mediaType: 'movie' | 'series'): string {
+  return `LEFT JOIN LATERAL (
+      SELECT f.last_failed_at
+        FROM title_translation_failures f
+       WHERE f.media_type = '${mediaType}'
+         AND f.media_id = ta.media_id
+         AND f.language = lang.code
+         AND f.field = '${ANALYSIS_TRANSLATION_FIELD}'
+         AND f.source_hash = md5(${analysisSourceSql()})
+    ) failed ON true`
+}
+
+/**
+ * FROM/JOIN/WHERE for pending analysis translations: every stored analysis
+ * crossed with every target language, kept where there is no translation of
+ * exactly this text. Joined to the title so the library switch applies and the
+ * order can use the same picks-first priority synopses use. Shared by the count
+ * and the selection.
+ */
+export function pendingAnalysisTranslationsFromSql(
+  mediaType: 'movie' | 'series',
+  languagesParam: string,
+  options: { withPicks?: boolean; withFailures?: boolean } = {}
+): string {
+  const src = analysisSourceSql()
+  const picks = options.withPicks ? `\n    ${selectedPicksJoinSql(mediaType, 'm')}` : ''
+  const failures = options.withFailures ? `\n    ${failedAnalysisJoinSql(mediaType)}` : ''
+  return `FROM title_analysis ta
+    JOIN ${MEDIA_TABLE[mediaType]} m ON m.id = ta.media_id
+    CROSS JOIN unnest(${languagesParam}::text[]) AS lang(code)${picks}${failures}
+    WHERE ta.media_type = '${mediaType}'
+      AND ${src} IS NOT NULL
+      AND NOT EXISTS (
+            SELECT 1 FROM title_translations tt
+             WHERE tt.media_type = '${mediaType}'
+               AND tt.media_id = ta.media_id
+               AND tt.language = lang.code
+               AND tt.field = '${ANALYSIS_TRANSLATION_FIELD}'
+               AND tt.source_hash = md5(${src}))
+      AND ${enabledLibrarySql(mediaType)}`
+}
+
+/**
+ * The current translation of one analysis into one language, with the paragraph
+ * index it is shown under. `$1` media type, `$2` media id, `$3` language.
+ * "Current" means a translation of the analysis the title carries NOW.
+ */
+export function currentAnalysisTranslationSql(): string {
+  return `SELECT tt.translated_text, ta.paragraph_map, ta.analysis
+            FROM title_translations tt
+            JOIN title_analysis ta
+              ON ta.media_type = tt.media_type AND ta.media_id = tt.media_id
+           WHERE tt.media_type = $1
+             AND tt.media_id = $2
+             AND tt.language = $3
+             AND tt.field = '${ANALYSIS_TRANSLATION_FIELD}'
+             AND tt.source_hash = md5(${analysisSourceSql()})`
 }

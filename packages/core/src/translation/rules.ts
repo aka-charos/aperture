@@ -43,6 +43,19 @@ export function isTranslatableField(value: unknown): value is TranslatableField 
   return typeof value === 'string' && (TRANSLATABLE_FIELDS as readonly string[]).includes(value)
 }
 
+/**
+ * The `field` a film analysis translation is stored under, in the same
+ * `title_translations` table as the synopses. It is deliberately NOT in
+ * {@link TRANSLATABLE_FIELDS}: those are columns on `movies`/`series` read
+ * through `sourceTextSql`, whereas an analysis is read from `title_analysis`.
+ * Every synopsis reader is built from that list, so an analysis row is
+ * invisible to all of them without a filter of its own.
+ */
+export const ANALYSIS_TRANSLATION_FIELD = 'analysis' as const
+
+/** Any field a stored translation or a recorded failure can carry. */
+export type TranslationField = TranslatableField | typeof ANALYSIS_TRANSLATION_FIELD
+
 /** The free public Index-Translate endpoint (OpenAI-compatible). */
 export const INDEX_TRANSLATE_BASE_URL = 'https://index-translate.bilibili.com/v1'
 export const INDEX_TRANSLATE_DEFAULT_MODEL = 'Index-Translate-35B-A3B'
@@ -83,6 +96,17 @@ export interface TranslationConfig {
   timeoutMs: number
   /** Gap between calls to one endpoint; the public one is a free service. */
   callSpacingSeconds: number
+  /**
+   * Film analyses: their own switch, gating the `translate-title-analyses`
+   * job only. Independent of `enabled` (synopses): the two share the
+   * endpoint, model, languages, timeout and pacing, and nothing else.
+   */
+  analysisEnabled: boolean
+  /**
+   * The analysis counterpart of `instruction` — criticism needs constraints a
+   * blurb does not (critics, publications and the titles of other films).
+   */
+  analysisInstruction: string
 }
 
 export const DEFAULT_TRANSLATION_CONFIG: TranslationConfig = {
@@ -97,6 +121,8 @@ export const DEFAULT_TRANSLATION_CONFIG: TranslationConfig = {
   instruction: '',
   timeoutMs: 120_000,
   callSpacingSeconds: 1,
+  analysisEnabled: false,
+  analysisInstruction: '',
 }
 
 export const TRANSLATION_TIMEOUT_MIN_MS = 5_000
@@ -149,10 +175,7 @@ export function sanitizeTranslationConfig(
       overview: fields.overview !== false,
       plot_full: fields.plot_full !== false,
     },
-    instruction:
-      typeof input.instruction === 'string'
-        ? input.instruction.trim().slice(0, TRANSLATION_INSTRUCTION_MAX_CHARS)
-        : '',
+    instruction: sanitizeInstruction(input.instruction),
     timeoutMs:
       input.timeoutMs == null
         ? d.timeoutMs
@@ -163,7 +186,15 @@ export function sanitizeTranslationConfig(
       input.callSpacingSeconds == null
         ? d.callSpacingSeconds
         : clampNumber(input.callSpacingSeconds, 0, TRANSLATION_SPACING_MAX_SECONDS, d.callSpacingSeconds),
+    // Absent reads as OFF: the switch did not exist before, and turning on a
+    // second job nobody asked for is not what an upgrade should do.
+    analysisEnabled: input.analysisEnabled === true,
+    analysisInstruction: sanitizeInstruction(input.analysisInstruction),
   }
+}
+
+function sanitizeInstruction(raw: unknown): string {
+  return typeof raw === 'string' ? raw.trim().slice(0, TRANSLATION_INSTRUCTION_MAX_CHARS) : ''
 }
 
 /** The fields switched on, in a stable order. */

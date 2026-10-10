@@ -26,6 +26,7 @@ import HomeIcon from '@mui/icons-material/Home'
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep'
 import FactCheckIcon from '@mui/icons-material/FactCheck'
 import SubtitlesIcon from '@mui/icons-material/Subtitles'
+import TranslateIcon from '@mui/icons-material/Translate'
 import { JOB_DISPLAY_NAME_KEYS, titleCaseJobName } from './registry'
 import { getAppName } from '@/lib/branding'
 
@@ -66,6 +67,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'check-recommendation-explanations': <FactCheckIcon />,
   'generate-title-analysis': <TheatersIcon />,
   'translate-title-synopses': <SubtitlesIcon />,
+  'translate-title-analyses': <TranslateIcon />,
   'refresh-ratings': <StarHalfIcon />,
   'sync-home-sections': <HomeIcon />,
   'remove-legacy-libraries': <DeleteSweepIcon />,
@@ -102,6 +104,7 @@ export const JOB_COLORS: Record<string, string> = {
   'check-recommendation-explanations': '#0ea5e9',
   'generate-title-analysis': '#e91e63',
   'translate-title-synopses': '#0d9488',
+  'translate-title-analyses': '#0d9488',
   'refresh-ratings': '#f97316',
   'sync-home-sections': '#eab308',
   'remove-legacy-libraries': '#78716c',

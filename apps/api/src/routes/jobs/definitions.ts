@@ -3,7 +3,11 @@
  * Central registry of all background jobs
  */
 
-import { DEFAULT_MAX_TITLES_PER_RUN, DEFAULT_MAX_TRANSLATIONS_PER_RUN } from '@aperture/core'
+import {
+  DEFAULT_MAX_ANALYSIS_TRANSLATIONS_PER_RUN,
+  DEFAULT_MAX_TITLES_PER_RUN,
+  DEFAULT_MAX_TRANSLATIONS_PER_RUN,
+} from '@aperture/core'
 import type { JobDefinition } from './types.js'
 
 export const jobDefinitions: JobDefinition[] = [
@@ -129,6 +133,21 @@ export const jobDefinitions: JobDefinition[] = [
       default: DEFAULT_MAX_TRANSLATIONS_PER_RUN,
       min: 1,
       max: 20000,
+      unit: 'translations',
+    },
+  },
+  // Film analyses: the same endpoint and languages, its own switch, schedule
+  // and cap. An analysis is one streamed request (several when it falls back
+  // to section by section), so the unit is a title × language pair here too.
+  {
+    name: 'translate-title-analyses',
+    description:
+      'Machine-translates each stored film analysis into the enabled interface languages, current recommendations first, up to the per-run limit set in this job\'s schedule. The whole analysis goes as one request so pronouns and names stay consistent, and the translation keeps the paragraph structure the section headings are drawn from. Only analyses that have changed since they were last translated are sent again. Needs Film analyses switched on in Admin > AI > Synopsis translation.',
+    cron: null,
+    runLimit: {
+      default: DEFAULT_MAX_ANALYSIS_TRANSLATIONS_PER_RUN,
+      min: 1,
+      max: 5000,
       unit: 'translations',
     },
   },

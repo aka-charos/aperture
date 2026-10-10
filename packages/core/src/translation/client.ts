@@ -9,6 +9,7 @@
  * CLAUDE.md before pointing it at a paid endpoint.
  */
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
+import type { ParagraphMap } from '../analysis/paragraphMap.js'
 import { createChildLogger } from '../lib/logger.js'
 import type { AppLocaleCode } from '../lib/locales.js'
 import {
@@ -32,6 +33,12 @@ import {
   type TranslationConfig,
   type TranslationKind,
 } from './rules.js'
+import {
+  analysisFitsOneRequest,
+  analysisParagraphs,
+  analysisTranslationGroups,
+  joinAnalysisParagraphs,
+} from './analysisText.js'
 
 const logger = createChildLogger('translation')
 
@@ -72,14 +79,16 @@ export interface TranslationReadiness {
  */
 export function checkTranslationReadiness(
   config: TranslationConfig,
-  targets: readonly AppLocaleCode[]
+  targets: readonly AppLocaleCode[],
+  kind: TranslationKind = 'synopsis'
 ): TranslationReadiness {
-  if (!config.enabled) return { ready: false, reason: null }
+  // Each kind has its own switch; the endpoint and languages are shared.
+  if (!(kind === 'analysis' ? config.analysisEnabled : config.enabled)) return { ready: false, reason: null }
   if (!chatCompletionsUrl(config.baseUrl)) {
     return { ready: false, reason: 'The endpoint needs a base URL starting with http:// or https://' }
   }
   if (!config.model.trim()) return { ready: false, reason: 'No model is set.' }
-  if (enabledFields(config).length === 0) {
+  if (kind === 'synopsis' && enabledFields(config).length === 0) {
     return { ready: false, reason: 'Neither the plot nor the full synopsis is switched on.' }
   }
   if (targets.length === 0) {
@@ -170,6 +179,8 @@ export interface TranslateOptions {
    * analyses.
    */
   prompt?: TranslationPrompt
+  /** Told when an analysis falls back from one request to section by section. */
+  onNote?: (message: string) => void
 }
 
 export type TranslationPrompt = { kind: TranslationKind; instruction: string }
@@ -253,6 +264,79 @@ async function requestWithRateLimitRetry(
       await sleep(waitMs)
     }
   }
+}
+
+export interface AnalysisTranslationResult extends TranslationResult {
+  /** Paragraphs in the translation — always the source's count. */
+  paragraphs: number
+  /** One request for the whole analysis, or the section-by-section fallback. */
+  strategy: 'whole' | 'sections'
+}
+
+/**
+ * Translate a film analysis so that its paragraphs come back ONE FOR ONE,
+ * which is what lets the stored paragraph index put the same section headings
+ * over the translation (see ./analysisText.ts for why, and what was measured).
+ *
+ * 1. The whole analysis as one request, when it fits — full context.
+ * 2. If it does not fit, or came back with a different paragraph count: each
+ *    section (packed up to the size limit) as its own request.
+ * 3. A section that still miscounts: each of its paragraphs alone. A single
+ *    paragraph the model split in two is joined back into one.
+ *
+ * Every request goes through {@link translateText}, so pacing, Stop, 429
+ * retries and every check on an answer apply to each of them, and any failure
+ * throws — nothing of a half-translated analysis is returned.
+ */
+export async function translateAnalysisText(
+  config: TranslationConfig,
+  text: string,
+  map: ParagraphMap | null,
+  target: AppLocaleCode,
+  options: TranslateOptions = {}
+): Promise<AnalysisTranslationResult> {
+  const opts: TranslateOptions = {
+    ...options,
+    prompt: options.prompt ?? { kind: 'analysis', instruction: config.analysisInstruction },
+  }
+  const source = analysisParagraphs(text)
+  if (source.length === 0) throw new TranslationError('There is no text to translate')
+
+  let model = config.model
+  let latencyMs = 0
+  const call = async (piece: string): Promise<string[]> => {
+    const result = await translateText(config, piece, target, opts)
+    model = result.model
+    latencyMs += result.latencyMs
+    return analysisParagraphs(result.text)
+  }
+
+  if (analysisFitsOneRequest(source)) {
+    const whole = await call(joinAnalysisParagraphs(source))
+    if (whole.length === source.length) {
+      return { text: joinAnalysisParagraphs(whole), model, latencyMs, paragraphs: whole.length, strategy: 'whole' }
+    }
+    options.onNote?.(
+      `came back as ${whole.length} paragraph(s) for ${source.length}; translating it section by section`
+    )
+  }
+
+  const out: string[] = new Array(source.length)
+  for (const group of analysisTranslationGroups(source, map)) {
+    let pieces = await call(joinAnalysisParagraphs(group.map((i) => source[i])))
+    if (pieces.length !== group.length) {
+      if (group.length === 1) {
+        pieces = [pieces.join(' ')]
+      } else {
+        pieces = []
+        for (const i of group) pieces.push((await call(source[i])).join(' '))
+      }
+    }
+    group.forEach((index, k) => {
+      out[index] = pieces[k]
+    })
+  }
+  return { text: joinAnalysisParagraphs(out), model, latencyMs, paragraphs: out.length, strategy: 'sections' }
 }
 
 /** One request: one piece of text, one answer. */

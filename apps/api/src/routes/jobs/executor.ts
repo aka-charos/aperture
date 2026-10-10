@@ -38,6 +38,7 @@ import {
   updateJobProgress,
   generateTitleAnalyses,
   generateTitleTranslations,
+  generateAnalysisTranslations,
   getJobConfig,
   refreshRatings,
   RATING_SOURCE_IDS,
@@ -395,6 +396,30 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
             updateJobProgress(jobId, processed, total, current),
         })
         logger.info({ job: name, jobId, ...result }, `✅ Synopsis translation pass complete`)
+        // Skipped when cancelled: cancelJob has already filed the run.
+        if (!result.cancelled) {
+          completeJob(jobId, { ...result })
+        }
+        break
+      }
+      // Film analyses: same loop in core (`runTranslationPass`), own switch and cap.
+      case 'translate-title-analyses': {
+        createJobProgress(jobId, name, 1)
+        setJobStep(jobId, 0, 'Translating film analyses')
+
+        const runLimit = jobDefinitions.find((j) => j.name === name)?.runLimit
+        const maxPairs = runLimit
+          ? resolveRunLimit(runLimit, (await getJobConfig(name)).maxItemsPerRun)
+          : undefined
+
+        const result = await generateAnalysisTranslations({
+          maxPairs,
+          onLog: (level, message) => addLog(jobId, level, message),
+          shouldCancel: () => isJobCancelled(jobId),
+          onProgress: ({ processed, total, current }) =>
+            updateJobProgress(jobId, processed, total, current),
+        })
+        logger.info({ job: name, jobId, ...result }, `✅ Film analysis translation pass complete`)
         // Skipped when cancelled: cancelJob has already filed the run.
         if (!result.cancelled) {
           completeJob(jobId, { ...result })

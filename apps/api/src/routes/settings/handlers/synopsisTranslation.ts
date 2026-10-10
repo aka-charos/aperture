@@ -8,7 +8,12 @@
  * - POST   /api/settings/synopsis-translation/test          - one real translation of a fixed sample
  * - GET    /api/settings/synopsis-translation/models        - what the endpoint lists at /models
  * - GET    /api/settings/synopsis-translation/status        - pending and stored per language
- * - DELETE /api/settings/synopsis-translation/translations  - forget stored translations (one language or all)
+ * - DELETE /api/settings/synopsis-translation/translations  - forget stored translations of one kind
+ *                                                             (`?kind=synopsis|analysis`, one language or all)
+ *
+ * One card, two jobs: the endpoint, model, languages, timeout and pacing are
+ * shared; synopses and film analyses each have their own switch, instructions
+ * and job (`translate-title-synopses`, `translate-title-analyses`).
  *
  * Not the admin "Translations" page (`/api/i18n/*`), which edits the UI's own
  * strings. See core translation/.
@@ -54,6 +59,8 @@ interface UpdateBody {
   instruction?: string
   timeoutMs?: number
   callSpacingSeconds?: number
+  analysisEnabled?: boolean
+  analysisInstruction?: string
 }
 
 interface TestBody extends UpdateBody {
@@ -71,8 +78,18 @@ function toPublicConfig(config: TranslationConfig) {
  * is refused before merge() would quietly coerce it.
  */
 function typeError(body: UpdateBody): string | null {
-  if (body.enabled !== undefined && typeof body.enabled !== 'boolean') return 'enabled must be true or false'
-  for (const key of ['promptStyle', 'baseUrl', 'model', 'apiKey', 'sourceLanguage', 'instruction'] as const) {
+  for (const key of ['enabled', 'analysisEnabled'] as const) {
+    if (body[key] !== undefined && typeof body[key] !== 'boolean') return `${key} must be true or false`
+  }
+  for (const key of [
+    'promptStyle',
+    'baseUrl',
+    'model',
+    'apiKey',
+    'sourceLanguage',
+    'instruction',
+    'analysisInstruction',
+  ] as const) {
     if (body[key] !== undefined && typeof body[key] !== 'string') return `${key} must be a string`
   }
   for (const key of ['timeoutMs', 'callSpacingSeconds'] as const) {
@@ -114,8 +131,10 @@ function validate(body: UpdateBody): string | null {
   }
   const badTarget = body.targetLanguages?.find((c) => !isValidAppLocale(c))
   if (badTarget) return `${badTarget} is not a supported language`
-  if (body.instruction !== undefined && body.instruction.trim().length > TRANSLATION_INSTRUCTION_MAX_CHARS) {
-    return `The instruction must be at most ${TRANSLATION_INSTRUCTION_MAX_CHARS} characters`
+  for (const key of ['instruction', 'analysisInstruction'] as const) {
+    if (body[key] !== undefined && (body[key] as string).trim().length > TRANSLATION_INSTRUCTION_MAX_CHARS) {
+      return `The instructions must be at most ${TRANSLATION_INSTRUCTION_MAX_CHARS} characters`
+    }
   }
   if (
     body.timeoutMs !== undefined &&
@@ -169,6 +188,8 @@ function merge(current: TranslationConfig, body: UpdateBody): TranslationConfig 
     instruction: body.instruction ?? current.instruction,
     timeoutMs: body.timeoutMs ?? current.timeoutMs,
     callSpacingSeconds: body.callSpacingSeconds ?? current.callSpacingSeconds,
+    analysisEnabled: body.analysisEnabled ?? current.analysisEnabled,
+    analysisInstruction: body.analysisInstruction ?? current.analysisInstruction,
   })
 }
 
@@ -189,7 +210,8 @@ async function describe(config: TranslationConfig) {
   const targets = resolveTargetLanguages(config, enabledUiLanguages)
   return {
     config: toPublicConfig(config),
-    readiness: checkTranslationReadiness(config, targets),
+    readiness: checkTranslationReadiness(config, targets, 'synopsis'),
+    analysisReadiness: checkTranslationReadiness(config, targets, 'analysis'),
     targets,
     enabledUiLanguages,
     defaults: { baseUrl: DEFAULT_TRANSLATION_CONFIG.baseUrl, model: DEFAULT_TRANSLATION_CONFIG.model },
@@ -311,7 +333,7 @@ export function registerSynopsisTranslationHandlers(fastify: FastifyInstance) {
     }
   )
 
-  fastify.delete<{ Querystring: { language?: string } }>(
+  fastify.delete<{ Querystring: { language?: string; kind?: string } }>(
     '/api/settings/synopsis-translation/translations',
     { preHandler: requireAdmin, schema: { tags: ['settings'] } },
     async (request, reply) => {
@@ -319,8 +341,15 @@ export function registerSynopsisTranslationHandlers(fastify: FastifyInstance) {
       if (language !== undefined && !isValidAppLocale(language)) {
         return reply.status(400).send({ error: `${language} is not a supported language` })
       }
+      // Absent is synopses — what this route cleared before analyses shared
+      // the table. Anything else is refused rather than guessed at, since a
+      // wrong guess deletes the other kind's translations.
+      const kind = request.query.kind ?? 'synopsis'
+      if (kind !== 'synopsis' && kind !== 'analysis') {
+        return reply.status(400).send({ error: 'kind must be synopsis or analysis' })
+      }
       try {
-        return reply.send({ cleared: await clearTranslations(language) })
+        return reply.send({ cleared: await clearTranslations(language, kind) })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to clear synopsis translations')
         return reply.status(500).send({ error: 'Failed to clear synopsis translations' })

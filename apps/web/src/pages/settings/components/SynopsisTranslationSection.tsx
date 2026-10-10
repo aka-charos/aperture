@@ -74,11 +74,20 @@ interface PublicConfig {
   instruction: string
   timeoutMs: number
   callSpacingSeconds: number
+  analysisEnabled: boolean
+  analysisInstruction: string
+}
+
+interface Readiness {
+  ready: boolean
+  reason: string | null
 }
 
 interface Described {
   config: PublicConfig
-  readiness: { ready: boolean; reason: string | null }
+  readiness: Readiness
+  /** Absent from an older server, which has no analysis translation. */
+  analysisReadiness?: Readiness
   targets: string[]
   enabledUiLanguages: string[]
   defaults: { baseUrl: string; model: string }
@@ -90,6 +99,37 @@ interface LanguageStatus {
   pendingSeries: number
   storedMovies: number
   storedSeries: number
+  /** Film analyses. Absent from an older server; read as 0. */
+  analysisPendingMovies?: number
+  analysisPendingSeries?: number
+  analysisStoredMovies?: number
+  analysisStoredSeries?: number
+}
+
+type TranslationKind = 'synopsis' | 'analysis'
+
+/** One row of a status table, whichever kind it counts. */
+interface KindCounts {
+  language: string
+  pendingMovies: number
+  pendingSeries: number
+  stored: number
+}
+
+function countsFor(row: LanguageStatus, kind: TranslationKind): KindCounts {
+  return kind === 'analysis'
+    ? {
+        language: row.language,
+        pendingMovies: row.analysisPendingMovies ?? 0,
+        pendingSeries: row.analysisPendingSeries ?? 0,
+        stored: (row.analysisStoredMovies ?? 0) + (row.analysisStoredSeries ?? 0),
+      }
+    : {
+        language: row.language,
+        pendingMovies: row.pendingMovies,
+        pendingSeries: row.pendingSeries,
+        stored: row.storedMovies + row.storedSeries,
+      }
 }
 
 type TestResult =
@@ -97,6 +137,7 @@ type TestResult =
   | { success: false; error: string }
 
 const JOB = 'translate-title-synopses'
+const ANALYSIS_JOB = 'translate-title-analyses'
 
 const toInt = (raw: string, fallback: number) => {
   const n = Number(raw)
@@ -126,13 +167,16 @@ export function SynopsisTranslationSection() {
   const [instruction, setInstruction] = useState('')
   const [timeoutSeconds, setTimeoutSeconds] = useState('120')
   const [spacingSeconds, setSpacingSeconds] = useState('1')
+  const [analysisEnabled, setAnalysisEnabled] = useState(false)
+  const [analysisInstruction, setAnalysisInstruction] = useState('')
 
   const [models, setModels] = useState<{ reachable: boolean; models: string[] } | null>(null)
   const [modelsLoading, setModelsLoading] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [status, setStatus] = useState<LanguageStatus[] | null>(null)
-  const [confirmClear, setConfirmClear] = useState<string | 'all' | null>(null)
+  // Which kind and which language ('all' for every language) a clear is for.
+  const [confirmClear, setConfirmClear] = useState<{ kind: TranslationKind; language: string } | null>(null)
   const [clearing, setClearing] = useState(false)
 
   const apply = useCallback((d: Described) => {
@@ -150,6 +194,8 @@ export function SynopsisTranslationSection() {
     setInstruction(c.instruction)
     setTimeoutSeconds(String(Math.round(c.timeoutMs / 1000)))
     setSpacingSeconds(String(c.callSpacingSeconds))
+    setAnalysisEnabled(c.analysisEnabled === true)
+    setAnalysisInstruction(c.analysisInstruction ?? '')
     setHasChanges(false)
   }, [])
 
@@ -219,6 +265,8 @@ export function SynopsisTranslationSection() {
     instruction,
     timeoutMs: Math.round(toInt(timeoutSeconds, 120) * 1000),
     callSpacingSeconds: toInt(spacingSeconds, 1),
+    analysisEnabled,
+    analysisInstruction,
   })
 
   const handleSave = async () => {
@@ -299,8 +347,9 @@ export function SynopsisTranslationSection() {
     if (!confirmClear) return
     setClearing(true)
     try {
-      const query = confirmClear === 'all' ? '' : `?language=${encodeURIComponent(confirmClear)}`
-      const response = await fetch(`/api/settings/synopsis-translation/translations${query}`, {
+      const params = new URLSearchParams({ kind: confirmClear.kind })
+      if (confirmClear.language !== 'all') params.set('language', confirmClear.language)
+      const response = await fetch(`/api/settings/synopsis-translation/translations?${params}`, {
         method: 'DELETE',
         credentials: 'include',
       })
@@ -334,8 +383,88 @@ export function SynopsisTranslationSection() {
 
   const savedOn = !!described?.config.enabled
   const readiness = described?.readiness
-  const totalPending = (status ?? []).reduce((n, s) => n + s.pendingMovies + s.pendingSeries, 0)
-  const totalStored = (status ?? []).reduce((n, s) => n + s.storedMovies + s.storedSeries, 0)
+  const analysisReadiness = described?.analysisReadiness
+  const analysisSavedOn = !!described?.config.analysisEnabled
+
+  /**
+   * The status block for one kind: totals, the job link, clear, and a row per
+   * language. One function for both, so the two tables cannot drift apart.
+   */
+  const renderStatus = (kind: TranslationKind) => {
+    const rows = (status ?? []).map((row) => countsFor(row, kind))
+    const pending = rows.reduce((n, r) => n + r.pendingMovies + r.pendingSeries, 0)
+    const stored = rows.reduce((n, r) => n + r.stored, 0)
+    const isAnalysis = kind === 'analysis'
+    return (
+      <Box>
+        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={1}>
+          <Typography variant="subtitle2" fontWeight={600} sx={{ flexGrow: 1 }}>
+            {t(
+              isAnalysis ? 'settingsSynopsisTranslation.analysisStatusTitle' : 'settingsSynopsisTranslation.statusTitle',
+              { pending, stored }
+            )}
+          </Typography>
+          <Button
+            size="small"
+            startIcon={<PlayArrowIcon />}
+            component={RouterLink}
+            to={jobConsoleLink(isAnalysis ? ANALYSIS_JOB : JOB)}
+          >
+            {t('settingsSynopsisTranslation.openJob')}
+          </Button>
+          {stored > 0 && (
+            <Button size="small" color="error" onClick={() => setConfirmClear({ kind, language: 'all' })}>
+              {t('settingsSynopsisTranslation.clearAll')}
+            </Button>
+          )}
+        </Box>
+        {rows.length > 0 ? (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>{t('settingsSynopsisTranslation.colLanguage')}</TableCell>
+                <TableCell align="right">{t('settingsSynopsisTranslation.colMoviesPending')}</TableCell>
+                <TableCell align="right">{t('settingsSynopsisTranslation.colSeriesPending')}</TableCell>
+                <TableCell align="right">{t('settingsSynopsisTranslation.colStored')}</TableCell>
+                <TableCell />
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.language}>
+                  <TableCell>
+                    {label(row.language)}
+                    {!described?.targets.includes(row.language) && (
+                      <Chip size="small" sx={{ ml: 1 }} label={t('settingsSynopsisTranslation.notTarget')} />
+                    )}
+                  </TableCell>
+                  <TableCell align="right">{row.pendingMovies.toLocaleString()}</TableCell>
+                  <TableCell align="right">{row.pendingSeries.toLocaleString()}</TableCell>
+                  <TableCell align="right">{row.stored.toLocaleString()}</TableCell>
+                  <TableCell align="right">
+                    {row.stored > 0 && (
+                      <Tooltip title={t('settingsSynopsisTranslation.clearLanguage', { language: label(row.language) })}>
+                        <IconButton size="small" onClick={() => setConfirmClear({ kind, language: row.language })}>
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            {t('settingsSynopsisTranslation.statusEmpty')}
+          </Typography>
+        )}
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+          {t(isAnalysis ? 'settingsSynopsisTranslation.analysisStatusHelp' : 'settingsSynopsisTranslation.statusHelp')}
+        </Typography>
+      </Box>
+    )
+  }
 
   return (
     <Card>
@@ -633,6 +762,54 @@ export function SynopsisTranslationSection() {
             />
           </Box>
 
+          <Divider />
+
+          {/* ------------------------------------------------ film analyses
+              Their own switch and instructions; everything above them (the
+              endpoint, model, languages, timeout and pause) is shared, and
+              the analysis job paces on the same key as the synopsis job. */}
+          <Box>
+            <Typography variant="subtitle1" fontWeight={600}>
+              {t('settingsSynopsisTranslation.analysisHeading')}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {t('settingsSynopsisTranslation.analysisIntro')}
+            </Typography>
+          </Box>
+          {analysisSavedOn && analysisReadiness && !analysisReadiness.ready && analysisReadiness.reason && (
+            <Alert severity="warning">{analysisReadiness.reason}</Alert>
+          )}
+          <FormControlLabel
+            id="synopsis-translation-analysis-enabled"
+            control={
+              <Switch
+                checked={analysisEnabled}
+                onChange={(e) => {
+                  setAnalysisEnabled(e.target.checked)
+                  changed()
+                }}
+              />
+            }
+            label={t('settingsSynopsisTranslation.analysisEnabledLabel')}
+          />
+          <TextField
+            fullWidth
+            multiline
+            minRows={2}
+            label={t('settingsSynopsisTranslation.analysisInstructionsLabel')}
+            value={analysisInstruction}
+            onChange={(e) => {
+              setAnalysisInstruction(e.target.value)
+              changed()
+            }}
+            helperText={
+              promptStyle === 'index-translate'
+                ? t('settingsSynopsisTranslation.analysisInstructionsHelpIndexTranslate')
+                : t('settingsSynopsisTranslation.analysisInstructionsHelpChat')
+            }
+            slotProps={{ htmlInput: { maxLength: 500 } }}
+          />
+
           <Box display="flex" gap={1} flexWrap="wrap">
             <Button
               variant="contained"
@@ -679,65 +856,8 @@ export function SynopsisTranslationSection() {
           <Divider />
 
           {/* ------------------------------------------------ status */}
-          <Box>
-            <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" mb={1}>
-              <Typography variant="subtitle2" fontWeight={600} sx={{ flexGrow: 1 }}>
-                {t('settingsSynopsisTranslation.statusTitle', { pending: totalPending, stored: totalStored })}
-              </Typography>
-              <Button size="small" startIcon={<PlayArrowIcon />} component={RouterLink} to={jobConsoleLink(JOB)}>
-                {t('settingsSynopsisTranslation.openJob')}
-              </Button>
-              {totalStored > 0 && (
-                <Button size="small" color="error" onClick={() => setConfirmClear('all')}>
-                  {t('settingsSynopsisTranslation.clearAll')}
-                </Button>
-              )}
-            </Box>
-            {status && status.length > 0 ? (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>{t('settingsSynopsisTranslation.colLanguage')}</TableCell>
-                    <TableCell align="right">{t('settingsSynopsisTranslation.colMoviesPending')}</TableCell>
-                    <TableCell align="right">{t('settingsSynopsisTranslation.colSeriesPending')}</TableCell>
-                    <TableCell align="right">{t('settingsSynopsisTranslation.colStored')}</TableCell>
-                    <TableCell />
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {status.map((row) => (
-                    <TableRow key={row.language}>
-                      <TableCell>
-                        {label(row.language)}
-                        {!described?.targets.includes(row.language) && (
-                          <Chip size="small" sx={{ ml: 1 }} label={t('settingsSynopsisTranslation.notTarget')} />
-                        )}
-                      </TableCell>
-                      <TableCell align="right">{row.pendingMovies.toLocaleString()}</TableCell>
-                      <TableCell align="right">{row.pendingSeries.toLocaleString()}</TableCell>
-                      <TableCell align="right">{(row.storedMovies + row.storedSeries).toLocaleString()}</TableCell>
-                      <TableCell align="right">
-                        {row.storedMovies + row.storedSeries > 0 && (
-                          <Tooltip title={t('settingsSynopsisTranslation.clearLanguage', { language: label(row.language) })}>
-                            <IconButton size="small" onClick={() => setConfirmClear(row.language)}>
-                              <DeleteOutlineIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                {t('settingsSynopsisTranslation.statusEmpty')}
-              </Typography>
-            )}
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-              {t('settingsSynopsisTranslation.statusHelp')}
-            </Typography>
-          </Box>
+          {renderStatus('synopsis')}
+          {renderStatus('analysis')}
         </Stack>
       </CardContent>
 
@@ -745,9 +865,13 @@ export function SynopsisTranslationSection() {
         <DialogTitle>{t('settingsSynopsisTranslation.clearConfirmTitle')}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            {confirmClear === 'all'
-              ? t('settingsSynopsisTranslation.clearConfirmAll')
-              : t('settingsSynopsisTranslation.clearConfirmLanguage', { language: label(confirmClear ?? '') })}
+            {confirmClear?.kind === 'analysis'
+              ? confirmClear.language === 'all'
+                ? t('settingsSynopsisTranslation.analysisClearConfirmAll')
+                : t('settingsSynopsisTranslation.analysisClearConfirmLanguage', { language: label(confirmClear.language) })
+              : confirmClear?.language === 'all'
+                ? t('settingsSynopsisTranslation.clearConfirmAll')
+                : t('settingsSynopsisTranslation.clearConfirmLanguage', { language: label(confirmClear?.language ?? '') })}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
