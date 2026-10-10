@@ -273,7 +273,7 @@ test('Chinese and Japanese join sentences with no space', () => {
 
 // ---------------------------------------------------------------- rate limits
 
-test('the public endpoint's 429 is read through its FastAPI detail wrapper', () => {
+test("the public endpoint's 429 is read through its FastAPI detail wrapper", () => {
   const body = JSON.stringify({
     detail: {
       error: {
