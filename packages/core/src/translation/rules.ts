@@ -340,6 +340,187 @@ export function maxTokensFor(text: string): number {
   return Math.min(8192, Math.max(1024, Math.ceil(text.length * 1.5) + 256))
 }
 
+/**
+ * The longest piece of text one request carries.
+ *
+ * THE PUBLIC ENDPOINT'S GATEWAY ANSWERS 504 AT EXACTLY TEN SECONDS, whatever
+ * the client's timeout and whatever `max_tokens` says, so a synopsis is
+ * translatable in one call only if the model can write the whole translation
+ * inside that window. Measured 2026-10-10 against `Index-Translate-35B-A3B`:
+ * into Greek, 575/863/1,151 characters took 2.8/3.6/4.6s and 1,727 hit the
+ * wall at 10.2s; into German 1,727 took 4.3s and 3,167 hit it. So the failures
+ * were never about WHICH titles — they were the long `plot_full`s, which fail
+ * identically on every run (greedy decoding, same text, same length). Greek
+ * and Hindi cost more tokens per character than German, hence the margin: 700
+ * characters sits near three seconds into Greek and leaves room for a busy
+ * shared server.
+ */
+export const TRANSLATION_CHUNK_CHARS = 700
+
+export interface TextChunk {
+  text: string
+  /** How this chunk is joined to the one before it: '' (first), 'sentence' or 'paragraph'. */
+  joinBefore: '' | 'sentence' | 'paragraph'
+}
+
+/**
+ * Sentence-sized units of one paragraph. A boundary is sentence punctuation
+ * (optionally closed by a quote or bracket) FOLLOWED BY WHITESPACE, and only
+ * the whitespace is removed — so "3.5 million", "U.S." and a leading "..." stay
+ * exactly as written. A match-based splitter silently drops any character it
+ * cannot match and breaks "3.5" into "3." + "5", which the join then sends as
+ * "3. 5": the text translated would no longer be the text stored.
+ */
+function sentencesOf(paragraph: string): string[] {
+  return paragraph
+    .split(/(?<=[.!?…]["'”’)\]]*)\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+/**
+ * A sentence longer than the limit, cut at the last space before it. Only a
+ * single "word" longer than half the limit (a URL, say) is cut mid-word.
+ */
+function hardSplit(sentence: string, maxChars: number): string[] {
+  const out: string[] = []
+  let rest = sentence
+  while (rest.length > maxChars) {
+    const cut = rest.lastIndexOf(' ', maxChars)
+    const at = cut > maxChars / 2 ? cut : maxChars
+    out.push(rest.slice(0, at).trim())
+    rest = rest.slice(at).trim()
+  }
+  if (rest) out.push(rest)
+  return out
+}
+
+/**
+ * Cut a synopsis into pieces of at most `maxChars`, on paragraph breaks first,
+ * then sentence ends, then (for a single overlong sentence) spaces. A text
+ * under the limit is ONE chunk, so a short overview builds exactly the request
+ * it always did. Pieces are packed greedily so a long synopsis is as few calls
+ * as the limit allows — each call is a paced request to a shared free service.
+ */
+export function splitForTranslation(text: string, maxChars = TRANSLATION_CHUNK_CHARS): TextChunk[] {
+  const trimmed = text.trim()
+  if (trimmed.length <= maxChars) return trimmed ? [{ text: trimmed, joinBefore: '' }] : []
+
+  const chunks: TextChunk[] = []
+  const paragraphs = trimmed.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  for (const paragraph of paragraphs) {
+    const units = sentencesOf(paragraph).flatMap((s) => (s.length > maxChars ? hardSplit(s, maxChars) : [s]))
+    let current = ''
+    let firstInParagraph = true
+    const flush = () => {
+      if (!current) return
+      chunks.push({
+        text: current,
+        joinBefore: chunks.length === 0 ? '' : firstInParagraph ? 'paragraph' : 'sentence',
+      })
+      firstInParagraph = false
+      current = ''
+    }
+    for (const unit of units) {
+      if (current && current.length + 1 + unit.length > maxChars) flush()
+      current = current ? `${current} ${unit}` : unit
+    }
+    flush()
+  }
+  return chunks
+}
+
+/**
+ * Put translated chunks back together. Sentences are joined with a space,
+ * except into Chinese and Japanese, which write none between sentences;
+ * paragraphs keep their blank line.
+ */
+export function joinTranslatedChunks(
+  parts: ReadonlyArray<{ text: string; joinBefore: TextChunk['joinBefore'] }>,
+  target: AppLocaleCode
+): string {
+  const sentenceGap = target === 'zh' || target === 'ja' ? '' : ' '
+  return parts
+    .map((p) => (p.joinBefore === 'paragraph' ? '\n\n' : p.joinBefore === 'sentence' ? sentenceGap : '') + p.text)
+    .join('')
+}
+
+/**
+ * The provider's message and requested wait from an error body. Errors arrive
+ * in several shapes: OpenAI's `{ error: { message } }`, a bare `{ message }`,
+ * and FastAPI's `{ detail }` — which the public endpoint uses with an OpenAI
+ * error NESTED inside it (`{ detail: { error: { message, retry_after } } }`),
+ * so both layers are read. Non-JSON falls back to the raw text.
+ */
+export function readErrorBody(text: string): { message: string | null; retryAfterSeconds: number | null } {
+  let json: unknown
+  try {
+    json = JSON.parse(text)
+  } catch {
+    return { message: text.trim().slice(0, 300) || null, retryAfterSeconds: null }
+  }
+  const layers: unknown[] = [json]
+  const detail = (json as { detail?: unknown } | null)?.detail
+  if (detail && typeof detail === 'object') layers.push(detail)
+
+  let message: string | null = null
+  let retryAfterSeconds: number | null = null
+  for (const layer of layers) {
+    const obj = layer as { error?: unknown; message?: unknown; detail?: unknown; retry_after?: unknown }
+    const error = obj.error
+    const errObj = error && typeof error === 'object' ? (error as { message?: unknown; retry_after?: unknown }) : null
+    message ??=
+      typeof error === 'string'
+        ? error
+        : typeof errObj?.message === 'string'
+          ? errObj.message
+          : typeof obj.message === 'string'
+            ? obj.message
+            : typeof obj.detail === 'string'
+              ? obj.detail
+              : null
+    for (const raw of [errObj?.retry_after, obj.retry_after]) {
+      const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN
+      if (retryAfterSeconds == null && Number.isFinite(n) && n >= 0) retryAfterSeconds = n
+    }
+  }
+  return { message: message ?? (text.trim().slice(0, 300) || null), retryAfterSeconds }
+}
+
+/**
+ * How long to wait before retry number `attempt` (1-based) of a 429, in ms.
+ *
+ * THE ENDPOINT'S OWN FIGURE IS A FLOOR, NOT THE ANSWER. The public endpoint's
+ * limit is 60,000 tokens per minute per IP and it answers "retry in 1s" when
+ * the window is a hair over (measured: current 59,720, requested 567). A
+ * sliding minute that full frees a few hundred tokens a second at best, so a
+ * one-second wait mostly buys a second refusal. The wait is therefore the
+ * larger of what the server asked for (body `retry_after`, then the
+ * `Retry-After` header in seconds — an HTTP date reads as absent) and a
+ * backoff of 5s doubling per attempt, capped at {@link RATE_LIMIT_MAX_WAIT_MS}
+ * so a server asking for an hour fails the call instead of parking the job.
+ */
+export function rateLimitWaitMs(
+  bodyRetryAfterSeconds: number | null,
+  header: string | null,
+  attempt = 1
+): number {
+  const headerSeconds = header != null && header.trim() !== '' ? Number(header) : NaN
+  const asked =
+    bodyRetryAfterSeconds ?? (Number.isFinite(headerSeconds) && headerSeconds >= 0 ? headerSeconds : 0)
+  const backoff = RATE_LIMIT_BASE_WAIT_S * 2 ** Math.max(0, attempt - 1)
+  return Math.round(Math.min(RATE_LIMIT_MAX_WAIT_MS, Math.max(asked, backoff) * 1000))
+}
+
+export const RATE_LIMIT_BASE_WAIT_S = 5
+export const RATE_LIMIT_MAX_WAIT_MS = 60_000
+/**
+ * Retries of ONE request after a 429. 5 + 10 + 20 + 40 + 60 + 60 seconds is
+ * over three minutes — three full windows of a per-minute limit — after which
+ * the failure is reported as before and the pair moves to the back of the queue.
+ */
+export const RATE_LIMIT_MAX_RETRIES = 6
+
 export interface ChatCompletionBody {
   model: string
   messages: Array<{ role: 'system' | 'user'; content: string }>

@@ -3,9 +3,11 @@
  * priority order, up to a per-run cap. Shaped on `analysis/job.ts`, and for
  * the same three reasons:
  *
- * 1. EVERY PAIR IS ATTEMPTED AT MOST ONCE PER RUN. A failure writes no row, so
- *    the pair stays pending; a loop reading until the selection empties would
- *    spin on it forever (the `enrichMetadata` `while (true)` lesson). Only a
+ * 1. EVERY PAIR IS ATTEMPTED AT MOST ONCE PER RUN. A failure writes no
+ *    translation, so the pair stays pending — and a `title_translation_failures`
+ *    row, which queues it LAST on every later run, since a pair that fails
+ *    each time must not open each run. A loop reading until the selection
+ *    empties would spin on it forever (the `enrichMetadata` `while (true)` lesson). Only a
  *    pair LEFT pending is sent back to SQL as an exclusion — a stored pair
  *    has already left the pending set, and an exclusion array of every pair
  *    tried is a `<> ALL` over thousands of entries on every row of every batch
@@ -23,14 +25,19 @@ import { waitForCallSlot } from '../lib/callPacing.js'
 import { createChildLogger } from '../lib/logger.js'
 import type { AppLocaleCode } from '../lib/locales.js'
 import { getSystemLanguageDefaults } from '../settings/systemSettings.js'
-import { checkTranslationReadiness, getTranslationConfig, translateText } from './client.js'
+import {
+  TranslationCancelledError,
+  checkTranslationReadiness,
+  getTranslationConfig,
+  translateText,
+} from './client.js'
 import {
   fieldPendingSql,
   pendingTranslationsFromSql,
   sourceColumnsSql,
   translationPriorityOrderSql,
 } from './pending.js'
-import { countPendingByLanguage, storeTranslation } from './store.js'
+import { countPendingByLanguage, recordTranslationFailure, storeTranslation } from './store.js'
 import {
   chatCompletionsUrl,
   enabledFields,
@@ -82,6 +89,8 @@ interface PendingPair {
   title: string
   year: number | null
   language: AppLocaleCode
+  /** This pair failed on an earlier run (it was queued last for that reason). */
+  retry: boolean
   work: Array<{ field: TranslatableField; text: string; hash: string }>
 }
 
@@ -90,6 +99,7 @@ type PairRow = {
   title: string
   year: number | null
   language: string
+  retry: boolean
 } & Record<string, unknown>
 
 async function selectPendingPairs(
@@ -104,9 +114,10 @@ async function selectPendingPairs(
     .join(',\n           ')
   const rows = await query<PairRow>(
     `SELECT m.id, m.title, m.year, lang.code AS language,
+           (failed.last_failed_at IS NOT NULL) AS retry,
            ${sourceColumnsSql(fields)},
            ${pendingFlags}
-     ${pendingTranslationsFromSql(mediaType, fields, '$1', { withPicks: true })}
+     ${pendingTranslationsFromSql(mediaType, fields, '$1', { withPicks: true, withFailures: true })}
        AND (m.id::text || ':' || lang.code) <> ALL($2::text[])
      ${translationPriorityOrderSql()}
      LIMIT $3`,
@@ -119,6 +130,7 @@ async function selectPendingPairs(
     title: row.title,
     year: row.year,
     language: row.language as AppLocaleCode,
+    retry: row.retry === true,
     work: fields
       .filter((f) => row[`${f}_pending`] === true && typeof row[`${f}_source`] === 'string')
       .map((f) => ({
@@ -236,12 +248,25 @@ export async function generateTitleTranslations(
         }
         for (const item of pair.work) {
           if (await cancelled()) return stop()
-          const paced = await waitForCallSlot(pacingKey, spacingMs, { shouldCancel: options.shouldCancel })
-          if (paced.cancelled) return stop()
-          calls++
 
           try {
-            const translation = await translateText(config, item.text, pair.language)
+            // Every request — each chunk of a long synopsis, and each retry
+            // after a 429 — waits its pacing slot and checks Stop first.
+            const translation = await translateText(config, item.text, pair.language, {
+              beforeCall: async () => {
+                if (await cancelled()) return false
+                const paced = await waitForCallSlot(pacingKey, spacingMs, { shouldCancel: options.shouldCancel })
+                if (paced.cancelled) return false
+                calls++
+                return true
+              },
+              onRateLimited: (waitMs, attempt) =>
+                say(
+                  'info',
+                  `⏳ ${label} · ${item.field} — rate-limited by the endpoint, waiting ` +
+                    `${Math.round(waitMs / 1000)}s before retry ${attempt}`
+                ),
+            })
             await storeTranslation({
               mediaType,
               mediaId: pair.mediaId,
@@ -259,14 +284,32 @@ export async function generateTitleTranslations(
                 `${translation.text.length.toLocaleString()} chars in ${(translation.latencyMs / 1000).toFixed(1)}s`
             )
           } catch (err) {
+            if (err instanceof TranslationCancelledError) return stop()
             result.failed++
             pairFailed = true
             const reason = err instanceof Error ? err.message : String(err)
+            await recordTranslationFailure({
+              mediaType,
+              mediaId: pair.mediaId,
+              language: pair.language,
+              field: item.field,
+              sourceHash: item.hash,
+              error: reason,
+            })
             logger.warn(
               { err, mediaType, mediaId: pair.mediaId, language: pair.language, field: item.field },
               'Synopsis translation failed; leaving it pending'
             )
-            say('warn', `⚠️ ${label} · ${item.field} — failed, staying pending: ${reason}`)
+            say(
+              'warn',
+              `⚠️ ${label} · ${item.field} — failed${pair.retry ? ' again' : ''}, ` +
+                `staying pending (queued after the rest next run): ${reason}`
+            )
+            // A pair that already failed on an earlier run says nothing new
+            // about the endpoint: these are queued last on purpose, so a run
+            // reaching them meets them back to back, and counting them would
+            // end every run that gets that far in a false "endpoint is down".
+            if (pair.retry) continue
             consecutiveFailures++
             lastFailure = reason
             if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {

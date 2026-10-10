@@ -14,13 +14,19 @@ import type { AppLocaleCode } from '../lib/locales.js'
 import {
   DEFAULT_TRANSLATION_CONFIG,
   INDEX_TRANSLATE_USER_AGENT,
+  RATE_LIMIT_MAX_RETRIES,
   buildChatCompletionBody,
   chatCompletionsUrl,
   enabledFields,
+  joinTranslatedChunks,
   modelsUrl,
+  rateLimitWaitMs,
   readCompletion,
+  readErrorBody,
   readModelList,
   sanitizeTranslationConfig,
+  splitForTranslation,
+  type TextChunk,
   type TranslationConfig,
 } from './rules.js'
 
@@ -85,34 +91,41 @@ export function checkTranslationReadiness(
 
 export class TranslationError extends Error {
   status?: number
-  constructor(message: string, status?: number) {
+  /** On a 429: what the endpoint asked for, read into a wait per attempt by `rateLimitWaitMs`. */
+  rateLimit?: { retryAfterSeconds: number | null; header: string | null }
+  constructor(
+    message: string,
+    status?: number,
+    rateLimit?: { retryAfterSeconds: number | null; header: string | null }
+  ) {
     super(message)
     this.name = 'TranslationError'
     this.status = status
+    this.rateLimit = rateLimit
   }
 }
 
-/** The provider's own words, when the body has any. */
-async function readErrorMessage(response: Response): Promise<string> {
+/** The provider's own words, and on a 429 the wait it asked for. */
+async function readError(
+  response: Response
+): Promise<{ message: string; rateLimit?: { retryAfterSeconds: number | null; header: string | null } }> {
+  let text = ''
   try {
-    const text = await response.text()
-    try {
-      const json = JSON.parse(text) as { error?: unknown; message?: unknown; detail?: unknown }
-      const error = json.error
-      if (typeof error === 'string') return error
-      if (error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string') {
-        return (error as { message: string }).message
-      }
-      if (typeof json.message === 'string') return json.message
-      if (typeof json.detail === 'string') return json.detail
-    } catch {
-      // Not JSON: fall through to the raw text.
-    }
-    return text.slice(0, 300) || response.statusText
+    text = await response.text()
   } catch {
-    return response.statusText
+    // Body unreadable: the status line is all there is.
+  }
+  const { message, retryAfterSeconds } = readErrorBody(text)
+  return {
+    message: message ?? response.statusText,
+    rateLimit:
+      response.status === 429
+        ? { retryAfterSeconds, header: response.headers.get('retry-after') }
+        : undefined,
   }
 }
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 function headersFor(config: TranslationConfig): Record<string, string> {
   return {
@@ -130,19 +143,113 @@ export interface TranslationResult {
   latencyMs: number
 }
 
+export interface TranslateOptions {
+  /**
+   * Called before EVERY request, including each chunk of a long text — that is
+   * where the job's pacing wait and cancellation live, so a synopsis cut into
+   * five chunks is five paced calls rather than a burst. Return false to stop:
+   * the call then throws {@link TranslationCancelledError} and nothing of the
+   * text is returned, since half a synopsis must never be stored.
+   */
+  beforeCall?: () => Promise<boolean>
+  /** Told when a 429 makes the call wait, so the job log can say why it paused. */
+  onRateLimited?: (waitMs: number, attempt: number) => void
+  /**
+   * Retries after a 429 before it is reported. Defaults to
+   * {@link RATE_LIMIT_MAX_RETRIES} (minutes of waiting, right for the job); an
+   * interactive caller passes 0, since a request held open that long is cut
+   * off by any proxy in front of it (F-141) and the 429 IS the answer there.
+   */
+  rateLimitRetries?: number
+}
+
+/** A text abandoned between chunks because the run was stopped. */
+export class TranslationCancelledError extends Error {
+  constructor() {
+    super('Translation stopped between chunks')
+    this.name = 'TranslationCancelledError'
+  }
+}
+
 /**
- * Translate one text. Throws {@link TranslationError} for anything that is not
- * a usable translation — transport, HTTP status, a truncated answer, an echo of
- * the source — so the caller stores nothing and the pair stays pending.
+ * Translate one text. A text longer than {@link TRANSLATION_CHUNK_CHARS} is
+ * translated in pieces and joined (the public endpoint's gateway gives up on
+ * any request over ten seconds). Throws {@link TranslationError} for anything
+ * that is not a usable translation — transport, HTTP status, a truncated
+ * answer, an echo of the source — in ANY chunk, so the caller stores nothing
+ * and the pair stays pending.
  */
 export async function translateText(
   config: TranslationConfig,
   text: string,
-  target: AppLocaleCode
+  target: AppLocaleCode,
+  options: TranslateOptions = {}
 ): Promise<TranslationResult> {
   const url = chatCompletionsUrl(config.baseUrl)
   if (!url) throw new TranslationError('The endpoint base URL is not an http(s) URL')
 
+  const chunks = splitForTranslation(text)
+  // Blank text has nothing to translate; answering '' would store an empty
+  // translation that reads as current. (The pending SQL never selects one.)
+  if (chunks.length === 0) throw new TranslationError('There is no text to translate')
+  const parts: Array<{ text: string; joinBefore: TextChunk['joinBefore'] }> = []
+  let model = config.model
+  let latencyMs = 0
+  for (const [index, chunk] of chunks.entries()) {
+    try {
+      const piece = await requestWithRateLimitRetry(config, url, chunk.text, target, options)
+      parts.push({ text: piece.text, joinBefore: chunk.joinBefore })
+      model = piece.model
+      latencyMs += piece.latencyMs
+    } catch (err) {
+      // Say which piece failed, or a long synopsis reads as failing whole.
+      if (err instanceof TranslationError && chunks.length > 1) {
+        throw new TranslationError(`Part ${index + 1} of ${chunks.length}: ${err.message}`, err.status)
+      }
+      throw err
+    }
+  }
+  return { text: joinTranslatedChunks(parts, target), model, latencyMs }
+}
+
+/**
+ * One piece, retried while the endpoint answers 429. A rate limit is a fact
+ * about the last minute of traffic, not about this text, so failing the pair
+ * on it would push a perfectly good title to the back of the queue and count
+ * toward the "endpoint is down" stop. The wait is the larger of what the
+ * endpoint asked for and a backoff that doubles per attempt
+ * (`rateLimitWaitMs`), and `beforeCall` runs again after it, so a Stop pressed
+ * during the wait is honoured before the retry is sent.
+ */
+async function requestWithRateLimitRetry(
+  config: TranslationConfig,
+  url: string,
+  text: string,
+  target: AppLocaleCode,
+  options: TranslateOptions
+): Promise<TranslationResult> {
+  for (let attempt = 0; ; attempt++) {
+    if (options.beforeCall && !(await options.beforeCall())) throw new TranslationCancelledError()
+    try {
+      return await requestTranslation(config, url, text, target)
+    } catch (err) {
+      const limited = err instanceof TranslationError ? err.rateLimit : undefined
+      if (!limited || attempt >= (options.rateLimitRetries ?? RATE_LIMIT_MAX_RETRIES)) throw err
+      const waitMs = rateLimitWaitMs(limited.retryAfterSeconds, limited.header, attempt + 1)
+      logger.info({ waitMs, attempt: attempt + 1 }, 'Translation endpoint rate-limited; waiting before retrying')
+      options.onRateLimited?.(waitMs, attempt + 1)
+      await sleep(waitMs)
+    }
+  }
+}
+
+/** One request: one piece of text, one answer. */
+async function requestTranslation(
+  config: TranslationConfig,
+  url: string,
+  text: string,
+  target: AppLocaleCode
+): Promise<TranslationResult> {
   const body = buildChatCompletionBody(config, text, target, config.sourceLanguage)
   const startedAt = Date.now()
   let response: Response
@@ -163,7 +270,8 @@ export async function translateText(
   }
 
   if (!response.ok) {
-    throw new TranslationError(`HTTP ${response.status}: ${await readErrorMessage(response)}`, response.status)
+    const { message, rateLimit } = await readError(response)
+    throw new TranslationError(`HTTP ${response.status}: ${message}`, response.status, rateLimit)
   }
 
   let json: unknown

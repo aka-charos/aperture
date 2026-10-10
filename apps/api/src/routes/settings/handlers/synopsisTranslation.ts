@@ -255,7 +255,11 @@ export function registerSynopsisTranslationHandlers(fastify: FastifyInstance) {
           })
         }
         try {
-          const result = await translateText(config, TRANSLATION_TEST_TEXT, language)
+          // No 429 retries here: the job waits minutes for a rate limit, and a
+          // button cannot hold a request open that long.
+          const result = await translateText(config, TRANSLATION_TEST_TEXT, language, {
+            rateLimitRetries: 0,
+          })
           return reply.send({
             success: true,
             language,

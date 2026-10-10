@@ -30,9 +30,18 @@ export interface StoredTranslation {
   model: string
 }
 
+/**
+ * Store a translation. The same statement deletes any failure recorded for
+ * this field, so a pair that finally translates leaves the back of the queue
+ * in the write that proves it can.
+ */
 export async function storeTranslation(row: StoredTranslation): Promise<void> {
   await query(
-    `INSERT INTO title_translations
+    `WITH cleared AS (
+       DELETE FROM title_translation_failures
+        WHERE media_type = $1 AND media_id = $2 AND language = $3 AND field = $4
+     )
+     INSERT INTO title_translations
        (media_type, media_id, language, field, source_hash, translated_text, model)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (media_type, media_id, language, field) DO UPDATE
@@ -42,6 +51,40 @@ export async function storeTranslation(row: StoredTranslation): Promise<void> {
            updated_at = NOW()`,
     [row.mediaType, row.mediaId, row.language, row.field, row.sourceHash, row.text, row.model]
   )
+}
+
+/**
+ * Record that a field failed, which moves its pair to the back of every later
+ * run's queue (`translationPriorityOrderSql`). The count restarts when the
+ * source text is not the one that failed before. Never throws: the failure is
+ * already being reported, and losing this record only costs the ordering.
+ */
+export async function recordTranslationFailure(row: {
+  mediaType: 'movie' | 'series'
+  mediaId: string
+  language: AppLocaleCode
+  field: TranslatableField
+  sourceHash: string
+  error: string
+}): Promise<void> {
+  try {
+    await query(
+      `INSERT INTO title_translation_failures
+         (media_type, media_id, language, field, source_hash, last_error)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (media_type, media_id, language, field) DO UPDATE
+         SET failures = CASE WHEN title_translation_failures.source_hash = EXCLUDED.source_hash
+                             THEN title_translation_failures.failures + 1 ELSE 1 END,
+             first_failed_at = CASE WHEN title_translation_failures.source_hash = EXCLUDED.source_hash
+                                    THEN title_translation_failures.first_failed_at ELSE NOW() END,
+             source_hash = EXCLUDED.source_hash,
+             last_error = EXCLUDED.last_error,
+             last_failed_at = NOW()`,
+      [row.mediaType, row.mediaId, row.language, row.field, row.sourceHash, row.error.slice(0, 1000)]
+    )
+  } catch (err) {
+    logger.warn({ err, ...row }, 'Could not record a failed synopsis translation')
+  }
 }
 
 /**
@@ -178,6 +221,10 @@ export async function getTranslationStatus(config?: TranslationConfig): Promise<
 
 /** Forget stored translations — one language, or all of them. Returns rows removed. */
 export async function clearTranslations(language?: AppLocaleCode): Promise<number> {
+  // Failure records go too: after a clear the pairs start over, and keeping
+  // them would queue those titles last for a reason nobody can see any more.
+  if (language) await query('DELETE FROM title_translation_failures WHERE language = $1', [language])
+  else await query('DELETE FROM title_translation_failures')
   const result = language
     ? await query('DELETE FROM title_translations WHERE language = $1', [language])
     : await query('DELETE FROM title_translations')

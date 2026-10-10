@@ -4,10 +4,12 @@ import assert from 'node:assert/strict'
 import {
   currentTranslationsSql,
   enabledLibrarySql,
+  failedPairJoinSql,
   fieldPendingSql,
   pendingTranslationsFromSql,
   sourceColumnsSql,
   sourceTextSql,
+  translationPriorityOrderSql,
 } from './pending.js'
 import { TRANSLATABLE_FIELDS } from './rules.js'
 
@@ -64,4 +66,24 @@ test('pending crosses every title with every language and scopes rows by media t
 test('the detail read joins the right table for each media type', () => {
   assert.match(currentTranslationsSql('movie'), /JOIN movies m ON m\.id = tt\.media_id/)
   assert.match(currentTranslationsSql('series'), /JOIN series m ON m\.id = tt\.media_id/)
+})
+
+test('a pair that failed before is queued after every pair that has not', () => {
+  // The failure flag leads the ORDER BY, ahead of the picks priority: a pair
+  // failing every run must never open the next one.
+  const order = translationPriorityOrderSql()
+  assert.match(order, /^ORDER BY \(failed\.last_failed_at IS NOT NULL\), failed\.last_failed_at ASC NULLS FIRST,/)
+  assert.ok(order.indexOf('failed.last_failed_at') < order.indexOf('picks.id'))
+  const sql = pendingTranslationsFromSql('movie', ['overview'], '$1', { withPicks: true, withFailures: true })
+  assert.ok(sql.includes(failedPairJoinSql('movie')))
+})
+
+test('a failure applies only to the text that failed', () => {
+  // Once the synopsis changes, the pair is new work and queues as such.
+  const join = failedPairJoinSql('series')
+  assert.match(join, /f\.media_type = 'series'/)
+  for (const field of TRANSLATABLE_FIELDS) {
+    assert.ok(join.includes(`WHEN '${field}' THEN ${sourceTextSql(field)}`), field)
+  }
+  assert.match(join, /f\.source_hash = md5\(CASE f\.field/)
 })

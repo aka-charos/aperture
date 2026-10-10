@@ -6,16 +6,22 @@ import {
   DEFAULT_TRANSLATION_CONFIG,
   ECHO_CHECK_MIN_CHARS,
   INDEX_TRANSLATE_BASE_URL,
+  RATE_LIMIT_MAX_WAIT_MS,
+  TRANSLATION_CHUNK_CHARS,
   buildChatCompletionBody,
   buildIndexTranslatePrompt,
   chatCompletionsUrl,
   enabledFields,
+  joinTranslatedChunks,
   maxTokensFor,
   modelsUrl,
+  rateLimitWaitMs,
   readCompletion,
+  readErrorBody,
   readModelList,
   resolveTargetLanguages,
   sanitizeTranslationConfig,
+  splitForTranslation,
   stripThink,
 } from './rules.js'
 
@@ -198,4 +204,109 @@ test('an explicit empty list means none, not "follow the interface"', () => {
     resolveTargetLanguages({ targetLanguages: [], sourceLanguage: 'en' }, ['en', 'el', 'de']),
     []
   )
+})
+
+// ---------------------------------------------------------------- chunking
+
+test('a text under the limit is one chunk — the request a short overview always made', () => {
+  const text = '  Six deadly stories that explore the extremities of human behaviour.  '
+  assert.deepEqual(splitForTranslation(text), [{ text: text.trim(), joinBefore: '' }])
+  assert.deepEqual(splitForTranslation('   '), [])
+})
+
+test('a long synopsis is cut at sentence ends, every piece under the limit, nothing lost', () => {
+  const sentence = 'The Kim family live in a cramped semi-basement flat in Seoul and fold pizza boxes for money. '
+  const text = sentence.repeat(30).trim()
+  const chunks = splitForTranslation(text)
+  assert.ok(chunks.length > 1)
+  for (const c of chunks) {
+    assert.ok(c.text.length <= TRANSLATION_CHUNK_CHARS, `${c.text.length}`)
+    assert.match(c.text, /\.$/, 'ends on a sentence boundary')
+  }
+  assert.equal(chunks[0].joinBefore, '')
+  assert.ok(chunks.slice(1).every((c) => c.joinBefore === 'sentence'))
+  // Joined back with a space, the pieces are the source exactly.
+  assert.equal(chunks.map((c) => c.text).join(' '), text)
+})
+
+test('paragraph breaks survive the round trip', () => {
+  const a = 'First paragraph. '.repeat(30).trim()
+  const b = 'Second paragraph. '.repeat(30).trim()
+  const chunks = splitForTranslation(`${a}
+
+${b}`, 300)
+  assert.equal(chunks.filter((c) => c.joinBefore === 'paragraph').length, 1)
+  assert.equal(joinTranslatedChunks(chunks, 'el'), `${a}
+
+${b}`)
+})
+
+test('splitting never changes the text: decimals, initialisms and a leading ellipsis survive', () => {
+  // A match-based splitter dropped unmatched characters and broke "3.5" into
+  // "3." + "5", which the join sent as "3. 5".
+  const text =
+    '...and so it begins. The U.S. Army spends $3.5 million on a plan nobody reads. "Why?" asks Dr. Hale. ' +
+    'Nobody answers! '.repeat(60)
+  const chunks = splitForTranslation(text.trim(), 200)
+  assert.ok(chunks.length > 1)
+  assert.equal(chunks.map((c) => c.text).join(' '), text.trim())
+  assert.ok(chunks[0].text.startsWith('...and so it begins.'))
+  assert.ok(chunks.some((c) => c.text.includes('$3.5 million')))
+  assert.ok(chunks.some((c) => c.text.includes('The U.S. Army')))
+})
+
+test('one sentence over the limit is cut at a space, never mid-word', () => {
+  const words = Array.from({ length: 200 }, (_, i) => `word${i}`).join(' ')
+  const chunks = splitForTranslation(words, 300)
+  assert.ok(chunks.every((c) => c.text.length <= 300))
+  assert.equal(chunks.map((c) => c.text).join(' '), words)
+})
+
+test('Chinese and Japanese join sentences with no space', () => {
+  const parts = [
+    { text: '第一句。', joinBefore: '' as const },
+    { text: '第二句。', joinBefore: 'sentence' as const },
+  ]
+  assert.equal(joinTranslatedChunks(parts, 'zh'), '第一句。第二句。')
+  assert.equal(joinTranslatedChunks(parts, 'el'), '第一句。 第二句。')
+})
+
+// ---------------------------------------------------------------- rate limits
+
+test('the public endpoint's 429 is read through its FastAPI detail wrapper', () => {
+  const body = JSON.stringify({
+    detail: {
+      error: {
+        message: 'Rate limit exceeded: TPM limit of 60000 tokens/min exceeded. Please retry in 1s.',
+        type: 'rate_limit_error',
+        code: 429,
+        retry_after: 1,
+      },
+    },
+  })
+  const read = readErrorBody(body)
+  assert.match(read.message ?? '', /^Rate limit exceeded/)
+  assert.equal(read.retryAfterSeconds, 1)
+})
+
+test('other error shapes still read, and non-JSON falls back to the text', () => {
+  assert.equal(readErrorBody('{"error":{"message":"bad model"}}').message, 'bad model')
+  assert.equal(readErrorBody('{"detail":"Not Found"}').message, 'Not Found')
+  assert.equal(readErrorBody('<html>504</html>').message, '<html>504</html>')
+  assert.equal(readErrorBody('').message, null)
+})
+
+test('"retry in 1s" is not taken literally: the wait backs off from 5s and doubles', () => {
+  // A minute-window limit at 59,720 of 60,000 does not clear in a second.
+  assert.equal(rateLimitWaitMs(1, null, 1), 5_000)
+  assert.equal(rateLimitWaitMs(1, null, 2), 10_000)
+  assert.equal(rateLimitWaitMs(1, null, 3), 20_000)
+  assert.equal(rateLimitWaitMs(1, null, 6), RATE_LIMIT_MAX_WAIT_MS)
+})
+
+test('a longer wait asked for by the server wins, but never parks the job past the cap', () => {
+  assert.equal(rateLimitWaitMs(30, null, 1), 30_000)
+  assert.equal(rateLimitWaitMs(null, '25', 1), 25_000)
+  assert.equal(rateLimitWaitMs(null, 'Wed, 21 Oct 2026 07:28:00 GMT', 1), 5_000)
+  assert.equal(rateLimitWaitMs(3600, null, 1), RATE_LIMIT_MAX_WAIT_MS)
 })

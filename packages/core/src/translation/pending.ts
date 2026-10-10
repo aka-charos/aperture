@@ -82,27 +82,54 @@ export function pendingTranslationsFromSql(
   mediaType: 'movie' | 'series',
   fields: readonly TranslatableField[],
   languagesParam: string,
-  options: { withPicks?: boolean } = {}
+  options: { withPicks?: boolean; withFailures?: boolean } = {}
 ): string {
   const predicate =
     fields.length === 0
       ? 'FALSE'
       : fields.map((f) => fieldPendingSql(mediaType, f, 'lang.code')).join('\n       OR ')
   const picks = options.withPicks ? `\n    ${selectedPicksJoinSql(mediaType, 'm')}` : ''
+  const failures = options.withFailures ? `\n    ${failedPairJoinSql(mediaType)}` : ''
   return `FROM ${MEDIA_TABLE[mediaType]} m
-    CROSS JOIN unnest(${languagesParam}::text[]) AS lang(code)${picks}
+    CROSS JOIN unnest(${languagesParam}::text[]) AS lang(code)${picks}${failures}
     WHERE (${predicate})
       AND ${enabledLibrarySql(mediaType)}`
 }
 
 /**
- * Work order: titles somebody is being recommended right now, then the newest
- * additions, the same priority title analysis uses. The id and language tail
- * make the order total, so a batch boundary cannot skip or repeat a pair.
- * Requires `withPicks`.
+ * The most recent failure recorded for this (title, language) pair, as
+ * `failed.last_failed_at` — NULL when none applies. A failure counts only while
+ * its `source_hash` is still the live text's: once the synopsis changes, the
+ * pair is a new piece of work and queues as one. The CASE is built from
+ * TRANSLATABLE_FIELDS like the read's, so it hashes the expression the pending
+ * check hashes.
+ */
+export function failedPairJoinSql(mediaType: 'movie' | 'series', alias = 'm'): string {
+  return `LEFT JOIN LATERAL (
+      SELECT MAX(f.last_failed_at) AS last_failed_at
+        FROM title_translation_failures f
+       WHERE f.media_type = '${mediaType}'
+         AND f.media_id = ${alias}.id
+         AND f.language = lang.code
+         AND f.source_hash = md5(CASE f.field
+               ${TRANSLATABLE_FIELDS.map((f) => `WHEN '${f}' THEN ${sourceTextSql(f, alias)}`).join('\n               ')}
+             END)
+    ) failed ON true`
+}
+
+/**
+ * Work order: pairs that have never failed first — titles somebody is being
+ * recommended right now, then the newest additions, the same priority title
+ * analysis uses — and pairs that failed before LAST, oldest failure first so
+ * the tail rotates rather than retrying the same few. Without the failure
+ * term a pair that fails on every attempt opened every run, and five of them
+ * tripped the job's consecutive-failure stop before anything else was tried.
+ * The id and language tail make the order total, so a batch boundary cannot
+ * skip or repeat a pair. Requires `withPicks` and `withFailures`.
  */
 export function translationPriorityOrderSql(): string {
-  return `ORDER BY (picks.id IS NOT NULL) DESC, m.created_at DESC NULLS LAST, m.id, lang.code`
+  return `ORDER BY (failed.last_failed_at IS NOT NULL), failed.last_failed_at ASC NULLS FIRST,
+           (picks.id IS NOT NULL) DESC, m.created_at DESC NULLS LAST, m.id, lang.code`
 }
 
 /**
