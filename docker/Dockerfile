@@ -57,27 +57,8 @@ WORKDIR /app
 
 # Install dependencies:
 # - fontconfig: Sharp SVG text rendering (needed for poster overlays)
-# - postgresql17-client: pg_dump and pg_restore for database backup/restore
-#
-# The client major is PINNED to 17 while the bundled database is pgvector:pg16.
-# That pairing is deliberate, not an oversight:
-#
-#   - pg_dump 17 works against a PostgreSQL 16 server (a newer client may talk
-#     to an older server; only the reverse is forbidden).
-#   - pg_restore 17 reads archives written by ANY older pg_dump, so it can
-#     restore backups from every previous Aperture release. A pinned-16 client
-#     cannot read the 1.16 archives that releases before 0.7.10 produced:
-#
-#       pg_restore: error: unsupported version (1.16) in file header
-#
-#   - It also keeps working unchanged for anyone who moves their database to 17.
-#
-# Do NOT replace this with the unpinned `postgresql-client` package: that tracks
-# Alpine's current default major (18 as of Alpine 3.23), and an 18 client refuses
-# to run against a 16 or 17 server, which disables backups entirely.
-#
-# apps/api verifies this pairing at startup (see clientCompatibility.ts).
-RUN apk add --no-cache fontconfig postgresql17-client
+# - postgresql-client: pg_dump and pg_restore for database backup/restore
+RUN apk add --no-cache fontconfig postgresql-client
 
 # Add non-root user
 RUN addgroup --system --gid 1001 nodejs && \
