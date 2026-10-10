@@ -17,8 +17,10 @@ import {
   RATE_LIMIT_MAX_RETRIES,
   buildChatCompletionBody,
   chatCompletionsUrl,
+  createStreamReader,
   enabledFields,
   joinTranslatedChunks,
+  judgeTranslation,
   modelsUrl,
   rateLimitWaitMs,
   readCompletion,
@@ -28,6 +30,7 @@ import {
   splitForTranslation,
   type TextChunk,
   type TranslationConfig,
+  type TranslationKind,
 } from './rules.js'
 
 const logger = createChildLogger('translation')
@@ -130,7 +133,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 function headersFor(config: TranslationConfig): Record<string, string> {
   return {
     'Content-Type': 'application/json',
-    Accept: 'application/json',
+    Accept: 'text/event-stream, application/json',
     ...(config.promptStyle === 'index-translate' ? { 'User-Agent': INDEX_TRANSLATE_USER_AGENT } : {}),
     ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
   }
@@ -161,7 +164,15 @@ export interface TranslateOptions {
    * off by any proxy in front of it (F-141) and the 429 IS the answer there.
    */
   rateLimitRetries?: number
+  /**
+   * Which kind of text this is and that kind's instruction. Omitted, it is a
+   * synopsis with `config.instruction` — the only kind there was before
+   * analyses.
+   */
+  prompt?: TranslationPrompt
 }
+
+export type TranslationPrompt = { kind: TranslationKind; instruction: string }
 
 /** A text abandoned between chunks because the run was stopped. */
 export class TranslationCancelledError extends Error {
@@ -172,9 +183,10 @@ export class TranslationCancelledError extends Error {
 }
 
 /**
- * Translate one text. A text longer than {@link TRANSLATION_CHUNK_CHARS} is
- * translated in pieces and joined (the public endpoint's gateway gives up on
- * any request over ten seconds). Throws {@link TranslationError} for anything
+ * Translate one text, streamed. A text longer than {@link TRANSLATION_CHUNK_CHARS}
+ * is translated in pieces and joined; anything shorter is one request, so the
+ * model sees all of it (see that constant for why streaming made that
+ * possible). Throws {@link TranslationError} for anything
  * that is not a usable translation — transport, HTTP status, a truncated
  * answer, an echo of the source — in ANY chunk, so the caller stores nothing
  * and the pair stays pending.
@@ -231,7 +243,7 @@ async function requestWithRateLimitRetry(
   for (let attempt = 0; ; attempt++) {
     if (options.beforeCall && !(await options.beforeCall())) throw new TranslationCancelledError()
     try {
-      return await requestTranslation(config, url, text, target)
+      return await requestTranslation(config, url, text, target, options.prompt)
     } catch (err) {
       const limited = err instanceof TranslationError ? err.rateLimit : undefined
       if (!limited || attempt >= (options.rateLimitRetries ?? RATE_LIMIT_MAX_RETRIES)) throw err
@@ -248,23 +260,27 @@ async function requestTranslation(
   config: TranslationConfig,
   url: string,
   text: string,
-  target: AppLocaleCode
+  target: AppLocaleCode,
+  prompt: TranslationPrompt | undefined
 ): Promise<TranslationResult> {
-  const body = buildChatCompletionBody(config, text, target, config.sourceLanguage)
+  const body = buildChatCompletionBody(config, text, target, config.sourceLanguage, prompt)
   const startedAt = Date.now()
+  const timedOut = (err: unknown) =>
+    err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+  const noAnswer = `No answer within ${Math.round(config.timeoutMs / 1000)}s`
   let response: Response
   try {
     response = await fetch(url, {
       method: 'POST',
       headers: headersFor(config),
       body: JSON.stringify(body),
+      // Covers the whole streamed body, not just the headers.
       signal: AbortSignal.timeout(config.timeoutMs),
     })
   } catch (err) {
-    const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
     throw new TranslationError(
-      timedOut
-        ? `No answer within ${Math.round(config.timeoutMs / 1000)}s`
+      timedOut(err)
+        ? noAnswer
         : `Could not reach the translation endpoint: ${err instanceof Error ? err.message : String(err)}`
     )
   }
@@ -274,23 +290,60 @@ async function requestTranslation(
     throw new TranslationError(`HTTP ${response.status}: ${message}`, response.status, rateLimit)
   }
 
-  let json: unknown
+  // A server that ignores `stream: true` answers with one JSON body; read that
+  // the way every request was read before streaming.
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.includes('text/event-stream')) {
+    let json: unknown
+    try {
+      json = await response.json()
+    } catch (err) {
+      if (timedOut(err)) throw new TranslationError(noAnswer)
+      throw new TranslationError(
+        `The endpoint answered with a body that is not JSON: ${err instanceof Error ? err.message : String(err)}`
+      )
+    }
+    const reading = readCompletion(json, text, target)
+    if (!reading.ok) throw new TranslationError(reading.reason)
+    const answered = (json as { model?: unknown }).model
+    return {
+      text: reading.text,
+      model: typeof answered === 'string' && answered ? answered : config.model,
+      latencyMs: Date.now() - startedAt,
+    }
+  }
+
+  const stream = createStreamReader()
   try {
-    json = await response.json()
+    if (!response.body) throw new TranslationError('The endpoint sent a stream with no body')
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      stream.push(decoder.decode(value, { stream: true }))
+    }
+    stream.push(decoder.decode())
   } catch (err) {
-    // The timeout covers the body as well as the headers.
+    if (err instanceof TranslationError) throw err
+    // A stream cut off part-way is not a translation; nothing of it is kept.
     throw new TranslationError(
-      `The endpoint answered with a body that is not JSON: ${err instanceof Error ? err.message : String(err)}`
+      timedOut(err)
+        ? `${noAnswer} (the translation was still arriving)`
+        : `The stream broke off: ${err instanceof Error ? err.message : String(err)}`
     )
   }
 
-  const reading = readCompletion(json, text)
+  const streamed = stream.finish()
+  if (streamed.error) throw new TranslationError(streamed.error)
+  if (!streamed.sawData) throw new TranslationError('The endpoint sent an empty stream')
+  // A stream that simply ENDS with no finish_reason was cut off by something
+  // between us and the model; judged as `length` so it is never stored.
+  const reading = judgeTranslation(streamed.content, streamed.finishReason ?? 'length', text, target)
   if (!reading.ok) throw new TranslationError(reading.reason)
-
-  const answered = (json as { model?: unknown }).model
   return {
     text: reading.text,
-    model: typeof answered === 'string' && answered ? answered : config.model,
+    model: streamed.model || config.model,
     latencyMs: Date.now() - startedAt,
   }
 }

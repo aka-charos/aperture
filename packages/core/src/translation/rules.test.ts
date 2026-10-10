@@ -6,13 +6,18 @@ import {
   DEFAULT_TRANSLATION_CONFIG,
   ECHO_CHECK_MIN_CHARS,
   INDEX_TRANSLATE_BASE_URL,
+  LENGTH_CHECK_MIN_CHARS,
+  MIN_TRANSLATION_LENGTH_RATIO,
+  MIN_TRANSLATION_LENGTH_RATIO_COMPACT,
   RATE_LIMIT_MAX_WAIT_MS,
   TRANSLATION_CHUNK_CHARS,
   buildChatCompletionBody,
   buildIndexTranslatePrompt,
   chatCompletionsUrl,
+  createStreamReader,
   enabledFields,
   joinTranslatedChunks,
+  judgeTranslation,
   maxTokensFor,
   modelsUrl,
   rateLimitWaitMs,
@@ -23,6 +28,7 @@ import {
   sanitizeTranslationConfig,
   splitForTranslation,
   stripThink,
+  translationLengthProblem,
 } from './rules.js'
 
 // ---------------------------------------------------------------- prompt
@@ -217,10 +223,10 @@ test('a text under the limit is one chunk — the request a short overview alway
 test('a long synopsis is cut at sentence ends, every piece under the limit, nothing lost', () => {
   const sentence = 'The Kim family live in a cramped semi-basement flat in Seoul and fold pizza boxes for money. '
   const text = sentence.repeat(30).trim()
-  const chunks = splitForTranslation(text)
+  const chunks = splitForTranslation(text, 700)
   assert.ok(chunks.length > 1)
   for (const c of chunks) {
-    assert.ok(c.text.length <= TRANSLATION_CHUNK_CHARS, `${c.text.length}`)
+    assert.ok(c.text.length <= 700, `${c.text.length}`)
     assert.match(c.text, /\.$/, 'ends on a sentence boundary')
   }
   assert.equal(chunks[0].joinBefore, '')
@@ -309,4 +315,114 @@ test('a longer wait asked for by the server wins, but never parks the job past t
   assert.equal(rateLimitWaitMs(null, '25', 1), 25_000)
   assert.equal(rateLimitWaitMs(null, 'Wed, 21 Oct 2026 07:28:00 GMT', 1), 5_000)
   assert.equal(rateLimitWaitMs(3600, null, 1), RATE_LIMIT_MAX_WAIT_MS)
+})
+
+// ---------------------------------------------------------------- streaming
+
+test('every request streams: the gateway gives up on a silent wait, not on size', () => {
+  for (const promptStyle of ['index-translate', 'instruction'] as const) {
+    const body = buildChatCompletionBody({ ...DEFAULT_TRANSLATION_CONFIG, promptStyle }, 'Hello there.', 'el', 'en')
+    assert.equal(body.stream, true, promptStyle)
+    assert.equal('stream_options' in body, false, promptStyle)
+  }
+})
+
+test('the stream reader rebuilds an answer from lines cut at arbitrary points', () => {
+  const events = [
+    'data: {"model":"Index-Translate-35B-A3B","choices":[{"delta":{"content":"Μια "}}]}',
+    ': keep-alive',
+    'data: {"choices":[{"delta":{"content":"ληστεία."}}]}',
+    'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
+    'data: [DONE]',
+  ].join('\n') + '\n'
+  // Split points all through the text, including inside the JSON.
+  for (let cut = 1; cut < events.length; cut += 7) {
+    const reader = createStreamReader()
+    reader.push(events.slice(0, cut))
+    reader.push(events.slice(cut))
+    const out = reader.finish()
+    assert.equal(out.content, 'Μια ληστεία.', `cut at ${cut}`)
+    assert.equal(out.finishReason, 'stop')
+    assert.equal(out.model, 'Index-Translate-35B-A3B')
+    assert.equal(out.error, null)
+  }
+})
+
+test('a last line with no newline is still read', () => {
+  const reader = createStreamReader()
+  reader.push('data: {"choices":[{"delta":{"content":"x"},"finish_reason":"stop"}]}')
+  assert.equal(reader.finish().content, 'x')
+})
+
+test('an error sent inside a 200 stream is surfaced, not read as a short answer', () => {
+  const reader = createStreamReader()
+  reader.push('data: {"choices":[{"delta":{"content":"Μια "}}]}\n')
+  reader.push('data: {"error":{"message":"upstream overloaded"}}\n')
+  const out = reader.finish()
+  assert.equal(out.error, 'upstream overloaded')
+})
+
+test('a body with no data events reads as not a stream at all', () => {
+  const reader = createStreamReader()
+  reader.push('event: ping\n\n')
+  assert.equal(reader.finish().sawData, false)
+})
+
+// ---------------------------------------------------------------- length floor
+
+test('an answer far shorter than its source is refused: the model can drop text and stop cleanly', () => {
+  // Measured: six copies of one paragraph, 6,605 chars, came back as 1,292
+  // chars with finish_reason "stop".
+  const source = 'x'.repeat(6605)
+  const r = judgeTranslation('y'.repeat(1292), 'stop', source, 'el')
+  assert.equal(r.ok, false)
+  // A real Greek translation runs ~1.2x its English.
+  assert.equal(judgeTranslation('y'.repeat(6000), 'stop', 'x'.repeat(5035), 'el').ok, true)
+})
+
+test('Chinese, Japanese and Korean get a lower floor, and a short source is never judged', () => {
+  assert.equal(translationLengthProblem('x'.repeat(1000), 'y'.repeat(300), 'zh'), null)
+  assert.notEqual(translationLengthProblem('x'.repeat(1000), 'y'.repeat(300), 'el'), null)
+  assert.equal(translationLengthProblem('x'.repeat(LENGTH_CHECK_MIN_CHARS - 1), 'y', 'el'), null)
+  assert.ok(MIN_TRANSLATION_LENGTH_RATIO_COMPACT < MIN_TRANSLATION_LENGTH_RATIO)
+})
+
+test('without a target the length floor is not applied (older callers)', () => {
+  assert.equal(readCompletion(answer('y'), 'x'.repeat(2000)).ok, true)
+})
+
+// ---------------------------------------------------------------- analysis prompt
+
+test('an analysis gets its own chat-model system prompt, which keeps paragraphs one for one', () => {
+  const config = { ...DEFAULT_TRANSLATION_CONFIG, promptStyle: 'instruction' as const, model: 'qwen' }
+  const body = buildChatCompletionBody(config, 'Para one.\n\nPara two.', 'el', 'en', {
+    kind: 'analysis',
+    instruction: 'Keep film titles in the original.',
+  })
+  assert.match(body.messages[0].content, /film criticism/)
+  assert.match(body.messages[0].content, /one translated paragraph for each source paragraph/)
+  assert.match(body.messages[0].content, /Keep film titles in the original\.$/)
+  // The synopsis prompt is untouched by the analysis instruction.
+  const synopsis = buildChatCompletionBody({ ...config, instruction: 'Synopsis rule.' }, 'x', 'el', 'en')
+  assert.match(synopsis.messages[0].content, /synopses/)
+  assert.match(synopsis.messages[0].content, /Synopsis rule\.$/)
+})
+
+test('Index-Translate keeps its own prompt for an analysis; only the constraints differ', () => {
+  const body = buildChatCompletionBody({ ...DEFAULT_TRANSLATION_CONFIG }, 'Para.', 'el', 'en', {
+    kind: 'analysis',
+    instruction: 'Keep film titles in the original.',
+  })
+  assert.equal(body.messages.length, 1)
+  assert.equal(
+    body.messages[0].content,
+    buildIndexTranslatePrompt('Para.', 'el', 'en', 'Keep film titles in the original.')
+  )
+})
+
+test('a full-length analysis is one request, so the model sees all of its context', () => {
+  // Measured: 5,035 characters, 12 paragraphs, one streamed call in 19.8s.
+  const analysis = Array.from({ length: 12 }, (_, i) => `Paragraph ${i}. ${'word '.repeat(84).trim()}.`).join('\n\n')
+  assert.ok(analysis.length > 5000 && analysis.length <= TRANSLATION_CHUNK_CHARS)
+  assert.equal(splitForTranslation(analysis).length, 1)
 })

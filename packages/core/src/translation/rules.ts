@@ -343,19 +343,27 @@ export function maxTokensFor(text: string): number {
 /**
  * The longest piece of text one request carries.
  *
- * THE PUBLIC ENDPOINT'S GATEWAY ANSWERS 504 AT EXACTLY TEN SECONDS, whatever
- * the client's timeout and whatever `max_tokens` says, so a synopsis is
- * translatable in one call only if the model can write the whole translation
- * inside that window. Measured 2026-10-10 against `Index-Translate-35B-A3B`:
- * into Greek, 575/863/1,151 characters took 2.8/3.6/4.6s and 1,727 hit the
- * wall at 10.2s; into German 1,727 took 4.3s and 3,167 hit it. So the failures
- * were never about WHICH titles — they were the long `plot_full`s, which fail
- * identically on every run (greedy decoding, same text, same length). Greek
- * and Hindi cost more tokens per character than German, hence the margin: 700
- * characters sits near three seconds into Greek and leaves room for a busy
- * shared server.
+ * THE PUBLIC ENDPOINT'S GATEWAY ANSWERS 504 WHEN NOTHING HAS COME BACK FOR TEN
+ * SECONDS — a wait for the first byte, not a cap on characters, input or
+ * context. Measured 2026-10-11 against `Index-Translate-35B-A3B`: an 18,700-
+ * character input with a 50-token answer returned in 2.3s, a 3,300-character
+ * input capped at 300 tokens in 3.2s, while 2,200 characters translated whole
+ * without streaming 504'd at 10.3s. A non-streamed answer sends nothing until
+ * it is finished, so a long OUTPUT trips the wall; a streamed one sends its
+ * first token in under a second and keeps the connection busy, and the same
+ * 2,200 characters streamed finished in 12.1s, a full 12-paragraph analysis
+ * (5,035 characters, 2,105 tokens of Greek) in 19.8s. Every request streams
+ * (`buildChatCompletionBody`), which is what retired the old 700-character
+ * pieces: those were sized to finish inside ten seconds, and splitting a text
+ * costs the model its context — measured, a paragraph opening on "its"
+ * translated alone into Greek took the wrong gender for the film (του for
+ * η ταινία) where the same paragraph in one call agreed.
+ *
+ * 6,000 characters is about 2,500 tokens of Greek (~30s), inside every budget
+ * measured: `maxTokensFor` allows 8,192 and no output cap below 4,096 was seen.
+ * Only a text longer than that is still split.
  */
-export const TRANSLATION_CHUNK_CHARS = 700
+export const TRANSLATION_CHUNK_CHARS = 6000
 
 export interface TextChunk {
   text: string
@@ -521,12 +529,21 @@ export const RATE_LIMIT_MAX_WAIT_MS = 60_000
  */
 export const RATE_LIMIT_MAX_RETRIES = 6
 
+/**
+ * What is being translated. A synopsis and a film analysis get different
+ * instructions — a blurb versus a piece of criticism with critics, publications
+ * and other films named in it — and the operator writes a separate instruction
+ * list for each.
+ */
+export type TranslationKind = 'synopsis' | 'analysis'
+
 export interface ChatCompletionBody {
   model: string
   messages: Array<{ role: 'system' | 'user'; content: string }>
   temperature: number
   max_tokens: number
-  stream: false
+  /** Always true: see {@link TRANSLATION_CHUNK_CHARS} for why a request streams. */
+  stream: true
   chat_template_kwargs?: { enable_thinking: boolean }
 }
 
@@ -535,36 +552,73 @@ export interface ChatCompletionBody {
  * model card prescribes for Index-Translate. `chat_template_kwargs` only for
  * the Index-Translate style: its client sends it so the model's reasoning
  * cannot replace the translation, while a stricter OpenAI-compatible server
- * may reject a field it does not know.
+ * may reject a field it does not know. No `stream_options`: usage is not
+ * read, and an older server rejects the field.
+ *
+ * `prompt` says which text this is and carries that kind's instruction; it
+ * defaults to the synopsis prompt with `config.instruction`, the only kind
+ * there was before analyses.
  */
 export function buildChatCompletionBody(
   config: Pick<TranslationConfig, 'model' | 'promptStyle' | 'instruction'>,
   text: string,
   target: AppLocaleCode,
-  source: AppLocaleCode
+  source: AppLocaleCode,
+  prompt: { kind: TranslationKind; instruction: string } = { kind: 'synopsis', instruction: config.instruction }
 ): ChatCompletionBody {
   const base = {
     model: config.model,
     temperature: 0,
     max_tokens: maxTokensFor(text),
-    stream: false as const,
+    stream: true as const,
   }
   if (config.promptStyle === 'index-translate') {
+    // Index-Translate's prompt is the same for every kind: its own client has
+    // one, and the model was trained on it. The kinds differ only in the
+    // operator's constraints.
     return {
       ...base,
       messages: [
-        { role: 'user', content: buildIndexTranslatePrompt(text, target, source, config.instruction) },
+        { role: 'user', content: buildIndexTranslatePrompt(text, target, source, prompt.instruction) },
       ],
       chat_template_kwargs: { enable_thinking: false },
     }
   }
+  const system =
+    prompt.kind === 'analysis'
+      ? buildAnalysisSystemPrompt(target, source, prompt.instruction)
+      : buildInstructionSystemPrompt(target, source, prompt.instruction)
   return {
     ...base,
     messages: [
-      { role: 'system', content: buildInstructionSystemPrompt(target, source, config.instruction) },
+      { role: 'system', content: system },
       { role: 'user', content: text.trim() },
     ],
   }
+}
+
+/**
+ * The system prompt for a film analysis, for any chat model. It differs from
+ * the synopsis one in what the text is (criticism, not a blurb), in what must
+ * survive untouched (the names of critics, publications and other works), and
+ * in one structural rule: THE PARAGRAPHS MUST COME BACK ONE FOR ONE, because the
+ * stored paragraph index that puts the section headings over an analysis is
+ * reused, unchanged, over its translation (see ./analysisText.ts).
+ */
+export function buildAnalysisSystemPrompt(
+  target: AppLocaleCode,
+  source: AppLocaleCode,
+  instruction = ''
+): string {
+  const lines = [
+    `You are a professional translator of film criticism.`,
+    `Translate the user's text from ${ENGLISH_LANGUAGE_NAMES[source]} into ${ENGLISH_LANGUAGE_NAMES[target]}.`,
+    `Keep the meaning, register and argument exactly. Keep every name exact — people, critics, publications and the titles of films and other works — and write them the way ${ENGLISH_LANGUAGE_NAMES[target]} publications write them.`,
+    `Keep the paragraphs exactly: one translated paragraph for each source paragraph, separated by a blank line, in the same order. Never merge, split, drop or add a paragraph.`,
+    `Output only the translation: no notes, no headings, no quotation marks around it, no original text.`,
+  ]
+  if (instruction.trim()) lines.push(instruction.trim())
+  return lines.join('\n')
 }
 
 /** Drop a reasoning block if one leaked through — `call_api.py`'s strip_think. */
@@ -582,22 +636,36 @@ export type CompletionReading =
   | { ok: false; reason: string }
 
 /**
- * Read one chat-completion response into a translation, or the reason it is
- * not one. A truncated answer is refused even when it has text — storing a
- * synopsis that stops mid-sentence would retire the title until its source
- * changes, the short-text lesson (F-137). An answer identical to a
- * sentence-length source is refused too: a model that echoes its input has not
- * translated anything, and stored, that echo would be shown as the translation
- * ({@link ECHO_CHECK_MIN_CHARS} for why a short source is exempt).
+ * Read one (non-streamed) chat-completion response into a translation, or the
+ * reason it is not one. A server that ignores `stream: true` answers this way.
+ * The judgement is {@link judgeTranslation}'s, shared with the streamed path.
  */
-export function readCompletion(json: unknown, sourceText: string): CompletionReading {
+export function readCompletion(json: unknown, sourceText: string, target?: AppLocaleCode): CompletionReading {
   const choice = (json as { choices?: unknown[] } | null)?.choices?.[0] as
     | { message?: { content?: unknown }; finish_reason?: unknown }
     | undefined
   if (!choice) return { ok: false, reason: 'The response carried no choices' }
-  const content = choice.message?.content
+  return judgeTranslation(choice.message?.content, choice.finish_reason, sourceText, target)
+}
+
+/**
+ * Whether an answer is a usable translation. A truncated answer is refused even
+ * when it has text — storing a synopsis that stops mid-sentence would retire the
+ * title until its source changes, the short-text lesson (F-137). An answer
+ * identical to a sentence-length source is refused too: a model that echoes its
+ * input has not translated anything ({@link ECHO_CHECK_MIN_CHARS} for why a short
+ * source is exempt). And an answer far SHORTER than its source is refused
+ * ({@link translationLengthProblem}), since a model can drop text without
+ * saying so.
+ */
+export function judgeTranslation(
+  content: unknown,
+  finishReason: unknown,
+  sourceText: string,
+  target?: AppLocaleCode
+): CompletionReading {
   if (typeof content !== 'string') return { ok: false, reason: 'The response carried no text' }
-  if (choice.finish_reason === 'length') {
+  if (finishReason === 'length') {
     return { ok: false, reason: 'The translation was cut off at the output limit' }
   }
   const text = stripThink(content)
@@ -605,7 +673,122 @@ export function readCompletion(json: unknown, sourceText: string): CompletionRea
   if (sourceText.trim().length >= ECHO_CHECK_MIN_CHARS && normalizeForEcho(text) === normalizeForEcho(sourceText)) {
     return { ok: false, reason: 'The model returned the source text unchanged' }
   }
+  const short = target ? translationLengthProblem(sourceText, text, target) : null
+  if (short) return { ok: false, reason: short }
   return { ok: true, text }
+}
+
+/**
+ * The shortest a translation may be, as a share of its source's characters.
+ *
+ * A MODEL CAN DROP TEXT AND STILL FINISH CLEANLY. Measured 2026-10-11: handed
+ * one paragraph six times, Index-Translate translated it ONCE and stopped with
+ * `finish_reason: stop` — 6,605 characters in, 1,292 out (0.20), no error. So
+ * a short answer is not caught by the truncation test and would be stored as
+ * the whole translation. Real translations sit far above these floors: into
+ * Greek a synopsis and a full analysis both came back at ~1.2x their English.
+ * Chinese, Japanese and Korean write far fewer characters for the same text,
+ * hence their own, lower floor. Below {@link LENGTH_CHECK_MIN_CHARS} a short
+ * source can legitimately shrink (a title, a name), so it is not judged.
+ */
+export const MIN_TRANSLATION_LENGTH_RATIO = 0.4
+export const MIN_TRANSLATION_LENGTH_RATIO_COMPACT = 0.15
+const COMPACT_SCRIPT_TARGETS: ReadonlySet<AppLocaleCode> = new Set<AppLocaleCode>(['zh', 'ja', 'ko'])
+export const LENGTH_CHECK_MIN_CHARS = 300
+
+/** Why an answer is too short to be the whole translation, or null when it is not. */
+export function translationLengthProblem(
+  sourceText: string,
+  translated: string,
+  target: AppLocaleCode
+): string | null {
+  const source = sourceText.trim().length
+  if (source < LENGTH_CHECK_MIN_CHARS) return null
+  const floor = COMPACT_SCRIPT_TARGETS.has(target)
+    ? MIN_TRANSLATION_LENGTH_RATIO_COMPACT
+    : MIN_TRANSLATION_LENGTH_RATIO
+  const out = translated.trim().length
+  if (out / source >= floor) return null
+  return (
+    `The translation is ${out.toLocaleString('en')} characters for a ` +
+    `${source.toLocaleString('en')}-character source, too short to be all of it, so the model probably dropped part`
+  )
+}
+
+export interface StreamedCompletion {
+  content: string
+  finishReason: string | null
+  model: string | null
+  /** A failure the server reported inside the stream, after its 200. */
+  error: string | null
+  /** False when not one `data:` event was readable — not a stream at all. */
+  sawData: boolean
+}
+
+/**
+ * Reads a streamed (server-sent events) chat completion as it arrives.
+ *
+ * Bytes arrive in arbitrary pieces, so a line can be cut anywhere — including
+ * mid-JSON — and only complete lines are parsed. `data: [DONE]` ends the
+ * stream; `data: {...}` carries `choices[0].delta.content`, a `finish_reason`
+ * on the last chunk and usually `model`. A server can also report a failure
+ * MID-STREAM as `data: {"error": ...}` after the 200 has been sent, so the HTTP
+ * status alone does not say the answer is complete; that error is surfaced
+ * rather than read as a short translation. Anything that is not a `data:` line
+ * (comments, keep-alives, `event:` lines) is ignored.
+ */
+export function createStreamReader() {
+  let buffer = ''
+  let content = ''
+  let finishReason: string | null = null
+  let model: string | null = null
+  let error: string | null = null
+  let sawData = false
+
+  const readLine = (line: string) => {
+    const trimmed = line.trim()
+    if (!trimmed.startsWith('data:')) return
+    const data = trimmed.slice(5).trim()
+    if (!data || data === '[DONE]') return
+    let json: unknown
+    try {
+      json = JSON.parse(data)
+    } catch {
+      return
+    }
+    sawData = true
+    const obj = json as {
+      model?: unknown
+      error?: unknown
+      choices?: Array<{ delta?: { content?: unknown }; finish_reason?: unknown }>
+    }
+    if (obj.error != null) {
+      error ??= readErrorBody(data).message ?? 'The endpoint reported an error mid-stream'
+      return
+    }
+    if (typeof obj.model === 'string' && obj.model) model = obj.model
+    const choice = obj.choices?.[0]
+    if (typeof choice?.delta?.content === 'string') content += choice.delta.content
+    if (typeof choice?.finish_reason === 'string' && choice.finish_reason) finishReason = choice.finish_reason
+  }
+
+  return {
+    push(chunk: string): void {
+      buffer += chunk
+      let newline = buffer.indexOf('\n')
+      while (newline !== -1) {
+        readLine(buffer.slice(0, newline))
+        buffer = buffer.slice(newline + 1)
+        newline = buffer.indexOf('\n')
+      }
+    },
+    /** Everything read, after flushing a last line that had no newline. */
+    finish(): StreamedCompletion {
+      if (buffer) readLine(buffer)
+      buffer = ''
+      return { content, finishReason, model, error, sawData }
+    },
+  }
 }
 
 /**
