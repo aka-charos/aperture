@@ -587,13 +587,21 @@ export function SynopsisTranslationSection() {
             fullWidth
             multiline
             minRows={2}
-            label={t('settingsSynopsisTranslation.instructionLabel')}
+            label={t('settingsSynopsisTranslation.instructionsLabel')}
             value={instruction}
             onChange={(e) => {
               setInstruction(e.target.value)
               changed()
             }}
-            helperText={t('settingsSynopsisTranslation.instructionHelp')}
+            // The field is the system prompt in effect, but where it lands
+            // depends on the model type: Index-Translate has no system message
+            // (each line becomes an in-prompt constraint), a chat model gets it
+            // appended to the system prompt core already sends.
+            helperText={
+              promptStyle === 'index-translate'
+                ? t('settingsSynopsisTranslation.instructionsHelpIndexTranslate')
+                : t('settingsSynopsisTranslation.instructionsHelpChat')
+            }
             slotProps={{ htmlInput: { maxLength: 500 } }}
           />
 
