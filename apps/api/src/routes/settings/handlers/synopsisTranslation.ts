@@ -37,6 +37,7 @@ import {
   isValidAppLocale,
   listTranslationModels,
   resolveTargetLanguages,
+  resolveTranslationLanguages,
   sanitizeTranslationConfig,
   setTranslationConfig,
   translateAnalysisText,
@@ -216,11 +217,18 @@ function storedKeyFor(current: TranslationConfig, baseUrl: string): string {
 async function describe(config: TranslationConfig) {
   const { enabledUiLanguages } = await getSystemLanguageDefaults()
   const targets = resolveTargetLanguages(config, enabledUiLanguages)
+  // Every language a text can go into: the targets plus the source language,
+  // which receives text in another alphabet (a Greek plot into English). The
+  // card's status table lists it, and readiness is judged on it — an instance
+  // whose only interface language is English still has Greek plots to
+  // translate into it.
+  const translationLanguages = resolveTranslationLanguages(config, enabledUiLanguages)
   return {
     config: toPublicConfig(config),
-    readiness: checkTranslationReadiness(config, targets, 'synopsis'),
-    analysisReadiness: checkTranslationReadiness(config, targets, 'analysis'),
+    readiness: checkTranslationReadiness(config, translationLanguages, 'synopsis'),
+    analysisReadiness: checkTranslationReadiness(config, translationLanguages, 'analysis'),
     targets,
+    translationLanguages,
     enabledUiLanguages,
     defaults: { baseUrl: DEFAULT_TRANSLATION_CONFIG.baseUrl, model: DEFAULT_TRANSLATION_CONFIG.model },
   }

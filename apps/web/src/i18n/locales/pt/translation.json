@@ -5917,6 +5917,7 @@
     "testAnalysisWhole_one": "{{count}} paragraph back, in one request — the paragraphs survived, so the section headings will land on the right prose.",
     "testAnalysisWhole_other": "{{count}} paragraphs back, in one request — the paragraphs survived, so the section headings will land on the right prose.",
     "testAnalysisSections_one": "{{count}} paragraph back, but only in smaller requests: the one-request translation did not keep the paragraphs. The job does the same, at the cost of more requests and less context.",
-    "testAnalysisSections_other": "{{count}} paragraphs back, but only in smaller requests: the one-request translation did not keep the paragraphs. The job does the same, at the cost of more requests and less context."
+    "testAnalysisSections_other": "{{count}} paragraphs back, but only in smaller requests: the one-request translation did not keep the paragraphs. The job does the same, at the cost of more requests and less context.",
+    "sourceHelp": "Assumed for text in the Latin alphabet. Text written in another alphabet — a Greek plot, say — is detected, never translated into its own language, and translated into {{language}} as well, so a reader in {{language}} can read it too."
   }
 }

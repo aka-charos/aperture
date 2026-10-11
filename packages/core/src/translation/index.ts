@@ -24,6 +24,7 @@ export {
   isTranslatableField,
   isTranslationPromptStyle,
   resolveTargetLanguages,
+  resolveTranslationLanguages,
   sanitizeTranslationConfig,
   type TranslatableField,
   type TranslationConfig,

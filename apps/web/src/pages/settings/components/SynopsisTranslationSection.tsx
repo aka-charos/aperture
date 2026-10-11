@@ -89,6 +89,11 @@ interface Described {
   /** Absent from an older server, which has no analysis translation. */
   analysisReadiness?: Readiness
   targets: string[]
+  /**
+   * The targets plus the source language, which receives text written in
+   * another alphabet (a Greek plot into English). Absent from an older server.
+   */
+  translationLanguages?: string[]
   enabledUiLanguages: string[]
   defaults: { baseUrl: string; model: string }
 }
@@ -453,7 +458,7 @@ export function SynopsisTranslationSection() {
                 <TableRow key={row.language}>
                   <TableCell>
                     {label(row.language)}
-                    {!described?.targets.includes(row.language) && (
+                    {!(described?.translationLanguages ?? described?.targets ?? []).includes(row.language) && (
                       <Chip size="small" sx={{ ml: 1 }} label={t('settingsSynopsisTranslation.notTarget')} />
                     )}
                   </TableCell>
@@ -680,26 +685,33 @@ export function SynopsisTranslationSection() {
             </Typography>
           </Box>
 
-          <FormControl size="small" sx={{ maxWidth: 260 }}>
-            <InputLabel id="synopsis-translation-source-label">
-              {t('settingsSynopsisTranslation.sourceLabel')}
-            </InputLabel>
-            <Select
-              labelId="synopsis-translation-source-label"
-              label={t('settingsSynopsisTranslation.sourceLabel')}
-              value={sourceLanguage}
-              onChange={(e) => {
-                setSourceLanguage(e.target.value)
-                changed()
-              }}
-            >
-              {(Object.keys(labels).length > 0 ? Object.keys(labels) : [sourceLanguage]).map((code) => (
-                <MenuItem key={code} value={code}>
-                  {label(code)}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Box>
+            <FormControl size="small" sx={{ maxWidth: 260 }}>
+              <InputLabel id="synopsis-translation-source-label">
+                {t('settingsSynopsisTranslation.sourceLabel')}
+              </InputLabel>
+              <Select
+                labelId="synopsis-translation-source-label"
+                label={t('settingsSynopsisTranslation.sourceLabel')}
+                value={sourceLanguage}
+                onChange={(e) => {
+                  setSourceLanguage(e.target.value)
+                  changed()
+                }}
+              >
+                {(Object.keys(labels).length > 0 ? Object.keys(labels) : [sourceLanguage]).map((code) => (
+                  <MenuItem key={code} value={code}>
+                    {label(code)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {/* Full width under the narrow select: it explains that this is
+                only the fallback, which the select alone cannot say. */}
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+              {t('settingsSynopsisTranslation.sourceHelp', { language: label(sourceLanguage) })}
+            </Typography>
+          </Box>
 
           <Box>
             <Typography variant="subtitle2" fontWeight={600} gutterBottom>

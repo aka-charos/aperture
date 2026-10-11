@@ -4,6 +4,8 @@ import assert from 'node:assert/strict'
 import {
   currentTranslationsSql,
   enabledLibrarySql,
+  localeLiteral,
+  textLanguageSql,
   failedPairJoinSql,
   fieldPendingSql,
   pendingTranslationsFromSql,
@@ -11,7 +13,7 @@ import {
   sourceTextSql,
   translationPriorityOrderSql,
 } from './pending.js'
-import { TRANSLATABLE_FIELDS } from './rules.js'
+import { TRANSLATABLE_FIELDS, resolveTranslationLanguages } from './rules.js'
 
 test('the pending check, the stored hash and the read all hash the SAME expression', () => {
   // The whole design rests on this: a row is current only when its hash equals
@@ -19,8 +21,8 @@ test('the pending check, the stored hash and the read all hash the SAME expressi
   // differently, a translation would be stale to one and current to another.
   for (const field of TRANSLATABLE_FIELDS) {
     const src = sourceTextSql(field)
-    assert.ok(fieldPendingSql('movie', field, 'lang.code').includes(`md5(${src})`), `pending: ${field}`)
-    assert.ok(sourceColumnsSql([field]).includes(`md5(${src}) AS ${field}_hash`), `selection: ${field}`)
+    assert.ok(fieldPendingSql('movie', field, 'lang.code', 'en').includes(`md5(${src})`), `pending: ${field}`)
+    assert.ok(sourceColumnsSql([field], 'en').includes(`md5(${src}) AS ${field}_hash`), `selection: ${field}`)
     assert.ok(currentTranslationsSql('movie').includes(`WHEN '${field}' THEN ${src}`), `read: ${field}`)
   }
 })
@@ -39,12 +41,12 @@ test('a blank overview is no source at all', () => {
 })
 
 test('no field switched on is FALSE, not a syntax error', () => {
-  assert.match(pendingTranslationsFromSql('series', [], '$1'), /WHERE \(FALSE\)\s+AND /)
+  assert.match(pendingTranslationsFromSql('series', [], '$1', 'en'), /WHERE \(FALSE\)\s+AND /)
 })
 
 test('a title in a switched-off library is never pending (the embedding jobs\' rule)', () => {
   for (const mediaType of ['movie', 'series'] as const) {
-    const sql = pendingTranslationsFromSql(mediaType, ['overview'], '$1')
+    const sql = pendingTranslationsFromSql(mediaType, ['overview'], '$1', 'en')
     assert.ok(sql.includes(enabledLibrarySql(mediaType)), mediaType)
   }
   assert.match(enabledLibrarySql('movie'), /NOT EXISTS \(SELECT 1 FROM library_config\)/)
@@ -54,13 +56,13 @@ test('a title in a switched-off library is never pending (the embedding jobs\' r
 })
 
 test('pending crosses every title with every language and scopes rows by media type', () => {
-  const sql = pendingTranslationsFromSql('series', ['overview'], '$1', { withPicks: true })
+  const sql = pendingTranslationsFromSql('series', ['overview'], '$1', 'en', { withPicks: true })
   assert.match(sql, /FROM series m/)
   assert.match(sql, /CROSS JOIN unnest\(\$1::text\[\]\) AS lang\(code\)/)
   assert.match(sql, /tt\.media_type = 'series'/)
   assert.match(sql, /tt\.language = lang\.code/)
   assert.match(sql, /\) picks ON picks\.id = m\.id/)
-  assert.doesNotMatch(pendingTranslationsFromSql('series', ['overview'], '$1'), /picks/)
+  assert.doesNotMatch(pendingTranslationsFromSql('series', ['overview'], '$1', 'en'), /picks/)
 })
 
 test('the detail read joins the right table for each media type', () => {
@@ -74,7 +76,7 @@ test('a pair that failed before is queued after every pair that has not', () => 
   const order = translationPriorityOrderSql()
   assert.match(order, /^ORDER BY \(failed\.last_failed_at IS NOT NULL\), failed\.last_failed_at ASC NULLS FIRST,/)
   assert.ok(order.indexOf('failed.last_failed_at') < order.indexOf('picks.id'))
-  const sql = pendingTranslationsFromSql('movie', ['overview'], '$1', { withPicks: true, withFailures: true })
+  const sql = pendingTranslationsFromSql('movie', ['overview'], '$1', 'en', { withPicks: true, withFailures: true })
   assert.ok(sql.includes(failedPairJoinSql('movie')))
 })
 
@@ -86,4 +88,55 @@ test('a failure applies only to the text that failed', () => {
     assert.ok(join.includes(`WHEN '${field}' THEN ${sourceTextSql(field)}`), field)
   }
   assert.match(join, /f\.source_hash = md5\(CASE f\.field/)
+})
+
+// ---------------------------------------------------------------- the text's own language
+
+test('a text is never pending into the language it is already written in', () => {
+  // A Greek plot asked "from English into Greek" came back unchanged, failed
+  // the echo check and was retried at the back of the queue forever.
+  for (const field of TRANSLATABLE_FIELDS) {
+    const src = sourceTextSql(field)
+    assert.ok(
+      fieldPendingSql('movie', field, 'lang.code', 'en').includes(`lang.code <> aperture_text_language(${src}, 'en')`),
+      field
+    )
+  }
+})
+
+test('the pending check, the selection and the read detect a language with the SAME call on the SAME text', () => {
+  for (const field of TRANSLATABLE_FIELDS) {
+    const src = sourceTextSql(field)
+    const call = textLanguageSql(src, localeLiteral('en'))
+    assert.ok(fieldPendingSql('movie', field, 'lang.code', 'en').includes(call), `pending: ${field}`)
+    // The selection returns it, so the prompt names the language the text is in.
+    assert.ok(sourceColumnsSql([field], 'en').includes(`${call} AS ${field}_language`), `selection: ${field}`)
+  }
+  // The read takes the source language as a parameter and refuses a row "into"
+  // the text's own language (one left from before detection existed).
+  const read = currentTranslationsSql('movie')
+  assert.match(read, /AND tt\.language <> aperture_text_language\(CASE tt\.field/)
+  assert.match(read, /aperture_text_language\(CASE tt\.field[\s\S]*?END, \$3\)/)
+  assert.match(read, /AS source_language/)
+})
+
+test('the source language is interpolated only after validation', () => {
+  assert.equal(localeLiteral('el'), "'el'")
+  assert.throws(() => localeLiteral("en'; DROP TABLE movies; --" as never))
+  assert.throws(() => fieldPendingSql('movie', 'overview', 'lang.code', 'xx' as never))
+})
+
+test('the source language is a translation language too, so a Greek plot reaches English readers', () => {
+  const config = { targetLanguages: null, sourceLanguage: 'en' as const }
+  assert.deepEqual(resolveTranslationLanguages(config, ['en', 'el']), ['en', 'el'])
+  // Never a language the interface does not offer: nobody could be shown it.
+  assert.deepEqual(resolveTranslationLanguages(config, ['el']), ['el'])
+  // A narrowed target list still gets the source language added.
+  assert.deepEqual(
+    resolveTranslationLanguages({ targetLanguages: ['el'], sourceLanguage: 'en' }, ['en', 'el', 'de']),
+    ['en', 'el']
+  )
+  // An English-only instance still has something to translate into: English,
+  // for the plots that are not in it.
+  assert.deepEqual(resolveTranslationLanguages(config, ['en']), ['en'])
 })

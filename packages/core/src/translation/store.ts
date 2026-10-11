@@ -21,7 +21,7 @@ import {
   ANALYSIS_TRANSLATION_FIELD,
   enabledFields,
   isTranslatableField,
-  resolveTargetLanguages,
+  resolveTranslationLanguages,
   type TranslatableField,
   type TranslationConfig,
   type TranslationField,
@@ -106,6 +106,11 @@ export async function recordTranslationFailure(row: {
  */
 export interface LocalizedSynopsis {
   language: AppLocaleCode
+  /**
+   * What was translated FROM — the overview's language when it was translated,
+   * else the full synopsis's. They can differ: a Greek film's plot can arrive
+   * from the media server in Greek while its IMDb synopsis is English.
+   */
   source_language: AppLocaleCode
   overview: string | null
   plot_full: string | null
@@ -117,8 +122,10 @@ export interface LocalizedSynopsis {
  * `requested` is the language the page is DISPLAYED in, which the client sends
  * because only it knows (a browser-detected language may differ from the
  * stored preference). Anything that is not a valid app locale falls back to the
- * viewer's effective UI language. The source language answers null at once —
- * there is nothing to swap.
+ * viewer's effective UI language. A reader in the configured source language
+ * is asked like everyone else: a Greek plot has an English translation for
+ * them, and the SQL never returns a "translation" into the language a text is
+ * already written in, so an English plot simply has none.
  *
  * NEVER THROWS. A detail page must not fail over an optional caption: a
  * missing table on a half-migrated instance, or any read error, is logged and
@@ -133,11 +140,10 @@ export async function resolveLocalizedSynopsis(
   try {
     const config = await getTranslationConfig()
     const language = isValidAppLocale(requested) ? requested : await resolveEffectiveUiLanguage(userId)
-    if (language === config.sourceLanguage) return null
 
-    const rows = await query<{ field: string; translated_text: string }>(
+    const rows = await query<{ field: string; translated_text: string; source_language: string }>(
       currentTranslationsSql(mediaType),
-      [mediaId, language]
+      [mediaId, language, config.sourceLanguage]
     )
     if (rows.rows.length === 0) return null
 
@@ -147,9 +153,13 @@ export async function resolveLocalizedSynopsis(
       overview: null,
       plot_full: null,
     }
+    const from: Partial<Record<TranslatableField, AppLocaleCode>> = {}
     for (const row of rows.rows) {
-      if (isTranslatableField(row.field)) result[row.field] = row.translated_text
+      if (!isTranslatableField(row.field)) continue
+      result[row.field] = row.translated_text
+      if (isValidAppLocale(row.source_language)) from[row.field] = row.source_language
     }
+    result.source_language = from.overview ?? from.plot_full ?? config.sourceLanguage
     return result.overview || result.plot_full ? result : null
   } catch (err) {
     logger.warn({ err, mediaType, mediaId }, 'Could not read synopsis translations; showing the original')
@@ -168,8 +178,9 @@ export async function resolveLocalizedSynopsis(
  * unlabelled run rather than with headings over the wrong prose.
  *
  * Same contract as {@link resolveLocalizedSynopsis}: `requested` is the
- * language the page is displayed in, the source language answers null, and it
- * NEVER THROWS — an optional translation must not cost a reader the analysis.
+ * language the page is displayed in, there is never a translation into the
+ * language the analysis is already in, and it NEVER THROWS — an optional
+ * translation must not cost a reader the analysis.
  */
 export interface LocalizedAnalysis {
   language: AppLocaleCode
@@ -187,19 +198,20 @@ export async function resolveLocalizedAnalysis(
   try {
     const config = await getTranslationConfig()
     const language = isValidAppLocale(requested) ? requested : await resolveEffectiveUiLanguage(userId)
-    if (language === config.sourceLanguage) return null
 
-    const rows = await query<{ translated_text: string; paragraph_map: ParagraphMap | null; analysis: string }>(
-      currentAnalysisTranslationSql(),
-      [mediaType, mediaId, language]
-    )
+    const rows = await query<{
+      translated_text: string
+      paragraph_map: ParagraphMap | null
+      analysis: string
+      source_language: string
+    }>(currentAnalysisTranslationSql(), [mediaType, mediaId, language, config.sourceLanguage])
     const row = rows.rows[0]
     if (!row?.translated_text) return null
     const sameShape =
       analysisParagraphs(row.translated_text).length === analysisParagraphs(row.analysis).length
     return {
       language,
-      source_language: config.sourceLanguage,
+      source_language: isValidAppLocale(row.source_language) ? row.source_language : config.sourceLanguage,
       text: row.translated_text,
       paragraphs: buildAnalysisSegments(row.translated_text, sameShape ? row.paragraph_map : null),
     }
@@ -229,13 +241,14 @@ export interface TranslationLanguageStatus {
 export async function countPendingByLanguage(
   mediaType: 'movie' | 'series',
   fields: readonly TranslatableField[],
-  languages: readonly AppLocaleCode[]
+  languages: readonly AppLocaleCode[],
+  sourceLanguage: AppLocaleCode
 ): Promise<Map<string, number>> {
   const counts = new Map<string, number>()
   if (languages.length === 0 || fields.length === 0) return counts
   const rows = await query<{ code: string; count: string }>(
     `SELECT lang.code AS code, COUNT(*)::text AS count
-     ${pendingTranslationsFromSql(mediaType, fields, '$1')}
+     ${pendingTranslationsFromSql(mediaType, fields, '$1', sourceLanguage)}
      GROUP BY lang.code`,
     [languages]
   )
@@ -246,13 +259,14 @@ export async function countPendingByLanguage(
 /** Pending analysis translations per language for one media type, from the job's own predicate. */
 export async function countPendingAnalysesByLanguage(
   mediaType: 'movie' | 'series',
-  languages: readonly AppLocaleCode[]
+  languages: readonly AppLocaleCode[],
+  sourceLanguage: AppLocaleCode
 ): Promise<Map<string, number>> {
   const counts = new Map<string, number>()
   if (languages.length === 0) return counts
   const rows = await query<{ code: string; count: string }>(
     `SELECT lang.code AS code, COUNT(*)::text AS count
-     ${pendingAnalysisTranslationsFromSql(mediaType, '$1')}
+     ${pendingAnalysisTranslationsFromSql(mediaType, '$1', sourceLanguage)}
      GROUP BY lang.code`,
     [languages]
   )
@@ -271,14 +285,16 @@ export async function getTranslationStatus(config?: TranslationConfig): Promise<
 }> {
   const cfg = config ?? (await getTranslationConfig())
   const { enabledUiLanguages } = await getSystemLanguageDefaults()
-  const targets = resolveTargetLanguages(cfg, enabledUiLanguages)
+  // The source language is in here: a Greek plot is pending into English.
+  const targets = resolveTranslationLanguages(cfg, enabledUiLanguages)
   const fields = enabledFields(cfg)
+  const source = cfg.sourceLanguage
 
   const [pendingMovies, pendingSeries, analysisMovies, analysisSeries, stored] = await Promise.all([
-    countPendingByLanguage('movie', fields, targets),
-    countPendingByLanguage('series', fields, targets),
-    countPendingAnalysesByLanguage('movie', targets),
-    countPendingAnalysesByLanguage('series', targets),
+    countPendingByLanguage('movie', fields, targets, source),
+    countPendingByLanguage('series', fields, targets, source),
+    countPendingAnalysesByLanguage('movie', targets, source),
+    countPendingAnalysesByLanguage('series', targets, source),
     query<{ language: string; media_type: string; is_analysis: boolean; count: string }>(
       `SELECT language, media_type, (field = $1) AS is_analysis, COUNT(*)::text AS count
          FROM title_translations GROUP BY language, media_type, (field = $1)`,

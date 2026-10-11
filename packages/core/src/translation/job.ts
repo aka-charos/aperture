@@ -33,7 +33,7 @@
 import { query } from '../lib/db.js'
 import { waitForCallSlot } from '../lib/callPacing.js'
 import { createChildLogger } from '../lib/logger.js'
-import type { AppLocaleCode } from '../lib/locales.js'
+import { isValidAppLocale, type AppLocaleCode } from '../lib/locales.js'
 import { getSystemLanguageDefaults } from '../settings/systemSettings.js'
 import type { ParagraphMap } from '../analysis/paragraphMap.js'
 import {
@@ -48,9 +48,11 @@ import {
 import {
   analysisSourceSql,
   fieldPendingSql,
+  localeLiteral,
   pendingAnalysisTranslationsFromSql,
   pendingTranslationsFromSql,
   sourceColumnsSql,
+  textLanguageSql,
   translationPriorityOrderSql,
 } from './pending.js'
 import {
@@ -63,7 +65,7 @@ import {
   ANALYSIS_TRANSLATION_FIELD,
   chatCompletionsUrl,
   enabledFields,
-  resolveTargetLanguages,
+  resolveTranslationLanguages,
   type TranslatableField,
   type TranslationConfig,
   type TranslationField,
@@ -121,6 +123,8 @@ interface WorkItem {
   text: string
   /** md5 of `text`, computed by SQL from the expression the pending check hashes. */
   hash: string
+  /** The language `text` is written in, from `aperture_text_language` in the selection. */
+  sourceLanguage: AppLocaleCode
   translate: (options: TranslateOptions) => Promise<TranslationResult & { detail?: string }>
 }
 
@@ -158,6 +162,15 @@ interface PassSpec {
 
 const pairKey = (mediaId: string, language: string) => `${mediaId}:${language}`
 
+/**
+ * The language SQL said a text is in. Always an app locale (the function only
+ * answers with one, or with the fallback it was given); anything else reads as
+ * the configured source language rather than reaching a prompt.
+ */
+function sourceLanguageOf(raw: unknown, config: TranslationConfig): AppLocaleCode {
+  return isValidAppLocale(raw) ? raw : config.sourceLanguage
+}
+
 // ---------------------------------------------------------------- synopses
 
 async function selectPendingSynopsisPairs(
@@ -169,14 +182,14 @@ async function selectPendingSynopsisPairs(
   attempted: readonly string[]
 ): Promise<PendingPair[]> {
   const pendingFlags = fields
-    .map((f) => `${fieldPendingSql(mediaType, f, 'lang.code')} AS ${f}_pending`)
+    .map((f) => `${fieldPendingSql(mediaType, f, 'lang.code', config.sourceLanguage)} AS ${f}_pending`)
     .join(',\n           ')
   const rows = await query<PairRow>(
     `SELECT m.id, m.title, m.year, lang.code AS language,
            (failed.last_failed_at IS NOT NULL) AS retry,
-           ${sourceColumnsSql(fields)},
+           ${sourceColumnsSql(fields, config.sourceLanguage)},
            ${pendingFlags}
-     ${pendingTranslationsFromSql(mediaType, fields, '$1', { withPicks: true, withFailures: true })}
+     ${pendingTranslationsFromSql(mediaType, fields, '$1', config.sourceLanguage, { withPicks: true, withFailures: true })}
        AND (m.id::text || ':' || lang.code) <> ALL($2::text[])
      ${translationPriorityOrderSql()}
      LIMIT $3`,
@@ -195,11 +208,14 @@ async function selectPendingSynopsisPairs(
         .filter((f) => row[`${f}_pending`] === true && typeof row[`${f}_source`] === 'string')
         .map((f) => {
           const text = row[`${f}_source`] as string
+          const sourceLanguage = sourceLanguageOf(row[`${f}_language`], config)
           return {
             field: f,
             text,
             hash: row[`${f}_hash`] as string,
-            translate: (options: TranslateOptions) => translateText(config, text, language, options),
+            sourceLanguage,
+            translate: (options: TranslateOptions) =>
+              translateText(config, text, language, { ...options, sourceLanguage }),
           }
         }),
     }
@@ -211,7 +227,9 @@ export async function generateTitleTranslations(
 ): Promise<TranslationJobResult> {
   const config = await getTranslationConfig()
   const { enabledUiLanguages } = await getSystemLanguageDefaults()
-  const targets = resolveTargetLanguages(config, enabledUiLanguages)
+  // The targets plus the source language: a text in another alphabet (a Greek
+  // plot) is translated into the source language too. Never into its own.
+  const languages = resolveTranslationLanguages(config, enabledUiLanguages)
   const fields = enabledFields(config)
 
   // Fail once, before any work, when the run cannot do anything — the
@@ -219,22 +237,24 @@ export async function generateTitleTranslations(
   if (!config.enabled) {
     throw new Error('Synopsis translation is switched off. Turn it on in Admin → AI → Synopsis translation.')
   }
-  const readiness = checkTranslationReadiness(config, targets, 'synopsis')
+  const readiness = checkTranslationReadiness(config, languages, 'synopsis')
   if (!readiness.ready) throw new Error(readiness.reason ?? 'Synopsis translation is not configured')
 
   return runTranslationPass(
     config,
-    targets,
+    languages,
     {
       noun: 'synopsis',
       what: fields.join(' + '),
       async countPending(mediaType) {
         let total = 0
-        for (const count of (await countPendingByLanguage(mediaType, fields, targets)).values()) total += count
+        for (const count of (await countPendingByLanguage(mediaType, fields, languages, config.sourceLanguage)).values()) {
+          total += count
+        }
         return total
       },
       select: (mediaType, limit, leftPending) =>
-        selectPendingSynopsisPairs(config, mediaType, fields, targets, limit, leftPending),
+        selectPendingSynopsisPairs(config, mediaType, fields, languages, limit, leftPending),
     },
     options,
     DEFAULT_MAX_TRANSLATIONS_PER_RUN
@@ -255,8 +275,9 @@ async function selectPendingAnalysisPairs(
     `SELECT m.id, m.title, m.year, lang.code AS language,
            (failed.last_failed_at IS NOT NULL) AS retry,
            ${src} AS analysis_source, md5(${src}) AS analysis_hash,
+           ${textLanguageSql(src, localeLiteral(config.sourceLanguage))} AS analysis_language,
            ta.paragraph_map
-     ${pendingAnalysisTranslationsFromSql(mediaType, '$1', { withPicks: true, withFailures: true })}
+     ${pendingAnalysisTranslationsFromSql(mediaType, '$1', config.sourceLanguage, { withPicks: true, withFailures: true })}
        AND (m.id::text || ':' || lang.code) <> ALL($2::text[])
      ${translationPriorityOrderSql()}
      LIMIT $3`,
@@ -269,6 +290,7 @@ async function selectPendingAnalysisPairs(
       const language = row.language as AppLocaleCode
       const text = row.analysis_source as string
       const map = (row.paragraph_map ?? null) as ParagraphMap | null
+      const sourceLanguage = sourceLanguageOf(row.analysis_language, config)
       return {
         mediaId: row.id,
         title: row.title,
@@ -280,8 +302,9 @@ async function selectPendingAnalysisPairs(
             field: ANALYSIS_TRANSLATION_FIELD,
             text,
             hash: row.analysis_hash as string,
+            sourceLanguage,
             translate: async (options: TranslateOptions) => {
-              const result = await translateAnalysisText(config, text, map, language, options)
+              const result = await translateAnalysisText(config, text, map, language, { ...options, sourceLanguage })
               return {
                 ...result,
                 detail:
@@ -301,29 +324,31 @@ export async function generateAnalysisTranslations(
 ): Promise<TranslationJobResult> {
   const config = await getTranslationConfig()
   const { enabledUiLanguages } = await getSystemLanguageDefaults()
-  const targets = resolveTargetLanguages(config, enabledUiLanguages)
+  const languages = resolveTranslationLanguages(config, enabledUiLanguages)
 
   if (!config.analysisEnabled) {
     throw new Error(
       'Film analysis translation is switched off. Turn it on in Admin → AI → Synopsis translation, under Film analyses.'
     )
   }
-  const readiness = checkTranslationReadiness(config, targets, 'analysis')
+  const readiness = checkTranslationReadiness(config, languages, 'analysis')
   if (!readiness.ready) throw new Error(readiness.reason ?? 'Film analysis translation is not configured')
 
   return runTranslationPass(
     config,
-    targets,
+    languages,
     {
       noun: 'film analysis',
       what: 'film analyses',
       async countPending(mediaType) {
         let total = 0
-        for (const count of (await countPendingAnalysesByLanguage(mediaType, targets)).values()) total += count
+        for (const count of (await countPendingAnalysesByLanguage(mediaType, languages, config.sourceLanguage)).values()) {
+          total += count
+        }
         return total
       },
       select: (mediaType, limit, leftPending) =>
-        selectPendingAnalysisPairs(config, mediaType, targets, limit, leftPending),
+        selectPendingAnalysisPairs(config, mediaType, languages, limit, leftPending),
     },
     options,
     DEFAULT_MAX_ANALYSIS_TRANSLATIONS_PER_RUN
@@ -334,7 +359,7 @@ export async function generateAnalysisTranslations(
 
 async function runTranslationPass(
   config: TranslationConfig,
-  targets: readonly AppLocaleCode[],
+  languages: readonly AppLocaleCode[],
   spec: PassSpec,
   options: TranslationJobOptions,
   defaultBudget: number
@@ -360,7 +385,7 @@ async function runTranslationPass(
 
   say(
     'info',
-    `🌐 ${total.toLocaleString()} title × language pair(s) pending into ${targets.join(', ')} ` +
+    `🌐 ${total.toLocaleString()} title × language pair(s) pending into ${languages.join(', ')} ` +
       `(${spec.what}) — translating up to ${capped.toLocaleString()} this run ` +
       `with ${config.model} at ${new URL(chatCompletionsUrl(config.baseUrl) as string).host}`
   )
@@ -406,6 +431,9 @@ async function runTranslationPass(
         let calls = 0
         let pairFailed = false
         const label = `${pair.year ? `${pair.title} (${pair.year})` : pair.title} → ${pair.language}`
+        // Named when a text is NOT in the configured source language, so a
+        // Greek plot going into English reads as "el → en" in the log.
+        const from = (item: WorkItem) => (item.sourceLanguage === config.sourceLanguage ? '' : ` (from ${item.sourceLanguage})`)
         report(label)
         result.processed++
 
@@ -457,7 +485,7 @@ async function runTranslationPass(
             consecutiveFailures = 0
             say(
               'info',
-              `✅ ${label} · ${item.field} — ${item.text.length.toLocaleString()} → ` +
+              `✅ ${label} · ${item.field}${from(item)} — ${item.text.length.toLocaleString()} → ` +
                 `${translation.text.length.toLocaleString()} chars in ${(translation.latencyMs / 1000).toFixed(1)}s` +
                 (translation.detail ? ` (${translation.detail})` : '')
             )

@@ -83,7 +83,7 @@ test('a single paragraph over the limit is its own group (translateText splits i
 test('the pending check, the stored hash and the read hash the SAME analysis expression', () => {
   const src = analysisSourceSql()
   assert.equal(src, "NULLIF(btrim(ta.analysis), '')")
-  assert.ok(pendingAnalysisTranslationsFromSql('movie', '$1').includes(`tt.source_hash = md5(${src})`))
+  assert.ok(pendingAnalysisTranslationsFromSql('movie', '$1', 'en').includes(`tt.source_hash = md5(${src})`))
   assert.ok(currentAnalysisTranslationSql().includes(`tt.source_hash = md5(${src})`))
   assert.ok(failedAnalysisJoinSql('movie').includes(`f.source_hash = md5(${src})`))
 })
@@ -94,7 +94,7 @@ test('analysis rows share the table but are invisible to every synopsis reader',
   // 'analysis' row hashes NULL there and never matches.
   assert.doesNotMatch(currentTranslationsSql('movie'), /'analysis'/)
   for (const sql of [
-    pendingAnalysisTranslationsFromSql('series', '$1'),
+    pendingAnalysisTranslationsFromSql('series', '$1', 'en'),
     currentAnalysisTranslationSql(),
     failedAnalysisJoinSql('series'),
   ]) {
@@ -103,7 +103,7 @@ test('analysis rows share the table but are invisible to every synopsis reader',
 })
 
 test('a declined analysis (no text) is never pending, and the library switch applies', () => {
-  const sql = pendingAnalysisTranslationsFromSql('movie', '$1')
+  const sql = pendingAnalysisTranslationsFromSql('movie', '$1', 'en')
   assert.match(sql, /NULLIF\(btrim\(ta\.analysis\), ''\) IS NOT NULL/)
   assert.match(sql, /FROM title_analysis ta\s+JOIN movies m ON m\.id = ta\.media_id/)
   assert.match(sql, /ta\.media_type = 'movie'/)
@@ -111,10 +111,18 @@ test('a declined analysis (no text) is never pending, and the library switch app
 })
 
 test('an analysis that failed before is queued after the rest, like a synopsis', () => {
-  const sql = pendingAnalysisTranslationsFromSql('movie', '$1', { withPicks: true, withFailures: true })
+  const sql = pendingAnalysisTranslationsFromSql('movie', '$1', 'en', { withPicks: true, withFailures: true })
   assert.ok(sql.includes(failedAnalysisJoinSql('movie')))
   assert.match(sql, /\) picks ON picks\.id = m\.id/)
   // The shared ORDER BY reads `failed.last_failed_at` first.
   assert.match(translationPriorityOrderSql(), /^ORDER BY \(failed\.last_failed_at IS NOT NULL\)/)
   assert.match(failedAnalysisJoinSql('movie'), /\) failed ON true$/)
+})
+
+test('an analysis is never pending into, or read in, the language it is written in', () => {
+  const src = analysisSourceSql()
+  assert.ok(pendingAnalysisTranslationsFromSql('movie', '$1', 'en').includes(`lang.code <> aperture_text_language(${src}, 'en')`))
+  const read = currentAnalysisTranslationSql()
+  assert.ok(read.includes(`AND tt.language <> aperture_text_language(${src}, $4)`))
+  assert.ok(read.includes(`aperture_text_language(${src}, $4) AS source_language`))
 })

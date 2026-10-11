@@ -219,6 +219,12 @@ export interface TranslateOptions {
   prompt?: TranslationPrompt
   /** Told when an analysis falls back from one request to smaller ones. */
   onNote?: (message: string) => void
+  /**
+   * The language THIS text is written in, as `aperture_text_language` decided
+   * it (the job's selection returns it). Named in the prompt; omitted, the
+   * configured source language — right for anything not read from the library.
+   */
+  sourceLanguage?: AppLocaleCode
 }
 
 export type TranslationPrompt = { kind: TranslationKind; instruction: string }
@@ -446,7 +452,13 @@ async function requestTranslation(
   target: AppLocaleCode,
   options: TranslateOptions
 ): Promise<TranslationResult> {
-  const body = buildChatCompletionBody(config, text, target, config.sourceLanguage, options.prompt)
+  const body = buildChatCompletionBody(
+    config,
+    text,
+    target,
+    options.sourceLanguage ?? config.sourceLanguage,
+    options.prompt
+  )
   const startedAt = Date.now()
   const guard = startStreamStallGuard({
     stallMs: config.timeoutMs,

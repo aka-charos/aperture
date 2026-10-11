@@ -10,8 +10,18 @@
  * expression would agree until someone trimmed whitespace in one of them — and
  * then every row would read as stale to one reader and current to another, the
  * count-versus-selection drift `enrichment/pending.ts` exists to prevent.
+ *
+ * ONE LANGUAGE DETECTOR, THE SAME READERS. A text is never translated into the
+ * language it is already written in, and that language is decided by ONE SQL
+ * function, `aperture_text_language` (migration 0198), through
+ * {@link textLanguageSql}: the pending check, the selection (which returns it,
+ * so the prompt names the real source language) and the read all call it. A
+ * Greek plot is therefore pending into English and never into Greek, and the
+ * configured source language is only the FALLBACK for text whose alphabet does
+ * not say otherwise.
  */
 import { selectedPicksJoinSql } from '../analysis/pending.js'
+import { isValidAppLocale, type AppLocaleCode } from '../lib/locales.js'
 import { ANALYSIS_TRANSLATION_FIELD, TRANSLATABLE_FIELDS, type TranslatableField } from './rules.js'
 
 const MEDIA_TABLE = { movie: 'movies', series: 'series' } as const
@@ -35,18 +45,41 @@ export function sourceTextSql(field: TranslatableField, alias = 'm'): string {
 }
 
 /**
- * True when this field of this title has text and no translation of exactly
- * that text into `langExpr`. A missing row and a row of an older source text
- * are the same answer: pending.
+ * A locale code as a SQL literal. Builders interpolate the configured source
+ * language rather than binding it (it is one of a fixed set of codes), so it is
+ * validated here — anything else throws rather than reaching a query.
+ */
+export function localeLiteral(code: AppLocaleCode): string {
+  if (!isValidAppLocale(code)) throw new Error(`Not an app locale: ${String(code)}`)
+  return `'${code}'`
+}
+
+/**
+ * The language `expr` is written in: its alphabet's when that says (Greek,
+ * Cyrillic, Arabic, Devanagari, Hangul, kana, Han), else `fallbackSql` — the
+ * configured source language, as {@link localeLiteral} or a bound parameter.
+ * The only way any reader asks; see the module comment and migration 0198.
+ */
+export function textLanguageSql(expr: string, fallbackSql: string): string {
+  return `aperture_text_language(${expr}, ${fallbackSql})`
+}
+
+/**
+ * True when this field of this title has text, is not already written in
+ * `langExpr`, and has no translation of exactly that text into it. A missing
+ * row and a row of an older source text are the same answer: pending.
  */
 export function fieldPendingSql(
   mediaType: 'movie' | 'series',
   field: TranslatableField,
   langExpr: string,
+  sourceLanguage: AppLocaleCode,
   alias = 'm'
 ): string {
   const src = sourceTextSql(field, alias)
-  return `(${src} IS NOT NULL AND NOT EXISTS (
+  return `(${src} IS NOT NULL
+         AND ${langExpr} <> ${textLanguageSql(src, localeLiteral(sourceLanguage))}
+         AND NOT EXISTS (
             SELECT 1 FROM title_translations tt
              WHERE tt.media_type = '${mediaType}'
                AND tt.media_id = ${alias}.id
@@ -82,12 +115,13 @@ export function pendingTranslationsFromSql(
   mediaType: 'movie' | 'series',
   fields: readonly TranslatableField[],
   languagesParam: string,
+  sourceLanguage: AppLocaleCode,
   options: { withPicks?: boolean; withFailures?: boolean } = {}
 ): string {
   const predicate =
     fields.length === 0
       ? 'FALSE'
-      : fields.map((f) => fieldPendingSql(mediaType, f, 'lang.code')).join('\n       OR ')
+      : fields.map((f) => fieldPendingSql(mediaType, f, 'lang.code', sourceLanguage)).join('\n       OR ')
   const picks = options.withPicks ? `\n    ${selectedPicksJoinSql(mediaType, 'm')}` : ''
   const failures = options.withFailures ? `\n    ${failedPairJoinSql(mediaType)}` : ''
   return `FROM ${MEDIA_TABLE[mediaType]} m
@@ -111,9 +145,7 @@ export function failedPairJoinSql(mediaType: 'movie' | 'series', alias = 'm'): s
        WHERE f.media_type = '${mediaType}'
          AND f.media_id = ${alias}.id
          AND f.language = lang.code
-         AND f.source_hash = md5(CASE f.field
-               ${TRANSLATABLE_FIELDS.map((f) => `WHEN '${f}' THEN ${sourceTextSql(f, alias)}`).join('\n               ')}
-             END)
+         AND f.source_hash = md5(${sourceTextByFieldSql('f.field', alias)})
     ) failed ON true`
 }
 
@@ -133,37 +165,62 @@ export function translationPriorityOrderSql(): string {
 }
 
 /**
- * The columns a selection returns for each field: its source text and that
- * text's hash, under `<field>_source` / `<field>_hash`. The hash is computed
- * here, in SQL, from the same expression the pending check hashes — the job
- * stores it back verbatim and never hashes anything itself, so a JS/Postgres
- * disagreement about encoding cannot arise.
+ * The columns a selection returns for each field: its source text, that text's
+ * hash and the language it is written in, under `<field>_source` /
+ * `<field>_hash` / `<field>_language`. Hash and language are computed here, in
+ * SQL, from the same expression the pending check uses — the job stores the
+ * hash back verbatim and names the language in its prompt, and never works
+ * either out itself, so JS and Postgres cannot disagree about them.
  */
-export function sourceColumnsSql(fields: readonly TranslatableField[], alias = 'm'): string {
+export function sourceColumnsSql(
+  fields: readonly TranslatableField[],
+  sourceLanguage: AppLocaleCode,
+  alias = 'm'
+): string {
   return fields
     .map((f) => {
       const src = sourceTextSql(f, alias)
-      return `${src} AS ${f}_source, md5(${src}) AS ${f}_hash`
+      return (
+        `${src} AS ${f}_source, md5(${src}) AS ${f}_hash, ` +
+        `${textLanguageSql(src, localeLiteral(sourceLanguage))} AS ${f}_language`
+      )
     })
     .join(',\n           ')
 }
 
 /**
+ * The live source text of whichever field `fieldExpr` names, as one CASE built
+ * from TRANSLATABLE_FIELDS — so a row keyed by field (a stored translation, a
+ * recorded failure) is compared against exactly the expression the pending
+ * check uses. A field outside the list (an analysis row) reads as NULL here,
+ * which is what keeps it invisible to every synopsis reader.
+ */
+function sourceTextByFieldSql(fieldExpr: string, alias = 'm'): string {
+  return `CASE ${fieldExpr}
+                   ${TRANSLATABLE_FIELDS.map((f) => `WHEN '${f}' THEN ${sourceTextSql(f, alias)}`).join('\n                   ')}
+                 END`
+}
+
+/**
  * The stored translations of one title into one language that are still
- * current — translations of the text the title carries NOW. `$1` is the media
- * id and `$2` the language. The CASE is built from TRANSLATABLE_FIELDS, so a
- * new field is readable the moment it can be written.
+ * current — translations of the text the title carries NOW, and never "into"
+ * the language that text is already written in (a row left from before
+ * languages were detected would otherwise show a Greek reader a paraphrase of
+ * the Greek plot as a machine translation). `$1` is the media id, `$2` the
+ * language, `$3` the configured source language. Each row also says which
+ * language it was translated FROM. The CASE is built from TRANSLATABLE_FIELDS,
+ * so a new field is readable the moment it can be written.
  */
 export function currentTranslationsSql(mediaType: 'movie' | 'series'): string {
-  return `SELECT tt.field, tt.translated_text
+  const src = sourceTextByFieldSql('tt.field')
+  return `SELECT tt.field, tt.translated_text, ${textLanguageSql(src, '$3')} AS source_language
             FROM title_translations tt
             JOIN ${MEDIA_TABLE[mediaType]} m ON m.id = tt.media_id
            WHERE tt.media_type = '${mediaType}'
              AND tt.media_id = $1
              AND tt.language = $2
-             AND tt.source_hash = md5(CASE tt.field
-                   ${TRANSLATABLE_FIELDS.map((f) => `WHEN '${f}' THEN ${sourceTextSql(f)}`).join('\n                   ')}
-                 END)`
+             AND tt.source_hash = md5(${src})
+             AND tt.language <> ${textLanguageSql(src, '$3')}`
 }
 
 // ---------------------------------------------------------------- film analyses
@@ -209,6 +266,7 @@ export function failedAnalysisJoinSql(mediaType: 'movie' | 'series'): string {
 export function pendingAnalysisTranslationsFromSql(
   mediaType: 'movie' | 'series',
   languagesParam: string,
+  sourceLanguage: AppLocaleCode,
   options: { withPicks?: boolean; withFailures?: boolean } = {}
 ): string {
   const src = analysisSourceSql()
@@ -219,6 +277,7 @@ export function pendingAnalysisTranslationsFromSql(
     CROSS JOIN unnest(${languagesParam}::text[]) AS lang(code)${picks}${failures}
     WHERE ta.media_type = '${mediaType}'
       AND ${src} IS NOT NULL
+      AND lang.code <> ${textLanguageSql(src, localeLiteral(sourceLanguage))}
       AND NOT EXISTS (
             SELECT 1 FROM title_translations tt
              WHERE tt.media_type = '${mediaType}'
@@ -231,11 +290,15 @@ export function pendingAnalysisTranslationsFromSql(
 
 /**
  * The current translation of one analysis into one language, with the paragraph
- * index it is shown under. `$1` media type, `$2` media id, `$3` language.
- * "Current" means a translation of the analysis the title carries NOW.
+ * index it is shown under and the language it was translated from. `$1` media
+ * type, `$2` media id, `$3` language, `$4` the configured source language.
+ * "Current" means a translation of the analysis the title carries NOW, never
+ * into the language it is already written in.
  */
 export function currentAnalysisTranslationSql(): string {
-  return `SELECT tt.translated_text, ta.paragraph_map, ta.analysis
+  const src = analysisSourceSql()
+  return `SELECT tt.translated_text, ta.paragraph_map, ta.analysis,
+                 ${textLanguageSql(src, '$4')} AS source_language
             FROM title_translations tt
             JOIN title_analysis ta
               ON ta.media_type = tt.media_type AND ta.media_id = tt.media_id
@@ -243,5 +306,6 @@ export function currentAnalysisTranslationSql(): string {
              AND tt.media_id = $2
              AND tt.language = $3
              AND tt.field = '${ANALYSIS_TRANSLATION_FIELD}'
-             AND tt.source_hash = md5(${analysisSourceSql()})`
+             AND tt.source_hash = md5(${src})
+             AND tt.language <> ${textLanguageSql(src, '$4')}`
 }

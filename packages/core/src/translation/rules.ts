@@ -75,7 +75,12 @@ export interface TranslationConfig {
   model: string
   /** Optional bearer. The free endpoint needs none. */
   apiKey: string
-  /** What the stored metadata is written in. Almost always English. */
+  /**
+   * What the stored metadata is written in when its alphabet does not say
+   * otherwise — the fallback of `aperture_text_language` (migration 0198). A
+   * Greek, Cyrillic, Arabic, Devanagari, Hangul or CJK text is detected and
+   * translated from its own language, including into this one.
+   */
   sourceLanguage: AppLocaleCode
   /**
    * Which enabled UI languages to translate into. NULL follows the enabled UI
@@ -223,6 +228,24 @@ export function resolveTargetLanguages(
   return APP_LOCALE_OPTIONS.map((o) => o.code).filter(
     (code) => code !== config.sourceLanguage && enabled.has(code) && wanted.has(code)
   )
+}
+
+/**
+ * Every language a text can be translated INTO: the targets above plus the
+ * source language itself, when the interface offers it. A text is never sent
+ * into the language it is already written in (that is decided per text, in SQL
+ * — `textLanguageSql` in ./pending.ts), so in practice the source language only
+ * ever receives text whose alphabet says it is something else: a Greek plot is
+ * translated into English, an English one never is. App order, so the job, the
+ * status counts and the card agree on it.
+ */
+export function resolveTranslationLanguages(
+  config: Pick<TranslationConfig, 'targetLanguages' | 'sourceLanguage'>,
+  enabledUiLanguages: readonly string[]
+): AppLocaleCode[] {
+  const targets = new Set<string>(resolveTargetLanguages(config, enabledUiLanguages))
+  if (enabledUiLanguages.includes(config.sourceLanguage)) targets.add(config.sourceLanguage)
+  return APP_LOCALE_OPTIONS.map((o) => o.code).filter((code) => targets.has(code))
 }
 
 /**
