@@ -81,6 +81,16 @@ services:
     # NETWORKING: Choose ONE option below (see TROUBLESHOOTING section above)
     # ───────────────────────────────────────────────────────────────────────────
     # OPTION A (DEFAULT): qnet networking - containers get their own IPs
+    #
+    # SECURITY WARNING: on qnet the database gets its OWN address on your LAN,
+    # so anyone on the network can reach PostgreSQL on port 5432 and log in
+    # with the default app/app above. That database holds every API key and
+    # password Aperture stores (media server, AI providers, SMTP, Seerr...),
+    # unencrypted. Option B (host networking) exposes it on the NAS's address
+    # too. Keep port 5432 blocked at your firewall, and consider changing the
+    # password: POSTGRES_PASSWORD only applies when the volume is first created,
+    # so on an existing install run ALTER USER app PASSWORD '...' inside the
+    # database, then update DATABASE_URL in the app service to match.
     networks:
       qnet-network:
         # =====================================================================

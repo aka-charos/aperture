@@ -12,6 +12,12 @@ services:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
       POSTGRES_DB: aperture
+    # SECURITY WARNING: this publishes PostgreSQL on every network interface,
+    # so anyone who can reach this machine can log in with app/app and read
+    # every API key and password Aperture stores, unencrypted. It is here so
+    # `pnpm dev` on the host can reach the database. Do not use this file on a
+    # machine reachable from an untrusted network; '127.0.0.1:5432:5432' keeps
+    # host access and closes the LAN.
     ports:
       - '5432:5432'
     volumes:
