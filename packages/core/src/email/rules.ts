@@ -8,6 +8,7 @@
  * `config.ts`, and `send.ts` is the one way the rest of the app sends.
  */
 import type { SMTPTransportOptions } from 'nodemailer'
+import { normalizePublicUrl, publicUrlProblem } from './links.js'
 
 /**
  * How the connection is encrypted.
@@ -85,6 +86,11 @@ export interface SmtpConfig {
    * loopback literal there, which a strict MTA refuses or scores as forged.
    */
   ehloName: string
+  /**
+   * The address recipients reach the app at, for links in emails. Blank falls
+   * back to APP_BASE_URL; a loopback address means no links (see `links.ts`).
+   */
+  publicUrl: string
 }
 
 export const DEFAULT_SMTP_CONFIG: Readonly<SmtpConfig> = {
@@ -98,6 +104,7 @@ export const DEFAULT_SMTP_CONFIG: Readonly<SmtpConfig> = {
   fromAddress: '',
   fromName: '',
   ehloName: '',
+  publicUrl: '',
 }
 
 function trimmed(value: unknown): string {
@@ -151,6 +158,7 @@ export function sanitizeSmtpConfig(raw: Partial<SmtpConfig> | null | undefined):
     fromAddress: trimmed(input.fromAddress),
     fromName: trimmed(input.fromName),
     ehloName: trimmed(input.ehloName),
+    publicUrl: normalizePublicUrl(trimmed(input.publicUrl)),
   }
 }
 
@@ -247,7 +255,7 @@ export function smtpConfigError(config: SmtpConfig): string | null {
   if (config.ehloName && !isEhloName(config.ehloName)) {
     return 'The EHLO name must be a host name like mail.example.com, or an address literal like [192.0.2.1]'
   }
-  return null
+  return publicUrlProblem(config.publicUrl)
 }
 
 /**
@@ -286,13 +294,63 @@ export function buildTransportOptions(config: SmtpConfig): SMTPTransportOptions 
   }
 }
 
+/**
+ * An image carried inside the message and shown by `<img src="cid:…">`.
+ *
+ * Embedded rather than linked: most clients block remote images until the
+ * reader allows them, and a remote image tells whoever serves it that the
+ * message was opened. The bytes are capped because every recipient downloads
+ * them with the message.
+ */
+export interface EmailImage {
+  cid: string
+  content: Buffer
+  contentType: EmailImageType
+}
+
+export const EMAIL_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
+export type EmailImageType = (typeof EMAIL_IMAGE_TYPES)[number]
+
+/** Per image. A w185 TMDb poster is ~15 KB; this is headroom, not a target. */
+export const EMAIL_IMAGE_MAX_BYTES = 300_000
+/** Per message, so a long list of titles cannot make a multi-megabyte email. */
+export const EMAIL_IMAGES_MAX_TOTAL_BYTES = 2_000_000
+
+/** A content id an `<img src="cid:…">` can name without escaping. */
+const CONTENT_ID = /^[A-Za-z0-9._-]{1,100}$/
+
+export function isEmailImageType(value: unknown): value is EmailImageType {
+  return typeof value === 'string' && (EMAIL_IMAGE_TYPES as readonly string[]).includes(value)
+}
+
+export function isContentId(value: unknown): value is string {
+  return typeof value === 'string' && CONTENT_ID.test(value)
+}
+
+/** Why a message's images cannot be sent, or null. The fetch helper already holds images to this. */
+export function emailImagesProblem(images: readonly EmailImage[]): string | null {
+  const seen = new Set<string>()
+  let total = 0
+  for (const image of images) {
+    if (!isContentId(image.cid)) return `Invalid image content id: ${image.cid}`
+    if (seen.has(image.cid)) return `Two images share the content id ${image.cid}`
+    seen.add(image.cid)
+    if (!isEmailImageType(image.contentType)) return `Unsupported image type: ${image.contentType}`
+    if (image.content.length > EMAIL_IMAGE_MAX_BYTES) return `Image ${image.cid} is larger than ${EMAIL_IMAGE_MAX_BYTES} bytes`
+    total += image.content.length
+  }
+  return total > EMAIL_IMAGES_MAX_TOTAL_BYTES ? `Images total more than ${EMAIL_IMAGES_MAX_TOTAL_BYTES} bytes` : null
+}
+
 export interface OutgoingEmail {
   /** One bare address. A list is a batch of these, so one refusal costs one message. */
   to: string
   subject: string
   text: string
-  /** Optional HTML alternative; `text` is always sent, for clients that read only that. */
+  /** Optional HTML alternative; `text` is always sent, for clients that read only that. Build it with `renderEmail`. */
   html?: string
+  /** Images the HTML shows by content id. */
+  images?: EmailImage[]
 }
 
 export interface EmailSender {
@@ -333,6 +391,7 @@ export const SMTP_FAILURES = [
   'sender',
   'recipient',
   'relayDenied',
+  'invalidMessage',
   'connection',
   'disabled',
   'notConfigured',
@@ -346,10 +405,11 @@ export type SmtpOutcome<T> = { ok: true; value: T } | { ok: false; failure: Smtp
  * Whether a failure is about the CONNECTION rather than one message. In a
  * batch, a connection failure ends the batch — every later message would fail
  * the same way, and repeating a refused login is how an account gets locked —
- * while a refused recipient costs only its own message.
+ * while a refused recipient, or a message that could not be built (an image
+ * over the cap), costs only its own message.
  */
 export function isSystemicSmtpFailure(failure: SmtpFailure): boolean {
-  return failure !== 'recipient' && failure !== 'relayDenied'
+  return failure !== 'recipient' && failure !== 'relayDenied' && failure !== 'invalidMessage'
 }
 
 interface ErrorShape {

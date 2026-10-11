@@ -2484,6 +2484,11 @@
     "ehloName": "EHLO name",
     "ehloNamePlaceholder": "mail.example.com",
     "ehloNameHelper": "The name this server introduces itself with. Leave blank unless the mail server refuses the default, which inside Docker is [127.0.0.1].",
+    "publicUrl": "Public address",
+    "publicUrlPlaceholder": "https://aperture.example.com",
+    "publicUrlHelperSet": "Links in emails point here.",
+    "publicUrlHelperFallback": "Leave blank to use {{url}} (from APP_BASE_URL) for links in emails.",
+    "publicUrlHelperNone": "Emails carry no links until this is set, because APP_BASE_URL is unset or a local address.",
     "readyButOff": "These settings are complete. Switch on Send email when a feature needs it.",
     "incomplete": "Not ready to send yet: {{list}} still missing.",
     "missingToEnable": "Fill in {{list}} before switching on Send email.",
@@ -2500,6 +2505,11 @@
     "sendTestTo": "Send to",
     "sendTest": "Send test email",
     "sending": "Sending…",
+    "preview": "Preview",
+    "previewTitle": "Preview of the test email",
+    "previewLanguage": "Language",
+    "previewPlainText": "Plain-text version",
+    "previewError": "Failed to render the preview",
     "sendOk": "Test email sent to {{address}}. If it does not arrive, check the spam folder.",
     "serverSaid": "Tried {{host}}: {{detail}}",
     "failure": {
@@ -2558,6 +2568,10 @@
       "relayDenied": {
         "title": "The server refused to pass the message on to that address.",
         "hint": "Usually the login was not accepted for sending, or this account may only send within its own domain. Check the username and password, or ask the mail provider."
+      },
+      "invalidMessage": {
+        "title": "The message could not be built.",
+        "hint": "The details are below."
       },
       "connection": {
         "title": "The connection dropped.",

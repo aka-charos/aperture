@@ -26,6 +26,7 @@ export interface SmtpSettingsUpdate {
   fromAddress?: string
   fromName?: string
   ehloName?: string
+  publicUrl?: string
 }
 
 export interface SmtpTestRequest extends SmtpSettingsUpdate {
@@ -42,6 +43,7 @@ const STRING_FIELDS = [
   'fromAddress',
   'fromName',
   'ehloName',
+  'publicUrl',
   'sendTo',
 ] as const
 
@@ -163,6 +165,7 @@ export function mergeSmtpSettings(
     fromAddress: update.fromAddress ?? current.fromAddress,
     fromName: update.fromName ?? current.fromName,
     ehloName: update.ehloName ?? current.ehloName,
+    publicUrl: update.publicUrl ?? current.publicUrl,
   })
   if (!next.username) return next
 
@@ -182,6 +185,7 @@ export interface PublicSmtpConfig {
   fromAddress: string
   fromName: string
   ehloName: string
+  publicUrl: string
 }
 
 /** The config as the card may see it: everything but the password, which is reported as set or not. */
@@ -197,5 +201,6 @@ export function publicSmtpConfig(config: SmtpConfig): PublicSmtpConfig {
     fromAddress: config.fromAddress,
     fromName: config.fromName,
     ehloName: config.ehloName,
+    publicUrl: config.publicUrl,
   }
 }

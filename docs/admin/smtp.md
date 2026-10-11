@@ -18,14 +18,16 @@ Admin console → **Integrations** → **Outgoing email** (`/admin/integrations/
 | **Username / Password** | Leave the username blank for a relay that takes mail without a login. With a username set, the login is always attempted, even if the server does not advertise it, so a wrong password fails the test instead of slipping through. The password is masked once saved. It is only ever sent to the server it was saved for, over a connection at least as secure as the one it was saved with: change the server, switch to **None**, or accept a self-signed certificate, and you must enter it again. |
 | **From address** | Most providers only accept an address that belongs to the account you log in with |
 | **From name** | Blank uses the instance name (Settings → System), so a rename follows |
+| **Public address** | The address people open the app at, used for links in emails. Leave blank to use `APP_BASE_URL`. A local address like `localhost` is refused. While neither is set, or `APP_BASE_URL` is a local address, emails carry no links rather than links that go nowhere. |
 | **EHLO name** | The name Aperture introduces itself with. Leave it blank unless the mail server refuses the default: inside Docker that default is `[127.0.0.1]`, which strict servers reject or score as spam. |
 
 ## Testing
 
 - **Test connection** connects, sets up encryption as the mode requires, and logs in. It sends nothing.
 - **Send test email** connects, logs in and sends a short message, to your own address by default.
+- **Preview** shows that test email as it would be sent, in any language, without connecting or sending anything.
 
-Both use the settings on the card **whether or not they are saved**, and give up after 45 seconds. A failure names its cause and shows the server's own reply beneath it. Causes include a refused login, a server that only takes a login over encryption, a security mode that does not match the port, a certificate that could not be verified, a refused From address, a refusal to relay and a blocked port.
+All three use the settings on the card **whether or not they are saved**; the two that connect give up after 45 seconds. A failure names its cause and shows the server's own reply beneath it. Causes include a refused login, a server that only takes a login over encryption, a security mode that does not match the port, a certificate that could not be verified, a refused From address, a refusal to relay and a blocked port.
 
 Common fixes:
 
@@ -36,6 +38,10 @@ Common fixes:
 | A relay in the same Docker network | its container name, None or STARTTLS on 25, no login |
 
 Many hosting providers block outgoing port 25. A test that times out on 25 is usually that.
+
+## What Emails Look Like
+
+Every email has an HTML version and a plain-text version with the same content, in the recipient's own interface language. Recipients see the instance name at the top in the theme's primary colour, and posters travel inside the message, so no "load images" prompt appears and nobody outside learns it was opened.
 
 ## Who Receives Email
 

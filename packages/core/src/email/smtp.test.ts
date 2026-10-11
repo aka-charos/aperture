@@ -352,3 +352,40 @@ test('a refused login ends the batch without trying the rest', LIMIT, async () =
   assert.equal(fake.commands.filter((c) => c.toUpperCase().startsWith('AUTH')).length, 1)
   assert.ok(outcomes[2].ok === false && outcomes[2].detail.startsWith('Not attempted after:'))
 })
+
+// ---------------------------------------------------------------- what an HTML message carries
+
+test('an HTML message carries its text, its HTML and its images inline', LIMIT, async () => {
+  const fake = await fakeSmtp()
+  const outcome = await sendWithSmtp(configFor(fake), sender, {
+    to: 'viewer@example.com',
+    subject: 'With a poster',
+    text: 'Plain version',
+    html: '<p>HTML version <img src="cid:poster-1"></p>',
+    images: [{ cid: 'poster-1', content: Buffer.from([0xff, 0xd8, 0xff, 0xe0]), contentType: 'image/jpeg' }],
+  })
+
+  assert.equal(outcome.ok, true, outcome.ok ? '' : `${outcome.failure}: ${outcome.detail}`)
+  const message = fake.messages[0]
+  assert.match(message, /multipart\/related/i)
+  assert.match(message, /multipart\/alternative/i)
+  assert.match(message, /^Content-ID: <poster-1>$/im)
+  assert.match(message, /^Content-Disposition: inline/im)
+  assert.match(message, /Plain version/)
+  assert.match(message, /HTML version/)
+})
+
+test('a message whose images break the limits is refused without connecting, and only that message', LIMIT, async () => {
+  const fake = await fakeSmtp()
+  const tooBig = { cid: 'big', content: Buffer.alloc(400_000), contentType: 'image/png' as const }
+  const outcomes = await sendManyWithSmtp(configFor(fake), sender, [
+    { ...message('a@example.com'), html: '<p>x</p>', images: [tooBig] },
+    message('b@example.com'),
+  ])
+
+  assert.deepEqual(
+    outcomes.map((o) => (o.ok ? 'sent' : o.failure)),
+    ['invalidMessage', 'sent']
+  )
+  assert.equal(fake.messages.length, 1)
+})

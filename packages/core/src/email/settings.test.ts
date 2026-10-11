@@ -117,3 +117,9 @@ test('the public config never carries the password', () => {
   assert.ok(!('password' in pub))
   assert.ok(!JSON.stringify(pub).includes('secret'))
 })
+
+test('the public address is merged like any other field', () => {
+  assert.equal(mergeSmtpSettings(saved, { publicUrl: 'https://aperture.example.com/' }, 'save').publicUrl, 'https://aperture.example.com')
+  assert.equal(mergeSmtpSettings({ ...saved, publicUrl: 'https://a.example.com' }, {}, 'save').publicUrl, 'https://a.example.com')
+  assert.equal(publicSmtpConfig({ ...saved, publicUrl: 'https://a.example.com' }).publicUrl, 'https://a.example.com')
+})

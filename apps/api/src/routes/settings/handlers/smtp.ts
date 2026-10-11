@@ -6,6 +6,8 @@
  * - PUT  /api/settings/smtp       - partial update
  * - POST /api/settings/smtp/test  - check the card's settings, saved or not,
  *                                   or send a test message with them
+ * - POST /api/settings/smtp/preview - the test message as it would be sent,
+ *                                   rendered for the card, in any language
  *
  * Nothing in the app sends email through this yet. It is the connection that
  * features send through, by calling core `sendEmail`/`sendEmails`; see core
@@ -14,8 +16,14 @@
  */
 import type { FastifyInstance } from 'fastify'
 import {
+  APP_LOCALE_OPTIONS,
+  buildTestEmail,
+  emailLinkBaseFor,
   getAppName,
   getSmtpConfig,
+  getSystemLanguageDefaults,
+  isValidAppLocale,
+  resolveEffectiveUiLanguage,
   isEmailAddress,
   mergeSmtpSettings,
   publicSmtpConfig,
@@ -74,6 +82,10 @@ async function settingsResponse(config: SmtpConfig, user: SessionUser) {
     securityModes: SMTP_SECURITY_MODES,
     defaultPorts: SMTP_DEFAULT_PORTS,
     storedPassword: storedPasswordScope(config),
+    // Where links in emails point now, and where they would point with the
+    // public address left blank (APP_BASE_URL, unless it is a loopback).
+    linkBase: emailLinkBaseFor(config),
+    fallbackLinkBase: emailLinkBaseFor({ ...config, publicUrl: '' }),
     defaultFromName: await getAppName(),
     testRecipient: await ownAddress(user.id),
   }
@@ -157,7 +169,13 @@ export function registerSmtpHandlers(fastify: FastifyInstance) {
         }
 
         const user = request.user as SessionUser
-        const sent = await sendTestEmail(config, sendTo, user.displayName || user.username)
+        // In the language of the admin who asked: they are the one reading it.
+        const sent = await sendTestEmail(
+          config,
+          sendTo,
+          user.displayName || user.username,
+          await resolveEffectiveUiLanguage(user.id)
+        )
         return reply.send(
           sent.ok
             ? { success: true, stage: 'send', host: config.host, sentTo: sendTo }
@@ -166,6 +184,45 @@ export function registerSmtpHandlers(fastify: FastifyInstance) {
       } catch (err) {
         fastify.log.error({ err }, 'Failed to test SMTP')
         return reply.status(500).send({ success: false, error: 'Failed to test the email settings' })
+      }
+    }
+  )
+
+  /**
+   * The test message as it would be sent with the card's settings, rendered
+   * for display: subject, HTML and plain text. Sends nothing and connects to
+   * nothing. `lang` picks the language (default: the admin's own), so an admin
+   * can see what a recipient reading another language — or right to left —
+   * would get.
+   */
+  fastify.post<{ Body: SmtpTestRequest & { lang?: string } }>(
+    '/api/settings/smtp/preview',
+    { preHandler: requireAdmin, schema: { tags: ['settings'] } },
+    async (request, reply) => {
+      try {
+        const { lang, ...update } = request.body ?? {}
+        const wrongType = smtpUpdateTypeError(update)
+        if (wrongType) return reply.status(400).send({ error: wrongType })
+        if (lang !== undefined && !isValidAppLocale(lang)) {
+          return reply.status(400).send({ error: 'Unknown language' })
+        }
+
+        const config = mergeSmtpSettings(await getSmtpConfig(), update, 'test')
+        const invalid = smtpConfigError(config)
+        if (invalid) return reply.status(400).send({ error: invalid })
+
+        const user = request.user as SessionUser
+        const locale = lang ?? (await resolveEffectiveUiLanguage(user.id))
+        // A preview with no server set yet still reads sensibly.
+        const shown = config.host ? config : { ...config, host: 'smtp.example.com' }
+        const rendered = await buildTestEmail(shown, locale, user.displayName || user.username)
+        // Only the languages a recipient can actually have on this instance.
+        const { enabledUiLanguages } = await getSystemLanguageDefaults()
+        const languages = APP_LOCALE_OPTIONS.filter((o) => enabledUiLanguages.includes(o.code) || o.code === locale)
+        return reply.send({ ...rendered, lang: locale, languages })
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to render the email preview')
+        return reply.status(500).send({ error: 'Failed to render the email preview' })
       }
     }
   )

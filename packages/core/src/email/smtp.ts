@@ -19,6 +19,7 @@ import { createChildLogger } from '../lib/logger.js'
 import {
   buildTransportOptions,
   classifySmtpFailure,
+  emailImagesProblem,
   isEmailAddress,
   isSystemicSmtpFailure,
   singleLine,
@@ -32,7 +33,7 @@ import {
   type SmtpOutcome,
 } from './rules.js'
 
-export type { EmailSender, OutgoingEmail, SentEmail, SmtpOutcome } from './rules.js'
+export type { EmailImage, EmailSender, OutgoingEmail, SentEmail, SmtpOutcome } from './rules.js'
 
 const logger = createChildLogger('smtp')
 
@@ -121,6 +122,9 @@ function compose(sender: EmailSender, message: OutgoingEmail): SendMailOptions |
   if (!isEmailAddress(sender.address)) {
     return { ok: false, failure: 'sender', detail: 'The From address is not a single plain email address' }
   }
+  const images = message.images ?? []
+  const imageProblem = emailImagesProblem(images)
+  if (imageProblem) return { ok: false, failure: 'invalidMessage', detail: imageProblem }
   return {
     from: { name: singleLine(sender.name), address: sender.address },
     to: message.to,
@@ -128,6 +132,15 @@ function compose(sender: EmailSender, message: OutgoingEmail): SendMailOptions |
     text: message.text,
     html: message.html,
     headers: { 'Auto-Submitted': 'auto-generated' },
+    // Buffers only, never a path or URL: the transport refuses file and URL
+    // access, and an image is fetched (and capped) before it gets here.
+    attachments: images.map((image) => ({
+      cid: image.cid,
+      content: image.content,
+      contentType: image.contentType,
+      contentDisposition: 'inline' as const,
+      filename: `${image.cid}.${image.contentType.split('/')[1]}`,
+    })),
   }
 }
 

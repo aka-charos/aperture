@@ -93,7 +93,7 @@
     "test:inference": "node --import tsx --test src/lib/usageFetch.test.ts src/lib/zai-usage.test.ts",
     "test:translation": "node --import tsx --test src/translation/rules.test.ts src/translation/pending.test.ts src/translation/analysisText.test.ts src/translation/client.test.ts",
     "test:collections": "node --import tsx --test src/tmdb/collectionParts.test.ts",
-    "test:email": "node --import tsx --test src/email/rules.test.ts src/email/settings.test.ts src/email/smtp.test.ts",
+    "test:email": "node --import tsx --test src/email/rules.test.ts src/email/settings.test.ts src/email/links.test.ts src/email/strings.test.ts src/email/template.test.ts src/email/images.test.ts src/email/smtp.test.ts",
     "test:library-scope": "node --import tsx --test src/lib/libraryScope.test.ts",
     "test:social": "node --import tsx --test src/social/rules.test.ts",
     "test:home-sections": "node --import tsx --test src/homeSections/version.test.ts src/homeSections/settings.test.ts src/homeSections/plan.test.ts src/homeSections/placement.test.ts src/homeSections/rowStates.test.ts src/homeSections/preview.test.ts src/media/managedTags.test.ts"

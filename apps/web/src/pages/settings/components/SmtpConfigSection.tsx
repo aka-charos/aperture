@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Alert,
@@ -10,6 +10,10 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   FormControlLabel,
   IconButton,
@@ -20,6 +24,7 @@ import {
   Typography,
 } from '@mui/material'
 import ForwardToInboxIcon from '@mui/icons-material/ForwardToInbox'
+import PreviewIcon from '@mui/icons-material/Preview'
 import SaveIcon from '@mui/icons-material/Save'
 import SendIcon from '@mui/icons-material/Send'
 import VisibilityIcon from '@mui/icons-material/Visibility'
@@ -40,6 +45,7 @@ interface SmtpSettings {
     fromAddress: string
     fromName: string
     ehloName: string
+    publicUrl: string
   }
   /** Decided by the server: what stops the SAVED settings from sending. */
   problems: string[]
@@ -47,8 +53,20 @@ interface SmtpSettings {
   defaultPorts: Record<Security, number>
   /** Decided by the server: the host and transports the stored password may be used with, or null. */
   storedPassword: { host: string; transports: string[] } | null
+  /** Where links in emails point now, or null for no links. */
+  linkBase: string | null
+  /** Where they would point with the public address left blank (APP_BASE_URL unless loopback), or null. */
+  fallbackLinkBase: string | null
   defaultFromName: string
   testRecipient: string | null
+}
+
+interface Preview {
+  subject: string
+  html: string
+  text: string
+  lang: string
+  languages: { code: string; label: string }[]
 }
 
 interface TestResult {
@@ -75,6 +93,7 @@ interface Form {
   fromAddress: string
   fromName: string
   ehloName: string
+  publicUrl: string
 }
 
 function formFrom(settings: SmtpSettings): Form {
@@ -90,6 +109,7 @@ function formFrom(settings: SmtpSettings): Form {
     fromAddress: c.fromAddress,
     fromName: c.fromName,
     ehloName: c.ehloName,
+    publicUrl: c.publicUrl,
   }
 }
 
@@ -127,6 +147,13 @@ export function SmtpConfigSection() {
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [result, setResult] = useState<TestResult | null>(null)
+  const [preview, setPreview] = useState<Preview | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  // Only the newest preview request may write its answer: switching language
+  // twice quickly must not let the slower first render land last.
+  const previewRequest = useRef(0)
 
   const apply = useCallback((data: SmtpSettings) => {
     setSettings(data)
@@ -221,6 +248,7 @@ export function SmtpConfigSection() {
     fromAddress: form.fromAddress,
     fromName: form.fromName,
     ehloName: form.ehloName,
+    publicUrl: form.publicUrl,
   })
 
   /** A refusal for missing settings names them in the reader's language; anything else shows the server's sentence. */
@@ -276,6 +304,34 @@ export function SmtpConfigSection() {
       setResult({ success: false, error: t('settingsSmtp.errConnect') })
     } finally {
       setTesting(null)
+    }
+  }
+
+  /** The test message as the card stands, in `lang` (default: the admin's own). Sends nothing. */
+  const loadPreview = async (lang?: string) => {
+    const request = ++previewRequest.current
+    const current = () => request === previewRequest.current
+    setPreviewOpen(true)
+    setPreviewing(true)
+    setPreviewError(null)
+    try {
+      const response = await fetch('/api/settings/smtp/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ...body(), lang }),
+      })
+      const data = await response.json()
+      if (!current()) return
+      if (!response.ok) {
+        setPreviewError(data.error ? withServerMessageDetail(t, data.error) : t('settingsSmtp.previewError'))
+        return
+      }
+      setPreview(data as Preview)
+    } catch {
+      if (current()) setPreviewError(t('settingsSmtp.errConnect'))
+    } finally {
+      if (current()) setPreviewing(false)
     }
   }
 
@@ -505,6 +561,23 @@ export function SmtpConfigSection() {
             fullWidth
           />
 
+          <TextField
+            label={t('settingsSmtp.publicUrl')}
+            value={form.publicUrl}
+            onChange={(e) => update({ publicUrl: e.target.value })}
+            placeholder={settings.fallbackLinkBase ?? t('settingsSmtp.publicUrlPlaceholder')}
+            helperText={
+              form.publicUrl.trim()
+                ? t('settingsSmtp.publicUrlHelperSet')
+                : settings.fallbackLinkBase
+                  ? t('settingsSmtp.publicUrlHelperFallback', { url: settings.fallbackLinkBase })
+                  : t('settingsSmtp.publicUrlHelperNone')
+            }
+            size="small"
+            fullWidth
+            inputProps={{ inputMode: 'url' }}
+          />
+
           {!settings.config.enabled && settings.problems.length === 0 && !hasChanges && (
             <Typography variant="caption" color="text.secondary">
               {t('settingsSmtp.readyButOff')}
@@ -523,6 +596,15 @@ export function SmtpConfigSection() {
             </Button>
             <Button variant="outlined" onClick={() => handleTest('connect')} disabled={!canCheck} size="small">
               {testing === 'connect' ? t('settingsSmtp.testing') : t('settingsSmtp.testConnection')}
+            </Button>
+            <Button
+              variant="text"
+              startIcon={<PreviewIcon />}
+              onClick={() => loadPreview()}
+              disabled={previewing}
+              size="small"
+            >
+              {t('settingsSmtp.preview')}
             </Button>
           </Box>
 
@@ -553,6 +635,62 @@ export function SmtpConfigSection() {
           {resultAlert()}
         </Box>
       </CardContent>
+
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>{preview?.subject ?? t('settingsSmtp.previewTitle')}</DialogTitle>
+        <DialogContent dividers>
+          {previewError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {previewError}
+            </Alert>
+          )}
+          {preview && (
+            <Box display="flex" flexDirection="column" gap={2}>
+              <TextField
+                select
+                label={t('settingsSmtp.previewLanguage')}
+                value={preview.lang}
+                onChange={(e) => loadPreview(e.target.value)}
+                size="small"
+                sx={{ maxWidth: 240 }}
+              >
+                {preview.languages.map((language) => (
+                  <MenuItem key={language.code} value={language.code}>
+                    {language.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+              {/* An empty sandbox: the email's HTML runs no script and reaches nothing of this page. */}
+              <Box
+                component="iframe"
+                title={t('settingsSmtp.previewTitle')}
+                sandbox=""
+                srcDoc={preview.html}
+                sx={{ width: '100%', height: 520, border: 0, borderRadius: 1, bgcolor: '#f4f4f7', opacity: previewing ? 0.5 : 1 }}
+              />
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  {t('settingsSmtp.previewPlainText')}
+                </Typography>
+                <Box
+                  component="pre"
+                  sx={{ m: 0, p: 2, bgcolor: 'action.hover', borderRadius: 1, whiteSpace: 'pre-wrap', fontSize: 13, overflowX: 'auto' }}
+                >
+                  {preview.text}
+                </Box>
+              </Box>
+            </Box>
+          )}
+          {!preview && previewing && (
+            <Box display="flex" justifyContent="center" py={4}>
+              <CircularProgress />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreviewOpen(false)}>{t('common.close')}</Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   )
 }

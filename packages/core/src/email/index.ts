@@ -1,5 +1,7 @@
 export {
   DEFAULT_SMTP_CONFIG,
+  EMAIL_IMAGE_MAX_BYTES,
+  EMAIL_IMAGE_TYPES,
   SMTP_DEFAULT_PORTS,
   SMTP_FAILURES,
   SMTP_FROM_NAME_MAX_LENGTH,
@@ -15,6 +17,8 @@ export {
   senderFor,
   smtpConfigError,
   smtpProblems,
+  type EmailImage,
+  type EmailImageType,
   type EmailSender,
   type OutgoingEmail,
   type SentEmail,
@@ -41,4 +45,25 @@ export {
 } from './settings.js'
 export { sendManyWithSmtp, sendWithSmtp, verifySmtp, type SmtpCallOptions } from './smtp.js'
 export { getSmtpConfig, setSmtpConfig } from './config.js'
-export { sendEmail, sendEmails, sendTestEmail } from './send.js'
+export {
+  buildTestEmail,
+  emailContext,
+  emailContextFor,
+  emailLinkBaseFor,
+  sendEmail,
+  sendEmails,
+  sendTestEmail,
+  type EmailContext,
+} from './send.js'
+export { appLink, emailLinkBase, isReachablePublicUrl } from './links.js'
+export { emailLocale, emailText, type EmailLocale, type EmailStringKey } from './strings.js'
+export {
+  inlineImagesForPreview,
+  renderEmail,
+  type EmailAction,
+  type EmailContent,
+  type EmailFrame,
+  type EmailItem,
+  type RenderedEmail,
+} from './template.js'
+export { fetchEmailImage, type FetchEmailImageOptions } from './images.js'

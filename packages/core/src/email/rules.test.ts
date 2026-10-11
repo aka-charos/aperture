@@ -3,9 +3,11 @@ import assert from 'node:assert/strict'
 
 import {
   DEFAULT_SMTP_CONFIG,
+  EMAIL_IMAGE_MAX_BYTES,
   SMTP_DEFAULT_PORTS,
   buildTransportOptions,
   classifySmtpFailure,
+  emailImagesProblem,
   isEhloName,
   isEmailAddress,
   isSystemicSmtpFailure,
@@ -394,9 +396,9 @@ test('our own deadline reads as a timeout', () => {
   assert.equal(classifySmtpFailure(err, starttls587), 'timeout')
 })
 
-test('in a batch, only a refused recipient lets the rest go on', () => {
+test('in a batch, only a failure about one message lets the rest go on', () => {
   const perMessage = SMTP_FAILURES.filter((f) => !isSystemicSmtpFailure(f))
-  assert.deepEqual(perMessage.sort(), ['recipient', 'relayDenied'])
+  assert.deepEqual(perMessage.sort(), ['invalidMessage', 'recipient', 'relayDenied'])
 })
 
 test('the sender name falls back to the instance name only when none is set', () => {
@@ -416,4 +418,23 @@ test('the detail keeps the server words on one line and clipped', () => {
 
 test('a subject cannot carry a header of its own', () => {
   assert.equal(singleLine('Hello\r\nBcc: victim@example.com'), 'Hello Bcc: victim@example.com')
+})
+
+// ---------------------------------------------------------------- the public address and images
+
+test('a public address is stored without its trailing slash and refused when it is not one', () => {
+  assert.equal(sanitizeSmtpConfig({ publicUrl: 'https://aperture.example.com/' }).publicUrl, 'https://aperture.example.com')
+  assert.equal(smtpConfigError({ ...configured, publicUrl: 'https://aperture.example.com' }), null)
+  assert.notEqual(smtpConfigError({ ...configured, publicUrl: 'aperture.example.com' }), null)
+})
+
+test('images are held to their limits: id, type, size each and in total', () => {
+  const jpeg = (cid: string, bytes = 10) => ({ cid, content: Buffer.alloc(bytes), contentType: 'image/jpeg' as const })
+  assert.equal(emailImagesProblem([jpeg('a'), jpeg('b')]), null)
+  assert.notEqual(emailImagesProblem([jpeg('a b')]), null)
+  assert.notEqual(emailImagesProblem([jpeg('a'), jpeg('a')]), null)
+  assert.notEqual(emailImagesProblem([{ ...jpeg('a'), contentType: 'image/svg+xml' as never }]), null)
+  assert.notEqual(emailImagesProblem([jpeg('a', EMAIL_IMAGE_MAX_BYTES + 1)]), null)
+  const many = Array.from({ length: 8 }, (_, i) => jpeg(`p${i}`, EMAIL_IMAGE_MAX_BYTES))
+  assert.notEqual(emailImagesProblem(many), null)
 })
