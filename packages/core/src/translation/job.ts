@@ -15,7 +15,9 @@
  *    every pair tried is a `<> ALL` over thousands of entries on every row of
  *    every batch late in a large run. A JS set is the guarantee; the SQL list
  *    keeps the selection from spending its LIMIT on rows the set would skip.
- * 2. CANCELLATION IS POLLED BEFORE EVERY REQUEST, and inside the pacing wait.
+ * 2. CANCELLATION IS POLLED BEFORE EVERY REQUEST, inside the pacing wait, while
+ *    a request streams and while a rate limit is waited out — so Stop reaches
+ *    a call already in flight (F-131).
  * 3. THE CAP COUNTS ATTEMPTED PAIRS, not stored rows — a failure costs the
  *    same wall-clock time as a success.
  *
@@ -285,7 +287,7 @@ async function selectPendingAnalysisPairs(
                 detail:
                   result.strategy === 'whole'
                     ? `${result.paragraphs} paragraphs in one request`
-                    : `${result.paragraphs} paragraphs, section by section`,
+                    : `${result.paragraphs} paragraphs, in smaller requests`,
               }
             },
           },
@@ -425,6 +427,8 @@ async function runTranslationPass(
             // analysis, and each retry after a 429 — waits its pacing slot and
             // checks Stop first.
             const translation = await item.translate({
+              // Reaches a request already streaming, and a rate-limit wait.
+              shouldCancel: options.shouldCancel,
               beforeCall: async () => {
                 if (await cancelled()) return false
                 const paced = await waitForCallSlot(pacingKey, spacingMs, { shouldCancel: options.shouldCancel })

@@ -92,7 +92,13 @@ export interface TranslationConfig {
    * prompt otherwise. Empty sends the plain prompt.
    */
   instruction: string
-  /** Per request. A long synopsis is a few thousand output tokens. */
+  /**
+   * How long a request may go SILENT — waiting for the first word, or between
+   * words — before it is given up. Not a cap on the whole answer: a streamed
+   * translation of a full analysis is still arriving after a minute on a slow
+   * local model, and a cap would cut it off healthy (F-131's rule; the
+   * absolute backstop is `TRANSLATION_DEADLINE_MS` in ./client.ts).
+   */
   timeoutMs: number
   /** Gap between calls to one endpoint; the public one is a free service. */
   callSpacingSeconds: number
@@ -664,7 +670,13 @@ export function stripThink(text: string): string {
 
 export type CompletionReading =
   | { ok: true; text: string }
-  | { ok: false; reason: string }
+  /**
+   * `sizeRelated`: the refusal is one a SMALLER request could avoid — the
+   * answer was cut off at the output limit, or came back too short to be all of
+   * it. An analysis falls back to section-by-section on these; an echo or an
+   * empty answer is not about size, and a smaller request would fail the same.
+   */
+  | { ok: false; reason: string; sizeRelated?: boolean }
 
 /**
  * Read one (non-streamed) chat-completion response into a translation, or the
@@ -697,7 +709,7 @@ export function judgeTranslation(
 ): CompletionReading {
   if (typeof content !== 'string') return { ok: false, reason: 'The response carried no text' }
   if (finishReason === 'length') {
-    return { ok: false, reason: 'The translation was cut off at the output limit' }
+    return { ok: false, reason: 'The translation was cut off at the output limit', sizeRelated: true }
   }
   const text = stripThink(content)
   if (!text) return { ok: false, reason: 'The model returned an empty translation' }
@@ -705,7 +717,7 @@ export function judgeTranslation(
     return { ok: false, reason: 'The model returned the source text unchanged' }
   }
   const short = target ? translationLengthProblem(sourceText, text, target) : null
-  if (short) return { ok: false, reason: short }
+  if (short) return { ok: false, reason: short, sizeRelated: true }
   return { ok: true, text }
 }
 

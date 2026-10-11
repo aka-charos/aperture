@@ -22,6 +22,7 @@ import type { FastifyInstance } from 'fastify'
 import {
   TRANSLATION_INSTRUCTION_MAX_CHARS,
   TRANSLATION_SPACING_MAX_SECONDS,
+  TRANSLATION_TEST_ANALYSIS_TEXT,
   TRANSLATION_TEST_TEXT,
   TRANSLATION_TIMEOUT_MAX_MS,
   TRANSLATION_TIMEOUT_MIN_MS,
@@ -38,6 +39,7 @@ import {
   resolveTargetLanguages,
   sanitizeTranslationConfig,
   setTranslationConfig,
+  translateAnalysisText,
   translateText,
   TranslationError,
   type AppLocaleCode,
@@ -66,6 +68,12 @@ interface UpdateBody {
 interface TestBody extends UpdateBody {
   /** Which language to test into; defaults to the first resolved target. */
   language?: string
+  /**
+   * Which prompt to test: the synopsis one (absent), or the analysis one, which
+   * translates a three-paragraph sample with the analysis instructions and
+   * reports whether its paragraphs came back one for one.
+   */
+  kind?: string
 }
 
 function toPublicConfig(config: TranslationConfig) {
@@ -263,6 +271,10 @@ export function registerSynopsisTranslationHandlers(fastify: FastifyInstance) {
         const body = request.body ?? {}
         const error = validate(body)
         if (error) return reply.status(400).send({ success: false, error })
+        const kind = body.kind ?? 'synopsis'
+        if (kind !== 'synopsis' && kind !== 'analysis') {
+          return reply.status(400).send({ success: false, error: 'kind must be synopsis or analysis' })
+        }
         const current = await getTranslationConfig()
         const config = merge(current, { ...body, apiKey: undefined })
         config.apiKey = body.apiKey?.trim() || storedKeyFor(current, config.baseUrl)
@@ -279,11 +291,31 @@ export function registerSynopsisTranslationHandlers(fastify: FastifyInstance) {
         try {
           // No 429 retries here: the job waits minutes for a rate limit, and a
           // button cannot hold a request open that long.
+          if (kind === 'analysis') {
+            // The job's own path, so what passes here is what the job does:
+            // the analysis prompt, the analysis instructions, and the
+            // paragraph-count contract with its fallback.
+            const result = await translateAnalysisText(config, TRANSLATION_TEST_ANALYSIS_TEXT, null, language, {
+              rateLimitRetries: 0,
+            })
+            return reply.send({
+              success: true,
+              kind,
+              language,
+              source: TRANSLATION_TEST_ANALYSIS_TEXT,
+              text: result.text,
+              model: result.model,
+              latencyMs: result.latencyMs,
+              paragraphs: result.paragraphs,
+              strategy: result.strategy,
+            })
+          }
           const result = await translateText(config, TRANSLATION_TEST_TEXT, language, {
             rateLimitRetries: 0,
           })
           return reply.send({
             success: true,
+            kind,
             language,
             source: TRANSLATION_TEST_TEXT,
             text: result.text,

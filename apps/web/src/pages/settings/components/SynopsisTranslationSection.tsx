@@ -133,8 +133,20 @@ function countsFor(row: LanguageStatus, kind: TranslationKind): KindCounts {
 }
 
 type TestResult =
-  | { success: true; language: string; source: string; text: string; model: string; latencyMs: number }
-  | { success: false; error: string }
+  | {
+      success: true
+      /** Absent from an older server, which only tested synopses. */
+      kind?: TranslationKind
+      language: string
+      source: string
+      text: string
+      model: string
+      latencyMs: number
+      /** Analysis test only: paragraphs back (always the sample's count) and how. */
+      paragraphs?: number
+      strategy?: 'whole' | 'sections'
+    }
+  | { success: false; kind?: TranslationKind; error: string }
 
 const JOB = 'translate-title-synopses'
 const ANALYSIS_JOB = 'translate-title-analyses'
@@ -172,7 +184,8 @@ export function SynopsisTranslationSection() {
 
   const [models, setModels] = useState<{ reachable: boolean; models: string[] } | null>(null)
   const [modelsLoading, setModelsLoading] = useState(false)
-  const [testing, setTesting] = useState(false)
+  // Which Test is running, if any — the two buttons share one result box.
+  const [testing, setTesting] = useState<TranslationKind | null>(null)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [status, setStatus] = useState<LanguageStatus[] | null>(null)
   // Which kind and which language ('all' for every language) a clear is for.
@@ -296,26 +309,26 @@ export function SynopsisTranslationSection() {
     }
   }
 
-  const handleTest = async () => {
-    setTesting(true)
+  const handleTest = async (kind: TranslationKind) => {
+    setTesting(kind)
     setTestResult(null)
     try {
       const response = await fetch('/api/settings/synopsis-translation/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ ...payload(), language: selected[0] }),
+        body: JSON.stringify({ ...payload(), language: selected[0], kind }),
       })
       const data = await response.json().catch(() => null)
       setTestResult(
         data && typeof data.success === 'boolean'
-          ? data
-          : { success: false, error: t('settingsSynopsisTranslation.testFailed') }
+          ? { kind, ...data }
+          : { success: false, kind, error: t('settingsSynopsisTranslation.testFailed') }
       )
     } catch {
-      setTestResult({ success: false, error: t('settingsSynopsisTranslation.connectError') })
+      setTestResult({ success: false, kind, error: t('settingsSynopsisTranslation.connectError') })
     } finally {
-      setTesting(false)
+      setTesting(null)
     }
   }
 
@@ -385,6 +398,12 @@ export function SynopsisTranslationSection() {
   const readiness = described?.readiness
   const analysisReadiness = described?.analysisReadiness
   const analysisSavedOn = !!described?.config.analysisEnabled
+  // The header chip answers for the card, which runs two jobs: On when either
+  // kind is switched on and every switched-on kind is ready. It read the
+  // synopsis switch alone, so a card translating only analyses said "Off".
+  const anyOn = savedOn || analysisSavedOn
+  const allOnReady =
+    (!savedOn || readiness?.ready === true) && (!analysisSavedOn || analysisReadiness?.ready === true)
 
   /**
    * The status block for one kind: totals, the job link, clear, and a row per
@@ -473,13 +492,13 @@ export function SynopsisTranslationSection() {
           <Typography variant="h6" fontWeight={600}>
             {t('settingsSynopsisTranslation.title')}
           </Typography>
-          {savedOn && readiness?.ready && (
+          {anyOn && allOnReady && (
             <Chip icon={<CheckCircleIcon />} label={t('settingsSynopsisTranslation.chipOn')} color="success" size="small" />
           )}
-          {savedOn && readiness && !readiness.ready && (
+          {anyOn && !allOnReady && (
             <Chip label={t('settingsSynopsisTranslation.chipNotReady')} color="warning" size="small" />
           )}
-          {!savedOn && <Chip label={t('settingsSynopsisTranslation.chipOff')} size="small" />}
+          {!anyOn && <Chip label={t('settingsSynopsisTranslation.chipOff')} size="small" />}
         </Box>
 
         <Typography variant="body2" color="text.secondary" mb={3}>
@@ -744,8 +763,9 @@ export function SynopsisTranslationSection() {
                 setTimeoutSeconds(e.target.value)
                 changed()
               }}
+              helperText={t('settingsSynopsisTranslation.timeoutHelp')}
               slotProps={{ htmlInput: { min: 5, max: 600 } }}
-              sx={{ width: 200 }}
+              sx={{ width: 260 }}
             />
             <TextField
               type="number"
@@ -821,11 +841,19 @@ export function SynopsisTranslationSection() {
             </Button>
             <Button
               variant="outlined"
-              startIcon={testing ? <CircularProgress size={18} /> : <ScienceIcon />}
-              onClick={handleTest}
-              disabled={testing || !baseUrl.trim() || selected.length === 0}
+              startIcon={testing === 'synopsis' ? <CircularProgress size={18} /> : <ScienceIcon />}
+              onClick={() => handleTest('synopsis')}
+              disabled={testing !== null || !baseUrl.trim() || selected.length === 0}
             >
               {t('settingsSynopsisTranslation.test')}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={testing === 'analysis' ? <CircularProgress size={18} /> : <ScienceIcon />}
+              onClick={() => handleTest('analysis')}
+              disabled={testing !== null || !baseUrl.trim() || selected.length === 0}
+            >
+              {t('settingsSynopsisTranslation.testAnalysis')}
             </Button>
           </Box>
 
@@ -840,10 +868,22 @@ export function SynopsisTranslationSection() {
                       seconds: (testResult.latencyMs / 1000).toFixed(1),
                     })}
                   </Typography>
-                  <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
+                  {testResult.kind === 'analysis' && testResult.paragraphs != null && (
+                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                      {t(
+                        testResult.strategy === 'sections'
+                          ? 'settingsSynopsisTranslation.testAnalysisSections'
+                          : 'settingsSynopsisTranslation.testAnalysisWhole',
+                        { count: testResult.paragraphs }
+                      )}
+                    </Typography>
+                  )}
+                  {/* pre-line so an analysis sample shows its paragraphs —
+                      keeping them is half of what that test checks. */}
+                  <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', whiteSpace: 'pre-line' }}>
                     {testResult.source}
                   </Typography>
-                  <Typography variant="body2" sx={{ mt: 1 }}>
+                  <Typography variant="body2" sx={{ mt: 1, whiteSpace: 'pre-line' }}>
                     {testResult.text}
                   </Typography>
                 </>

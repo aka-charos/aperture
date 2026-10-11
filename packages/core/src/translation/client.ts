@@ -10,6 +10,7 @@
  */
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import type { ParagraphMap } from '../analysis/paragraphMap.js'
+import { startStreamStallGuard } from '../lib/streamStall.js'
 import { createChildLogger } from '../lib/logger.js'
 import type { AppLocaleCode } from '../lib/locales.js'
 import {
@@ -101,26 +102,41 @@ export function checkTranslationReadiness(
   return { ready: true, reason: null }
 }
 
-export class TranslationError extends Error {
-  status?: number
+export interface TranslationErrorDetails {
   /** On a 429: what the endpoint asked for, read into a wait per attempt by `rateLimitWaitMs`. */
   rateLimit?: { retryAfterSeconds: number | null; header: string | null }
-  constructor(
-    message: string,
-    status?: number,
-    rateLimit?: { retryAfterSeconds: number | null; header: string | null }
-  ) {
+  /**
+   * A failure a SMALLER request could avoid: the answer was cut off at the
+   * output limit, came back too short to be all of it, went silent past the
+   * stall window, ran into the absolute deadline, or ended without the model
+   * saying it was finished. `translateAnalysisText` falls back to smaller
+   * requests on exactly these.
+   */
+  sizeRelated?: boolean
+}
+
+export class TranslationError extends Error {
+  status?: number
+  rateLimit?: TranslationErrorDetails['rateLimit']
+  sizeRelated: boolean
+  constructor(message: string, status?: number, details: TranslationErrorDetails = {}) {
     super(message)
     this.name = 'TranslationError'
     this.status = status
-    this.rateLimit = rateLimit
+    this.rateLimit = details.rateLimit
+    this.sizeRelated = details.sizeRelated === true
   }
+}
+
+/** A failure that a smaller request could avoid (see {@link TranslationErrorDetails}). */
+export function isSizeRelatedFailure(err: unknown): boolean {
+  return err instanceof TranslationError && err.sizeRelated
 }
 
 /** The provider's own words, and on a 429 the wait it asked for. */
 async function readError(
   response: Response
-): Promise<{ message: string; rateLimit?: { retryAfterSeconds: number | null; header: string | null } }> {
+): Promise<{ message: string; rateLimit?: TranslationErrorDetails['rateLimit'] }> {
   let text = ''
   try {
     text = await response.text()
@@ -137,7 +153,23 @@ async function readError(
   }
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+/**
+ * Wait, unless the run is stopped first. Polled once a second, so Stop reaches
+ * a job sitting out a rate limit (up to a minute) rather than only the next
+ * request after it. Returns true when stopped.
+ */
+async function waitUnlessCancelled(
+  ms: number,
+  shouldCancel: (() => Promise<boolean> | boolean) | undefined
+): Promise<boolean> {
+  const until = Date.now() + ms
+  for (;;) {
+    if (shouldCancel && (await shouldCancel()) === true) return true
+    const left = until - Date.now()
+    if (left <= 0) return false
+    await new Promise((resolve) => setTimeout(resolve, Math.min(1000, left)))
+  }
+}
 
 function headersFor(config: TranslationConfig): Record<string, string> {
   return {
@@ -164,6 +196,12 @@ export interface TranslateOptions {
    * text is returned, since half a synopsis must never be stored.
    */
   beforeCall?: () => Promise<boolean>
+  /**
+   * Polled WHILE a request streams and while a rate limit is waited out, so
+   * Stop reaches a call already in flight (F-131) rather than only the next
+   * one. True stops it with {@link TranslationCancelledError}.
+   */
+  shouldCancel?: () => Promise<boolean> | boolean
   /** Told when a 429 makes the call wait, so the job log can say why it paused. */
   onRateLimited?: (waitMs: number, attempt: number) => void
   /**
@@ -179,19 +217,30 @@ export interface TranslateOptions {
    * analyses.
    */
   prompt?: TranslationPrompt
-  /** Told when an analysis falls back from one request to section by section. */
+  /** Told when an analysis falls back from one request to smaller ones. */
   onNote?: (message: string) => void
 }
 
 export type TranslationPrompt = { kind: TranslationKind; instruction: string }
 
-/** A text abandoned between chunks because the run was stopped. */
+/** A text abandoned because the run was stopped — before, between or during requests. */
 export class TranslationCancelledError extends Error {
   constructor() {
-    super('Translation stopped between chunks')
+    super('Translation stopped')
     this.name = 'TranslationCancelledError'
   }
 }
+
+/**
+ * The absolute ceiling on one request, however lively its stream — a backstop
+ * against a server dribbling a token a minute, never the instrument that ends
+ * a normal call. The operator's timeout is a SILENCE window
+ * (`TranslationConfig.timeoutMs`); this only has to sit far above any real
+ * translation. Measured: a full analysis is ~20s into Greek on the public
+ * endpoint, and a 6,000-character request on a slow local model (~10 tok/s)
+ * is a few minutes.
+ */
+export const TRANSLATION_DEADLINE_MS = 30 * 60 * 1000
 
 /**
  * Translate one text, streamed. A text longer than {@link TRANSLATION_CHUNK_CHARS}
@@ -225,9 +274,13 @@ export async function translateText(
       model = piece.model
       latencyMs += piece.latencyMs
     } catch (err) {
-      // Say which piece failed, or a long synopsis reads as failing whole.
+      // Say which piece failed, or a long synopsis reads as failing whole. The
+      // size flag travels with it, or a caller could not tell a cut-off piece
+      // from any other failure.
       if (err instanceof TranslationError && chunks.length > 1) {
-        throw new TranslationError(`Part ${index + 1} of ${chunks.length}: ${err.message}`, err.status)
+        throw new TranslationError(`Part ${index + 1} of ${chunks.length}: ${err.message}`, err.status, {
+          sizeRelated: err.sizeRelated,
+        })
       }
       throw err
     }
@@ -241,8 +294,8 @@ export async function translateText(
  * on it would push a perfectly good title to the back of the queue and count
  * toward the "endpoint is down" stop. The wait is the larger of what the
  * endpoint asked for and a backoff that doubles per attempt
- * (`rateLimitWaitMs`), and `beforeCall` runs again after it, so a Stop pressed
- * during the wait is honoured before the retry is sent.
+ * (`rateLimitWaitMs`); Stop is polled during it, and `beforeCall` runs again
+ * after it before the retry is sent.
  */
 async function requestWithRateLimitRetry(
   config: TranslationConfig,
@@ -254,14 +307,14 @@ async function requestWithRateLimitRetry(
   for (let attempt = 0; ; attempt++) {
     if (options.beforeCall && !(await options.beforeCall())) throw new TranslationCancelledError()
     try {
-      return await requestTranslation(config, url, text, target, options.prompt)
+      return await requestTranslation(config, url, text, target, options)
     } catch (err) {
       const limited = err instanceof TranslationError ? err.rateLimit : undefined
       if (!limited || attempt >= (options.rateLimitRetries ?? RATE_LIMIT_MAX_RETRIES)) throw err
       const waitMs = rateLimitWaitMs(limited.retryAfterSeconds, limited.header, attempt + 1)
       logger.info({ waitMs, attempt: attempt + 1 }, 'Translation endpoint rate-limited; waiting before retrying')
       options.onRateLimited?.(waitMs, attempt + 1)
-      await sleep(waitMs)
+      if (await waitUnlessCancelled(waitMs, options.shouldCancel)) throw new TranslationCancelledError()
     }
   }
 }
@@ -269,7 +322,7 @@ async function requestWithRateLimitRetry(
 export interface AnalysisTranslationResult extends TranslationResult {
   /** Paragraphs in the translation — always the source's count. */
   paragraphs: number
-  /** One request for the whole analysis, or the section-by-section fallback. */
+  /** One request for the whole analysis, or the smaller-requests fallback. */
   strategy: 'whole' | 'sections'
 }
 
@@ -279,10 +332,20 @@ export interface AnalysisTranslationResult extends TranslationResult {
  * over the translation (see ./analysisText.ts for why, and what was measured).
  *
  * 1. The whole analysis as one request, when it fits — full context.
- * 2. If it does not fit, or came back with a different paragraph count: each
- *    section (packed up to the size limit) as its own request.
- * 3. A section that still miscounts: each of its paragraphs alone. A single
- *    paragraph the model split in two is joined back into one.
+ * 2. Smaller requests when it does not fit, came back with a different
+ *    paragraph count, or failed in a way a smaller request avoids (cut off,
+ *    too short, gone silent — {@link isSizeRelatedFailure}): each section,
+ *    packed up to the size limit.
+ * 3. A section that still miscounts, or fails for its size: each of its
+ *    paragraphs alone. A single paragraph the model split in two is joined
+ *    back into one.
+ *
+ * NEVER THE SAME REQUEST TWICE. Decoding is greedy (temperature 0), so a
+ * request repeated verbatim is answered verbatim — same miscount, same cut-off
+ * — and costs a request for nothing. An analysis with no section structure
+ * (no paragraph index, or one section) would otherwise make "section by
+ * section" one group holding the whole text, the request that just failed; it
+ * is halved instead.
  *
  * Every request goes through {@link translateText}, so pacing, Stop, 429
  * retries and every check on an answer apply to each of them, and any failure
@@ -301,6 +364,7 @@ export async function translateAnalysisText(
   }
   const source = analysisParagraphs(text)
   if (source.length === 0) throw new TranslationError('There is no text to translate')
+  const whole = joinAnalysisParagraphs(source)
 
   let model = config.model
   let latencyMs = 0
@@ -311,124 +375,227 @@ export async function translateAnalysisText(
     return analysisParagraphs(result.text)
   }
 
-  if (analysisFitsOneRequest(source)) {
-    const whole = await call(joinAnalysisParagraphs(source))
-    if (whole.length === source.length) {
-      return { text: joinAnalysisParagraphs(whole), model, latencyMs, paragraphs: whole.length, strategy: 'whole' }
+  let wholeFailure: unknown = null
+  const triedWhole = analysisFitsOneRequest(source)
+  if (triedWhole) {
+    try {
+      const back = await call(whole)
+      // One paragraph in: whatever came back IS that paragraph.
+      if (source.length === 1) {
+        return { text: back.join(' '), model, latencyMs, paragraphs: 1, strategy: 'whole' }
+      }
+      if (back.length === source.length) {
+        return { text: joinAnalysisParagraphs(back), model, latencyMs, paragraphs: back.length, strategy: 'whole' }
+      }
+      options.onNote?.(
+        `came back as ${back.length} paragraph(s) for ${source.length}; translating it in smaller requests`
+      )
+    } catch (err) {
+      if (!isSizeRelatedFailure(err)) throw err
+      wholeFailure = err
+      options.onNote?.(
+        `${err instanceof Error ? err.message : String(err)}; translating it in smaller requests`
+      )
     }
-    options.onNote?.(
-      `came back as ${whole.length} paragraph(s) for ${source.length}; translating it section by section`
-    )
+  }
+
+  let groups = analysisTranslationGroups(source, map)
+  if (triedWhole && groups.length === 1) {
+    // The only "section" is the request that just failed (see above).
+    groups = analysisTranslationGroups(source, map, Math.ceil(whole.length / 2))
+    // A single paragraph has nothing smaller that keeps it one paragraph.
+    if (groups.length === 1) throw wholeFailure ?? new TranslationError('The analysis could not be split further')
   }
 
   const out: string[] = new Array(source.length)
-  for (const group of analysisTranslationGroups(source, map)) {
-    let pieces = await call(joinAnalysisParagraphs(group.map((i) => source[i])))
-    if (pieces.length !== group.length) {
-      if (group.length === 1) {
-        pieces = [pieces.join(' ')]
-      } else {
-        pieces = []
-        for (const i of group) pieces.push((await call(source[i])).join(' '))
-      }
+  for (const group of groups) {
+    let pieces: string[] | null = null
+    try {
+      pieces = await call(joinAnalysisParagraphs(group.map((i) => source[i])))
+    } catch (err) {
+      if (group.length === 1 || !isSizeRelatedFailure(err)) throw err
+    }
+    if (pieces && pieces.length !== group.length && group.length === 1) pieces = [pieces.join(' ')]
+    if (!pieces || pieces.length !== group.length) {
+      pieces = []
+      for (const i of group) pieces.push((await call(source[i])).join(' '))
     }
     group.forEach((index, k) => {
-      out[index] = pieces[k]
+      out[index] = (pieces as string[])[k]
     })
   }
   return { text: joinAnalysisParagraphs(out), model, latencyMs, paragraphs: out.length, strategy: 'sections' }
 }
 
-/** One request: one piece of text, one answer. */
+/**
+ * One request: one piece of text, one answer.
+ *
+ * ENDED BY SILENCE, NOT BY THE CLOCK (F-131). The operator's timeout is how
+ * long the request may go without a byte — the wait for the first token, then
+ * the gaps between them — so a slow local model writing steadily is never cut
+ * off healthy, while a hung one still is. {@link TRANSLATION_DEADLINE_MS} is the
+ * only absolute limit. The same guard polls Stop, which is what lets the job
+ * be cancelled mid-request rather than only between requests. A reader blocked
+ * on the socket is woken by the guard's own promise as well as by the abort,
+ * because a caller left waiting on an aborted body is the hang F-131 measured.
+ */
 async function requestTranslation(
   config: TranslationConfig,
   url: string,
   text: string,
   target: AppLocaleCode,
-  prompt: TranslationPrompt | undefined
+  options: TranslateOptions
 ): Promise<TranslationResult> {
-  const body = buildChatCompletionBody(config, text, target, config.sourceLanguage, prompt)
+  const body = buildChatCompletionBody(config, text, target, config.sourceLanguage, options.prompt)
   const startedAt = Date.now()
-  const timedOut = (err: unknown) =>
-    err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
-  const noAnswer = `No answer within ${Math.round(config.timeoutMs / 1000)}s`
-  let response: Response
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: headersFor(config),
-      body: JSON.stringify(body),
-      // Covers the whole streamed body, not just the headers.
-      signal: AbortSignal.timeout(config.timeoutMs),
-    })
-  } catch (err) {
-    throw new TranslationError(
-      timedOut(err)
-        ? noAnswer
-        : `Could not reach the translation endpoint: ${err instanceof Error ? err.message : String(err)}`
-    )
-  }
-
-  if (!response.ok) {
-    const { message, rateLimit } = await readError(response)
-    throw new TranslationError(`HTTP ${response.status}: ${message}`, response.status, rateLimit)
-  }
-
-  // A server that ignores `stream: true` answers with one JSON body; read that
-  // the way every request was read before streaming.
-  const contentType = response.headers.get('content-type') ?? ''
-  if (!contentType.includes('text/event-stream')) {
-    let json: unknown
-    try {
-      json = await response.json()
-    } catch (err) {
-      if (timedOut(err)) throw new TranslationError(noAnswer)
-      throw new TranslationError(
-        `The endpoint answered with a body that is not JSON: ${err instanceof Error ? err.message : String(err)}`
+  const guard = startStreamStallGuard({
+    stallMs: config.timeoutMs,
+    deadlineMs: TRANSLATION_DEADLINE_MS,
+    // Checked often enough that a short window still means what it says.
+    checkMs: Math.max(50, Math.min(1000, Math.floor(config.timeoutMs / 4))),
+    shouldCancel: options.shouldCancel,
+  })
+  let arrived = false
+  /** The error for a guard abort, phrased for what was happening when it fired. */
+  const abortError = (): Error | null => {
+    const reason = guard.reason()
+    if (reason === 'cancelled') return new TranslationCancelledError()
+    if (reason === 'stalled') {
+      const seconds = Math.round(config.timeoutMs / 1000)
+      return new TranslationError(
+        arrived
+          ? `The translation stopped arriving: nothing for ${seconds}s`
+          : `No answer within ${seconds}s`,
+        undefined,
+        { sizeRelated: true }
       )
     }
-    const reading = readCompletion(json, text, target)
-    if (!reading.ok) throw new TranslationError(reading.reason)
-    const answered = (json as { model?: unknown }).model
+    if (reason === 'deadline') {
+      return new TranslationError(
+        `The translation was still arriving after ${Math.round(TRANSLATION_DEADLINE_MS / 60_000)} minutes`,
+        undefined,
+        { sizeRelated: true }
+      )
+    }
+    return null
+  }
+  // One promise that rejects when the guard aborts, raced by every step. Built
+  // once rather than per step (a stream is a step per token), and given a
+  // handler at once, so an abort landing between steps is not an unhandled
+  // rejection.
+  const aborted: Promise<never> = guard.aborted.then(() => {
+    throw abortError() ?? new TranslationError('The request was aborted')
+  })
+  aborted.catch(() => {})
+  /** Await a step of the request, but wake the moment the guard aborts. */
+  const step = <T>(work: Promise<T>): Promise<T> => Promise.race([work, aborted])
+
+  try {
+    let response: Response
+    try {
+      response = await step(
+        fetch(url, {
+          method: 'POST',
+          headers: headersFor(config),
+          body: JSON.stringify(body),
+          signal: guard.signal,
+        })
+      )
+    } catch (err) {
+      if (err instanceof TranslationError || err instanceof TranslationCancelledError) throw err
+      throw (
+        abortError() ??
+        new TranslationError(
+          `Could not reach the translation endpoint: ${err instanceof Error ? err.message : String(err)}`
+        )
+      )
+    }
+
+    if (!response.ok) {
+      const { message, rateLimit } = await step(readError(response))
+      // A gateway that gave up on a long wait (the public endpoint's own 504,
+      // before streaming) is a size problem: a shorter request can finish.
+      throw new TranslationError(`HTTP ${response.status}: ${message}`, response.status, {
+        rateLimit,
+        sizeRelated: response.status === 504 || response.status === 408,
+      })
+    }
+    guard.activity()
+
+    // A server that ignores `stream: true` answers with one JSON body; read that
+    // the way every request was read before streaming.
+    const contentType = (response.headers.get('content-type') ?? '').toLowerCase()
+    if (!contentType.includes('text/event-stream')) {
+      let json: unknown
+      try {
+        json = await step(response.json())
+      } catch (err) {
+        if (err instanceof TranslationError || err instanceof TranslationCancelledError) throw err
+        throw (
+          abortError() ??
+          new TranslationError(
+            `The endpoint answered with a body that is not JSON: ${err instanceof Error ? err.message : String(err)}`
+          )
+        )
+      }
+      const reading = readCompletion(json, text, target)
+      if (!reading.ok) throw new TranslationError(reading.reason, undefined, { sizeRelated: reading.sizeRelated })
+      const answered = (json as { model?: unknown }).model
+      return {
+        text: reading.text,
+        model: typeof answered === 'string' && answered ? answered : config.model,
+        latencyMs: Date.now() - startedAt,
+      }
+    }
+
+    const stream = createStreamReader()
+    try {
+      if (!response.body) throw new TranslationError('The endpoint sent a stream with no body')
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      for (;;) {
+        const { done, value } = await step(reader.read())
+        if (done) break
+        guard.activity()
+        arrived = true
+        stream.push(decoder.decode(value, { stream: true }))
+      }
+      stream.push(decoder.decode())
+    } catch (err) {
+      if (err instanceof TranslationError || err instanceof TranslationCancelledError) throw err
+      // A stream cut off part-way is not a translation; nothing of it is kept.
+      throw (
+        abortError() ??
+        new TranslationError(`The stream broke off: ${err instanceof Error ? err.message : String(err)}`, undefined, {
+          sizeRelated: true,
+        })
+      )
+    }
+
+    const streamed = stream.finish()
+    if (streamed.error) throw new TranslationError(streamed.error)
+    if (!streamed.sawData) throw new TranslationError('The endpoint sent an empty stream')
+    // A stream that ENDS without a finish_reason was closed by something
+    // between us and the model, or by a server that does not say; either way
+    // nothing proves the answer is complete, so it is never stored — but it is
+    // not a "cut off at the output limit", which would send an operator to the
+    // wrong setting.
+    if (streamed.finishReason == null) {
+      throw new TranslationError(
+        'The stream ended before the model said it was finished, so the translation may be incomplete',
+        undefined,
+        { sizeRelated: true }
+      )
+    }
+    const reading = judgeTranslation(streamed.content, streamed.finishReason, text, target)
+    if (!reading.ok) throw new TranslationError(reading.reason, undefined, { sizeRelated: reading.sizeRelated })
     return {
       text: reading.text,
-      model: typeof answered === 'string' && answered ? answered : config.model,
+      model: streamed.model || config.model,
       latencyMs: Date.now() - startedAt,
     }
-  }
-
-  const stream = createStreamReader()
-  try {
-    if (!response.body) throw new TranslationError('The endpoint sent a stream with no body')
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      stream.push(decoder.decode(value, { stream: true }))
-    }
-    stream.push(decoder.decode())
-  } catch (err) {
-    if (err instanceof TranslationError) throw err
-    // A stream cut off part-way is not a translation; nothing of it is kept.
-    throw new TranslationError(
-      timedOut(err)
-        ? `${noAnswer} (the translation was still arriving)`
-        : `The stream broke off: ${err instanceof Error ? err.message : String(err)}`
-    )
-  }
-
-  const streamed = stream.finish()
-  if (streamed.error) throw new TranslationError(streamed.error)
-  if (!streamed.sawData) throw new TranslationError('The endpoint sent an empty stream')
-  // A stream that simply ENDS with no finish_reason was cut off by something
-  // between us and the model; judged as `length` so it is never stored.
-  const reading = judgeTranslation(streamed.content, streamed.finishReason ?? 'length', text, target)
-  if (!reading.ok) throw new TranslationError(reading.reason)
-  return {
-    text: reading.text,
-    model: streamed.model || config.model,
-    latencyMs: Date.now() - startedAt,
+  } finally {
+    guard.stop()
   }
 }
 
@@ -463,3 +630,25 @@ export async function listTranslationModels(
 export const TRANSLATION_TEST_TEXT =
   'After a botched heist in Marseille, a retired safecracker named Viktor Hale is forced to take one last job — ' +
   'and to work alongside the detective who put him away twenty years ago.'
+
+/**
+ * What the card's analysis Test translates: three short paragraphs of film
+ * criticism, through `translateAnalysisText` with the analysis prompt and
+ * instructions. Chosen to exercise exactly what an analysis translation can get
+ * wrong — paragraphs that must come back one for one, a paragraph that OPENS on
+ * "its" (the pronoun whose gender was measured going wrong when a paragraph is
+ * translated without the one before it), and the names of a director, a film,
+ * publications and a festival that must survive. The people and the film are
+ * invented; Bergman and Winter Light are real, as a translator meets them.
+ */
+export const TRANSLATION_TEST_ANALYSIS_TEXT = [
+  "Set almost entirely in a lighthouse keeper's cottage on the Norwegian coast, the film belongs to the " +
+    'tradition of Scandinavian chamber drama that Ingmar Bergman made famous, and its director, Ingrid ' +
+    'Halvorsen, has said she studied Winter Light frame by frame before shooting.',
+  'Its most striking choice is to withhold the sea. We hear it in nearly every scene, yet the camera turns ' +
+    'towards the water only once, in the final minute, so that a sound the viewer has learned to ignore ' +
+    'becomes the whole of the ending.',
+  'Critics were divided on release. The Guardian praised its patience, while Variety found the restraint ' +
+    "closer to evasion; a retrospective at the Tromsø festival twenty years later did much to settle the " +
+    "argument in the film's favour.",
+].join('\n\n')

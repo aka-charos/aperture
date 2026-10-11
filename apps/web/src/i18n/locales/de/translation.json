@@ -5905,6 +5905,12 @@
     "analysisStatusTitle": "Film analyses: {{pending}} pending · {{stored}} stored",
     "analysisStatusHelp": "Pending counts analysis × language pairs. An analysis that is rewritten is hidden in translation at once and translated again on the next run.",
     "analysisClearConfirmAll": "Every stored film analysis translation will be deleted and the detail pages will show the original analysis until the analysis job runs again.",
-    "analysisClearConfirmLanguage": "Every stored {{language}} film analysis translation will be deleted and the detail pages will show the original analysis until the analysis job runs again."
+    "analysisClearConfirmLanguage": "Every stored {{language}} film analysis translation will be deleted and the detail pages will show the original analysis until the analysis job runs again.",
+    "timeoutHelp": "How long the model may go silent — waiting for the first word, or between words — before a request is given up. Not a limit on the whole translation, which can take minutes on a slow model.",
+    "testAnalysis": "Test analysis translation",
+    "testAnalysisWhole_one": "{{count}} paragraph back, in one request — the paragraphs survived, so the section headings will land on the right prose.",
+    "testAnalysisWhole_other": "{{count}} paragraphs back, in one request — the paragraphs survived, so the section headings will land on the right prose.",
+    "testAnalysisSections_one": "{{count}} paragraph back, but only in smaller requests: the one-request translation did not keep the paragraphs. The job does the same, at the cost of more requests and less context.",
+    "testAnalysisSections_other": "{{count}} paragraphs back, but only in smaller requests: the one-request translation did not keep the paragraphs. The job does the same, at the cost of more requests and less context."
   }
 }
