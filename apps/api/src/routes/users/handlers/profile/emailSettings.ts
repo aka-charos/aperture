@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { isEmailAddress } from '@aperture/core'
 import { query, queryOne } from '../../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
 import {
@@ -72,6 +73,15 @@ export function registerEmailSettingsHandlers(fastify: FastifyInstance) {
 
       if (!requireSelfOrAdmin(id, currentUser, reply)) return
 
+      // The address is held to the test the mail transport applies, so one a
+      // person can save is one a message can actually be sent to — otherwise a
+      // list, a display-name form or a typo is stored, locked against the
+      // sync, and every email to it fails without anyone being told.
+      const address = typeof email === 'string' ? email.trim() : email
+      if (address !== undefined && address !== null && address !== '' && !isEmailAddress(address)) {
+        return reply.status(400).send({ error: 'Enter one plain email address, like name@example.com' })
+      }
+
       try {
         if (emailNotificationsEnabled) {
           // Read from the row, not from the session: this is a permission the
@@ -93,12 +103,12 @@ export function registerEmailSettingsHandlers(fastify: FastifyInstance) {
         const values: (string | boolean | null)[] = []
         let paramIndex = 1
 
-        if (email !== undefined) {
+        if (address !== undefined) {
           updates.push(`email = $${paramIndex}`)
-          values.push(email)
+          values.push(address)
           paramIndex++
 
-          if (email !== null && email.trim() !== '') {
+          if (address !== null && address !== '') {
             updates.push(`email_locked = TRUE`)
           } else {
             updates.push(`email_locked = FALSE`)

@@ -26,9 +26,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import { withServerMessageDetail } from '@/lib/withServerMessageDetail'
 
-type Security = 'starttls' | 'tls' | 'none'
-
-const SECURITY_MODES: readonly Security[] = ['starttls', 'tls', 'none']
+type Security = string
 
 interface SmtpSettings {
   config: {
@@ -41,10 +39,14 @@ interface SmtpSettings {
     hasPassword: boolean
     fromAddress: string
     fromName: string
+    ehloName: string
   }
   /** Decided by the server: what stops the SAVED settings from sending. */
   problems: string[]
+  securityModes: Security[]
   defaultPorts: Record<Security, number>
+  /** Decided by the server: the host and transports the stored password may be used with, or null. */
+  storedPassword: { host: string; transports: string[] } | null
   defaultFromName: string
   testRecipient: string | null
 }
@@ -52,11 +54,14 @@ interface SmtpSettings {
 interface TestResult {
   success: boolean
   stage?: 'connect' | 'send'
+  /** The host the server actually tried, which the card may have moved on from since. */
+  host?: string
   /** A stable id, translated here; `detail` is the server's own words beside it. */
   failure?: string
   detail?: string
   sentTo?: string
   error?: string
+  problems?: string[]
 }
 
 interface Form {
@@ -69,6 +74,7 @@ interface Form {
   password: string
   fromAddress: string
   fromName: string
+  ehloName: string
 }
 
 function formFrom(settings: SmtpSettings): Form {
@@ -83,11 +89,23 @@ function formFrom(settings: SmtpSettings): Form {
     password: '',
     fromAddress: c.fromAddress,
     fromName: c.fromName,
+    ehloName: c.ehloName,
   }
 }
 
-/** Hosts compare the way the server compares them for the stored-password rule. */
-const sameHost = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+/**
+ * Two tiny mirrors of core `email/settings.ts` (the bundle never imports core):
+ * how a host is compared, and which transport a form describes. Only these are
+ * mirrored; WHICH transports the stored password may use is the server's
+ * decision, shipped in `storedPassword`.
+ */
+const hostKey = (host: string) => {
+  const trimmed = host.trim()
+  const bare = /^\[([0-9A-Fa-f:.]+)\]$/.exec(trimmed)
+  return (bare ? bare[1] : trimmed).toLowerCase()
+}
+const transportOf = (form: Pick<Form, 'security' | 'allowSelfSigned'>) =>
+  form.security === 'none' ? 'none' : form.allowSelfSigned ? `${form.security}-unverified` : form.security
 
 /**
  * Outgoing email: the mail server everything else will send through.
@@ -98,7 +116,7 @@ const sameHost = (a: string, b: string) => a.trim().toLowerCase() === b.trim().t
  * is on, because the point is to find out before switching it on.
  */
 export function SmtpConfigSection() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [settings, setSettings] = useState<SmtpSettings | null>(null)
   const [form, setForm] = useState<Form | null>(null)
   const [loading, setLoading] = useState(true)
@@ -141,6 +159,19 @@ export function SmtpConfigSection() {
     return (Object.keys(form) as (keyof Form)[]).some((key) => form[key] !== original[key])
   }, [settings, form])
 
+  /** The server's problem ids as one translated phrase: "the mail server and the password". */
+  const missingList = useCallback(
+    (problems: string[]) => {
+      const names = problems.map((p) => t(`settingsSmtp.problem.${p}`, { defaultValue: p }))
+      try {
+        return new Intl.ListFormat(i18n.resolvedLanguage, { type: 'conjunction' }).format(names)
+      } catch {
+        return names.join(', ')
+      }
+    },
+    [i18n.resolvedLanguage, t]
+  )
+
   if (loading || !form || !settings) {
     return (
       <Card>
@@ -156,6 +187,9 @@ export function SmtpConfigSection() {
   const update = (patch: Partial<Form>) => {
     setForm((current) => (current ? { ...current, ...patch } : current))
     setSaved(false)
+    // A result describes the settings it was run with; once they change, it
+    // describes settings that are no longer on the card.
+    setResult(null)
   }
 
   const changeSecurity = (security: Security) => {
@@ -170,10 +204,12 @@ export function SmtpConfigSection() {
 
   const portNumber = Number(form.port)
   const portValid = Number.isInteger(portNumber) && portNumber >= 1 && portNumber <= 65535
-  const savedPasswordApplies = settings.config.hasPassword && sameHost(form.host, settings.config.host)
-  const passwordAvailable = !form.username || !!form.password || savedPasswordApplies
+  const scope = settings.storedPassword
+  const samePasswordHost = !!scope && hostKey(form.host) === scope.host
+  const savedPasswordApplies = samePasswordHost && !!scope && scope.transports.includes(transportOf(form))
+  const passwordAvailable = !form.username.trim() || !!form.password || savedPasswordApplies
 
-  /** The card as it stands. A blank password is omitted, which means "keep the saved one" (for its own host). */
+  /** The card as it stands. A blank password is omitted, which means "keep the saved one" (within its scope). */
   const body = () => ({
     enabled: form.enabled,
     host: form.host,
@@ -184,7 +220,18 @@ export function SmtpConfigSection() {
     password: form.password || undefined,
     fromAddress: form.fromAddress,
     fromName: form.fromName,
+    ehloName: form.ehloName,
   })
+
+  /** A refusal for missing settings names them in the reader's language; anything else shows the server's sentence. */
+  const refusal = (data: { error?: string; problems?: string[] }, purpose: 'enable' | 'test', fallback: string) => {
+    if (data.problems?.length) {
+      return t(purpose === 'enable' ? 'settingsSmtp.missingToEnable' : 'settingsSmtp.missingToTest', {
+        list: missingList(data.problems),
+      })
+    }
+    return data.error ? withServerMessageDetail(t, data.error) : fallback
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -199,10 +246,11 @@ export function SmtpConfigSection() {
       })
       const data = await response.json()
       if (!response.ok) {
-        setError(data.error ? withServerMessageDetail(t, data.error) : t('settingsSmtp.errSave'))
+        setError(refusal(data, 'enable', t('settingsSmtp.errSave')))
         return
       }
       apply(data as SmtpSettings)
+      setResult(null)
       setSaved(true)
     } catch {
       setError(t('settingsSmtp.errConnect'))
@@ -222,7 +270,8 @@ export function SmtpConfigSection() {
         credentials: 'include',
         body: JSON.stringify({ ...body(), sendTo: stage === 'send' ? sendTo.trim() : undefined }),
       })
-      setResult((await response.json()) as TestResult)
+      const data = (await response.json()) as TestResult
+      setResult(data.error ? { success: false, error: refusal(data, 'test', t('settingsSmtp.errConnect')) } : data)
     } catch {
       setResult({ success: false, error: t('settingsSmtp.errConnect') })
     } finally {
@@ -237,14 +286,14 @@ export function SmtpConfigSection() {
         <Alert severity="success" onClose={() => setResult(null)}>
           {result.stage === 'send'
             ? t('settingsSmtp.sendOk', { address: result.sentTo })
-            : t('settingsSmtp.testOk', { host: form.host })}
+            : t('settingsSmtp.testOk', { host: result.host })}
         </Alert>
       )
     }
     if (result.error) {
       return (
         <Alert severity="error" onClose={() => setResult(null)}>
-          {withServerMessageDetail(t, result.error)}
+          {result.error}
         </Alert>
       )
     }
@@ -258,11 +307,20 @@ export function SmtpConfigSection() {
         {hint && <Typography variant="body2">{hint}</Typography>}
         {result.detail && (
           <Typography variant="caption" component="div" sx={{ mt: 1, opacity: 0.85, wordBreak: 'break-word' }}>
-            {t('settingsSmtp.serverSaid', { detail: result.detail })}
+            {t('settingsSmtp.serverSaid', { host: result.host, detail: result.detail })}
           </Typography>
         )}
       </Alert>
     )
+  }
+
+  const passwordHelper = () => {
+    if (form.password || !settings.config.hasPassword || savedPasswordApplies) {
+      return savedPasswordApplies && !form.password ? t('settingsSmtp.passwordSaved') : undefined
+    }
+    return samePasswordHost
+      ? t('settingsSmtp.passwordWeaker')
+      : t('settingsSmtp.passwordOtherHost', { host: settings.config.host })
   }
 
   const canCheck = !!form.host.trim() && portValid && passwordAvailable && testing === null
@@ -310,6 +368,12 @@ export function SmtpConfigSection() {
             }
           />
 
+          {!hasChanges && settings.problems.length > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              {t('settingsSmtp.incomplete', { list: missingList(settings.problems) })}
+            </Typography>
+          )}
+
           <Box display="flex" gap={2} flexWrap="wrap">
             <TextField
               label={t('settingsSmtp.host')}
@@ -335,14 +399,14 @@ export function SmtpConfigSection() {
             select
             label={t('settingsSmtp.security')}
             value={form.security}
-            onChange={(e) => changeSecurity(e.target.value as Security)}
+            onChange={(e) => changeSecurity(e.target.value)}
             helperText={t(`settingsSmtp.securityHelper.${form.security}`)}
             size="small"
             fullWidth
           >
-            {SECURITY_MODES.map((mode) => (
+            {settings.securityModes.map((mode) => (
               <MenuItem key={mode} value={mode}>
-                {t(`settingsSmtp.securityMode.${mode}`)}
+                {t(`settingsSmtp.securityMode.${mode}`, { defaultValue: mode })}
               </MenuItem>
             ))}
           </TextField>
@@ -383,15 +447,7 @@ export function SmtpConfigSection() {
               value={form.password}
               onChange={(e) => update({ password: e.target.value })}
               placeholder={savedPasswordApplies ? '••••••••' : undefined}
-              helperText={
-                form.password
-                  ? undefined
-                  : savedPasswordApplies
-                    ? t('settingsSmtp.passwordSaved')
-                    : settings.config.hasPassword
-                      ? t('settingsSmtp.passwordOtherHost', { host: settings.config.host })
-                      : undefined
-              }
+              helperText={passwordHelper()}
               error={!passwordAvailable}
               size="small"
               fullWidth
@@ -439,7 +495,17 @@ export function SmtpConfigSection() {
             fullWidth
           />
 
-          {settings.config.enabled === false && settings.problems.length === 0 && !hasChanges && (
+          <TextField
+            label={t('settingsSmtp.ehloName')}
+            value={form.ehloName}
+            onChange={(e) => update({ ehloName: e.target.value })}
+            placeholder={t('settingsSmtp.ehloNamePlaceholder')}
+            helperText={t('settingsSmtp.ehloNameHelper')}
+            size="small"
+            fullWidth
+          />
+
+          {!settings.config.enabled && settings.problems.length === 0 && !hasChanges && (
             <Typography variant="caption" color="text.secondary">
               {t('settingsSmtp.readyButOff')}
             </Typography>

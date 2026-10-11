@@ -16,6 +16,7 @@ import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getLldapConfig, getLldapAdminPassword } from '../settings/systemSettings.js'
 import { authenticateLldap, fetchLldapUserEmails } from './client.js'
+import { isEmailAddress } from '../email/rules.js'
 import {
   createJobProgress,
   setJobStep,
@@ -83,15 +84,20 @@ export async function syncLldapEmails(existingJobId?: string): Promise<SyncLldap
     // LLDAP user IDs are the login usernames. Matched in memory (not via SQL) so
     // it's case-insensitive on both sides regardless of how either system stores
     // case — cheap insurance against the two directories disagreeing on it.
+    // Only an address the mail transport would accept is imported (the same
+    // test the settings page applies), so nothing stored here is one an email
+    // can never be sent to. LLDAP does not validate the field itself.
     const lldapUsers = result.value.users
-    const lldapEmailByUsername = new Map(
-      lldapUsers.filter((u) => !!u.email).map((u) => [u.id.toLowerCase(), u.email])
-    )
+    const withEmail = lldapUsers.filter((u) => !!u.email)
+    const usable = withEmail.filter((u) => isEmailAddress(u.email.trim()))
+    const lldapEmailByUsername = new Map(usable.map((u) => [u.id.toLowerCase(), u.email.trim()]))
+    const unusable = withEmail.length - usable.length
 
     addLog(
       jobId,
       'info',
-      `👥 Found ${lldapUsers.length} LLDAP user(s), ${lldapEmailByUsername.size} with an email set`
+      `👥 Found ${lldapUsers.length} LLDAP user(s), ${lldapEmailByUsername.size} with a usable email` +
+        (unusable > 0 ? ` (${unusable} not a single plain address, skipped)` : '')
     )
 
     const existingUsers = await query<{

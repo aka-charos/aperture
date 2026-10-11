@@ -14,12 +14,16 @@ import assert from 'node:assert/strict'
 import { createServer, type AddressInfo, type Server, type Socket } from 'node:net'
 
 import { DEFAULT_SMTP_CONFIG, type SmtpConfig } from './rules.js'
-import { sendWithSmtp, verifySmtp } from './smtp.js'
+import { sendManyWithSmtp, sendWithSmtp, verifySmtp } from './smtp.js'
 
 interface FakeReplies {
   auth?: string
   mailFrom?: string
   rcptTo?: string
+  /** Leave AUTH out of the EHLO reply, as a relay that only takes a login over TLS does. */
+  hideAuth?: boolean
+  /** Accept the connection and never say anything. */
+  silent?: boolean
 }
 
 interface FakeSmtp {
@@ -51,6 +55,7 @@ async function fakeSmtp(replies: FakeReplies = {}): Promise<FakeSmtp> {
     let data: string[] | null = null
     const reply = (line: string) => socket.write(`${line}\r\n`)
 
+    if (replies.silent) return
     reply('220 fake.test ESMTP ready')
     socket.on('data', (chunk) => {
       buffer += chunk.toString('utf8')
@@ -70,7 +75,7 @@ async function fakeSmtp(replies: FakeReplies = {}): Promise<FakeSmtp> {
         }
         state.commands.push(line)
         const verb = line.toUpperCase()
-        if (verb.startsWith('EHLO')) socket.write('250-fake.test\r\n250 AUTH PLAIN\r\n')
+        if (verb.startsWith('EHLO')) socket.write(replies.hideAuth ? '250 fake.test\r\n' : '250-fake.test\r\n250 AUTH PLAIN\r\n')
         else if (verb.startsWith('HELO')) reply('250 fake.test')
         else if (verb.startsWith('STARTTLS')) reply('502 5.5.1 STARTTLS not available')
         else if (verb.startsWith('AUTH')) reply(replies.auth ?? '235 2.7.0 Authentication successful')
@@ -238,4 +243,112 @@ test('a port with nothing listening reads as refused', LIMIT, async () => {
 
   const outcome = await verifySmtp(configFor(fake, { port: closedPort }))
   assert.equal(outcome.ok === false && outcome.failure, 'refused')
+})
+
+// ---------------------------------------------------------------- a login that is never skipped
+
+test('a server that hides AUTH is still asked to log in, and its refusal is reported', LIMIT, async () => {
+  // Without forcing, nodemailer skips the login when AUTH is not advertised,
+  // and the check passed with any password at all.
+  const fake = await fakeSmtp({ hideAuth: true, auth: '503 5.5.1 Error: authentication not enabled' })
+  const outcome = await verifySmtp(configFor(fake))
+
+  assert.equal(outcome.ok === false && outcome.failure, 'authUnavailable')
+  assert.ok(fake.commands.some((c) => c.toUpperCase().startsWith('AUTH')), fake.commands.join(' | '))
+})
+
+test('a server that hides AUTH but takes the login passes the check', LIMIT, async () => {
+  const fake = await fakeSmtp({ hideAuth: true })
+  const outcome = await verifySmtp(configFor(fake))
+
+  assert.equal(outcome.ok, true, outcome.ok ? '' : `${outcome.failure}: ${outcome.detail}`)
+})
+
+test('without a username a server that hides AUTH is not asked for one', LIMIT, async () => {
+  const fake = await fakeSmtp({ hideAuth: true })
+  const outcome = await verifySmtp(configFor(fake, { username: '', password: '' }))
+
+  assert.equal(outcome.ok, true)
+  assert.ok(!fake.commands.some((c) => c.toUpperCase().startsWith('AUTH')), fake.commands.join(' | '))
+})
+
+test('a refusal to relay names relaying, not the address', LIMIT, async () => {
+  const fake = await fakeSmtp({ rcptTo: '554 5.7.1 <viewer@example.com>: Relay access denied' })
+  const outcome = await sendWithSmtp(configFor(fake), sender, { to: 'viewer@example.com', subject: 'x', text: 'x' })
+
+  assert.equal(outcome.ok === false && outcome.failure, 'relayDenied')
+})
+
+// ---------------------------------------------------------------- refusing to guess
+
+test('no mail server means no connection, not one to localhost', LIMIT, async () => {
+  const noHost = { ...DEFAULT_SMTP_CONFIG, host: '', fromAddress: 'aperture@example.com' }
+  const checked = await verifySmtp(noHost)
+  assert.equal(checked.ok === false && checked.failure, 'notConfigured')
+  const sent = await sendWithSmtp(noHost, sender, { to: 'viewer@example.com', subject: 'x', text: 'x' })
+  assert.equal(sent.ok === false && sent.failure, 'notConfigured')
+  const many = await sendManyWithSmtp(noHost, sender, [{ to: 'viewer@example.com', subject: 'x', text: 'x' }])
+  assert.equal(many[0].ok === false && many[0].failure, 'notConfigured')
+})
+
+test('a server that never answers is given up on at the deadline', LIMIT, async () => {
+  const fake = await fakeSmtp({ silent: true })
+  const started = Date.now()
+  const outcome = await verifySmtp(configFor(fake), { deadlineMs: 300 })
+
+  assert.equal(outcome.ok === false && outcome.failure, 'timeout')
+  assert.ok(Date.now() - started < 5_000, `took ${Date.now() - started}ms`)
+})
+
+// ---------------------------------------------------------------- a batch
+
+const message = (to: string) => ({ to, subject: `For ${to}`, text: 'Hi' })
+
+test('a batch logs in once and sends every message over one connection', LIMIT, async () => {
+  const fake = await fakeSmtp()
+  const outcomes = await sendManyWithSmtp(configFor(fake), sender, [
+    message('a@example.com'),
+    message('b@example.com'),
+    message('c@example.com'),
+  ])
+
+  assert.deepEqual(
+    outcomes.map((o) => o.ok),
+    [true, true, true]
+  )
+  assert.equal(fake.messages.length, 3)
+  assert.equal(fake.connections, 1)
+  assert.equal(fake.commands.filter((c) => c.toUpperCase().startsWith('AUTH')).length, 1)
+})
+
+test('a refused recipient costs only its own message', LIMIT, async () => {
+  const fake = await fakeSmtp()
+  const outcomes = await sendManyWithSmtp(configFor(fake), sender, [
+    message('a@example.com'),
+    message('not an address'),
+    message('c@example.com'),
+  ])
+
+  assert.deepEqual(
+    outcomes.map((o) => (o.ok ? 'sent' : o.failure)),
+    ['sent', 'recipient', 'sent']
+  )
+  assert.equal(fake.messages.length, 2)
+})
+
+test('a refused login ends the batch without trying the rest', LIMIT, async () => {
+  const fake = await fakeSmtp({ auth: '535 5.7.8 Authentication credentials invalid' })
+  const outcomes = await sendManyWithSmtp(configFor(fake), sender, [
+    message('a@example.com'),
+    message('b@example.com'),
+    message('c@example.com'),
+  ])
+
+  assert.deepEqual(
+    outcomes.map((o) => (o.ok ? 'sent' : o.failure)),
+    ['auth', 'auth', 'auth']
+  )
+  // One login attempt, not one per recipient — repeating a refused login is how an account gets locked.
+  assert.equal(fake.commands.filter((c) => c.toUpperCase().startsWith('AUTH')).length, 1)
+  assert.ok(outcomes[2].ok === false && outcomes[2].detail.startsWith('Not attempted after:'))
 })

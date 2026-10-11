@@ -5,12 +5,15 @@
 import type { MediaServerUser } from '../types.js'
 import type { EmbyUser } from './types.js'
 import type { EmbyProviderBase } from './base.js'
+import { isEmailAddress } from '../../email/rules.js'
 
-// Helper to check if a string looks like an email
+/**
+ * Whether an Emby Connect name can be stored as the user's address: the test
+ * the mail transport applies, plus a dotted domain, since a Connect name is
+ * an Emby account id and `user@localhost` there is not a mailbox.
+ */
 function isValidEmail(str: string | undefined): boolean {
-  if (!str) return false
-  // Basic email validation - must contain @ and have text before and after
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str)
+  return isEmailAddress(str) && str.slice(str.lastIndexOf('@') + 1).includes('.')
 }
 
 export async function getUsers(

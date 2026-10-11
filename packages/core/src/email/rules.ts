@@ -3,9 +3,9 @@
  *
  * Everything here is pure so it can be pinned without a mail server or a
  * database: what a stored config means, what is missing from it, which
- * nodemailer options it becomes, and what a failed attempt was. The transport
- * is `smtp.ts`, storage is `config.ts`, and `send.ts` is the one way the rest
- * of the app sends a message.
+ * nodemailer options it becomes, and what a failed attempt was. What a settings
+ * request may change is `settings.ts`; the transport is `smtp.ts`, storage is
+ * `config.ts`, and `send.ts` is the one way the rest of the app sends.
  */
 import type { SMTPTransportOptions } from 'nodemailer'
 
@@ -51,6 +51,17 @@ export const SMTP_GREETING_TIMEOUT_MS = 15_000
 export const SMTP_SOCKET_TIMEOUT_MS = 30_000
 export const SMTP_DNS_TIMEOUT_MS = 10_000
 
+/**
+ * The most one operation — a check, or one message — may take in total.
+ *
+ * The timeouts above are each an INACTIVITY window, so a server answering every
+ * few seconds can hold a connection open indefinitely, and the Test button's
+ * request with it. A request held past the least patient hop in front of the
+ * API dies there while the work carries on (nginx's default is 60s,
+ * Cloudflare's tunnel 100s — F-141), so this sits under both.
+ */
+export const SMTP_OPERATION_DEADLINE_MS = 45_000
+
 export const SMTP_FROM_NAME_MAX_LENGTH = 100
 
 export interface SmtpConfig {
@@ -67,6 +78,13 @@ export interface SmtpConfig {
   fromAddress: string
   /** Blank means the instance name, resolved at send time so a rename follows. */
   fromName: string
+  /**
+   * The name sent with EHLO. Blank leaves it to nodemailer, which uses the
+   * machine's host name when it has a dot in it and `[127.0.0.1]` otherwise —
+   * and inside Docker the host name is a bare container id, so it is always the
+   * loopback literal there, which a strict MTA refuses or scores as forged.
+   */
+  ehloName: string
 }
 
 export const DEFAULT_SMTP_CONFIG: Readonly<SmtpConfig> = {
@@ -79,6 +97,7 @@ export const DEFAULT_SMTP_CONFIG: Readonly<SmtpConfig> = {
   password: '',
   fromAddress: '',
   fromName: '',
+  ehloName: '',
 }
 
 function trimmed(value: unknown): string {
@@ -87,6 +106,16 @@ function trimmed(value: unknown): string {
 
 function isPort(value: number): boolean {
   return Number.isInteger(value) && value >= 1 && value <= 65535
+}
+
+/**
+ * An IPv6 literal is usually written in brackets (`[fd00::25]`), which is the
+ * URL form; a host field wants it bare. Unwrapped rather than refused, since
+ * the bracketed form is what anyone copying it from elsewhere will paste.
+ */
+function unbracketed(host: string): string {
+  const match = /^\[([0-9A-Fa-f:.]+)\]$/.exec(host)
+  return match ? match[1] : host
 }
 
 /**
@@ -113,7 +142,7 @@ export function sanitizeSmtpConfig(raw: Partial<SmtpConfig> | null | undefined):
         : NaN
   return {
     enabled: input.enabled === true,
-    host: trimmed(input.host),
+    host: unbracketed(trimmed(input.host)),
     port: isPort(port) ? port : SMTP_DEFAULT_PORTS[security],
     security,
     allowSelfSigned: input.allowSelfSigned === true,
@@ -121,6 +150,7 @@ export function sanitizeSmtpConfig(raw: Partial<SmtpConfig> | null | undefined):
     password: trimmed(input.password),
     fromAddress: trimmed(input.fromAddress),
     fromName: trimmed(input.fromName),
+    ehloName: trimmed(input.ehloName),
   }
 }
 
@@ -132,6 +162,9 @@ export function sanitizeSmtpConfig(raw: Partial<SmtpConfig> | null | undefined):
  * either typed by an admin or read from a user row and then handed to a mail
  * server. Deliberately loose about everything else — the server is the judge
  * of what it will deliver to, and `user@localhost` is a real relay address.
+ *
+ * This is also the test every write to `users.email` applies, so an address a
+ * person can save is one a message can be sent to.
  */
 const BARE_ADDRESS = /^[^\s@<>()[\]",;:\\]+@[^\s@<>()[\]",;:\\]+$/
 // eslint-disable-next-line no-control-regex
@@ -162,6 +195,14 @@ export function smtpHostProblem(host: string): SmtpHostProblem | null {
   if (!HOST.test(host)) return 'characters'
   if ((host.match(/:/g) ?? []).length === 1) return 'port'
   return null
+}
+
+/** A dotted host name, or an address literal (`[192.0.2.1]`, `[IPv6:2001:db8::1]`) — what RFC 5321 lets EHLO carry. */
+const EHLO_HOST_NAME = /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$/
+const EHLO_ADDRESS_LITERAL = /^\[(?:[0-9.]+|IPv6:[0-9A-Fa-f:.]+)\]$/
+
+export function isEhloName(value: string): boolean {
+  return EHLO_HOST_NAME.test(value) || EHLO_ADDRESS_LITERAL.test(value)
 }
 
 /**
@@ -203,30 +244,21 @@ export function smtpConfigError(config: SmtpConfig): string | null {
   if (CONTROL_CHARACTER.test(config.username) || CONTROL_CHARACTER.test(config.password)) {
     return 'The username and password cannot contain line breaks'
   }
+  if (config.ehloName && !isEhloName(config.ehloName)) {
+    return 'The EHLO name must be a host name like mail.example.com, or an address literal like [192.0.2.1]'
+  }
   return null
-}
-
-/** Host comparison for the stored-password rule: DNS names are case-insensitive. */
-export function smtpHostKey(host: string): string {
-  return host.trim().toLowerCase()
-}
-
-/**
- * The stored password, but only for the server it was saved for.
- *
- * Test accepts settings that are not saved yet so the card can try a server
- * before committing to it, and Save may move the host. Sending the stored
- * password along to a different host would hand it to whatever answers there,
- * so a different host gets the password typed on the card, or none. Same rule
- * as the decision model's stored key.
- */
-export function storedPasswordFor(current: SmtpConfig, host: string): string {
-  const target = smtpHostKey(host)
-  return target !== '' && target === smtpHostKey(current.host) ? current.password : ''
 }
 
 /**
  * The nodemailer options a config becomes.
+ *
+ * `forceAuth` whenever a username is set: without it nodemailer logs in only
+ * if the server ADVERTISES AUTH, and skips it silently otherwise — so a
+ * relay that hides AUTH (Postfix with `smtpd_tls_auth_only` under `none`, a
+ * port-25 relay) passed the Test button with a wrong password and then sent
+ * unauthenticated, to be refused at the recipient as "relay access denied".
+ * Forced, a server that cannot take the login says so at once.
  *
  * `disableFileAccess`/`disableUrlAccess` are set although nothing here sends
  * attachments: they stop a message field from being read as a path or a URL
@@ -241,7 +273,9 @@ export function buildTransportOptions(config: SmtpConfig): SMTPTransportOptions 
     requireTLS: config.security === 'starttls',
     ignoreTLS: config.security === 'none',
     auth: config.username ? { user: config.username, pass: config.password } : undefined,
+    forceAuth: !!config.username,
     tls: config.allowSelfSigned && config.security !== 'none' ? { rejectUnauthorized: false } : undefined,
+    name: config.ehloName || undefined,
     connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
     greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
     socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
@@ -252,18 +286,42 @@ export function buildTransportOptions(config: SmtpConfig): SMTPTransportOptions 
   }
 }
 
+export interface OutgoingEmail {
+  /** One bare address. A list is a batch of these, so one refusal costs one message. */
+  to: string
+  subject: string
+  text: string
+  /** Optional HTML alternative; `text` is always sent, for clients that read only that. */
+  html?: string
+}
+
+export interface EmailSender {
+  name: string
+  address: string
+}
+
+export interface SentEmail {
+  messageId: string
+}
+
+/** The From header: the configured name, or the instance name when there is none. */
+export function senderFor(config: SmtpConfig, appName: string): EmailSender {
+  return { name: config.fromName || appName, address: config.fromAddress }
+}
+
 /**
  * What a failed attempt was, as a stable id the card translates — the raw
  * error rides beside it as `detail`, since the server's own words are evidence
  * and a translated sentence is only a reading of them.
  *
- * `disabled` and `notConfigured` are not SMTP failures; they are what
- * `sendEmail` answers without opening a connection, kept in the same union so
- * a caller handles one outcome type.
+ * `disabled` and `notConfigured` are not SMTP failures; they are what the
+ * senders answer without opening a connection, kept in the same union so a
+ * caller handles one outcome type.
  */
 export const SMTP_FAILURES = [
   'auth',
   'authRequired',
+  'authUnavailable',
   'tlsUnavailable',
   'tlsRequired',
   'tlsMismatch',
@@ -274,12 +332,25 @@ export const SMTP_FAILURES = [
   'timeout',
   'sender',
   'recipient',
+  'relayDenied',
   'connection',
   'disabled',
   'notConfigured',
   'unknown',
 ] as const
 export type SmtpFailure = (typeof SMTP_FAILURES)[number]
+
+export type SmtpOutcome<T> = { ok: true; value: T } | { ok: false; failure: SmtpFailure; detail: string }
+
+/**
+ * Whether a failure is about the CONNECTION rather than one message. In a
+ * batch, a connection failure ends the batch — every later message would fail
+ * the same way, and repeating a refused login is how an account gets locked —
+ * while a refused recipient costs only its own message.
+ */
+export function isSystemicSmtpFailure(failure: SmtpFailure): boolean {
+  return failure !== 'recipient' && failure !== 'relayDenied'
+}
 
 interface ErrorShape {
   code?: unknown
@@ -291,9 +362,11 @@ interface ErrorShape {
 const CERTIFICATE_TEXT =
   /self[- ]signed certificate|unable to verify the first certificate|unable to get local issuer certificate|certificate has expired|certificate is not yet valid|does not match certificate's altnames|ERR_TLS_CERT_ALTNAME_INVALID/i
 const TLS_VERSION_TEXT = /wrong version number|packet length too long|unknown protocol|ssl3_get_record/i
+const ENCRYPTION_REQUIRED_TEXT = /STARTTLS|TLS required|encryption required|requires? encryption/i
+const RELAY_TEXT = /relay/i
 const DNS_TEXT = /ENOTFOUND|EAI_AGAIN|getaddrinfo/
 const REFUSED_TEXT = /ECONNREFUSED/
-const TIMEOUT_TEXT = /ETIMEDOUT|timed? ?out|Greeting never received/i
+const TIMEOUT_TEXT = /ETIMEDOUT|timed? ?out|Greeting never received|No answer within/i
 const CONNECTION_TEXT = /ECONNRESET|EHOSTUNREACH|ENETUNREACH|EPIPE|socket hang up|Connection closed/i
 
 /**
@@ -304,6 +377,11 @@ const CONNECTION_TEXT = /ECONNRESET|EHOSTUNREACH|ENETUNREACH|EPIPE|socket hang u
  * coarse one (`ESOCKET`, `ETLS`), keeping only the message — so the message is
  * read as well as the code, and the specific readings (certificate, protocol
  * mismatch) come before the coarse ones they would otherwise be filed under.
+ *
+ * A refused login is not always a wrong password: 538 (or a reply naming
+ * encryption) means "not over this connection", and 502/503/504 mean the
+ * server does not take a login here at all. Both send the admin to a
+ * different setting than the password, so they are read apart.
  *
  * A mismatched mode and port fails two ways depending on which side waits:
  * implicit TLS against a plain port reads the server's banner as a TLS record
@@ -322,19 +400,26 @@ export function classifySmtpFailure(err: unknown, config: Pick<SmtpConfig, 'port
   if (CERTIFICATE_TEXT.test(message)) return 'certificate'
   if (TLS_VERSION_TEXT.test(message)) return 'tlsMismatch'
   if (code === 'ETLS') return responseCode != null ? 'tlsUnavailable' : 'tlsHandshake'
-  if (code === 'EAUTH') return 'auth'
+  if (code === 'EAUTH') {
+    if (responseCode === 538 || ENCRYPTION_REQUIRED_TEXT.test(message)) return 'tlsRequired'
+    if (responseCode === 502 || responseCode === 503 || responseCode === 504) return 'authUnavailable'
+    return 'auth'
+  }
   if (code === 'ENOAUTH') return 'authRequired'
   if (responseCode === 530 || responseCode === 554) {
     // 530 means "not until you do something": log in, or (Gmail's wording,
     // under `none`) "Must issue a STARTTLS command first".
-    if (/STARTTLS|TLS required|encryption/i.test(message)) return 'tlsRequired'
+    if (ENCRYPTION_REQUIRED_TEXT.test(message)) return 'tlsRequired'
     if (responseCode === 530) return 'authRequired'
   }
   // The server answered the envelope, so this is a refusal, not a network
   // fault — and its reply text is free prose that the message-text readings
-  // below could misfile.
+  // below could misfile. A recipient refused for RELAYING is a refusal of the
+  // sender's standing (not logged in, or not allowed to send outside its
+  // domains), not of the address, so it is named apart.
   if (code === 'EENVELOPE' || command === 'MAIL FROM' || command.startsWith('RCPT')) {
-    return command === 'MAIL FROM' ? 'sender' : 'recipient'
+    if (command === 'MAIL FROM') return 'sender'
+    return RELAY_TEXT.test(message) ? 'relayDenied' : 'recipient'
   }
   if (code === 'EDNS' || DNS_TEXT.test(message)) return 'dns'
   if (REFUSED_TEXT.test(message)) return 'refused'

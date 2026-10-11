@@ -6,14 +6,17 @@ import {
   SMTP_DEFAULT_PORTS,
   buildTransportOptions,
   classifySmtpFailure,
+  isEhloName,
   isEmailAddress,
+  isSystemicSmtpFailure,
   sanitizeSmtpConfig,
+  senderFor,
   singleLine,
   smtpConfigError,
   smtpFailureDetail,
   smtpHostProblem,
   smtpProblems,
-  storedPasswordFor,
+  SMTP_FAILURES,
   type SmtpConfig,
 } from './rules.js'
 
@@ -127,16 +130,23 @@ test('an address is one bare address and nothing more', () => {
   }
 })
 
-// ---------------------------------------------------------------- the stored password
+test('a bracketed IPv6 literal is stored bare, which is what the host field wants', () => {
+  assert.equal(sanitizeSmtpConfig({ host: '[fd00::25]' }).host, 'fd00::25')
+  assert.equal(sanitizeSmtpConfig({ host: ' [::1] ' }).host, '::1')
+  assert.equal(smtpConfigError({ ...configured, host: sanitizeSmtpConfig({ host: '[fd00::25]' }).host }), null)
+  // Only an address in brackets is unwrapped; anything else bracketed is still refused.
+  assert.equal(smtpHostProblem(sanitizeSmtpConfig({ host: '[smtp.example.com]' }).host), 'characters')
+})
 
-test('the stored password is sent only to the host it was saved for', () => {
-  assert.equal(storedPasswordFor(configured, 'smtp.example.com'), 'secret')
-  // DNS names are case-insensitive, and a pasted space is not a different host.
-  assert.equal(storedPasswordFor(configured, ' SMTP.Example.com '), 'secret')
-  assert.equal(storedPasswordFor(configured, 'attacker.example.net'), '')
-  assert.equal(storedPasswordFor(configured, ''), '')
-  // Nothing stored yet means nothing to hand over, whatever the host.
-  assert.equal(storedPasswordFor({ ...configured, host: '' }, ''), '')
+test('an EHLO name is a dotted host name or an address literal, and blank is allowed', () => {
+  for (const ok of ['mail.example.com', 'aperture.home.arpa', '[192.0.2.1]', '[IPv6:2001:db8::1]']) {
+    assert.equal(isEhloName(ok), true, ok)
+  }
+  for (const bad of ['mail example.com', '-mail.example.com', 'mail.example.com\r\nRCPT', '192.0.2.1:25', '[mail]']) {
+    assert.equal(isEhloName(bad), false, bad)
+  }
+  assert.equal(smtpConfigError({ ...configured, ehloName: '' }), null)
+  assert.notEqual(smtpConfigError({ ...configured, ehloName: 'mail example.com' }), null)
 })
 
 // ---------------------------------------------------------------- nodemailer options
@@ -166,7 +176,20 @@ test('certificate checking is skipped only when asked, and never matters without
 })
 
 test('no username means no login attempt at all', () => {
-  assert.equal(buildTransportOptions({ ...configured, username: '', password: '' }).auth, undefined)
+  const options = buildTransportOptions({ ...configured, username: '', password: '' })
+  assert.equal(options.auth, undefined)
+  assert.equal(options.forceAuth, false)
+})
+
+test('a configured login is forced, so a server that hides AUTH cannot skip it silently', () => {
+  // Without forceAuth nodemailer logs in only when AUTH is advertised, and a
+  // wrong password then passes the check.
+  assert.equal(buildTransportOptions(configured).forceAuth, true)
+})
+
+test('the EHLO name is sent only when one is set', () => {
+  assert.equal(buildTransportOptions(configured).name, undefined)
+  assert.equal(buildTransportOptions({ ...configured, ehloName: 'mail.example.com' }).name, 'mail.example.com')
 })
 
 test('a message can never be told to read a file or fetch a URL', () => {
@@ -303,6 +326,85 @@ test('the network failures are told apart', () => {
   assert.equal(classifySmtpFailure(nodemailerError('read ECONNRESET', 'ESOCKET'), starttls587), 'connection')
   assert.equal(classifySmtpFailure(new Error('something else entirely'), starttls587), 'unknown')
   assert.equal(classifySmtpFailure('not even an error', starttls587), 'unknown')
+})
+
+test('a refused login over the wrong transport is not reported as a wrong password', () => {
+  // 538: the server wants encryption before it will take a login.
+  assert.equal(
+    classifySmtpFailure(
+      nodemailerError('Invalid login: 538 5.7.11 Encryption required for requested authentication mechanism', 'EAUTH', {
+        responseCode: 538,
+        command: 'AUTH PLAIN',
+      }),
+      { port: 25, security: 'none' }
+    ),
+    'tlsRequired'
+  )
+  // Gmail answers a plain-text AUTH with 530 and STARTTLS in the reply.
+  assert.equal(
+    classifySmtpFailure(
+      nodemailerError('Invalid login: 530 5.7.0 Must issue a STARTTLS command first', 'EAUTH', {
+        responseCode: 530,
+        command: 'AUTH PLAIN',
+      }),
+      { port: 587, security: 'none' }
+    ),
+    'tlsRequired'
+  )
+  // 503: no login on this connection at all (Postfix with auth over TLS only).
+  assert.equal(
+    classifySmtpFailure(
+      nodemailerError('Invalid login: 503 5.5.1 Error: authentication not enabled', 'EAUTH', {
+        responseCode: 503,
+        command: 'AUTH PLAIN',
+      }),
+      { port: 25, security: 'none' }
+    ),
+    'authUnavailable'
+  )
+  // 534 is still the password: an app password is required.
+  assert.equal(
+    classifySmtpFailure(
+      nodemailerError('Invalid login: 534-5.7.9 Application-specific password required', 'EAUTH', {
+        responseCode: 534,
+        command: 'AUTH PLAIN',
+      }),
+      starttls587
+    ),
+    'auth'
+  )
+})
+
+test('a recipient refused for relaying is named apart from a bad address', () => {
+  for (const reply of [
+    '554 5.7.1 <a@outside.example>: Relay access denied',
+    '550 5.7.54 SMTP; Unable to relay recipient in non-accepted domain',
+    '550 relay not permitted',
+  ]) {
+    const err = nodemailerError(`Can't send mail - all recipients were rejected: ${reply}`, 'EENVELOPE', {
+      responseCode: Number(reply.slice(0, 3)),
+      command: 'RCPT TO',
+    })
+    assert.equal(classifySmtpFailure(err, starttls587), 'relayDenied', reply)
+  }
+})
+
+test('our own deadline reads as a timeout', () => {
+  const err = Object.assign(new Error('No answer within 45 seconds'), { code: 'ETIMEDOUT' })
+  assert.equal(classifySmtpFailure(err, starttls587), 'timeout')
+})
+
+test('in a batch, only a refused recipient lets the rest go on', () => {
+  const perMessage = SMTP_FAILURES.filter((f) => !isSystemicSmtpFailure(f))
+  assert.deepEqual(perMessage.sort(), ['recipient', 'relayDenied'])
+})
+
+test('the sender name falls back to the instance name only when none is set', () => {
+  assert.deepEqual(senderFor(configured, 'Home cinema'), { name: 'Home cinema', address: 'aperture@example.com' })
+  assert.deepEqual(senderFor({ ...configured, fromName: 'Movies' }, 'Home cinema'), {
+    name: 'Movies',
+    address: 'aperture@example.com',
+  })
 })
 
 test('the detail keeps the server words on one line and clipped', () => {

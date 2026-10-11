@@ -1,11 +1,13 @@
 /**
  * The one way the app sends email.
  *
- * `sendEmail` is what a feature calls: it reads the saved settings, refuses
- * without opening a connection when sending is switched off or incomplete, and
- * fills in the sender. It never throws — a notification that could not be
- * delivered must not fail the work that wanted to send it — so a caller reads
- * the outcome and decides what a failure means for it.
+ * `sendEmail` (one message) and `sendEmails` (a batch) are what a feature
+ * calls: they read the saved settings once, refuse without opening a
+ * connection when sending is switched off or incomplete, and fill in the
+ * sender. They never throw — a notification that could not be delivered must
+ * not fail the work that wanted to send it — so a caller reads the outcome and
+ * decides what a failure means for it. A fan-out uses `sendEmails`, which
+ * shares one connection and one login across the batch.
  *
  * Whether a particular PERSON should get a particular email is deliberately not
  * decided here. That is a question about the recipient (an address on file,
@@ -14,21 +16,22 @@
  */
 import { getAppName } from '../settings/systemSettings.js'
 import { getSmtpConfig } from './config.js'
-import { smtpProblems, type SmtpConfig } from './rules.js'
 import {
-  sendWithSmtp,
+  senderFor,
+  smtpProblems,
   type EmailSender,
   type OutgoingEmail,
   type SentEmail,
+  type SmtpConfig,
+  type SmtpFailure,
   type SmtpOutcome,
-} from './smtp.js'
+} from './rules.js'
+import { sendManyWithSmtp, sendWithSmtp } from './smtp.js'
 
-/** The From header: the configured name, or the instance name when there is none. */
-export async function senderFor(config: SmtpConfig): Promise<EmailSender> {
-  return { name: config.fromName || (await getAppName()), address: config.fromAddress }
-}
+type Prepared = { config: SmtpConfig; sender: EmailSender } | { ok: false; failure: SmtpFailure; detail: string }
 
-export async function sendEmail(message: OutgoingEmail): Promise<SmtpOutcome<SentEmail>> {
+/** The saved settings and the sender, read once per call — or why nothing may be sent. */
+async function prepare(): Promise<Prepared> {
   const config = await getSmtpConfig()
   if (!config.enabled) {
     return { ok: false, failure: 'disabled', detail: 'Outgoing email is switched off' }
@@ -37,7 +40,21 @@ export async function sendEmail(message: OutgoingEmail): Promise<SmtpOutcome<Sen
   if (problems.length > 0) {
     return { ok: false, failure: 'notConfigured', detail: `Missing: ${problems.join(', ')}` }
   }
-  return sendWithSmtp(config, await senderFor(config), message)
+  return { config, sender: senderFor(config, await getAppName()) }
+}
+
+export async function sendEmail(message: OutgoingEmail): Promise<SmtpOutcome<SentEmail>> {
+  const ready = await prepare()
+  if ('ok' in ready) return ready
+  return sendWithSmtp(ready.config, ready.sender, message)
+}
+
+/** One outcome per message, in order. See `sendManyWithSmtp` for how a batch stops. */
+export async function sendEmails(messages: readonly OutgoingEmail[]): Promise<SmtpOutcome<SentEmail>[]> {
+  if (messages.length === 0) return []
+  const ready = await prepare()
+  if ('ok' in ready) return messages.map(() => ready)
+  return sendManyWithSmtp(ready.config, ready.sender, messages)
 }
 
 /**
@@ -51,8 +68,7 @@ export async function sendTestEmail(
   requestedBy: string
 ): Promise<SmtpOutcome<SentEmail>> {
   const appName = await getAppName()
-  const sender = await senderFor(config)
-  return sendWithSmtp(config, sender, {
+  return sendWithSmtp(config, senderFor(config, appName), {
     to,
     subject: `${appName}: test email`,
     text: [

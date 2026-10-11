@@ -2474,13 +2474,25 @@
     "togglePassword": "Show or hide the password",
     "passwordSaved": "A password is saved. Leave blank to keep it.",
     "passwordOtherHost": "The saved password is only sent to {{host}}. Enter it again for this server.",
+    "passwordWeaker": "The saved password is only used over a connection at least as secure as the one it was saved with. Enter it again to use it with this setting.",
     "plaintextWarning": "With no encryption, the username and password cross the network as plain text.",
     "fromAddress": "From address",
     "fromAddressPlaceholder": "media@example.com",
     "fromAddressHelper": "Most providers only accept an address that belongs to the account you log in with.",
     "fromName": "From name",
     "fromNameHelper": "Leave blank to use {{name}}.",
+    "ehloName": "EHLO name",
+    "ehloNamePlaceholder": "mail.example.com",
+    "ehloNameHelper": "The name this server introduces itself with. Leave blank unless the mail server refuses the default, which inside Docker is [127.0.0.1].",
     "readyButOff": "These settings are complete. Switch on Send email when a feature needs it.",
+    "incomplete": "Not ready to send yet: {{list}} still missing.",
+    "missingToEnable": "Fill in {{list}} before switching on Send email.",
+    "missingToTest": "Fill in {{list}} to run the test.",
+    "problem": {
+      "host": "the mail server",
+      "fromAddress": "a From address",
+      "password": "the password"
+    },
     "testConnection": "Test connection",
     "testing": "Testing…",
     "testOk": "Connected to {{host}} successfully.",
@@ -2489,7 +2501,7 @@
     "sendTest": "Send test email",
     "sending": "Sending…",
     "sendOk": "Test email sent to {{address}}. If it does not arrive, check the spam folder.",
-    "serverSaid": "Server said: {{detail}}",
+    "serverSaid": "Tried {{host}}: {{detail}}",
     "failure": {
       "auth": {
         "title": "The server refused the username or password.",
@@ -2498,6 +2510,10 @@
       "authRequired": {
         "title": "The server requires a login.",
         "hint": "Enter a username and password."
+      },
+      "authUnavailable": {
+        "title": "The server does not accept a login on this connection.",
+        "hint": "If it only allows a login over encryption, choose STARTTLS or SSL/TLS. If it takes mail without a login, clear the username."
       },
       "tlsUnavailable": {
         "title": "The server does not offer STARTTLS, so nothing was sent, not even the password.",
@@ -2538,6 +2554,10 @@
       "recipient": {
         "title": "The server refused the recipient address.",
         "hint": "Check the address, or try another one."
+      },
+      "relayDenied": {
+        "title": "The server refused to pass the message on to that address.",
+        "hint": "Usually the login was not accepted for sending, or this account may only send within its own domain. Check the username and password, or ask the mail provider."
       },
       "connection": {
         "title": "The connection dropped.",
