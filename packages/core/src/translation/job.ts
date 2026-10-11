@@ -168,7 +168,7 @@ const pairKey = (mediaId: string, language: string) => `${mediaId}:${language}`
  * the configured source language rather than reaching a prompt.
  */
 function sourceLanguageOf(raw: unknown, config: TranslationConfig): AppLocaleCode {
-  return isValidAppLocale(raw) ? raw : config.sourceLanguage
+  return typeof raw === 'string' && isValidAppLocale(raw) ? raw : config.sourceLanguage
 }
 
 // ---------------------------------------------------------------- synopses
