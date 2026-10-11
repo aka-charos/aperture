@@ -1064,6 +1064,39 @@ Every previous bump retired the whole library, which is what the floor was built
 
 **What goes live unverified, stated plainly.** Version 18 was benched once, on one title, with one model, and two of its clauses - the ending boundary and `IT IS NOBODY ELSE'S EITHER` - have **never been benched at all**, having been written from that bench's own faults. That is the same call 11 to 15 and 17 went live under. The things to read on the first library pass are a making paragraph checked against its documents (the attribution class has now failed three times and no column scores it) and a reception paragraph that reports a verdict on an ending without describing one.
 
+**THE FIRST BENCH OF 18 AS CURRENT BROKE ITS OWN HEADLINE RULE, AND THE OPERATOR FOUND A LOSS THREE VERSIONS OLD THAT NO SUSPIRIA BENCH COULD HAVE SHOWN.** Two changes to version 18 in place, both to the live edition.
+
+**THE NAMING BAN FAILED, AND IT FAILED WORSE THAN PERMITTING NAMES.** Four benches, one model (`altworld_hemmingway-1@q4_k_s`), one title:
+
+| bench | v17 `named` | v18 `named` |
+|---|---|---|
+| draft 18, Ebert exception | 2 (both right) | 3 (one invented) |
+| absolute ban | 7 | **0** |
+| absolute ban | 6 | **0** |
+| **18 as current** | 6 | **8** |
+
+Eight names in one reception paragraph - Janet Maslin, The New York Times, Time Out, Empire, Gary Arnold, the Washington Post, Josh Larsen, Christy Lemire - which is the aggregator's own shape, from the version that forbids naming, against six from the version that permits it. The attributions are correct; the rule is not being followed.
+
+**That is version 18's own headline principle refuting version 18's own headline rule.** The 42-row survey that produced this version measured compliance per rule: **ceilings are obeyed and flat bans are not** - paragraph count 98%, paragraph words 67%, word total 62%, sentence cap 55%, against "no semicolons" at 2% and "no rather than" at 0%. The naming ban is a flat ban. It was written on evidence that flat bans do not work, and it held for two benches before behaving like one.
+
+So it is a **CEILING**: name at most one writer or publication in the whole piece, counting a critic and the paper they wrote for alike, spent only where a critic's reading shaped how the work is watched. A ceiling makes the aggregator's list structurally impossible - that shape needs several names - while being the kind of rule this model demonstrably follows. **The accuracy half is what it rests on** and is carried over from version 16: the one name spent must be the one printed beside that very claim, because a ceiling of one without it is a licence to invent one, which is exactly what the Ebert exception did.
+
+**THE ORIENTING OPENING WAS LOST AT VERSION 16 AND NOTHING NOTICED FOR THREE VERSIONS.** Found by the operator, by reading a version-15 article beside a version-18 one on the same title. Version 15 on The Seed of the Sacred Fig opened:
+
+> "a political drama made as a French-German co-production and shot in Persian, belonging to the wave of contemporary Iranian cinema that engages with the 2022 protests following the death of Mahsa Amini"
+
+Version 18 on the same film opens on the fig-tree parable, the mode, the runtime, and "the tradition of Iranian cinema smuggled out under persecution" - excellent prose, and **the 2022 protests, the co-production, the language and the real protest footage are all gone**. A reader who does not know the film is told what register to bring and not what they are looking at.
+
+**Two rules compound to cause it.** Version 15 asked an OPEN question - *"Where does it come from - what kind of work is it, what source does it adapt, and what tradition, movement or body of work does it belong to?"* Version 16 replaced it with a closed list, and **every item on that list is an artistic antecedent**: a source it adapts, a tradition a document places it in, an earlier film a maker took from, a collaborator's earlier work. There is no slot in it for the world the film stands in. And `EARNS_ITS_PLACE_RULE` independently bans **"a date"**, **"a filming location"** and **"money, rights"** - which is three of the five facts in that version-15 sentence: the 2022 protests are a date and a co-production is rights.
+
+**THE BENCH TITLE DECIDES WHICH FAULTS ARE VISIBLE, and this is the clearest case in the corpus.** Every bench since version 16 ran on Suspiria, whose orienting facts - giallo, De Quincey, Snow White, Goblin - **are** artistic antecedents and fit version 16's closed list perfectly. The gap only appears on a work whose ground is historical rather than artistic, so no number of Suspiria runs could have exposed it, and the 42-row library survey did not either, because it read habits rather than absences. **An absence is invisible to every signal column by construction** - `proseSignals.ts` counts things that are present.
+
+The fix is positive rather than permissive, because the question had stopped asking: the tradition question now says **WHERE AND WHEN IT STANDS** - the country or countries that made it, the language it is in, and the place, period or real events it engages - with a mechanical line against the thing that ban was protecting: **what a work is ABOUT orients a reader, where what HAPPENS in it is the thing to withhold, so name the event and not the story.** And the never-earn-it list is narrowed where it was overreaching: "a date" becomes "a release or shooting date", "a filming location" becomes "a shooting location", and the preamble's worked exceptions gain the country, the language and the year of the events a work engages - "because they are what a reader is looking at", beside the literary source that tells a viewer how to hear the title.
+
+**Both edits are to the CURRENT edition, in place.** The 48-prompt dump brackets them: versions 7 to 17 are byte-identical and only version 18's four prompts moved (11,958 to 12,764 characters). The cost of editing a live version is that `title_analysis.prompt_version` cannot separate rows written by 18's first text from its second, and `ANALYSIS_STALE_BELOW` is 17 so neither is retired - a named inconsistency, accepted because the alternative is a library written with a broken headline rule and no orientation.
+
+**And two instrument gaps from the same bench, fixed but secondary.** `unattributed` read 0 on "The airport doors ... **are cited as** the moment many viewers commit fully" - `cited` was the one verb missing from a list that already carried described, called, regarded, considered, labelled, dubbed, hailed, traced, seen and recognised. And the per-question **allocation was four maximums that nothing measured**: `scattered` reads the map and asks only whether a question's paragraphs are contiguous, so version 18 giving `circumstances` two paragraphs where the rule allows one printed as a passing row, exactly as version 17 giving reception two had one bench earlier. The new `t/w/c/r` column reads `1/3/2!/1` on that answer. Both were found while validating this bench and neither is the finding - **the prompt is**, and reaching for the instrument first was the wrong order.
+
 ## F-125
 
 **A collection name on the detail page opens the franchise, with what is missing and a way to request it.** "Part of Collection — X" was plain text. Already present and unconnected: `movies.collection_id` was returned by the detail route; `tmdb_collection_cache` held part lists but only gap analysis wrote it; enrichment fetched every collection's parts and kept only name and poster. The person page's "not in your library → request" flow is reused.

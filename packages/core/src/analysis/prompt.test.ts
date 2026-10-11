@@ -852,19 +852,24 @@ test('version 18 names the makers and stops naming the critics', () => {
   // measured cause of the 83 names and has to be gone, not merely balanced.
   assert.ok(currentRules.includes('You may name a critic or the publication that ran them'))
   assert.ok(!rulesText.includes('You may name a critic or the publication that ran them'))
-  assert.ok(rulesText.includes('DO NOT NAME THE PEOPLE WHO WROTE ABOUT IT'))
-  assert.ok(rulesText.includes('do not name the publications they wrote for'))
-
-  // THE BAN HAS NO EXCEPTION, and the exception it used to have is why.
-  // Drafted with "Roger Ebert is the one name you may use", and the first
-  // bench of this draft produced "Roger Ebert read it as an adult fairy tale"
-  // from a RogerEbert.com piece bylined Peter Sobczynski - whose byline
-  // Metacritic carried in the same retrieval. The permitted name is what the
-  // model reached for; version 17, naming freely, got Maslin and Arnold both
-  // right on the same documents. A rule with one exception is enforced at the
-  // exception, so there is none to enforce at.
+  // A CEILING, NOT A BAN - and the ban is why. Benched four times on one model
+  // and one title, the flat ban scored `named` 0, 0 and then **8**, which is
+  // MORE than version 17 produced on the same documents while permitting names
+  // outright. That is version 18's own headline principle refuting version
+  // 18's own headline rule: measured on 42 live rows, ceilings are obeyed
+  // (paragraph count 98%, paragraph words 67%, word total 62%, sentence cap
+  // 55%) and flat bans are not (2% and 0%). A ban was never going to hold, and
+  // one name cannot be the aggregator's list however the model reaches for it.
+  assert.ok(rulesText.includes('NAME AT MOST ONE WRITER OR PUBLICATION IN THE WHOLE PIECE'))
+  assert.ok(rulesText.includes('a name per sentence is the list an aggregator prints'))
+  assert.ok(!rulesText.includes('DO NOT NAME THE PEOPLE WHO WROTE ABOUT IT'))
+  assert.ok(!rulesText.includes('There is no exception, however well known the name'))
+  // THE ACCURACY HALF IS WHAT THE CEILING RESTS ON, and it is version 16's
+  // measured finding: the one name spent must be the one printed beside that
+  // claim. Without it a ceiling of one is a licence to invent one, which is
+  // exactly what the Ebert exception did.
+  assert.ok(rulesText.includes('the name printed beside that very claim in the document you took it from'))
   assert.ok(!rulesText.includes('Roger Ebert'))
-  assert.ok(rulesText.includes('There is no exception, however well known the name'))
   // Deleted from this draft as "moot once names go" and restored for exactly
   // the misattribution it was written for - a site named after a critic is not
   // that critic. It was never moot while one name was permitted.

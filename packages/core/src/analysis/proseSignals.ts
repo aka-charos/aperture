@@ -123,6 +123,13 @@ export interface ProseSignals {
    */
   scattered: number
   /**
+   * How many paragraphs each question id got, so the report can check the
+   * per-question allocation the length rule states. Empty without a map, which
+   * the report renders as a dash for the same reason every other map-derived
+   * count does.
+   */
+  questionParagraphs: Record<string, number>
+  /**
    * Whether the answer carried a usable paragraph map. The counts that read the
    * model's labels are zero without one, and that zero means "not measured",
    * not "none found" - the report prints a dash for them.
@@ -194,7 +201,12 @@ const INLINE_LABELS = [
 const UNATTRIBUTED = [
   // Passive voice that hides whose view it is. "has been traced to" is
   // Possession's; "is described as" is the commonest.
-  /\b(?:is|are|was|were|has been|have been|had been)\s+(?:widely\s+|often\s+|variously\s+|also\s+)?(?:described|called|characteri[sz]ed|regarded|considered|labell?ed|dubbed|hailed|traced|seen|recogni[sz]ed)\s+(?:as|to)\b/gi,
+  // `cited` was the one verb in this family the list did not name, and the
+  // first bench of 18-as-current found it: "The airport doors with their loud
+  // mechanical snap ARE CITED AS the moment many viewers commit fully" scored
+  // `unattrib 0`. Cited by whom is the whole question, and the prompt's own
+  // list of banned hedges does not name it either.
+  /\b(?:is|are|was|were|has been|have been|had been)\s+(?:widely\s+|often\s+|variously\s+|also\s+)?(?:described|called|characteri[sz]ed|regarded|considered|labell?ed|dubbed|hailed|traced|seen|recogni[sz]ed|cited)\s+(?:as|to)\b/gi,
   // The Wretches Are Still Singing under version 13: "has been credited with
   // influencing independent film-making".
   /\b(?:is|are|was|were|has been|have been|had been)\s+(?:widely\s+|often\s+|also\s+)?credited\s+with\b/gi,
@@ -728,6 +740,32 @@ function scatteredQuestions(
   return scattered
 }
 
+/**
+ * How many paragraphs each question got.
+ *
+ * THE PER-QUESTION ALLOCATION IS FOUR MAXIMUMS AND NOTHING MEASURED THEM.
+ * Versions 16 to 18 state "at most two paragraphs on what kind of film it is,
+ * at most four on what to watch and listen for, one on what to know going in,
+ * and one on how it has been taken" - and the only column reading the map was
+ * `scattered`, which asks whether a question's paragraphs are CONTIGUOUS and
+ * never how many there are. Two breaches were found by reading the sections
+ * line by hand, one bench apart: version 17 gave reception two paragraphs, and
+ * version 18 gave `circumstances` two. Both read as passing rows.
+ *
+ * A SHARED PARAGRAPH COUNTS FOR BOTH ITS QUESTIONS, which is the same reading
+ * `scattered` takes - the length rule permits merging and caps the count, so a
+ * paragraph labelled `circumstances+work` has spent one of each budget.
+ */
+function paragraphsPerQuestion(
+  sections: readonly (readonly string[])[] | null | undefined
+): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const labels of sections ?? []) {
+    for (const label of labels ?? []) counts[label] = (counts[label] ?? 0) + 1
+  }
+  return counts
+}
+
 export function measureProse(
   text: string | null | undefined,
   sections?: readonly (readonly string[])[] | null,
@@ -756,6 +794,7 @@ export function measureProse(
     repeatedAcrossSections: repeatedPhrases.length,
     repeatedPhrases,
     scattered: scatteredQuestions(sections),
+    questionParagraphs: paragraphsPerQuestion(sections),
     spill: outsideReception(paragraphs, sections, WRITER_MENTIONS),
     praise: outsideReception(paragraphs, sections, PRAISE_WORDS),
     awards: count(trimmed, AWARDS),

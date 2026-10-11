@@ -293,7 +293,7 @@ test('a fact told under two questions is counted and named in the report', () =>
     })
   )
   assert.match(text, /told twice \d+ \([^)]*liquid metal/)
-  assert.match(text, /\s+twice\s+spill\s+praise\s+awards\s+semi\s+rec\/work\n/)
+  assert.match(text, /\s+twice\s+spill\s+praise\s+awards\s+semi\s+rec\/work\s+t\/w\/c\/r\n/)
 })
 
 /**
@@ -310,8 +310,8 @@ test('an answer with no map prints dashes for what the map measures', () => {
     })
   )
   const row = (name: string) => text.split('\n').find((line) => line.includes(' / ' + name + ' · v7 '))!
-  assert.match(row('mapped'), /\s0\s+0\s+0\s+6\/2!$/)
-  assert.match(row('unmapped'), /\s—\s+—\s+—\s+0\s+1\s+—$/)
+  assert.match(row('mapped'), /\s0\s+0\s+0\s+6\/2!\s+0\/1\/0\/1$/)
+  assert.match(row('unmapped'), /\s—\s+—\s+—\s+0\s+1\s+—\s+—$/)
   assert.match(text, /told twice — \(no map\)/)
   assert.match(text, /writers outside reception —/)
   assert.match(text, /reception 6 words, work 2 \(reception longer\)/)
@@ -625,6 +625,84 @@ test('paragraphs stay hard where words are loose', () => {
     })
   )
   assert.match(rendered, /9! paragraphs/)
+})
+
+/**
+ * THE PER-QUESTION ALLOCATION IS FOUR MAXIMUMS AND NOTHING MEASURED THEM.
+ * `scattered` reads the map and asks only whether a question's paragraphs are
+ * CONTIGUOUS. Two breaches were found by reading the sections line by hand, one
+ * bench apart: version 17 giving reception two paragraphs, version 18 giving
+ * `circumstances` two. Both printed as passing rows.
+ */
+test('paragraphs per question are checked against the allocation the rule states', () => {
+  const row = (version: number, sections: string[][]) => {
+    const text = renderComparisonReport(
+      report({
+        promptVersion: version,
+        entries: [
+          entry({
+            promptVersion: version,
+            model: 'm',
+            analysis: sections.map((_, i) => `Paragraph ${i + 1}.`).join('\n\n'),
+            sections,
+          }),
+        ],
+      })
+    )
+    return text.split('\n').find((l) => l.includes(' / m · v' + version + ' '))!
+  }
+
+  // Version 18's live answer: circumstances took two paragraphs where the rule
+  // allows one, and they were ADJACENT - so `split` is correctly 0 and this is
+  // the only column that can see it.
+  const v18 = row(18, [
+    ['tradition'],
+    ['work'],
+    ['work'],
+    ['circumstances', 'work'],
+    ['circumstances'],
+    ['reception'],
+  ])
+  assert.match(v18, /1\/3\/2!\/1$/)
+
+  // Version 17's live answer one bench earlier: reception took two.
+  assert.match(
+    row(17, [['tradition'], ['tradition'], ['work'], ['work'], ['circumstances'], ['reception'], ['reception']]),
+    /2\/2\/1\/2!$/
+  )
+
+  // THE TWO WERE ADJACENT, so `split` is correctly 0 and this column is the
+  // only thing in the table that can see the breach.
+  assert.match(
+    renderComparisonReport(
+      report({
+        promptVersion: 18,
+        entries: [
+          entry({
+            promptVersion: 18,
+            analysis: 'One.\n\nTwo.\n\nThree.\n\nFour.\n\nFive.\n\nSix.',
+            sections: [
+              ['tradition'],
+              ['work'],
+              ['work'],
+              ['circumstances', 'work'],
+              ['circumstances'],
+              ['reception'],
+            ],
+          }),
+        ],
+      })
+    ),
+    /answers split across non-adjacent paragraphs 0/
+  )
+
+  // A shared paragraph spends one of each budget, which is how `scattered`
+  // already reads a label set.
+  assert.match(row(18, [['tradition', 'work'], ['work'], ['circumstances'], ['reception']]), /1\/2\/1\/1$/)
+
+  // VERSIONS 7 TO 15 STATE NO ALLOCATION, so their counts are descriptive and
+  // flagging them would invent a rule they never had.
+  assert.match(row(15, [['reception'], ['reception'], ['reception']]), /0\/0\/0\/3$/)
 })
 
 test('every length cap is a figure its own edition states', () => {

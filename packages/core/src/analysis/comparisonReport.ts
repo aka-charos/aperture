@@ -388,9 +388,9 @@ const signalsOf = (
  * "twice" and "spill" when neither had been measured.
  */
 const labelled =
-  (read: (s: ProseSignals) => number | string) =>
-  (s: ProseSignals): number | string =>
-    s.mapped ? read(s) : '—'
+  (read: (s: ProseSignals, caps: LengthCaps | null) => number | string) =>
+  (s: ProseSignals, caps: LengthCaps | null): number | string =>
+    s.mapped ? read(s, caps) : '—'
 
 // "rec/work" carries a "!" when reception ran longer than the work answer,
 // which the prompt forbids.
@@ -419,7 +419,31 @@ const SIGNAL_COLUMNS: [
     'rec/work',
     labelled((s) => `${s.receptionWords}/${s.workWords}${s.receptionWords > s.workWords ? '!' : ''}`),
   ],
+  ['t/w/c/r', labelled(allocationCell)],
 ]
+
+/**
+ * Paragraphs per question against the maximums the length rule states.
+ *
+ * Printed in the rule's own order - what kind of film it is, what to watch and
+ * listen for, what to know going in, how it has been taken - so the cell reads
+ * against the sentence. A question over its budget carries "!".
+ *
+ * An edition with no allocation prints the counts bare: versions 7 to 15 state
+ * none, so a number there is descriptive and flagging it would invent a rule
+ * those versions never had. A question the allocation omits (series
+ * `structure`) is deliberately not shown, for the same reason.
+ */
+function allocationCell(s: ProseSignals, caps: LengthCaps | null): string {
+  const order = ['tradition', 'work', 'circumstances', 'reception']
+  return order
+    .map((id) => {
+      const had = s.questionParagraphs[id] ?? 0
+      const cap = caps?.allocation?.[id]
+      return cap != null && had > cap ? `${had}!` : String(had)
+    })
+    .join('/')
+}
 
 /**
  * What each prompt version's length rule actually states, so the report can say
@@ -463,6 +487,37 @@ interface LengthCaps {
    * mirrors it rather than averaging it.
    */
   wordsTolerance?: number
+  /**
+   * The per-question paragraph maximums this edition's length rule states.
+   *
+   * FOUR MAXIMUMS THAT NOTHING MEASURED. Versions 16 to 18 say "at most two
+   * paragraphs on what kind of film it is, at most four on what to watch and
+   * listen for, one on what to know going in, and one on how it has been
+   * taken", and the only column reading the map asked whether a question's
+   * paragraphs were CONTIGUOUS. Two breaches were found by reading the sections
+   * line by hand, one bench apart - version 17 giving reception two paragraphs,
+   * version 18 giving `circumstances` two - and both printed as passing rows.
+   *
+   * Absent for 7 to 15, which state no allocation: the per-question budget came
+   * in with version 16, from the compact variant. Series carry a `structure`
+   * question the rule never budgets, so an unlisted question is counted and
+   * never flagged.
+   */
+  allocation?: Readonly<Record<string, number>>
+}
+
+/**
+ * The allocation versions 16 to 18 share, in the order their rule states it.
+ *
+ * One object, referenced three times rather than copied, because the three
+ * editions carry the identical sentence and a drifting copy would report one
+ * version against another's budget.
+ */
+const ALLOCATION_16: Readonly<Record<string, number>> = {
+  tradition: 2,
+  work: 4,
+  circumstances: 1,
+  reception: 1,
 }
 
 const LENGTH_CAPS: ReadonlyMap<number, LengthCaps> = new Map([
@@ -475,15 +530,15 @@ const LENGTH_CAPS: ReadonlyMap<number, LengthCaps> = new Map([
   [13, { words: 900, paragraphs: 10 }],
   [14, { words: 900, paragraphs: 10 }],
   [15, { words: 900, paragraphs: 10 }],
-  [16, { words: 650, paragraphs: 8, paragraphWords: 150 }],
+  [16, { words: 650, paragraphs: 8, paragraphWords: 150, allocation: ALLOCATION_16 }],
   // 17 carries 16's length rule unchanged.
-  [17, { words: 650, paragraphs: 8, paragraphWords: 150 }],
+  [17, { words: 650, paragraphs: 8, paragraphWords: 150, allocation: ALLOCATION_16 }],
   // Version 18 states "around 600 words" and "about eight paragraphs" and drops
   // the paragraph-word anchor, on the operator's call that length should drift.
   // So there is no paragraphWords entry to flag against: measured on 42 live
   // version-17 rows, a third ran over the 150 and the prose was not worse for
   // it. `longest-w` is still printed, and is now descriptive rather than a cap.
-  [18, { words: 600, paragraphs: 8, wordsTolerance: 0.15 }],
+  [18, { words: 600, paragraphs: 8, wordsTolerance: 0.15, allocation: ALLOCATION_16 }],
 ])
 
 /**

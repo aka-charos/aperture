@@ -13,7 +13,11 @@ import { measureProse, namesFromDocuments, writerNamesFromSources } from './pros
 test('an empty or missing analysis measures as zero everywhere', () => {
   for (const text of [null, undefined, '', '   ']) {
     const s = measureProse(text)
-    const { repeatedPhrases, namedWriterMatches, mapped, ...counts } = s
+    const { repeatedPhrases, namedWriterMatches, mapped, questionParagraphs, ...counts } = s
+    // Not a count: a map of question id to paragraphs, empty when there is no
+    // map at all. Checked on its own below rather than left in `counts`, where
+    // an object is never `=== 0` and would fail the sweep for the wrong reason.
+    assert.deepEqual(questionParagraphs, {})
     // Every count, named rather than positional: a fixed-length array here has
     // to be edited for each new column, and editing it is when a genuine zero
     // gets written in beside the cosmetic one.
