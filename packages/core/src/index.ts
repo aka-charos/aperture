@@ -1162,8 +1162,14 @@ export {
 export {
   authenticateLldap,
   fetchLldapUserEmails,
+  fetchLldapDirectory,
   testLldapConnection,
   syncLldapEmails,
+  directoryUsernameKey,
+  lldapEmailState,
+  LLDAP_REQUEST_TIMEOUT_MS,
+  type LldapDirectoryUser,
+  type LldapEmailState,
   type SyncLldapEmailsResult,
 } from './lldap/index.js'
 
@@ -1701,6 +1707,24 @@ export {
   syncUsersFromMediaServer,
   type SyncUsersResult,
 } from './users/sync.js'
+
+// Account drift (media server, LLDAP and Aperture compared)
+export {
+  buildAccountDrift,
+  DRIFT_FINDINGS,
+  DRIFT_FINDING_SEVERITY,
+  type DriftApertureAccount,
+  type DriftFinding,
+  type DriftFindingId,
+  type DriftInput,
+  type DriftLldapAccount,
+  type DriftMediaServerAccount,
+  type DriftRow,
+  type DriftRowStatus,
+  type DriftSeverity,
+  type DriftSummary,
+} from './users/accountDrift.js'
+export { loadAccountDriftReport, type AccountDriftReport, type DriftSource } from './users/accountDriftReport.js'
 
 // API Keys
 export {

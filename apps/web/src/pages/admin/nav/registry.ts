@@ -243,6 +243,13 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     titleKey: 'adminNav.smtp.title',
     blurbKey: 'adminNav.smtp.blurb',
     aliases: ['smtp', 'email', 'mail', 'outgoing', 'notifications', 'starttls', 'gmail', 'postfix'],
+    fields: [
+      {
+        anchor: 'smtp-account-drift',
+        labelKey: 'settingsAccountDrift.title',
+        aliases: ['lldap', 'drift', 'deleted users', 'missing accounts', 'orphan accounts', 'directory'],
+      },
+    ],
   },
   {
     id: 'n8n',

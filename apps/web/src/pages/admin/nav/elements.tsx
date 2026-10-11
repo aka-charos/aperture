@@ -149,10 +149,7 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
   },
   smtp: {
     icon: <ForwardToInboxIcon />,
-    Component: section(
-      () => import('@/pages/settings/components/SmtpConfigSection'),
-      'SmtpConfigSection'
-    ),
+    Component: lazy(() => import('@/pages/admin/routes/OutgoingEmailRoute')),
   },
   n8n: {
     icon: <AccountTreeIcon />,

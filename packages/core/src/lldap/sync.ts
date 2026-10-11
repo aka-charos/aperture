@@ -16,7 +16,7 @@ import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getLldapConfig, getLldapAdminPassword } from '../settings/systemSettings.js'
 import { authenticateLldap, fetchLldapUserEmails } from './client.js'
-import { isEmailAddress } from '../email/rules.js'
+import { directoryUsernameKey, lldapEmailState } from './rules.js'
 import {
   createJobProgress,
   setJobStep,
@@ -81,17 +81,19 @@ export async function syncLldapEmails(existingJobId?: string): Promise<SyncLldap
       throw new Error(result.error)
     }
 
-    // LLDAP user IDs are the login usernames. Matched in memory (not via SQL) so
-    // it's case-insensitive on both sides regardless of how either system stores
-    // case — cheap insurance against the two directories disagreeing on it.
-    // Only an address the mail transport would accept is imported (the same
-    // test the settings page applies), so nothing stored here is one an email
-    // can never be sent to. LLDAP does not validate the field itself.
+    // LLDAP user IDs are the login usernames. Matched in memory (not via SQL)
+    // on `directoryUsernameKey`, the rule the account drift report shares, so
+    // the report cannot say an address will be imported that this skips.
+    // Only an address the mail transport would accept is imported, so nothing
+    // stored here is one an email can never be sent to.
     const lldapUsers = result.value.users
-    const withEmail = lldapUsers.filter((u) => !!u.email)
-    const usable = withEmail.filter((u) => isEmailAddress(u.email.trim()))
-    const lldapEmailByUsername = new Map(usable.map((u) => [u.id.toLowerCase(), u.email.trim()]))
-    const unusable = withEmail.length - usable.length
+    const lldapEmailByUsername = new Map<string, string>()
+    let unusable = 0
+    for (const u of lldapUsers) {
+      const email = lldapEmailState(u.email)
+      if (email.state === 'usable') lldapEmailByUsername.set(directoryUsernameKey(u.id), email.email)
+      else if (email.state === 'unusable') unusable++
+    }
 
     addLog(
       jobId,
@@ -117,7 +119,7 @@ export async function syncLldapEmails(existingJobId?: string): Promise<SyncLldap
       const user = existingUsers.rows[i]
       updateJobProgress(jobId, i, existingUsers.rows.length, user.username)
 
-      const lldapEmail = lldapEmailByUsername.get(user.username.toLowerCase())
+      const lldapEmail = lldapEmailByUsername.get(directoryUsernameKey(user.username))
       if (!lldapEmail) {
         skipped++
         continue

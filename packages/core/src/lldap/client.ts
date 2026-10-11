@@ -17,6 +17,14 @@ import { logApiError, hasRecentSimilarError, dismissResolvedErrors } from '../er
 
 const logger = createChildLogger('lldap')
 
+/**
+ * How long one LLDAP request may take. Every call had no limit, so a server
+ * that accepted the connection and never answered held the email import's job
+ * slot, and now the account drift report's request, open indefinitely. LLDAP
+ * answers a whole directory in well under a second.
+ */
+export const LLDAP_REQUEST_TIMEOUT_MS = 20_000
+
 function normalizeBaseUrl(url: string): string {
   return url.replace(/\/+$/, '')
 }
@@ -66,6 +74,7 @@ export async function authenticateLldap(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
+      signal: AbortSignal.timeout(LLDAP_REQUEST_TIMEOUT_MS),
     })
 
     if (!response.ok) {
@@ -96,8 +105,8 @@ export interface LldapUserNode {
   email: string
 }
 
-interface LldapGraphqlResponse {
-  data?: { users?: LldapUserNode[] }
+interface LldapGraphqlResponse<T> {
+  data?: { users?: T[] }
   errors?: Array<{ message: string }>
 }
 
@@ -110,6 +119,40 @@ export async function fetchLldapUserEmails(
   baseUrl: string,
   token: string
 ): Promise<LldapResult<{ users: LldapUserNode[] }>> {
+  return queryLldapUsers<LldapUserNode>(baseUrl, token, '{ users { id email } }')
+}
+
+/** One LLDAP account as the account drift report shows it. */
+export interface LldapDirectoryUser {
+  id: string
+  email: string
+  displayName: string
+  creationDate: string
+  groups: Array<{ displayName: string }>
+}
+
+/**
+ * Every LLDAP account with what an admin needs to recognise it: display name,
+ * creation date and groups (a group is often what decides whether the media
+ * server lets someone sign in at all). A separate query from the email
+ * import's, so a field an older LLDAP lacks can only fail the report.
+ */
+export async function fetchLldapDirectory(
+  baseUrl: string,
+  token: string
+): Promise<LldapResult<{ users: LldapDirectoryUser[] }>> {
+  return queryLldapUsers<LldapDirectoryUser>(
+    baseUrl,
+    token,
+    '{ users { id email displayName creationDate groups { displayName } } }'
+  )
+}
+
+async function queryLldapUsers<T>(
+  baseUrl: string,
+  token: string,
+  graphql: string
+): Promise<LldapResult<{ users: T[] }>> {
   const url = `${normalizeBaseUrl(baseUrl)}/api/graphql`
 
   try {
@@ -119,7 +162,8 @@ export async function fetchLldapUserEmails(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ query: '{ users { id email } }' }),
+      body: JSON.stringify({ query: graphql }),
+      signal: AbortSignal.timeout(LLDAP_REQUEST_TIMEOUT_MS),
     })
 
     if (!response.ok) {
@@ -128,7 +172,7 @@ export async function fetchLldapUserEmails(
       return { ok: false, error: `LLDAP query failed (HTTP ${response.status})` }
     }
 
-    const data = (await response.json()) as LldapGraphqlResponse
+    const data = (await response.json()) as LldapGraphqlResponse<T>
     if (data.errors?.length) {
       const message = data.errors.map((e) => e.message).join('; ')
       logger.warn({ message }, 'LLDAP GraphQL query returned errors')

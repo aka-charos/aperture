@@ -47,6 +47,26 @@ Every email has an HTML version and a plain-text version with the same content, 
 
 Not decided here. Each user's address and opt-in live in their own settings (the **Email & Notifications** card on their settings' Preferences tab), shown only to users an admin has granted it on the Users page. The addresses come from the media server sync, from [LLDAP](lldap.md), or from the user. Each must be one plain address: a list, a display-name form or a typo with spaces is refused when typed in and skipped when imported.
 
+## Account Drift
+
+The **Account drift** card under the connection compares three lists, read live each time the page opens or **Check again** is pressed: the accounts on the media server, the accounts in LLDAP (when [LLDAP](lldap.md) is set up), and Aperture's own. Aperture takes its accounts from the media server, matched by account id, and each one's address from the LLDAP account with the same username, ignoring capitals. Removing someone from one of the three does not remove them from the others, and the Users page cannot show it, because it is drawn from the media server's own list.
+
+Each person is one row, with a chip per place they have an account (hover a chip for last activity, groups, or the address on file). **Out of step** is what needs a decision:
+
+| Finding | What it means |
+|---|---|
+| In LLDAP only | No media-server account and none in Aperture. If they were removed from the media server, remove them from LLDAP too. If the media server signs people in through LDAP, someone who has never signed in shows here as well. |
+| No longer on the media server | Aperture still has the account, and usually an address it could one day email. |
+| Still in LLDAP | Shown with the one above. With LDAP sign-in, they can sign in again and get a new account. |
+| Left over | The media server has a newer account with the same name, and the email import gives the old one the same address. |
+| No LLDAP account | On the media server with no LLDAP account of that name, so no address is imported for them. Common for a local admin account. |
+| Renamed | Renamed on the media server. Aperture keeps the old name until the person next signs in, and the email import looks them up under it. |
+| Unusable LLDAP address | LLDAP holds something that is not one plain address, so it is not imported. |
+
+**Notes** are the normal course of things: an account the next user sync will import, one disabled on the media server, an LLDAP account with no address, an address waiting for the next email import, or an address the person set themselves (kept over LLDAP's). The account Aperture itself uses to read LLDAP is named as a service account rather than reported.
+
+The card only reports; it changes nothing. If the media server cannot be read there is nothing to compare against and the card says so. If LLDAP cannot be read, the rest is still compared and nothing is said about LLDAP.
+
 ---
 
 **Related:** [LLDAP](lldap.md) · [User management](user-management.md) · [Integrations overview](integrations-overview.md)

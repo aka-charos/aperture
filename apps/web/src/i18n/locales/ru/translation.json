@@ -6081,5 +6081,72 @@
     "previewLanguage": "Language",
     "previewPlainText": "Plain-text version",
     "previewError": "Failed to render the preview"
+  },
+  "settingsAccountDrift": {
+    "title": "Account drift",
+    "description": "{{appName}} takes its accounts from {{provider}}, and each account's email address from the LLDAP account with the same username (capitals ignored). Removing someone from one of the three does not remove them from the others, so this compares them.",
+    "ldapNote": "If {{provider}} signs people in through LDAP, it usually creates their account the first time they sign in, so an LLDAP account nobody has used yet also shows as in LLDAP only.",
+    "refresh": "Check again",
+    "checking": "Comparing accounts…",
+    "checkedAt": "Checked {{when}}",
+    "loadError": "Could not compare accounts.",
+    "mediaServerFallback": "Media server",
+    "apertureName": "{{appName}}",
+    "source": {
+      "ok_one": "{{name}}: {{count}} account",
+      "ok_other": "{{name}}: {{count}} accounts",
+      "notConfigured": "{{name}}: not set up",
+      "failed": "{{name}}: could not be read"
+    },
+    "mediaServerNotConfigured": "The media server is not set up yet. {{appName}} takes its accounts from it, so there is nothing to compare.",
+    "mediaServerFailed": "{{provider}} could not be read, so there is nothing to compare against: {{error}}",
+    "lldapFailed": "LLDAP could not be read, so this says nothing about LLDAP accounts or the addresses imported from them: {{error}}",
+    "lldapNotConfigured": "LLDAP is not set up, so only {{provider}} and {{appName}} are compared.",
+    "filter": {
+      "warning": "Out of step ({{count}})",
+      "info": "Notes ({{count}})",
+      "inSync": "In step ({{count}})",
+      "all": "All ({{count}})"
+    },
+    "empty": {
+      "warning": "Nothing is out of step.",
+      "info": "Nothing to note.",
+      "inSync": "No account is in step everywhere yet.",
+      "all": "No accounts to compare."
+    },
+    "presence": {
+      "present": "Has an account in {{name}}",
+      "absent": "No account in {{name}}",
+      "unknown": "{{name}} was not read",
+      "disabled": "Disabled in {{name}}"
+    },
+    "detail": {
+      "lastActivity": "Last active {{when}}",
+      "neverActive": "Never active",
+      "admin": "Administrator",
+      "created": "Created {{when}}",
+      "groups": "Groups: {{list}}",
+      "noGroups": "In no group",
+      "address": "Address on file: {{email}}",
+      "noAddress": "No address on file",
+      "accessOn": "Access on",
+      "accessOff": "Access off"
+    },
+    "findings": {
+      "lldapOnly": "In LLDAP only: no {{provider}} account and none in {{appName}}. If they were removed from {{provider}}, remove them from LLDAP too.",
+      "lldapServiceAccount": "The account {{appName}} signs in to LLDAP with. A service account, so it needs no {{provider}} account.",
+      "goneFromMediaServer": "No longer on {{provider}}, but {{appName}} still has the account.",
+      "goneFromMediaServerWithEmail": "No longer on {{provider}}, but {{appName}} still has the account and its address, {{email}}.",
+      "replacedOnMediaServer": "Left over: {{provider}} has a newer account with this name, and the email import gives this one the same address.",
+      "stillInLldap": "Still in LLDAP. If {{provider}} signs people in through LDAP, they can sign in again and get a new account.",
+      "noLldapAccount": "No LLDAP account named {{name}}, so no address is imported for them.",
+      "renamedOnMediaServer": "Renamed on {{provider}} from {{oldName}}. {{appName}} keeps the old name until they next sign in, and the email import looks them up under it.",
+      "notImported": "Not in {{appName}} yet. The next user sync imports it.",
+      "disabledOnMediaServer": "Disabled on {{provider}}, still in LLDAP.",
+      "lldapEmailUnusable": "LLDAP has {{email}}, which is not one plain address, so it is not imported.",
+      "lldapNoEmail": "The LLDAP account has no email address.",
+      "emailPending": "LLDAP has {{email}}; the next email import copies it in.",
+      "emailOverridden": "Keeps the address they set themselves; LLDAP has {{email}}."
+    }
   }
 }

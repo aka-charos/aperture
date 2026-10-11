@@ -33,6 +33,8 @@ This only makes sense when **Emby/Jellyfin authenticates against the same LLDAP*
 
 There is no "sync now" button on the page — manual runs go through **Operations → Jobs → Sync LLDAP Emails**.
 
+To see which accounts this matching misses, and which LLDAP accounts no longer have a media-server account at all, use the **Account drift** card under [Outgoing email](smtp.md#account-drift).
+
 ---
 
 **Related:** [User management](user-management.md) · [Jobs overview](jobs-overview.md) · [API errors](api-errors.md)

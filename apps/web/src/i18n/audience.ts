@@ -86,6 +86,7 @@ export const ADMIN_ONLY_NAMESPACES: readonly string[] = [
   'jobsUi',
   'legacyLibraryOutput',
   'runningJobs',
+  'settingsAccountDrift',
   'settingsAiExplanation',
   'settingsAiSetup',
   'settingsApiKeys',
