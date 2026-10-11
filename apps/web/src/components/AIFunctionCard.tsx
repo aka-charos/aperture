@@ -57,6 +57,7 @@ import {
   reasoningEffortLabelKey,
   OPENROUTER_UPSTREAMS,
   type EmbeddingInputTypeValue,
+  type FallbackKeySlot,
   type FallbackModelConfig,
   type FlexTierInfo,
   type FunctionConfig,
@@ -443,13 +444,19 @@ export function AIFunctionCard({
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState(config?.baseUrl || '')
   const [showApiKey, setShowApiKey] = useState(false)
+  /**
+   * Whether the server holds a key for the provider being edited. The key
+   * itself never reaches the browser; an empty field means "use the saved one"
+   * for every action on this card. Null until the server has said.
+   */
+  const [savedKeyAvailable, setSavedKeyAvailable] = useState<boolean | null>(null)
   const [initialized, setInitialized] = useState(false)
 
   // Spare keys, tried in order when the one above runs out of quota. Seeded
   // from what is stored and sent back whole on every save, so editing one key
-  // cannot silently drop the others. Rendered as password fields — the values
-  // are real, not masked placeholders, which is what lets a save round-trip.
-  const [fallbackKeys, setFallbackKeys] = useState<string[]>([])
+  // cannot silently drop the others. A saved key is never sent to the browser:
+  // its slot carries only a hint, and is sent back as `{ keep: <position> }`.
+  const [fallbackKeys, setFallbackKeys] = useState<FallbackKeySlot[]>([])
   const [showFallbackKeys, setShowFallbackKeys] = useState(false)
   /** Whether the meter may assume Google's free-tier ceilings. See the checkbox below. */
   const [freeTier, setFreeTier] = useState(true)
@@ -556,13 +563,12 @@ export function AIFunctionCard({
     }
   }, [config, initialized])
 
-  // Reads the legacy single-key field too, so a role configured before the list
-  // existed shows its spare key rather than appearing to have none.
-  const storedFallbackKeys = useMemo(() => {
-    const list = config?.fallbackApiKeys ?? []
-    const legacy = config?.fallbackApiKey ? [config.fallbackApiKey] : []
-    return [...list, ...legacy].filter((k) => k.trim().length > 0)
-  }, [config?.fallbackApiKeys, config?.fallbackApiKey])
+  // One slot per saved spare key, in the server's order (which already folds in
+  // the legacy single-key field), so `{ keep: n }` names the key it was shown for.
+  const storedFallbackKeys = useMemo<FallbackKeySlot[]>(
+    () => (config?.fallbackKeyHints ?? []).map((hint, saved) => ({ saved, hint })),
+    [config?.fallbackKeyHints]
+  )
 
   useEffect(() => {
     setFallbackKeys(storedFallbackKeys)
@@ -751,18 +757,22 @@ export function AIFunctionCard({
       .finally(() => setLoadingProviders(false))
   }, [functionType, apiBase])
 
-  // Load saved credentials for current provider on mount (if no apiKey in config)
+  // Ask whether a key is saved for the current provider (never the key itself),
+  // and pick up its saved address when the field is empty.
   useEffect(() => {
-    if (!config?.apiKey && provider) {
-      fetch(`${apiBase}/credentials/${provider}`, { credentials: 'include' })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data?.apiKey) setApiKey(data.apiKey)
-          if (data?.baseUrl && !baseUrl) setBaseUrl(data.baseUrl)
-        })
-        .catch(() => {})
-    }
-  }, [apiBase, config?.apiKey, provider, baseUrl])
+    if (!provider) return
+    fetch(`${apiBase}/credentials/${provider}`, { credentials: 'include' })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data) return
+        // The role may hold its own key (a grounding role keeps it off the
+        // shared store), which counts only while the role is on this provider.
+        const ownKey = config?.provider === provider && config?.hasApiKey === true
+        setSavedKeyAvailable(data.hasApiKey === true || ownKey)
+        if (data.baseUrl && !baseUrl) setBaseUrl(data.baseUrl)
+      })
+      .catch(() => {})
+  }, [apiBase, config?.provider, config?.hasApiKey, provider, baseUrl])
 
   // Fetch models when provider changes
   useEffect(() => {
@@ -801,16 +811,18 @@ export function AIFunctionCard({
     // Fetch saved credentials for this provider
     try {
       const res = await fetch(`${apiBase}/credentials/${newProvider}`, { credentials: 'include' })
+      setApiKey('')
       if (res.ok) {
         const data = await res.json()
-        setApiKey(data.apiKey || '')
+        setSavedKeyAvailable(data.hasApiKey === true)
         setBaseUrl(data.baseUrl || PROVIDER_INFO[newProvider]?.defaultBaseUrl || '')
       } else {
-        setApiKey('')
+        setSavedKeyAvailable(false)
         setBaseUrl(PROVIDER_INFO[newProvider]?.defaultBaseUrl || '')
       }
     } catch {
       setApiKey('')
+      setSavedKeyAvailable(null)
       setBaseUrl(PROVIDER_INFO[newProvider]?.defaultBaseUrl || '')
     }
   }, [apiBase])
@@ -832,8 +844,13 @@ export function AIFunctionCard({
   const providerIsFixed = !loadingProviders && providers.length === 1
   const fixedProvider = providerIsFixed ? providers[0] : null
 
-  /** Spare keys worth exercising: whatever is in the boxes, blanks dropped. */
-  const effectiveFallbackKeys = fallbackKeys.map((k) => k.trim()).filter((k) => k.length > 0)
+  /**
+   * Spare keys worth exercising: every saved slot still listed, plus whatever
+   * was typed into a new one, blanks dropped.
+   */
+  const effectiveFallbackKeys = fallbackKeys.filter(
+    (slot) => 'saved' in slot || slot.value.trim().length > 0
+  )
 
   // The tier question is Google's alone: it is the only provider whose free
   // tier this app meters, and the only one the usage panel is drawn for. A
@@ -856,14 +873,19 @@ export function AIFunctionCard({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ baseUrl: baseUrl || undefined, apiKey: apiKey || undefined }),
+        // The role travels so the server can fall back to the key saved on it.
+        body: JSON.stringify({
+          baseUrl: baseUrl || undefined,
+          apiKey: apiKey || undefined,
+          function: functionType,
+        }),
       })
       if (!res.ok) return null
       return (await res.json()) as LmStudioStatus
     } catch {
       return null
     }
-  }, [apiBase, baseUrl, apiKey])
+  }, [apiBase, baseUrl, apiKey, functionType])
 
   const handleTest = async () => {
     setTesting(true)
@@ -891,7 +913,12 @@ export function AIFunctionCard({
       // `reportFlex` asks for the flex report, whose probe is a second paid
       // call — so only the primary key's test asks, never each spare key, and
       // never in the setup wizard, which draws no tier control.
-      const runTest = async (key: string | undefined, reportFlex: boolean) => {
+      // A key the operator typed is sent; a saved one is named by its slot and
+      // looked up by the server, since the browser never holds it.
+      const runTest = async (
+        key: { apiKey?: string; fallbackKeyIndex?: number },
+        reportFlex: boolean
+      ) => {
         const res = await fetch(`${apiBase}/test`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -900,7 +927,8 @@ export function AIFunctionCard({
             function: functionType,
             provider,
             model,
-            apiKey: key || undefined,
+            apiKey: key.apiKey || undefined,
+            fallbackKeyIndex: key.fallbackKeyIndex,
             baseUrl: baseUrl || undefined,
             ...(reportFlex && !isSetup ? { reportServiceTier: true } : {}),
           }),
@@ -908,7 +936,7 @@ export function AIFunctionCard({
         return (await res.json()) as TestResult
       }
 
-      const primary = await runTest(apiKey || undefined, true)
+      const primary = await runTest({ apiKey: apiKey || undefined }, true)
       if (!primary.success) {
         setTestResult(primary)
         return
@@ -928,8 +956,11 @@ export function AIFunctionCard({
       // out at the moment the main key runs out. Check them all here instead,
       // and stop at the first bad one so the message names a single fault.
       if (supportsFallbackKey) {
-        for (const [i, key] of effectiveFallbackKeys.entries()) {
-          const fallback = await runTest(key, false)
+        for (const [i, slot] of effectiveFallbackKeys.entries()) {
+          const fallback = await runTest(
+            'saved' in slot ? { fallbackKeyIndex: slot.saved } : { apiKey: slot.value.trim() },
+            false
+          )
           if (!fallback.success) {
             setTestResult({
               success: false,
@@ -959,7 +990,13 @@ export function AIFunctionCard({
       // Always sent whole for roles that offer it — the boxes were seeded from
       // what is stored, so a round-trip preserves keys the admin didn't touch,
       // and clearing them all is expressible as an empty array.
-      ...(supportsFallbackKey ? { fallbackApiKeys: effectiveFallbackKeys } : {}),
+      ...(supportsFallbackKey
+        ? {
+            fallbackApiKeys: effectiveFallbackKeys.map((slot) =>
+              'saved' in slot ? { keep: slot.saved } : slot.value.trim()
+            ),
+          }
+        : {}),
       // Only sent by the card that asks the question. Omitting it elsewhere is
       // what stops switching Title Analysis to a local model from silently
       // rewriting the tier it was told about its Google keys.
@@ -1015,10 +1052,9 @@ export function AIFunctionCard({
       await onSave(newConfig)
       setSuccess(t('aiFunctionCard.configSaved'))
       setApiKey('') // Clear for security
-      // Spare keys stay in the form on purpose: they are a list the admin
-      // manages, and blanking it after every save would make "how many do I
-      // have?" unanswerable without a reload.
-      setFallbackKeys(effectiveFallbackKeys)
+      // The parent reloads the config after a save and the spare-key slots are
+      // reseeded from the hints it returns, so saved keys stay listed and "how
+      // many do I have?" is answered without the keys themselves.
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('aiFunctionCard.failedToSave'))
@@ -1563,7 +1599,9 @@ export function AIFunctionCard({
           <TextField
             label={t('aiFunctionCard.apiKey')}
             type={showApiKey ? 'text' : 'password'}
-            value={apiKey || (isConfigured ? '••••••••••••••••' : '')}
+            // Dots stand for a key the server holds and the browser never sees;
+            // leaving them untouched keeps it.
+            value={apiKey || ((savedKeyAvailable ?? isConfigured) ? '••••••••••••••••' : '')}
             onChange={(e) => setApiKey(e.target.value.replace(/•/g, ''))}
             size="small"
             fullWidth
@@ -1598,15 +1636,19 @@ export function AIFunctionCard({
             one quota, so a "fallback" there buys nothing. */}
         {supportsFallbackKey && providerInfo?.requiresApiKey && (
           <Box sx={{ mb: 2 }}>
-            {fallbackKeys.map((key, i) => (
+            {fallbackKeys.map((slot, i) => (
               <TextField
-                key={i}
+                key={'saved' in slot ? `saved-${slot.saved}` : `new-${i}`}
                 label={t('aiFunctionCard.fallbackApiKeyNumbered', { number: i + 1 })}
-                type={showFallbackKeys ? 'text' : 'password'}
-                value={key}
+                // A saved key is shown by its hint and cannot be edited, only
+                // removed — the browser never holds it. Replace it by removing
+                // it and adding a new one.
+                type={'saved' in slot || showFallbackKeys ? 'text' : 'password'}
+                value={'saved' in slot ? t('aiFunctionCard.savedFallbackKey', { hint: slot.hint }) : slot.value}
                 onChange={(e) => {
+                  if ('saved' in slot) return
                   const next = [...fallbackKeys]
-                  next[i] = e.target.value
+                  next[i] = { value: e.target.value }
                   setFallbackKeys(next)
                 }}
                 size="small"
@@ -1614,11 +1656,14 @@ export function AIFunctionCard({
                 placeholder={t('aiFunctionCard.fallbackApiKeyPlaceholder')}
                 sx={{ mb: 1 }}
                 InputProps={{
+                  readOnly: 'saved' in slot,
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton onClick={() => setShowFallbackKeys(!showFallbackKeys)} size="small">
-                        {showFallbackKeys ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                      </IconButton>
+                      {!('saved' in slot) && (
+                        <IconButton onClick={() => setShowFallbackKeys(!showFallbackKeys)} size="small">
+                          {showFallbackKeys ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                        </IconButton>
+                      )}
                       <IconButton
                         onClick={() => setFallbackKeys(fallbackKeys.filter((_, j) => j !== i))}
                         size="small"
@@ -1634,7 +1679,7 @@ export function AIFunctionCard({
             <Button
               size="small"
               startIcon={<AddIcon />}
-              onClick={() => setFallbackKeys([...fallbackKeys, ''])}
+              onClick={() => setFallbackKeys([...fallbackKeys, { value: '' }])}
             >
               {t('aiFunctionCard.addFallbackKey')}
             </Button>

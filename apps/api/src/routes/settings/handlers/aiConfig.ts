@@ -99,6 +99,17 @@ import { query } from '../../../lib/db.js'
 import { requireAdmin, requireAuth } from '../../../plugins/auth.js'
 import { isGroundingRole, sharedCredentialUpdate } from '../../../lib/providerCredentials.js'
 import {
+  publicAIConfig,
+  publicRoleConfig,
+  resolveFallbackKeyEntries,
+  type FallbackKeyEntry,
+} from '../../../lib/secretExposure.js'
+import {
+  resolveTestCredentials,
+  storedApiKeyFor,
+  storedBaseUrlFor,
+} from '../../../lib/storedAiKey.js'
+import {
   aiConfigSchema,
   aiCapabilitiesSchema,
   aiFeaturesSchema,
@@ -140,7 +151,13 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       const promptVariants = BENCH_PROMPT_VARIANTS.filter(
         (variant) => libraryVariantFor(variant.id) != null
       ).map((variant) => ({ id: variant.id, label: variant.label, note: variant.note }))
-      return reply.send({ config, capabilities, promptVariants })
+      // Keys never leave the server: the card is told whether one is saved and
+      // a four-character hint per spare key (lib/secretExposure.ts).
+      return reply.send({
+        config: publicAIConfig(config, resolveFallbackKeys),
+        capabilities,
+        promptVariants,
+      })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to get AI config')
       return reply.status(500).send({ error: 'Failed to get AI configuration' })
@@ -200,7 +217,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
 
       await setAIConfig(newConfig)
       const capabilities = await getAICapabilitiesStatus()
-      return reply.send({ config: newConfig, capabilities })
+      return reply.send({ config: publicAIConfig(newConfig, resolveFallbackKeys), capabilities })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to update AI config')
       return reply.status(500).send({ error: 'Failed to update AI configuration' })
@@ -296,10 +313,12 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       const credentialsJson = await getSystemSetting('ai_provider_credentials')
       const credentials = credentialsJson ? JSON.parse(credentialsJson) : {}
       const providerCreds = credentials[provider] || {}
-      
+
+      // Whether a key is saved, never the key: the card shows a placeholder and
+      // its actions ask the server to use the saved one (lib/storedAiKey.ts).
       return reply.send({
         provider,
-        apiKey: providerCreds.apiKey || '',
+        hasApiKey: !!providerCreds.apiKey,
         baseUrl: providerCreds.baseUrl || '',
       })
     } catch (err) {
@@ -423,16 +442,11 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         }
 
         // Fall back to what is saved, so the button also works on a card the
-        // operator has not touched this visit.
-        let url = baseUrl
-        let key = apiKey
-        if (!url || !key) {
-          const saved = await getFunctionConfig(fn)
-          if (saved && saved.provider === provider) {
-            url = url || saved.baseUrl
-            key = key || saved.apiKey
-          }
-        }
+        // operator has not touched this visit. The browser never holds a saved
+        // key, so the saved one is used here — but only for the address it was
+        // saved for (lib/storedAiKey.ts).
+        const url = baseUrl || (await storedBaseUrlFor(fn, provider as ProviderType))
+        const key = apiKey || (await storedApiKeyFor(fn, provider as ProviderType, baseUrl))
 
         const result = await discoverLocalModels(provider, fn, url, key)
         if (!result) {
@@ -456,21 +470,19 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
    * especially from a container, where the usual faults are an unresolvable
    * host or a closed port rather than anything about a model.
    */
-  fastify.post<{ Body: { baseUrl?: string; apiKey?: string } }>(
+  fastify.post<{ Body: { baseUrl?: string; apiKey?: string; function?: string } }>(
     '/api/settings/ai/lmstudio/status',
     { preHandler: requireAdmin, schema: lmStudioStatusSchema },
     async (request, reply) => {
       try {
         const { baseUrl, apiKey } = request.body ?? {}
-        let url = baseUrl
-        let key = apiKey
-        if (!url || !key) {
-          const saved = await getFunctionConfig('textGeneration')
-          if (saved?.provider === 'lmstudio') {
-            url = url || saved.baseUrl
-            key = key || saved.apiKey
-          }
-        }
+        // The card names its role; an older client that does not is read as
+        // Text Generation, which is what this route assumed before.
+        const fn: AIFunction = isAIFunction(request.body?.function ?? '')
+          ? (request.body!.function as AIFunction)
+          : 'textGeneration'
+        const url = baseUrl || (await storedBaseUrlFor(fn, 'lmstudio'))
+        const key = apiKey || (await storedApiKeyFor(fn, 'lmstudio', baseUrl))
         return reply.send(await probeLmStudioServer(url, key))
       } catch (err) {
         fastify.log.error({ err }, 'Failed to probe LM Studio')
@@ -490,6 +502,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       model: string
       baseUrl?: string
       apiKey?: string
+      function?: string
       contextLength?: number
       flashAttention?: boolean
       evalBatchSize?: number
@@ -501,9 +514,11 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
     { preHandler: requireAdmin, schema: lmStudioLoadSchema },
     async (request, reply) => {
       try {
-        const { model, baseUrl, apiKey, ...options } = request.body
+        const { model, baseUrl, apiKey, function: role, ...options } = request.body
         if (!model) return reply.status(400).send({ error: 'model is required' })
-        return reply.send(await loadLmStudioModel(model, baseUrl, apiKey, options))
+        const fn: AIFunction = isAIFunction(role ?? '') ? (role as AIFunction) : 'textGeneration'
+        const key = apiKey || (await storedApiKeyFor(fn, 'lmstudio', baseUrl))
+        return reply.send(await loadLmStudioModel(model, baseUrl, key, options))
       } catch (err) {
         fastify.log.error({ err }, 'Failed to load an LM Studio model')
         return reply.status(500).send({ error: 'Failed to load the model' })
@@ -891,26 +906,32 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       model: string
       apiKey?: string
       baseUrl?: string
+      /**
+       * Test the saved spare key at this position instead of the primary. The
+       * browser never holds saved keys, so it names the slot it is testing.
+       */
+      fallbackKeyIndex?: number
       /** Ask for the flex report too (see core's `serviceTierReport`). */
       reportServiceTier?: boolean
     }
   }>('/api/settings/ai/test', { preHandler: requireAdmin, schema: testAiProviderSchema }, async (request, reply) => {
     try {
-      const { function: fn, provider, model, apiKey, baseUrl, reportServiceTier } = request.body
+      const { function: fn, provider, model, apiKey, baseUrl, fallbackKeyIndex, reportServiceTier } = request.body
 
       if (!fn || !provider || !model) {
         return reply.status(400).send({ error: 'function, provider, and model are required' })
       }
-
-      let testApiKey = apiKey
-      let testBaseUrl = baseUrl
-      if (!testApiKey || !testBaseUrl) {
-        const savedConfig = await getFunctionConfig(fn as AIFunction)
-        if (savedConfig && savedConfig.provider === provider) {
-          testApiKey = testApiKey || savedConfig.apiKey
-          testBaseUrl = testBaseUrl || savedConfig.baseUrl
-        }
+      if (!isAIFunction(fn)) {
+        return reply.status(400).send({ error: `Invalid function. Must be one of: ${AI_FUNCTIONS.join(', ')}` })
       }
+
+      const resolved = await resolveTestCredentials(fn, provider as ProviderType, {
+        apiKey,
+        baseUrl,
+        fallbackKeyIndex,
+      })
+      if ('error' in resolved) return reply.send({ success: false, error: resolved.error })
+      const { apiKey: testApiKey, baseUrl: testBaseUrl } = resolved
 
       const result = await testProviderConnection(
         {
@@ -940,7 +961,8 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       model: string
       apiKey?: string
       baseUrl?: string
-      fallbackApiKeys?: string[]
+      /** New keys as strings; a saved key the card kept as `{ keep: <its position> }`. */
+      fallbackApiKeys?: FallbackKeyEntry[]
       freeTier?: boolean
       fallbackModels?: { provider: string; model: string }[]
       callSpacingSeconds?: number
@@ -1013,12 +1035,19 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       const nextApiKey = apiKey ?? (grounding ? existing?.apiKey : undefined)
 
       // Fallback keys live only here, so an omitted field means "leave alone"
-      // and only an explicit empty array clears them.
+      // and only an explicit empty array clears them. The card never holds a
+      // saved key, so it keeps one by naming its position (`{ keep: n }`) —
+      // honoured only while the role stays on the provider the key was saved
+      // for, since a Google key kept across a switch would be sent to the new
+      // provider.
       const nextFallbackKeys =
         fallbackApiKeys === undefined
           ? (existing?.fallbackApiKeys ??
             (existing?.fallbackApiKey ? [existing.fallbackApiKey] : undefined))
-          : fallbackApiKeys.map((k) => k.trim()).filter((k) => k.length > 0)
+          : resolveFallbackKeyEntries(
+              Array.isArray(fallbackApiKeys) ? fallbackApiKeys : [],
+              existing && existing.provider === provider ? resolveFallbackKeys(existing) : []
+            )
 
       // Same rule as the keys, for the same reason: the flag lives only here,
       // so an omitted field means "leave alone". Unlike the keys it is stored
@@ -1329,7 +1358,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       })
 
       const config = await getFunctionConfig(fn)
-      return reply.send({ config })
+      return reply.send({ config: publicRoleConfig(config, resolveFallbackKeys) })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to update AI function config')
       return reply.status(500).send({ error: 'Failed to update AI function configuration' })

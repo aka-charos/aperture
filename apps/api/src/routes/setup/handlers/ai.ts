@@ -21,10 +21,13 @@ import {
   VALID_EMBEDDING_DIMENSIONS,
   AI_FUNCTIONS,
   isAIFunction,
+  resolveFallbackKeys,
   type AIFunction,
   type ProviderType,
 } from '@aperture/core'
 import { setupSchemas } from '../schemas.js'
+import { publicRoleConfig } from '../../../lib/secretExposure.js'
+import { resolveTestCredentials, storedApiKeyFor, storedBaseUrlFor } from '../../../lib/storedAiKey.js'
 import { requireSetupWritable } from './status.js'
 
 export async function registerAIHandlers(fastify: FastifyInstance) {
@@ -118,15 +121,10 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
           return reply.status(400).send({ error: `${provider} does not publish an installed-model list` })
         }
 
-        let url = baseUrl
-        let key = apiKey
-        if (!url || !key) {
-          const saved = await getFunctionConfig(fn)
-          if (saved && saved.provider === provider) {
-            url = url || saved.baseUrl
-            key = key || saved.apiKey
-          }
-        }
+        // The saved key, never sent to the browser, is used only for the
+        // address it was saved for (lib/storedAiKey.ts).
+        const url = baseUrl || (await storedBaseUrlFor(fn, provider as ProviderType))
+        const key = apiKey || (await storedApiKeyFor(fn, provider as ProviderType, baseUrl))
 
         const result = await discoverLocalModels(provider, fn, url, key)
         if (!result) {
@@ -250,9 +248,10 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
         const credentials = credentialsJson ? JSON.parse(credentialsJson) : {}
         const providerCreds = credentials[provider] || {}
 
+        // Whether a key is saved, never the key (lib/secretExposure.ts).
         return reply.send({
           provider,
-          apiKey: providerCreds.apiKey || '',
+          hasApiKey: !!providerCreds.apiKey,
           baseUrl: providerCreds.baseUrl || '',
         })
       } catch (err) {
@@ -281,7 +280,7 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
         }
 
         const config = await getFunctionConfig(fn)
-        return reply.send({ config })
+        return reply.send({ config: publicRoleConfig(config, resolveFallbackKeys) })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to get AI function config')
         return reply.status(500).send({ error: 'Failed to get AI function configuration' })
@@ -315,15 +314,13 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
           return reply.status(400).send({ error: 'function, provider, and model are required' })
         }
 
-        let testApiKey = apiKey
-        let testBaseUrl = baseUrl
-        if (!testApiKey || !testBaseUrl) {
-          const savedConfig = await getFunctionConfig(fn as AIFunction)
-          if (savedConfig && savedConfig.provider === provider) {
-            testApiKey = testApiKey || savedConfig.apiKey
-            testBaseUrl = testBaseUrl || savedConfig.baseUrl
-          }
+        if (!isAIFunction(fn)) {
+          return reply.status(400).send({ error: `Invalid function. Must be one of: ${AI_FUNCTIONS.join(', ')}` })
         }
+
+        const resolved = await resolveTestCredentials(fn, provider as ProviderType, { apiKey, baseUrl })
+        if ('error' in resolved) return reply.send({ success: false, error: resolved.error })
+        const { apiKey: testApiKey, baseUrl: testBaseUrl } = resolved
 
         const result = await testProviderConnection(
           {
@@ -386,7 +383,7 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
         })
 
         const config = await getFunctionConfig(fn)
-        return reply.send({ config })
+        return reply.send({ config: publicRoleConfig(config, resolveFallbackKeys) })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to update AI function config')
         return reply.status(500).send({ error: 'Failed to update AI function configuration' })

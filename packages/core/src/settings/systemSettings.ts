@@ -1,6 +1,7 @@
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { validateServerUrl } from './validateServerUrl.js'
+import { loggableSettingValue } from './settingLog.js'
 import {
   APP_LOCALE_OPTIONS,
   DEFAULT_LOCALE,
@@ -10,33 +11,6 @@ import {
 } from '../lib/locales.js'
 
 const logger = createChildLogger('system-settings')
-
-// Keys that contain sensitive data and should be redacted in logs
-const SENSITIVE_SETTING_KEYS = new Set([
-  'media_server_api_key',
-  'openai_api_key',
-  'tmdb_api_key',
-  'omdb_api_key',
-  'trakt_client_secret',
-  // JSON blobs containing embedded secrets (API keys, auth header values)
-  'ai_config',
-  'ai_provider_credentials',
-  'n8n_integration',
-  'tavily_integration',
-])
-
-/**
- * Check if a setting key contains sensitive data that should be redacted
- */
-function isSensitiveSetting(key: string): boolean {
-  return (
-    SENSITIVE_SETTING_KEYS.has(key) ||
-    key.includes('api_key') ||
-    key.includes('secret') ||
-    key.includes('password') ||
-    key.includes('token')
-  )
-}
 
 export interface SystemSetting {
   key: string
@@ -94,8 +68,9 @@ export async function setSystemSetting(
        updated_at = NOW()`,
     [key, value, description ?? null]
   )
-  const logValue = isSensitiveSetting(key) ? '[REDACTED]' : value
-  logger.info({ key, value: logValue }, 'System setting updated')
+  // Never trust the key name alone: see settingLog.ts for the four integration
+  // blobs whose passwords and API keys that rule printed at info level.
+  logger.info({ key, value: loggableSettingValue(key, value) }, 'System setting updated')
 }
 
 /**

@@ -1352,6 +1352,7 @@
     "fallbackApiKey": "Fallback API Key",
     "fallbackApiKeyNumbered": "Spare API key {{number}}",
     "fallbackApiKeyPlaceholder": "Optional spare key",
+    "savedFallbackKey": "Saved key {{hint}}",
     "fallbackApiKeyHelp": "Used automatically, in order, when the key above runs out of quota. Each spare must come from a different Google project — keys on the same project share one limit, so a spare there buys nothing.",
     "addFallbackKey": "Add spare key",
     "removeFallbackKey": "Remove this spare key",

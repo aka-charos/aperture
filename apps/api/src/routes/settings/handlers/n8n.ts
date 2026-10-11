@@ -15,6 +15,15 @@ import {
   type N8nWebhookConfig,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
+import { publicWebhook, withStoredAuthHeader } from '../../../lib/secretExposure.js'
+
+/** The config as the card may see it: each webhook without its auth header value. */
+function publicN8nConfig(config: N8nIntegrationConfig) {
+  return {
+    searchTool: publicWebhook(config.searchTool),
+    preProcess: publicWebhook(config.preProcess),
+  }
+}
 
 function validateWebhook(name: string, webhook: N8nWebhookConfig | null): string | null {
   if (!webhook) return null
@@ -47,7 +56,7 @@ export function registerN8nHandlers(fastify: FastifyInstance) {
   fastify.get('/api/settings/n8n', { preHandler: requireAdmin, schema: { tags: ['settings'] } }, async (_request, reply) => {
     try {
       const config = await getN8nConfig()
-      return reply.send({ config })
+      return reply.send({ config: publicN8nConfig(config) })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to get n8n config')
       return reply.status(500).send({ error: 'Failed to get n8n configuration' })
@@ -67,9 +76,18 @@ export function registerN8nHandlers(fastify: FastifyInstance) {
       const currentConfig = await getN8nConfig()
       const updates = request.body
 
+      // The card never receives the saved header value, so a webhook arriving
+      // without one keeps the saved value — to the same URL under the same
+      // header name only (lib/secretExposure.ts).
       const newConfig: N8nIntegrationConfig = {
-        searchTool: updates.searchTool !== undefined ? updates.searchTool : currentConfig.searchTool,
-        preProcess: updates.preProcess !== undefined ? updates.preProcess : currentConfig.preProcess,
+        searchTool:
+          updates.searchTool !== undefined
+            ? (withStoredAuthHeader(updates.searchTool, currentConfig.searchTool) ?? null)
+            : currentConfig.searchTool,
+        preProcess:
+          updates.preProcess !== undefined
+            ? (withStoredAuthHeader(updates.preProcess, currentConfig.preProcess) ?? null)
+            : currentConfig.preProcess,
       }
 
       const validationError =
@@ -80,7 +98,7 @@ export function registerN8nHandlers(fastify: FastifyInstance) {
       }
 
       await setN8nConfig(newConfig)
-      return reply.send({ config: newConfig })
+      return reply.send({ config: publicN8nConfig(newConfig) })
     } catch (err) {
       fastify.log.error({ err }, 'Failed to update n8n config')
       return reply.status(500).send({ error: 'Failed to update n8n configuration' })
@@ -104,7 +122,8 @@ export function registerN8nHandlers(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'target must be searchTool or preProcess' })
       }
 
-      const webhook = config ?? (await getN8nConfig())[target]
+      const stored = (await getN8nConfig())[target]
+      const webhook = config ? withStoredAuthHeader(config, stored) : stored
       if (!webhook?.webhookUrl) {
         return reply.status(400).send({ error: 'No webhook URL configured for this target' })
       }

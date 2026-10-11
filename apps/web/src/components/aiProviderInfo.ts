@@ -22,6 +22,12 @@ export interface ProviderInfo {
   logoPath?: string
 }
 
+/**
+ * One spare-key field on a role card: a key the server holds, shown by its hint
+ * and sent back as `{ keep: saved }`, or a key typed in this visit.
+ */
+export type FallbackKeySlot = { saved: number; hint: string } | { value: string }
+
 export interface FunctionConfig {
   provider: ProviderType
   model: string
@@ -37,9 +43,18 @@ export interface FunctionConfig {
    * Each key should belong to a separate provider project — two keys on one
    * project share a quota, so the second buys nothing.
    */
-  fallbackApiKeys?: string[]
-  /** @deprecated Superseded by {@link fallbackApiKeys}; still read, never written. */
-  fallbackApiKey?: string
+  fallbackApiKeys?: Array<string | { keep: number }>
+  /**
+   * Received, never sent: whether the role holds its own key. The server never
+   * returns a key — not this one, not a shared one, not a spare.
+   */
+  hasApiKey?: boolean
+  /**
+   * Received, never sent: one hint per saved spare key (its last four
+   * characters, or '…' for a short key), in the order a save names them with
+   * `{ keep: <position> }` in `fallbackApiKeys`.
+   */
+  fallbackKeyHints?: string[]
   /**
    * Whether this role's Google keys are on the free tier. Only affects what the
    * usage meter may assume: on, the shipped free-tier ceilings give the bars a

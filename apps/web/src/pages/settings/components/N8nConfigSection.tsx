@@ -28,6 +28,12 @@ interface WebhookFormState {
   webhookUrl: string
   authHeaderName: string
   authHeaderValue: string
+  /**
+   * A value is saved on the server. The value itself is never sent to the
+   * browser; leaving the field blank keeps it, as long as the URL and header
+   * name are unchanged.
+   */
+  hasSavedAuthValue: boolean
   timeoutMs: string
 }
 
@@ -36,6 +42,7 @@ interface WebhookApiConfig {
   webhookUrl: string
   authHeaderName?: string
   authHeaderValue?: string
+  hasAuthHeaderValue?: boolean
   timeoutMs?: number
 }
 
@@ -44,6 +51,7 @@ const EMPTY_FORM: WebhookFormState = {
   webhookUrl: '',
   authHeaderName: '',
   authHeaderValue: '',
+  hasSavedAuthValue: false,
   timeoutMs: '',
 }
 
@@ -53,7 +61,8 @@ function toForm(config: WebhookApiConfig | null): WebhookFormState {
     enabled: config.enabled,
     webhookUrl: config.webhookUrl || '',
     authHeaderName: config.authHeaderName || '',
-    authHeaderValue: config.authHeaderValue || '',
+    authHeaderValue: '',
+    hasSavedAuthValue: config.hasAuthHeaderValue === true,
     timeoutMs: config.timeoutMs ? String(config.timeoutMs) : '',
   }
 }
@@ -129,6 +138,7 @@ function WebhookBlock({ icon, title, caption, form, onChange, onTest, testing }:
             onChange={(e) => onChange({ ...form, authHeaderValue: e.target.value })}
             size="small"
             fullWidth
+            placeholder={form.hasSavedAuthValue ? 'Saved — leave blank to keep' : undefined}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">

@@ -198,7 +198,8 @@ async function mdblistRequest<T>(
     url = new URL(`${MDBLIST_API_BASE_URL}${endpoint}?apikey=${apiKey}`)
   }
 
-  logger.debug({ url: url.toString() }, 'MDBList API request')
+  // The endpoint, never the URL: MDBList takes its key as a query parameter.
+  logger.debug({ endpoint }, 'MDBList API request')
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     await rateLimit()
@@ -605,7 +606,7 @@ export async function getMediaInfoByTmdbBatch(
 
     try {
       const url = `${MDBLIST_API_BASE_URL}/tmdb/${mediaType}?apikey=${apiKey}`
-      logger.debug({ url, batchSize: batch.length }, 'MDBList batch POST request')
+      logger.debug({ mediaType, batchSize: batch.length }, 'MDBList batch POST request')
 
       // API expects { ids: ["id1", "id2"], append_to_response: [...] }
       const requestBody = {

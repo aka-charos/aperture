@@ -19,6 +19,7 @@ import { startJob } from '../../jobs/startJob.js'
 import { setupSchemas } from '../schemas.js'
 import { requireSetupWritable } from './status.js'
 import type { SetupProgressBody } from './status.js'
+import { publicMediaServerConfig } from '../../../lib/secretExposure.js'
 
 export async function registerAdminHandlers(fastify: FastifyInstance) {
   /**
@@ -112,7 +113,8 @@ export async function registerAdminHandlers(fastify: FastifyInstance) {
       return reply.send({
         progress,
         snapshot: {
-          mediaServer: mediaServerConfig,
+          // The media server admin key never leaves the server; the wizard shows a hint.
+          mediaServer: publicMediaServerConfig(mediaServerConfig),
           openai: { configured: hasOpenAI },
           libraries,
           topPicks,

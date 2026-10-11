@@ -165,11 +165,13 @@ export function useSetupWizard(): SetupWizardContext {
 
         // Set existing media server config if configured
         const ms = data?.snapshot?.mediaServer
-        if (ms?.isConfigured && ms.type && ms.baseUrl && ms.apiKey) {
+        // The key itself never reaches the browser; the server sends whether
+        // one is saved and its last four characters.
+        if (ms?.isConfigured && ms.type && ms.baseUrl && ms.hasApiKey) {
           setExistingMediaServer({
             type: ms.type,
             baseUrl: ms.baseUrl,
-            maskedApiKey: `${ms.apiKey.slice(0, 4)}...${ms.apiKey.slice(-4)}`,
+            maskedApiKey: ms.apiKeyHint ?? '••••',
           })
           setServerType(ms.type)
           setServerUrl(ms.baseUrl)
