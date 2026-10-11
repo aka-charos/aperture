@@ -8,6 +8,7 @@ import {
   publicRoleConfig,
   publicWebhook,
   resolveFallbackKeyEntries,
+  savedSecretFor,
   storedKeyMayGoTo,
   withStoredAuthHeader,
 } from './secretExposure.js'
@@ -74,6 +75,17 @@ test('a stored key may go only to the address it was saved for', () => {
   assert.ok(!storedKeyMayGoTo('https://attacker.example/v1', allowed))
   assert.ok(!storedKeyMayGoTo('http://lmstudio:1234/v2', allowed), 'a different path is a different endpoint')
   assert.ok(!storedKeyMayGoTo('https://anything.example', []), 'nothing saved admits no address')
+})
+
+test('a saved credential for a Test button follows the saved address only', () => {
+  const saved = 'http://lldap:17170'
+  assert.equal(savedSecretFor(undefined, saved, 'admin-pw'), 'admin-pw', 'no address means the saved one')
+  assert.equal(savedSecretFor('', saved, 'admin-pw'), 'admin-pw')
+  assert.equal(savedSecretFor('http://LLDAP:17170/', saved, 'admin-pw'), 'admin-pw')
+  assert.equal(savedSecretFor('https://attacker.example', saved, 'admin-pw'), undefined)
+  assert.equal(savedSecretFor('https://lldap:17170', saved, 'admin-pw'), undefined, 'a scheme change is a new address')
+  assert.equal(savedSecretFor('http://lldap:17170', null, 'admin-pw'), undefined, 'nothing saved admits nothing typed')
+  assert.equal(savedSecretFor(undefined, saved, ''), undefined)
 })
 
 test('normalizeEndpoint keeps the path and query, folds only what is case-insensitive', () => {

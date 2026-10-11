@@ -22,6 +22,7 @@ import {
   type MediaServerType,
 } from '@aperture/core'
 import { requireAdmin, requireAuth } from '../../../plugins/auth.js'
+import { SAVED_SECRET_REFUSED, savedSecretFor } from '../../../lib/secretExposure.js'
 import {
   mediaServerInfoSchema,
   mediaServerConfigSchema,
@@ -263,7 +264,14 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
         const savedConfig = await getMediaServerConfig()
         testType = type || (savedConfig.type as MediaServerType) || undefined
         testBaseUrl = baseUrl || savedConfig.baseUrl || undefined
-        testApiKey = apiKey || savedConfig.apiKey || undefined
+        // The saved admin key goes only to the saved server address. The
+        // address comes from the form, and pointing it elsewhere used to send
+        // that server the media server's admin API key.
+        const savedKey = savedSecretFor(baseUrl, savedConfig.baseUrl, savedConfig.apiKey)
+        if (!apiKey && savedConfig.apiKey && !savedKey) {
+          return reply.status(400).send({ success: false, error: SAVED_SECRET_REFUSED })
+        }
+        testApiKey = apiKey || savedKey
       }
 
       if (!testType || !testBaseUrl || !testApiKey) {

@@ -156,6 +156,28 @@ export function storedKeyMayGoTo(
   return allowed.some((url) => !!url?.trim() && normalizeEndpoint(url) === target)
 }
 
+/**
+ * A saved secret for a Test button that also accepts a typed address: the
+ * secret, or undefined when the form names an address other than the saved one.
+ *
+ * The shape every integration with one server and one credential needs (LLDAP,
+ * fastCRW, the media server). Each Test route took the address from the form
+ * and the credential from storage, so pointing the form at any server sent it
+ * the saved LLDAP admin password, CRW key or media server admin key.
+ */
+export function savedSecretFor(
+  requestedUrl: string | null | undefined,
+  savedUrl: string | null | undefined,
+  savedSecret: string | null | undefined
+): string | undefined {
+  if (!savedSecret) return undefined
+  return storedKeyMayGoTo(requestedUrl, [savedUrl]) ? savedSecret : undefined
+}
+
+/** What a Test button says when it declined to send a saved credential. */
+export const SAVED_SECRET_REFUSED =
+  'The saved credential is only sent to the saved server address. Enter it again to test a different address.'
+
 // ---------------------------------------------------------------------------
 // n8n webhooks
 // ---------------------------------------------------------------------------

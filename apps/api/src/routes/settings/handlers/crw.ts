@@ -26,6 +26,7 @@ import {
   type RetrievalMode,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
+import { SAVED_SECRET_REFUSED, savedSecretFor } from '../../../lib/secretExposure.js'
 
 interface CrwUpdateBody {
   enabled?: boolean
@@ -288,12 +289,18 @@ export function registerCrwHandlers(fastify: FastifyInstance) {
           return reply.status(400).send({ error: 'No retrieval service URL configured' })
         }
 
+        // The saved key goes only to the saved address; a typed address with no
+        // typed key used to send this one wherever the form pointed.
+        const typedKey =
+          typeof provided.apiKey === 'string' && provided.apiKey.trim() ? provided.apiKey.trim() : ''
+        const savedKey = savedSecretFor(baseUrl, current.baseUrl, current.apiKey)
+        if (!typedKey && current.apiKey && !savedKey) {
+          return reply.send({ success: false, error: SAVED_SECRET_REFUSED })
+        }
+
         const result = await testCrwConnection({
           baseUrl,
-          apiKey:
-            typeof provided.apiKey === 'string' && provided.apiKey.trim()
-              ? provided.apiKey.trim()
-              : current.apiKey,
+          apiKey: typedKey || savedKey || '',
           maxResults: 1,
           maxContentChars: current.maxContentChars,
           timeoutMs: current.timeoutMs,

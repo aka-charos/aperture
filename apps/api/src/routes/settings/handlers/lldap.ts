@@ -13,6 +13,7 @@
 import type { FastifyInstance } from 'fastify'
 import { getLldapConfig, setLldapConfig, getLldapAdminPassword, testLldapConnection } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
+import { SAVED_SECRET_REFUSED, savedSecretFor } from '../../../lib/secretExposure.js'
 import { lldapConfigSchema, updateLldapConfigSchema, testLldapSchema } from '../schemas.js'
 
 export function registerLldapHandlers(fastify: FastifyInstance) {
@@ -57,7 +58,15 @@ export function registerLldapHandlers(fastify: FastifyInstance) {
       const saved = await getLldapConfig()
       const url = request.body?.url || saved.url
       const adminUsername = request.body?.adminUsername || saved.adminUsername
-      const adminPassword = request.body?.adminPassword || (await getLldapAdminPassword())
+      // The saved admin password goes only to the saved server: the URL comes
+      // from the form, and pointing it elsewhere used to send that server the
+      // password (lib/secretExposure.ts).
+      const savedPassword = savedSecretFor(request.body?.url, saved.url, await getLldapAdminPassword())
+      const adminPassword = request.body?.adminPassword || savedPassword
+
+      if (url && adminUsername && !adminPassword && !request.body?.adminPassword && saved.hasAdminPassword) {
+        return reply.send({ success: false, error: SAVED_SECRET_REFUSED })
+      }
 
       if (!url || !adminUsername || !adminPassword) {
         return reply.send({
