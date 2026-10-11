@@ -968,6 +968,18 @@ test('version 18 names the makers and stops naming the critics', () => {
   assert.equal(question('work'), current.movieQuestions.find((q) => q.id === 'work')!.text)
   assert.ok(question('work').includes('may be your own reading of what a document describes'))
   assert.ok(rulesText.includes('THESE NEVER EARN IT, in any answer'))
+
+  // A RELAXATION AIMED AT ONE NUMBER TRAVELS TO EVERY NUMBER PHRASED LIKE IT -
+  // which this file already records from version 18's length rule, and which
+  // the orientation fix then repeated inside the same version. "The year of the
+  // events a work engages belong" was added to a list that bans dates flatly,
+  // and the next bench produced a shooting-date range ("between late December
+  // 2023 and March 2024") and an awards list, neither of which version 17 wrote
+  // from the identical nine documents. So the exception carries its own fence.
+  assert.ok(rulesText.includes('THAT ONE YEAR AND NO OTHER'))
+  assert.ok(rulesText.includes('never a date from the making or the release'))
+  assert.ok(rulesText.includes('a release or shooting date'), 'and the list still bans both')
+  assert.ok(rulesText.includes('an award'))
 })
 
 /**
