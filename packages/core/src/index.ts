@@ -1167,6 +1167,9 @@ export {
   type SyncLldapEmailsResult,
 } from './lldap/index.js'
 
+// Outgoing email (SMTP)
+export * from './email/index.js'
+
 // Graph Playlists
 export {
   // AI generation

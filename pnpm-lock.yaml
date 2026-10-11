@@ -250,6 +250,9 @@ importers:
       ai-sdk-ollama:
         specifier: 2.2.0
         version: 2.2.0(ai@5.0.118(zod@3.25.76))(zod@3.25.76)
+      nodemailer:
+        specifier: ^10.0.16
+        version: 10.0.16
       openai:
         specifier: ^4.77.0
         version: 4.104.0(zod@3.25.76)
@@ -3073,6 +3076,10 @@ packages:
 
   node-releases@2.0.27:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
+
+  nodemailer@10.0.16:
+    resolution: {integrity: sha512-VL9xKErxN+el77o8eBOuYKUPMyEx7F9hfnDCuiUKJRp9v3wnWMOudYgP/SWbwSHy8rUL4cylobuXtki1LpQS7A==}
+    engines: {node: '>=20.0.0'}
 
   npm-run-path@6.0.0:
     resolution: {integrity: sha512-9qny7Z9DsQU8Ou39ERsPU4OZQlSTP47ShQzuKZ6PRXpYLtIFgl/DEBYEXKlvcEa+9tHVcK8CF81Y2V72qaZhWA==}
@@ -6846,6 +6853,8 @@ snapshots:
       whatwg-url: 5.0.0
 
   node-releases@2.0.27: {}
+
+  nodemailer@10.0.16: {}
 
   npm-run-path@6.0.0:
     dependencies:

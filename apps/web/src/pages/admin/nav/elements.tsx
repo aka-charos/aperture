@@ -15,6 +15,7 @@ import FactCheckIcon from '@mui/icons-material/FactCheck'
 import GavelIcon from '@mui/icons-material/Gavel'
 import FolderOpenIcon from '@mui/icons-material/FolderOpen'
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted'
+import ForwardToInboxIcon from '@mui/icons-material/ForwardToInbox'
 import GTranslateIcon from '@mui/icons-material/GTranslate'
 import HealingIcon from '@mui/icons-material/Healing'
 import HomeIcon from '@mui/icons-material/Home'
@@ -144,6 +145,13 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
     Component: section(
       () => import('@/pages/settings/components/LldapConfigSection'),
       'LldapConfigSection'
+    ),
+  },
+  smtp: {
+    icon: <ForwardToInboxIcon />,
+    Component: section(
+      () => import('@/pages/settings/components/SmtpConfigSection'),
+      'SmtpConfigSection'
     ),
   },
   n8n: {

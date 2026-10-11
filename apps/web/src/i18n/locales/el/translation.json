@@ -5260,6 +5260,10 @@
     "synopsisTranslation": {
       "title": "Synopsis translation",
       "blurb": "Machine-translate plots into the interface languages"
+    },
+    "smtp": {
+      "title": "Outgoing email",
+      "blurb": "The mail server {{appName}} sends email through"
     }
   },
   "settingsEvaluation": {
@@ -5913,5 +5917,122 @@
     "testAnalysisSections_one": "{{count}} paragraph back, but only in smaller requests: the one-request translation did not keep the paragraphs. The job does the same, at the cost of more requests and less context.",
     "testAnalysisSections_other": "{{count}} paragraphs back, but only in smaller requests: the one-request translation did not keep the paragraphs. The job does the same, at the cost of more requests and less context.",
     "sourceHelp": "Assumed for text in the Latin alphabet. Text written in another alphabet — a Greek plot, say — is detected, never translated into its own language, and translated into {{language}} as well, so a reader in {{language}} can read it too."
+  },
+  "settingsSmtp": {
+    "title": "Outgoing email (SMTP)",
+    "description": "The mail server {{appName}} sends email through. Nothing sends email yet: set the server up and test it here, and the notification features that come later will use it.",
+    "chipOn": "Sending on",
+    "chipOff": "Sending off",
+    "loadError": "Failed to load the email settings",
+    "saved": "Email settings saved",
+    "errSave": "Failed to save the email settings",
+    "errConnect": "The request failed. Check your connection and try again.",
+    "enabled": "Send email",
+    "enabledCaption": "Leave this off until a feature needs it. Testing works either way.",
+    "host": "Mail server",
+    "hostPlaceholder": "smtp.example.com",
+    "port": "Port",
+    "portHelper": "Usually {{port}}",
+    "security": "Security",
+    "securityMode": {
+      "starttls": "STARTTLS",
+      "tls": "SSL/TLS",
+      "none": "None"
+    },
+    "securityHelper": {
+      "starttls": "Connects, then switches to encryption before logging in. If the server cannot switch, the attempt stops and the password is never sent.",
+      "tls": "Encrypted from the first byte. Usually port 465.",
+      "none": "Nothing is encrypted. Only for a relay on the same machine or a network you trust."
+    },
+    "allowSelfSigned": "Accept a self-signed certificate",
+    "allowSelfSignedCaption": "The connection stays encrypted, but the server's identity is not checked. Only for a mail server you run yourself.",
+    "username": "Username",
+    "usernameHelper": "Leave blank if the server accepts mail without a login.",
+    "password": "Password",
+    "togglePassword": "Show or hide the password",
+    "passwordSaved": "A password is saved. Leave blank to keep it.",
+    "passwordOtherHost": "The saved password is only sent to {{host}}. Enter it again for this server.",
+    "plaintextWarning": "With no encryption, the username and password cross the network as plain text.",
+    "fromAddress": "From address",
+    "fromAddressPlaceholder": "media@example.com",
+    "fromAddressHelper": "Most providers only accept an address that belongs to the account you log in with.",
+    "fromName": "From name",
+    "fromNameHelper": "Leave blank to use {{name}}.",
+    "readyButOff": "These settings are complete. Switch on Send email when a feature needs it.",
+    "testConnection": "Test connection",
+    "testing": "Testing…",
+    "testOk": "Connected to {{host}} successfully.",
+    "sendTestTitle": "Send a test email",
+    "sendTestTo": "Send to",
+    "sendTest": "Send test email",
+    "sending": "Sending…",
+    "sendOk": "Test email sent to {{address}}. If it does not arrive, check the spam folder.",
+    "serverSaid": "Server said: {{detail}}",
+    "failure": {
+      "auth": {
+        "title": "The server refused the username or password.",
+        "hint": "Gmail, Outlook and iCloud need an app password here, not your normal one."
+      },
+      "authRequired": {
+        "title": "The server requires a login.",
+        "hint": "Enter a username and password."
+      },
+      "tlsUnavailable": {
+        "title": "The server does not offer STARTTLS, so nothing was sent, not even the password.",
+        "hint": "Try SSL/TLS on port 465. Choose None only for a server on a network you trust."
+      },
+      "tlsRequired": {
+        "title": "The server requires an encrypted connection.",
+        "hint": "Choose STARTTLS or SSL/TLS."
+      },
+      "tlsMismatch": {
+        "title": "The security setting does not match the port.",
+        "hint": "SSL/TLS is normally port 465, and STARTTLS port 587."
+      },
+      "tlsHandshake": {
+        "title": "The encrypted connection could not be set up.",
+        "hint": "Check the security setting. The server may only support an older encryption version."
+      },
+      "certificate": {
+        "title": "The server's certificate could not be verified.",
+        "hint": "Check that the mail server name matches its certificate. For a server you run yourself with a self-signed certificate, allow it above."
+      },
+      "dns": {
+        "title": "No server found at that name.",
+        "hint": "Check the spelling of the mail server."
+      },
+      "refused": {
+        "title": "Nothing accepted the connection on that port.",
+        "hint": "Check the port, and that the mail server is running."
+      },
+      "timeout": {
+        "title": "The server did not answer in time.",
+        "hint": "A firewall or the hosting provider may be blocking the port. Many block port 25."
+      },
+      "sender": {
+        "title": "The server refused the From address.",
+        "hint": "Most providers only accept an address that belongs to the account you log in with."
+      },
+      "recipient": {
+        "title": "The server refused the recipient address.",
+        "hint": "Check the address, or try another one."
+      },
+      "connection": {
+        "title": "The connection dropped.",
+        "hint": "Try again. If it keeps happening, check the security setting."
+      },
+      "disabled": {
+        "title": "Sending is switched off.",
+        "hint": "Switch on Send email and save."
+      },
+      "notConfigured": {
+        "title": "The email settings are incomplete.",
+        "hint": "Fill in the mail server and the From address."
+      },
+      "unknown": {
+        "title": "The test failed.",
+        "hint": "The server's own words are below."
+      }
+    }
   }
 }

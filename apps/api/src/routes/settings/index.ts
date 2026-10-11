@@ -22,6 +22,7 @@ import {
   registerAiConfigHandlers,
   registerIntegrationHandlers,
   registerLldapHandlers,
+  registerSmtpHandlers,
   registerTopPicksHandlers,
   registerAiOutputHandlers,
   registerLegacyLibraryOutputHandlers,
@@ -56,6 +57,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   registerAiConfigHandlers(fastify)
   registerIntegrationHandlers(fastify)
   registerLldapHandlers(fastify)
+  registerSmtpHandlers(fastify)
   registerTopPicksHandlers(fastify)
   registerAiOutputHandlers(fastify)
   registerLegacyLibraryOutputHandlers(fastify)

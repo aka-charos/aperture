@@ -16,6 +16,7 @@ Admin console → **Integrations** — one page per service:
 | **Trakt** | `/admin/integrations/trakt` | Per-user rating sync + Discovery chart sources |
 | **Seerr** | `/admin/integrations/seerr` | Requests, issue reporting, Top Picks auto-request |
 | **LLDAP** | `/admin/integrations/lldap` | Email address import for users |
+| **Outgoing email** | `/admin/integrations/smtp` | The SMTP server email is sent through (nothing sends yet) |
 | **n8n** | `/admin/integrations/n8n` | Webhook automation |
 | **Tavily** | `/admin/integrations/tavily` | Web search for the assistant's discovery turns |
 | **fastCRW** | `/admin/integrations/crw` | Self-hosted search/scrape for Title Analysis |

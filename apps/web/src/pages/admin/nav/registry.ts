@@ -237,6 +237,14 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     aliases: ['lldap', 'ldap', 'email', 'import', 'directory'],
   },
   {
+    id: 'smtp',
+    group: 'integrations',
+    segment: 'smtp',
+    titleKey: 'adminNav.smtp.title',
+    blurbKey: 'adminNav.smtp.blurb',
+    aliases: ['smtp', 'email', 'mail', 'outgoing', 'notifications', 'starttls', 'gmail', 'postfix'],
+  },
+  {
     id: 'n8n',
     group: 'integrations',
     segment: 'n8n',

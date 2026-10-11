@@ -161,7 +161,7 @@ Under **Admin console → Appearance → Language defaults**, the instance-wide 
 
 ### Admin Console Map
 
-Groups in the admin nav (one page per route): **Overview**, **Library** (Media server, Libraries, File locations, Gap analysis), **Integrations** (11 pages), **AI models** (Providers & roles, Embeddings, AI Spend, Cost estimate, Analysis bench), **Recommendations** (Algorithm, Evaluation, Explanations, Output format, Library naming, Top Picks, Shows You Watch, Discovery tuning, Genre strips, Channels web expand), **Appearance** (Branding, Theme colours, Poster display, Language defaults, Translations), **Access** (Users, API keys), **Operations** (Jobs, Backup & restore, Database, Poster repair).
+Groups in the admin nav (one page per route): **Overview**, **Library** (Media server, Libraries, File locations, Gap analysis), **Integrations** (12 pages), **AI models** (Providers & roles, Embeddings, AI Spend, Cost estimate, Analysis bench), **Recommendations** (Algorithm, Evaluation, Explanations, Output format, Library naming, Top Picks, Shows You Watch, Discovery tuning, Genre strips, Channels web expand), **Appearance** (Branding, Theme colours, Poster display, Language defaults, Translations), **Access** (Users, API keys), **Operations** (Jobs, Backup & restore, Database, Poster repair).
 
 ### Default Job Schedule (seeds)
 
@@ -227,6 +227,7 @@ All admin documentation files:
 - [admin/trakt.md](admin/trakt.md)
 - [admin/seerr.md](admin/seerr.md)
 - [admin/lldap.md](admin/lldap.md)
+- [admin/smtp.md](admin/smtp.md)
 - [admin/n8n.md](admin/n8n.md)
 - [admin/tavily.md](admin/tavily.md)
 - [admin/crw.md](admin/crw.md)
