@@ -7,10 +7,8 @@
 import { query, queryOne } from './db.js'
 import { auditUserPermissions, type PermissionActor } from '../permissionAudit.js'
 import { createChildLogger } from './logger.js'
-import {
-  isValidAppLocale,
-  type AppLocaleCode,
-} from './locales.js'
+import { type AppLocaleCode } from './locales.js'
+import { resolveAiLanguage, resolveUiLanguage } from './languagePreference.js'
 
 const logger = createChildLogger('user-settings')
 
@@ -94,7 +92,8 @@ export interface UserUiPreferences {
    */
   uiLanguage?: string | null
   /**
-   * BCP-47 locale for AI-generated synopsis/explanations. Omit or null to use system default.
+   * Locale AI writes to this viewer in (Watcher Identity, explanations, playlists, assistant).
+   * Omit or null to use the system default; `'app'` (AI_LANGUAGE_FOLLOWS_APP) follows the UI language.
    */
   aiLanguage?: string | null
 }
@@ -448,25 +447,18 @@ export async function updateUserUiPreferences(
  */
 export async function resolveEffectiveUiLanguage(userId: string): Promise<AppLocaleCode> {
   const { getSystemLanguageDefaults } = await import('../settings/systemSettings.js')
-  const prefs = await getUserUiPreferences(userId)
-  const system = await getSystemLanguageDefaults()
-  if (isValidAppLocale(prefs.uiLanguage) && system.enabledUiLanguages.includes(prefs.uiLanguage)) {
-    return prefs.uiLanguage
-  }
-  return system.defaultUiLanguage
+  const [prefs, system] = await Promise.all([getUserUiPreferences(userId), getSystemLanguageDefaults()])
+  return resolveUiLanguage(prefs.uiLanguage, system)
 }
 
 /**
- * Effective AI output locale: user override, else system default.
+ * Effective AI output locale: user override (which may be "same as the app"),
+ * else system default. See `languagePreference.ts`.
  */
 export async function resolveEffectiveAiLanguage(userId: string): Promise<AppLocaleCode> {
   const { getSystemLanguageDefaults } = await import('../settings/systemSettings.js')
-  const prefs = await getUserUiPreferences(userId)
-  const system = await getSystemLanguageDefaults()
-  if (isValidAppLocale(prefs.aiLanguage) && system.enabledAiLanguages.includes(prefs.aiLanguage)) {
-    return prefs.aiLanguage
-  }
-  return system.defaultAiLanguage
+  const [prefs, system] = await Promise.all([getUserUiPreferences(userId), getSystemLanguageDefaults()])
+  return resolveAiLanguage(prefs.aiLanguage, resolveUiLanguage(prefs.uiLanguage, system), system)
 }
 
 /**

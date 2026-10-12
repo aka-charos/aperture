@@ -557,6 +557,13 @@ export {
   buildAiLanguageInstruction,
   type AppLocaleCode,
 } from './lib/locales.js'
+export {
+  AI_LANGUAGE_FOLLOWS_APP,
+  resolveUiLanguage,
+  resolveAiLanguage,
+  languagePreferenceRefusal,
+  type LanguageDefaults,
+} from './lib/languagePreference.js'
 
 // User Settings
 export {

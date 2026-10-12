@@ -153,6 +153,9 @@ importers:
       ai:
         specifier: ^5.0.0
         version: 5.0.118(zod@3.25.76)
+      country-flag-icons:
+        specifier: 1.6.20
+        version: 1.6.20
       d3:
         specifier: ^7.9.0
         version: 7.9.0
@@ -2185,6 +2188,9 @@ packages:
   cosmiconfig@7.1.0:
     resolution: {integrity: sha512-AdmX6xUzdNASswsFtmwSt7Vj8po9IuqXm0UXz7QKPuEUmPB4XyjGfaAr2PSuELMwkRMVH1EpIkX5bTZGRB3eCA==}
     engines: {node: '>=10'}
+
+  country-flag-icons@1.6.20:
+    resolution: {integrity: sha512-py8JiEKzjhYw6HPJ0L7SxLgCYim36UPRTZX43/kqGueUCZLSvnrqAiwW8HtQibur7mdkFQUkjOgdK+o/9FBtaw==}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -5786,6 +5792,8 @@ snapshots:
       parse-json: 5.2.0
       path-type: 4.0.0
       yaml: 1.10.2
+
+  country-flag-icons@1.6.20: {}
 
   cross-spawn@7.0.6:
     dependencies:

@@ -88,7 +88,7 @@ Start here if you're new to Aperture:
 
 ### Language defaults (admin)
 
-Under **Admin console → Appearance → Language defaults**, the instance-wide default **UI language** and default **AI output language** (taste synopses, recommendation explanations, assistant replies, etc.) are set. Users can override both under **User Settings → Preferences → Language** (`uiLanguage` / `aiLanguage` in stored preferences; `null` means "use server default"). Supported locale codes match `APP_LOCALE_OPTIONS` in core: `en`, `es`, `de`, `fr`, `it`, `pt`, `nl`, `ru`, `ja`, `zh`, `ko`, `hi`, `ar`, `he`, `el`.
+Under **Admin console → Appearance → Language defaults**, the instance-wide default **app language** and default **language for AI-written text** (Watcher Identity, recommendation explanations, playlist text, assistant replies) are set, along with which languages people may choose for each. People choose their own from the **flag in the top bar**, beside their avatar: the app language applies at once, and AI-written text can follow the app, use the server default, or be a different language (Greek app, English AI text). Stored as `uiLanguage` / `aiLanguage` in the user's preferences: `null` means the server default, `aiLanguage: 'app'` means the same language as the app, and a language the admin has not enabled is refused. A changed AI language applies to text written from then on; existing explanations and identities are not rewritten. Supported locale codes match `APP_LOCALE_OPTIONS` in core: `en`, `es`, `de`, `fr`, `it`, `pt`, `nl`, `ru`, `ja`, `zh`, `ko`, `hi`, `ar`, `el`.
 
 ### Gap Analysis (admin)
 

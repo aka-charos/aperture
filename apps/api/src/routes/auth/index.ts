@@ -118,6 +118,24 @@ async function decidedCapabilities(user: SessionUser): Promise<Record<string, bo
 }
 
 /**
+ * The language facts a preferences response carries, all DECIDED here: which
+ * language the app is in, which one AI writes in, and which one it WOULD write
+ * in if the viewer chose "same as the app" — so the switcher can label that
+ * option truthfully without holding a copy of the rule.
+ */
+async function languageFacts(preferences: { uiLanguage?: string | null; aiLanguage?: string | null }) {
+  const { getSystemLanguageDefaults, resolveUiLanguage, resolveAiLanguage, AI_LANGUAGE_FOLLOWS_APP } =
+    await import('@aperture/core')
+  const defaults = await getSystemLanguageDefaults()
+  const effectiveUiLanguage = resolveUiLanguage(preferences.uiLanguage, defaults)
+  return {
+    effectiveUiLanguage,
+    effectiveAiLanguage: resolveAiLanguage(preferences.aiLanguage, effectiveUiLanguage, defaults),
+    aiLanguageFollowingApp: resolveAiLanguage(AI_LANGUAGE_FOLLOWS_APP, effectiveUiLanguage, defaults),
+  }
+}
+
+/**
  * What a person calls the media server: the admin's display name for it, else the
  * name the server reports, else its product name. Never throws — this words a
  * refusal, and a refusal that failed to render would read as a broken login.
@@ -393,23 +411,15 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/auth/me/preferences',
     { preHandler: requireAuth, schema: getPreferencesSchema },
     async (request, reply) => {
-      const {
-        getUserUiPreferences,
-        resolveEffectiveUiLanguage,
-        resolveEffectiveAiLanguage,
-        getPosterDisplayConfig,
-      } = await import('@aperture/core')
-      const uid = request.user!.id
-      const preferences = await getUserUiPreferences(uid)
-      const [effectiveUiLanguage, effectiveAiLanguage, posterDisplay] = await Promise.all([
-        resolveEffectiveUiLanguage(uid),
-        resolveEffectiveAiLanguage(uid),
+      const { getUserUiPreferences, getPosterDisplayConfig } = await import('@aperture/core')
+      const preferences = await getUserUiPreferences(request.user!.id)
+      const [languages, posterDisplay] = await Promise.all([
+        languageFacts(preferences),
         getPosterDisplayConfig(),
       ])
       return reply.send({
         ...preferences,
-        effectiveUiLanguage,
-        effectiveAiLanguage,
+        ...languages,
         posterRatingHiddenByDefault: posterDisplay.hideRatingBadgeByDefault,
       })
     }
@@ -426,6 +436,17 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       type UserUiPreferences = Awaited<ReturnType<typeof getUserUiPreferences>>
       const body = request.body as Partial<UserUiPreferences>
       
+      // A language the admin has not enabled is refused rather than stored:
+      // the resolver would ignore it, so the save would look made and do nothing.
+      if (body.uiLanguage !== undefined || body.aiLanguage !== undefined) {
+        const { getSystemLanguageDefaults, languagePreferenceRefusal } = await import('@aperture/core')
+        const defaults = await getSystemLanguageDefaults()
+        const refusal =
+          languagePreferenceRefusal('uiLanguage', body.uiLanguage, defaults) ??
+          languagePreferenceRefusal('aiLanguage', body.aiLanguage, defaults)
+        if (refusal) return reply.status(400).send({ error: refusal })
+      }
+
       const currentPrefs = await getUserUiPreferences(request.user!.id)
       const updates: Partial<UserUiPreferences> = { ...body }
       
@@ -444,18 +465,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       }
       
       const preferences = await updateUserUiPreferences(request.user!.id, updates)
-      const { resolveEffectiveUiLanguage, resolveEffectiveAiLanguage, getPosterDisplayConfig } =
-        await import('@aperture/core')
-      const uid = request.user!.id
-      const [effectiveUiLanguage, effectiveAiLanguage, posterDisplay] = await Promise.all([
-        resolveEffectiveUiLanguage(uid),
-        resolveEffectiveAiLanguage(uid),
+      const { getPosterDisplayConfig } = await import('@aperture/core')
+      const [languages, posterDisplay] = await Promise.all([
+        languageFacts(preferences),
         getPosterDisplayConfig(),
       ])
       return reply.send({
         ...preferences,
-        effectiveUiLanguage,
-        effectiveAiLanguage,
+        ...languages,
         posterRatingHiddenByDefault: posterDisplay.hideRatingBadgeByDefault,
       })
     }

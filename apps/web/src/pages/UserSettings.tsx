@@ -15,7 +15,6 @@ import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { WatcherIdentitySection } from './UserSettings/WatcherIdentitySection'
 import { GenreWeightingCard, type GenreWeightingUpdate } from './UserSettings/GenreWeightingCard'
 import { AlgorithmSettingsSection } from './UserSettings/AlgorithmSettingsSection'
-import { UserLanguagePreferencesCard } from './UserSettings/UserLanguagePreferencesCard'
 import { EmailNotificationsCard } from './UserSettings/EmailNotificationsCard'
 import { AiLibraryNamesCard } from './UserSettings/AiLibraryNamesCard'
 import { AiExplanationPreferenceCard } from './UserSettings/AiExplanationPreferenceCard'
@@ -249,9 +248,6 @@ export function UserSettingsPage() {
 
           <TabPanel value={tabValue} index={2}>
             <Grid container spacing={3}>
-              <Grid item xs={12} lg={6}>
-                <UserLanguagePreferencesCard />
-              </Grid>
               <Grid item xs={12} lg={6}>
                 <AiLibraryNamesCard user={user} />
               </Grid>

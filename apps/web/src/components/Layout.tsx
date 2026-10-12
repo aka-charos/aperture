@@ -53,6 +53,7 @@ import { AdminMenuButton } from './AdminMenuButton'
 import { ImpersonationBanner, IMPERSONATION_BANNER_HEIGHT } from './ImpersonationBanner'
 import { AdminSearchProvider } from '@/hooks/AdminSearchProvider'
 import { GlobalSearch } from './GlobalSearch'
+import { LanguageMenuButton } from './LanguageMenuButton'
 import { AppBarPageHeading } from './PageHeading'
 import { PageHeaderProvider } from '@/hooks/PageHeaderProvider'
 import { USER_SETTINGS_TAB_KEYS } from '@/pages/UserSettings/tabHelpers'
@@ -673,6 +674,10 @@ function AppShell() {
 
           {/* Global Search */}
           <GlobalSearch />
+
+          {/* Language: the app's, and the one AI writes in. Beside the avatar
+              because it is a choice about the person, not the library. */}
+          <LanguageMenuButton />
 
           {/* User menu */}
           {user && (

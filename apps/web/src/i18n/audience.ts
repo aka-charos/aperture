@@ -86,6 +86,7 @@ export const ADMIN_ONLY_NAMESPACES: readonly string[] = [
   'imageUpload',
   'inferenceDashboard',
   'jobsUi',
+  'language',
   'legacyLibraryOutput',
   'runningJobs',
   'settingsAccountDrift',
