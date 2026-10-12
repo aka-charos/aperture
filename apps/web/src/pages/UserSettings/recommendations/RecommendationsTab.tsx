@@ -197,19 +197,20 @@ export function RecommendationsTab() {
       <SettingsSection
         title={t('userSettings.recs.advancedTitle')}
         description={t('userSettings.recs.advancedBody')}
-        action={
+      >
+        {/* Under the heading, on the left: at the right edge the floating
+            assistant button sat on top of it at the bottom of the page. */}
+        <Box sx={{ mt: -0.5, mb: advancedOpen ? 1.5 : 0 }}>
           <Button
             size="small"
             onClick={() => setAdvancedOpen((open) => !open)}
             aria-expanded={advancedOpen}
-            endIcon={
-              <ExpandMoreIcon sx={{ transition: 'transform 150ms', transform: advancedOpen ? 'rotate(180deg)' : 'none' }} />
-            }
+            endIcon={<ExpandMoreIcon sx={{ transition: 'transform 150ms', transform: advancedOpen ? 'rotate(180deg)' : 'none' }} />}
+            sx={{ ml: -0.75, textTransform: 'none' }}
           >
             {advancedOpen ? t('userSettings.recs.advancedHide') : t('userSettings.recs.advancedShow')}
           </Button>
-        }
-      >
+        </Box>
         <Collapse in={advancedOpen} unmountOnExit>
           <SettingsGrid>
             <CustomWeightsCard mediaTypes={data.mediaTypes} />
