@@ -1409,14 +1409,11 @@
   },
   "languageMenu": {
     "tooltip": "언어: {{app}}",
-    "tooltipSplit": "앱 언어: {{app}} · AI가 쓰는 글: {{ai}}",
+    "tooltipSplit": "언어: {{app}} · 추천: {{content}}",
     "appHeading": "앱 언어",
-    "appHint": "메뉴, 버튼 및 레이블.",
-    "aiHeading": "AI가 쓰는 글",
-    "aiHint": "추천, 시청자 ID, 재생목록 설명 및 어시스턴트. 새로 작성되는 글에 적용되며 이미 작성된 글은 그대로입니다.",
-    "sameAsApp": "앱과 동일",
-    "serverDefault": "서버 기본값",
-    "readOnlyNote": "다른 사용자로 보고 있습니다. 언어는 이 탭에서만 바뀌며, 해당 사용자의 AI 언어는 여기서 바꿀 수 없습니다.",
+    "contentHeading": "추천 언어",
+    "contentHint": "프로필과 어시스턴트에도 적용됩니다.",
+    "readOnlyNote": "다른 사용자로 보고 있습니다: 언어는 이 탭에서만 바뀝니다.",
     "saveFailed": "언어를 저장하지 못했습니다. 다시 시도하세요."
   },
   "discovery": {

@@ -1409,14 +1409,11 @@
   },
   "languageMenu": {
     "tooltip": "Sprache: {{app}}",
-    "tooltipSplit": "App-Sprache: {{app}} · Von KI geschriebene Texte: {{ai}}",
+    "tooltipSplit": "Sprache: {{app}} · Empfehlungen: {{content}}",
     "appHeading": "App-Sprache",
-    "appHint": "Menüs, Schaltflächen und Beschriftungen.",
-    "aiHeading": "Von KI geschriebene Texte",
-    "aiHint": "Empfehlungen, deine Watcher-Identität, Playlist-Beschreibungen und der Assistent. Gilt für neue Texte; bereits Geschriebenes bleibt, wie es ist.",
-    "sameAsApp": "Wie die App",
-    "serverDefault": "Server-Standard",
-    "readOnlyNote": "Du siehst die App als eine andere Person. Die Sprache ändert sich nur in diesem Tab, und deren KI-Sprache kann hier nicht geändert werden.",
+    "contentHeading": "Sprache der Empfehlungen",
+    "contentHint": "Gilt auch für dein Profil und den Assistenten.",
+    "readOnlyNote": "Du siehst die App als jemand anderes: Die Sprache ändert sich nur in diesem Tab.",
     "saveFailed": "Die Sprache konnte nicht gespeichert werden. Bitte erneut versuchen."
   },
   "discovery": {

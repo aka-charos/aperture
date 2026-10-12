@@ -2773,15 +2773,12 @@
   },
   "languageMenu": {
     "tooltip": "Taal: {{app}}",
-    "tooltipSplit": "Taal van de app: {{app}} · Door AI geschreven tekst: {{ai}}",
+    "tooltipSplit": "Taal: {{app}} · Aanbevelingen: {{content}}",
     "appHeading": "Taal van de app",
-    "appHint": "Menu’s, knoppen en labels.",
-    "aiHeading": "Door AI geschreven tekst",
-    "aiHint": "Aanbevelingen, je Watcher-identiteit, afspeellijstbeschrijvingen en de assistent. Geldt voor nieuwe tekst; wat al geschreven is, blijft zoals het is.",
-    "sameAsApp": "Zelfde als de app",
-    "serverDefault": "Serverstandaard",
-    "readOnlyNote": "Je bekijkt de app als iemand anders. De taal verandert alleen in dit tabblad en hun AI-taal kan hier niet worden gewijzigd.",
-    "saveFailed": "Kan je taalkeuze niet opslaan. Probeer het opnieuw."
+    "contentHeading": "Taal van aanbevelingen",
+    "contentHint": "Ook voor je profiel en de assistent.",
+    "readOnlyNote": "Je kijkt als iemand anders: de taal verandert alleen in dit tabblad.",
+    "saveFailed": "Kan je taal niet opslaan. Probeer het opnieuw."
   },
   "discovery": {
     "title": "Ontdekken",

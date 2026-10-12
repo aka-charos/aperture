@@ -4,7 +4,6 @@ import {
   Alert,
   Badge,
   Box,
-  Collapse,
   Divider,
   IconButton,
   List,
@@ -12,15 +11,13 @@ import {
   ListItemIcon,
   ListItemText,
   Popover,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
   useTheme,
 } from '@mui/material'
 import CheckIcon from '@mui/icons-material/Check'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import ExpandLessIcon from '@mui/icons-material/ExpandLess'
-import LinkIcon from '@mui/icons-material/Link'
-import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined'
 import { useAuth } from '@/hooks/useAuth'
 import { applyEffectiveUiLanguage } from '@/i18n/syncUiLanguage'
 import { LocaleFlag } from './LocaleFlag'
@@ -35,11 +32,11 @@ interface LanguageState {
   enabledUi: string[]
   enabledAi: string[]
   defaultAi: string
-  /** The stored AI choice: a language, FOLLOW_APP, or null (the server default). */
+  /** The stored recommendations-language choice: a language, FOLLOW_APP, or null (the server default). */
   aiChoice: string | null
   effectiveUi: string
   effectiveAi: string
-  /** What AI would write in under FOLLOW_APP — decided by the API. */
+  /** What recommendations would be written in under FOLLOW_APP — decided by the API. */
   aiFollowingApp: string
 }
 
@@ -62,24 +59,24 @@ function applyPrefs(prev: LanguageState, prefs: PrefsResponse): LanguageState {
 
 /**
  * The language switcher in the app bar: the flag of the language the app is
- * in, opening onto two choices that are deliberately separate — the language
- * the app is in, and the language AI writes to this viewer in (recommendation
- * explanations, the Watcher Identity, playlist text, the assistant). Someone
- * can read the app in Greek and have AI write to them in English.
+ * in, opening onto the list of app languages and, under it, one two-way toggle
+ * for the language recommendations are written in (and with them the Watcher
+ * Identity, playlist text and the assistant). Someone can read the app in
+ * Greek and have recommendations written in English.
  *
- * It replaces the Language card that sat in Settings → Preferences, where a
- * choice made on every visit by some people was three clicks deep.
+ * The toggle is deliberately two options, not a second language list: the
+ * app's own language (stored as FOLLOW_APP, so it moves when the app language
+ * does) and one other — the server default, or when that IS the app language,
+ * the first other language enabled. On an instance with two languages that is
+ * simply "this one or the other one". A third language is still storable
+ * through the API; the toggle then shows neither option pressed rather than a
+ * wrong one.
  *
- * The app language applies the moment it is picked (and is saved); the AI
- * section is collapsed by default because most people never change it, and a
- * second full list of languages would double the height of the popover. When
- * the two differ, the button carries a small second flag so the split is
- * visible without opening anything.
- *
- * Only languages the admin enabled are offered, and the API refuses anything
- * else. A section with nothing to choose is hidden, and the button with it
- * when both are. During an assumed session the app language changes in this
- * tab only (the session is read-only) and the AI choice is shown, not offered.
+ * When the two differ, the button carries a small second flag so the split is
+ * visible without opening anything. Only languages the admin enabled are
+ * offered, and the API refuses anything else. During an assumed session the
+ * app language changes in this tab only (the session is read-only) and the
+ * toggle is shown, not offered.
  */
 export function LanguageMenuButton() {
   const { t, i18n } = useTranslation()
@@ -87,7 +84,6 @@ export function LanguageMenuButton() {
   const { user, impersonation } = useAuth()
   const [state, setState] = useState<LanguageState | null>(null)
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
-  const [aiOpen, setAiOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const readOnly = Boolean(impersonation)
@@ -102,7 +98,6 @@ export function LanguageMenuButton() {
       if (!locRes.ok || !defRes.ok || !prefRes.ok) return
       const locales = ((await locRes.json()).locales ?? []) as LocaleRow[]
       const defaults = (await defRes.json()) as {
-        defaultUiLanguage?: string
         defaultAiLanguage?: string
         enabledUiLanguages?: string[]
         enabledAiLanguages?: string[]
@@ -135,17 +130,30 @@ export function LanguageMenuButton() {
 
   const label = (code: string) => state.locales.find((l) => l.code === code)?.label ?? code
   const uiOptions = state.locales.filter((l) => state.enabledUi.includes(l.code))
-  const aiOptions = state.locales.filter((l) => state.enabledAi.includes(l.code))
+
+  // The toggle's two sides: the app's language, and one other.
+  const sameLang = state.aiFollowingApp
+  const otherLang =
+    state.defaultAi !== sameLang
+      ? state.defaultAi
+      : state.enabledAi.find((code) => code !== sameLang && state.locales.some((l) => l.code === code))
+  const toggleValue =
+    state.aiChoice === FOLLOW_APP || state.effectiveAi === sameLang
+      ? FOLLOW_APP
+      : state.effectiveAi === otherLang
+        ? otherLang
+        : null
+
   const showUi = uiOptions.length > 1
-  const showAi = aiOptions.length > 1
-  if (!showUi && !showAi) return null
+  const showContent = Boolean(otherLang)
+  if (!showUi && !showContent) return null
 
   // The flag shows what is on screen, which during an assumption may be a
   // tab-only choice the server does not know about.
   const appLang = i18n.resolvedLanguage || i18n.language || state.effectiveUi
   const split = state.effectiveAi !== appLang
   const tooltip = split
-    ? t('languageMenu.tooltipSplit', { app: label(appLang), ai: label(state.effectiveAi) })
+    ? t('languageMenu.tooltipSplit', { app: label(appLang), content: label(state.effectiveAi) })
     : t('languageMenu.tooltip', { app: label(appLang) })
 
   const save = async (body: { uiLanguage?: string; aiLanguage?: string | null }) => {
@@ -181,24 +189,13 @@ export function LanguageMenuButton() {
     if (!prefs) await applyEffectiveUiLanguage(previous)
   }
 
-  const chooseAi = async (choice: string | null) => {
-    if (readOnly || choice === state.aiChoice) return
-    const prefs = await save({ aiLanguage: choice })
-    if (prefs) setAiOpen(false)
+  const chooseContent = (value: string | null) => {
+    // An exclusive group hands back null when the pressed option is clicked again.
+    if (readOnly || value === null || value === toggleValue) return
+    void save({ aiLanguage: value })
   }
 
-  const aiSummary = (() => {
-    if (state.aiChoice === FOLLOW_APP) {
-      return { icon: <LinkIcon fontSize="small" />, primary: t('languageMenu.sameAsApp'), secondary: label(state.effectiveAi) }
-    }
-    if (state.aiChoice && state.enabledAi.includes(state.aiChoice)) {
-      return { icon: <LocaleFlag locale={state.aiChoice} />, primary: label(state.aiChoice), secondary: null }
-    }
-    return { icon: <DnsOutlinedIcon fontSize="small" />, primary: t('languageMenu.serverDefault'), secondary: label(state.effectiveAi) }
-  })()
-
   const side = theme.direction === 'rtl' ? ('left' as const) : ('right' as const)
-  const check = (on: boolean) => (on ? <CheckIcon fontSize="small" color="primary" sx={{ marginInlineStart: 1 }} /> : null)
 
   return (
     <>
@@ -241,7 +238,7 @@ export function LanguageMenuButton() {
         onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: side }}
         transformOrigin={{ vertical: 'top', horizontal: side }}
-        slotProps={{ paper: { sx: { width: 320, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 96px)' } } }}
+        slotProps={{ paper: { sx: { width: 300, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100vh - 96px)' } } }}
       >
         {error && (
           <Alert severity="error" sx={{ m: 1.5, mb: 0 }} onClose={() => setError(null)}>
@@ -256,7 +253,7 @@ export function LanguageMenuButton() {
 
         {showUi && (
           <>
-            <SectionHeading title={t('languageMenu.appHeading')} hint={t('languageMenu.appHint')} />
+            <SectionHeading>{t('languageMenu.appHeading')}</SectionHeading>
             <List dense disablePadding sx={{ pb: 1 }}>
               {uiOptions.map((l) => (
                 <ListItemButton
@@ -270,86 +267,63 @@ export function LanguageMenuButton() {
                     <LocaleFlag locale={l.code} />
                   </ListItemIcon>
                   <ListItemText primary={l.label} />
-                  {check(l.code === appLang)}
+                  {l.code === appLang && (
+                    <CheckIcon fontSize="small" color="primary" sx={{ marginInlineStart: 1 }} />
+                  )}
                 </ListItemButton>
               ))}
             </List>
           </>
         )}
 
-        {showUi && showAi && <Divider />}
+        {showUi && showContent && <Divider />}
 
-        {showAi && (
-          <>
-            <SectionHeading title={t('languageMenu.aiHeading')} hint={t('languageMenu.aiHint')} />
-            <List dense disablePadding sx={{ pb: 1 }}>
-              <ListItemButton
-                onClick={() => setAiOpen((open) => !open)}
-                aria-expanded={aiOpen}
-                disabled={readOnly}
-              >
-                <ListItemIcon sx={{ minWidth: 36 }}>{aiSummary.icon}</ListItemIcon>
-                <ListItemText primary={aiSummary.primary} secondary={aiSummary.secondary} />
-                {!readOnly && (aiOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />)}
-              </ListItemButton>
-              <Collapse in={aiOpen && !readOnly} unmountOnExit>
-                <List dense disablePadding sx={{ paddingInlineStart: theme.spacing(1.5) }}>
-                  <ListItemButton
-                    selected={state.aiChoice === FOLLOW_APP}
-                    disabled={saving}
-                    onClick={() => void chooseAi(FOLLOW_APP)}
-                  >
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <LinkIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText primary={t('languageMenu.sameAsApp')} secondary={label(state.aiFollowingApp)} />
-                    {check(state.aiChoice === FOLLOW_APP)}
-                  </ListItemButton>
-                  <ListItemButton
-                    selected={state.aiChoice === null}
-                    disabled={saving}
-                    onClick={() => void chooseAi(null)}
-                  >
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <DnsOutlinedIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText primary={t('languageMenu.serverDefault')} secondary={label(state.defaultAi)} />
-                    {check(state.aiChoice === null)}
-                  </ListItemButton>
-                  {aiOptions.map((l) => (
-                    <ListItemButton
-                      key={l.code}
-                      selected={state.aiChoice === l.code}
-                      disabled={saving}
-                      onClick={() => void chooseAi(l.code)}
-                      lang={l.code}
-                    >
-                      <ListItemIcon sx={{ minWidth: 36 }}>
-                        <LocaleFlag locale={l.code} />
-                      </ListItemIcon>
-                      <ListItemText primary={l.label} />
-                      {check(state.aiChoice === l.code)}
-                    </ListItemButton>
-                  ))}
-                </List>
-              </Collapse>
-            </List>
-          </>
+        {showContent && otherLang && (
+          <Box sx={{ px: 2, pb: 2 }}>
+            <SectionHeading inset={false}>{t('languageMenu.contentHeading')}</SectionHeading>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              value={toggleValue}
+              onChange={(_e, value: string | null) => chooseContent(value)}
+              disabled={readOnly || saving}
+              aria-label={t('languageMenu.contentHeading')}
+            >
+              {[
+                { value: FOLLOW_APP, code: sameLang },
+                { value: otherLang, code: otherLang },
+              ].map((option) => (
+                <ToggleButton
+                  key={option.value}
+                  value={option.value}
+                  lang={option.code}
+                  sx={{ gap: 1, textTransform: 'none' }}
+                >
+                  <LocaleFlag locale={option.code} width={18} />
+                  {label(option.code)}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+            <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
+              {t('languageMenu.contentHint')}
+            </Typography>
+          </Box>
         )}
       </Popover>
     </>
   )
 }
 
-function SectionHeading({ title, hint }: { title: string; hint: string }) {
+function SectionHeading({ children, inset = true }: { children: string; inset?: boolean }) {
   return (
-    <Box sx={{ px: 2, pt: 1.5, pb: 0.5 }}>
-      <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-        {title}
-      </Typography>
-      <Typography variant="caption" color="text.secondary" component="p">
-        {hint}
-      </Typography>
-    </Box>
+    <Typography
+      variant="overline"
+      color="text.secondary"
+      component="p"
+      sx={{ lineHeight: 1.6, pt: 1.5, pb: 0.75, px: inset ? 2 : 0 }}
+    >
+      {children}
+    </Typography>
   )
 }

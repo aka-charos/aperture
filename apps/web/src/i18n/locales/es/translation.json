@@ -1413,14 +1413,11 @@
   },
   "languageMenu": {
     "tooltip": "Idioma: {{app}}",
-    "tooltipSplit": "Idioma de la aplicación: {{app}} · Textos escritos por IA: {{ai}}",
+    "tooltipSplit": "Idioma: {{app}} · Recomendaciones: {{content}}",
     "appHeading": "Idioma de la aplicación",
-    "appHint": "Menús, botones y etiquetas.",
-    "aiHeading": "Textos escritos por IA",
-    "aiHint": "Recomendaciones, tu Identidad del espectador, descripciones de listas y el asistente. Se aplica a textos nuevos; lo ya escrito no cambia.",
-    "sameAsApp": "Igual que la aplicación",
-    "serverDefault": "Predeterminado del servidor",
-    "readOnlyNote": "Estás viendo la aplicación como otra persona. El idioma cambia solo en esta pestaña y su idioma de IA no se puede cambiar aquí.",
+    "contentHeading": "Idioma de las recomendaciones",
+    "contentHint": "También para tu perfil y el asistente.",
+    "readOnlyNote": "Estás viendo como otra persona: el idioma cambia solo en esta pestaña.",
     "saveFailed": "No se pudo guardar el idioma. Inténtalo de nuevo."
   },
   "discovery": {

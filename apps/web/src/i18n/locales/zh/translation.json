@@ -952,15 +952,12 @@
   },
   "languageMenu": {
     "tooltip": "语言：{{app}}",
-    "tooltipSplit": "应用语言：{{app}} · AI 撰写的文字：{{ai}}",
+    "tooltipSplit": "语言：{{app}} · 推荐：{{content}}",
     "appHeading": "应用语言",
-    "appHint": "菜单、按钮和标签。",
-    "aiHeading": "AI 撰写的文字",
-    "aiHint": "推荐、你的观看身份、播放列表描述和助手。适用于新生成的文字；已有内容保持不变。",
-    "sameAsApp": "与应用相同",
-    "serverDefault": "服务器默认",
-    "readOnlyNote": "你正在以其他用户身份查看。语言仅在此标签页中更改，且无法在此更改其 AI 语言。",
-    "saveFailed": "无法保存语言选择，请重试。"
+    "contentHeading": "推荐语言",
+    "contentHint": "也用于你的资料和助手。",
+    "readOnlyNote": "你正在以其他用户身份查看：语言仅在此标签页中更改。",
+    "saveFailed": "无法保存语言，请重试。"
   },
   "discovery": {
     "title": "发现",

@@ -1413,14 +1413,11 @@
   },
   "languageMenu": {
     "tooltip": "Langue : {{app}}",
-    "tooltipSplit": "Langue de l’application : {{app}} · Textes écrits par l’IA : {{ai}}",
+    "tooltipSplit": "Langue : {{app}} · Recommandations : {{content}}",
     "appHeading": "Langue de l’application",
-    "appHint": "Menus, boutons et libellés.",
-    "aiHeading": "Textes écrits par l’IA",
-    "aiHint": "Recommandations, votre Identité du spectateur, descriptions de playlists et l’assistant. S’applique aux nouveaux textes ; ce qui est déjà écrit reste inchangé.",
-    "sameAsApp": "Comme l’application",
-    "serverDefault": "Valeur par défaut du serveur",
-    "readOnlyNote": "Vous voyez l’application en tant qu’une autre personne. La langue ne change que dans cet onglet, et sa langue d’IA ne peut pas être modifiée ici.",
+    "contentHeading": "Langue des recommandations",
+    "contentHint": "Aussi pour votre profil et l’assistant.",
+    "readOnlyNote": "Vous naviguez en tant qu’une autre personne : la langue ne change que dans cet onglet.",
     "saveFailed": "Impossible d’enregistrer la langue. Réessayez."
   },
   "discovery": {

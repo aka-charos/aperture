@@ -952,14 +952,11 @@
   },
   "languageMenu": {
     "tooltip": "言語: {{app}}",
-    "tooltipSplit": "アプリの言語: {{app}} · AIが書く文章: {{ai}}",
+    "tooltipSplit": "言語: {{app}} · おすすめ: {{content}}",
     "appHeading": "アプリの言語",
-    "appHint": "メニュー、ボタン、ラベル。",
-    "aiHeading": "AIが書く文章",
-    "aiHint": "おすすめ、視聴者プロフィール、プレイリストの説明、アシスタント。新しく書かれる文章に適用され、既存の文章は変わりません。",
-    "sameAsApp": "アプリと同じ",
-    "serverDefault": "サーバーの既定",
-    "readOnlyNote": "別のユーザーとして表示しています。言語の変更はこのタブのみに適用され、そのユーザーのAIの言語はここでは変更できません。",
+    "contentHeading": "おすすめの言語",
+    "contentHint": "プロフィールとアシスタントにも使われます。",
+    "readOnlyNote": "別のユーザーとして表示中：言語はこのタブでのみ変わります。",
     "saveFailed": "言語を保存できませんでした。もう一度お試しください。"
   },
   "discovery": {

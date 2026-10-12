@@ -3888,13 +3888,13 @@
   },
   "language": {
     "defaultsTitle": "Language defaults",
-    "defaultsSubtitle": "Choose which languages people can pick for the app and for AI-written text, and the default for each. Everyone picks their own from the flag in the top bar.",
+    "defaultsSubtitle": "Choose which languages people can pick for the app and for recommendations, and the default for each. Everyone picks their own from the flag in the top bar.",
     "uiSectionTitle": "App language",
-    "aiSectionTitle": "AI-written text",
+    "aiSectionTitle": "Recommendations language",
     "availableUi": "App languages people can choose",
-    "availableAi": "Languages AI can write in",
+    "availableAi": "Languages recommendations can be written in",
     "defaultUi": "Default app language",
-    "defaultAi": "Default language for AI-written text",
+    "defaultAi": "Default recommendations language",
     "saveDefaults": "Save defaults",
     "defaultsSaved": "Language defaults saved.",
     "loadDefaultsFailed": "Failed to load language defaults",
@@ -3904,15 +3904,12 @@
   },
   "languageMenu": {
     "tooltip": "Language: {{app}}",
-    "tooltipSplit": "App language: {{app}} · AI-written text: {{ai}}",
+    "tooltipSplit": "Language: {{app}} · Recommendations: {{content}}",
     "appHeading": "App language",
-    "appHint": "Menus, buttons and labels.",
-    "aiHeading": "AI-written text",
-    "aiHint": "Recommendations, your Watcher Identity, playlist descriptions and the assistant. Applies to new text; what is already written stays as it is.",
-    "sameAsApp": "Same as the app",
-    "serverDefault": "Server default",
-    "readOnlyNote": "You are viewing as someone else. The app language changes in this tab only, and their AI language cannot be changed here.",
-    "saveFailed": "Could not save your language choice. Try again."
+    "contentHeading": "Recommendations language",
+    "contentHint": "Also used for your profile and the assistant.",
+    "readOnlyNote": "You are viewing as someone else: the language changes in this tab only.",
+    "saveFailed": "Could not save your language. Try again."
   },
   "discovery": {
     "title": "Discover",
