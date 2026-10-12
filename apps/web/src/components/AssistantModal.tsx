@@ -22,6 +22,7 @@ import { AssistantChatSurface } from './assistant/AssistantChatSurface'
 import { useAssistantChat } from './assistant/useAssistantChat'
 import { useAssistantDock } from '@/hooks/useAssistantDock'
 import { gradients } from '@/theme'
+import { FAB_SCROLL_DEADBAND_PX, FAB_TOP_ZONE_PX, nextFabVisible } from './assistant/fabVisibility'
 
 // Surface the assistant renders in: blocking dialog or persistent side panel
 // that leaves the rest of the app browsable.
@@ -88,6 +89,26 @@ export function AssistantModal() {
   }, [onAssistantPage])
 
   const chat = useAssistantChat(open)
+
+  // The button steps aside while the page scrolls down and returns on the way
+  // up (see fabVisibility.ts). The window is what scrolls here; an inner list
+  // scrolling (a slider box, a carousel) is not page movement and is ignored.
+  const [fabVisible, setFabVisible] = useState(true)
+  useEffect(() => {
+    let anchor = window.scrollY
+    const onScroll = () => {
+      const y = window.scrollY
+      // Read the anchor NOW: React runs the updater later, after the line
+      // below has moved it, and it would compare the position with itself.
+      const from = anchor
+      setFabVisible((visible) => nextFabVisible(visible, from, y))
+      if (Math.abs(y - anchor) >= FAB_SCROLL_DEADBAND_PX || y <= FAB_TOP_ZONE_PX) anchor = y
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+  // A new page starts at the top, where the button belongs.
+  useEffect(() => setFabVisible(true), [location.pathname])
 
   const docked = surface === 'dock' && canDock
 
@@ -229,14 +250,18 @@ export function AssistantModal() {
             what the sidebar's Assistant page already is, and the button sat
             over the last row, the pagination and the graph legend of every
             page. */}
-        <Zoom in={!open && !onAssistantPage && canDock}>
+        <Zoom in={!open && !onAssistantPage && canDock && fabVisible}>
           <Fab
             color="primary"
+            size="small"
             onClick={handleOpen}
+            aria-label={t('assistant.fabTooltip')}
             sx={{
               position: 'fixed',
-              bottom: 24,
-              insetInlineEnd: 24,
+              // 40px and close to the corner: at 56px and 24px in it sat over
+              // the last card of every page.
+              bottom: 12,
+              insetInlineEnd: 12,
               zIndex: 1000,
               background: gradients.primaryToSecondary,
               '&:hover': {
@@ -244,7 +269,7 @@ export function AssistantModal() {
               },
             }}
           >
-            <AutoAwesomeIcon />
+            <AutoAwesomeIcon fontSize="small" />
           </Fab>
         </Zoom>
       </Tooltip>
