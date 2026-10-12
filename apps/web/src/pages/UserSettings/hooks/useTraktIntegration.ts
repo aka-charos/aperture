@@ -94,24 +94,32 @@ export function useTraktIntegration() {
     }
   }, [fetchStatus, t])
 
-  const handleCallbackFromUrl = useCallback(() => {
-    const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
-    if (params.get('trakt') === 'success') {
-      const username = params.get('username')
-      setMessage({
-        type: 'success',
-        text: t('userSettings.traktSuccessConnect', { username: username ?? '' }),
-      })
-      void fetchStatus()
-      window.history.replaceState(null, '', window.location.pathname + '#/settings')
-      return
-    }
-    if (params.get('trakt') === 'error') {
-      const callbackMessage = params.get('message') || t('userSettings.traktErrUnknown')
-      setMessage({ type: 'error', text: t('userSettings.traktFailConnect', { message: callbackMessage }) })
-      window.history.replaceState(null, '', window.location.pathname + '#/settings')
-    }
-  }, [fetchStatus, t])
+  /**
+   * Shows the outcome of a Trakt sign-in, which the API's OAuth callback hands
+   * back as `?trakt=success&username=…` or `?trakt=error&message=…` on the
+   * settings page. Returns whether the params carried one, so the page can
+   * strip them from the address once shown.
+   */
+  const showCallbackResult = useCallback(
+    (params: URLSearchParams): boolean => {
+      const outcome = params.get('trakt')
+      if (outcome === 'success') {
+        setMessage({
+          type: 'success',
+          text: t('userSettings.traktSuccessConnect', { username: params.get('username') ?? '' }),
+        })
+        void fetchStatus()
+        return true
+      }
+      if (outcome === 'error') {
+        const callbackMessage = params.get('message') || t('userSettings.traktErrUnknown')
+        setMessage({ type: 'error', text: t('userSettings.traktFailConnect', { message: callbackMessage }) })
+        return true
+      }
+      return false
+    },
+    [fetchStatus, t]
+  )
 
   return {
     status,
@@ -123,6 +131,6 @@ export function useTraktIntegration() {
     connect,
     disconnect,
     syncRatings,
-    handleCallbackFromUrl,
+    showCallbackResult,
   }
 }

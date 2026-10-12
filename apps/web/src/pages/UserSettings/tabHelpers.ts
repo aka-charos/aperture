@@ -1,38 +1,55 @@
 /**
- * `home` is last on purpose: it is rendered only for an Emby account (managed
- * home rows are Emby-only), and a tab left out at the END shifts no other tab's
- * index. Anywhere else, hiding it would send every later tab's address to the
- * wrong panel.
+ * The settings tabs, by what each is about rather than where its data is
+ * stored:
+ *
+ * - `recommendations` — everything that decides what this viewer is offered
+ * - `display` — how things look while browsing
+ * - `account` — their address, email opt-in and linked services
+ * - `home` — their Emby home screen rows (Emby accounts only)
+ *
+ * Tabs are addressed by KEY, never by position. They used to be a position in
+ * a JSX list, which is why a tab shown to only some accounts had to go last: a
+ * hidden tab anywhere else renumbered every tab after it. Two tabs are
+ * conditional now (`account` when it has nothing on it, `home` off Emby), so
+ * position could not work.
  */
-export const USER_SETTINGS_TAB_KEYS = ['watcher', 'algorithm', 'preferences', 'home'] as const
-
-/** Tabs shown only to some accounts: an address naming one lands on the first tab otherwise. */
-export const CONDITIONAL_TAB_KEYS: ReadonlySet<UserSettingsTabKey> = new Set(['home'])
+export const USER_SETTINGS_TAB_KEYS = ['recommendations', 'display', 'account', 'home'] as const
 
 export type UserSettingsTabKey = (typeof USER_SETTINGS_TAB_KEYS)[number]
 
 /**
- * Addresses that no longer name a tab, and where they should land instead.
+ * Addresses that no longer name a tab, and where they should land instead —
+ * where the thing an old link could change now lives, never just the default.
  *
- * `profile` was a tab until its read-only half (avatar, username, display name,
- * media server, role -- every field disabled, all of it already in the account
- * menu header) was deleted and its one editable part, the email address and
- * notification opt-in, moved into Preferences. So a bookmark or an old link to
- * `?tab=profile` resolves *there*, where the thing it could actually change now
- * lives. Falling through to the default would silently land on Watcher
- * Identity, which shares nothing with what the link asked for.
+ * - `watcher` (Watcher Identity) and `algorithm` (AI Algorithm) held the
+ *   taste and recommendation settings, now all on Recommendations.
+ * - `preferences` was a mix; most of it (poster badges, the similarity graph)
+ *   is Display.
+ * - `profile` was deleted earlier; its one editable part, the email address
+ *   and notification opt-in, is on Account.
  */
 const LEGACY_TAB_ALIASES: Record<string, UserSettingsTabKey> = {
-  profile: 'preferences',
+  watcher: 'recommendations',
+  algorithm: 'recommendations',
+  preferences: 'display',
+  profile: 'account',
 }
 
-export function userSettingsTabIndexFromParam(tab: string | null): number {
-  if (!tab) return 0
-  const resolved = LEGACY_TAB_ALIASES[tab] ?? tab
-  const idx = USER_SETTINGS_TAB_KEYS.indexOf(resolved as UserSettingsTabKey)
-  return idx >= 0 ? idx : 0
+function isTabKey(value: string): value is UserSettingsTabKey {
+  return (USER_SETTINGS_TAB_KEYS as readonly string[]).includes(value)
 }
 
-export function userSettingsTabParamFromIndex(index: number): string {
-  return USER_SETTINGS_TAB_KEYS[index] ?? USER_SETTINGS_TAB_KEYS[0]
+/** The tab an address names, following retired names; the first tab for anything else. */
+export function userSettingsTabFromParam(tab: string | null): UserSettingsTabKey {
+  if (!tab) return USER_SETTINGS_TAB_KEYS[0]
+  const resolved = Object.prototype.hasOwnProperty.call(LEGACY_TAB_ALIASES, tab) ? LEGACY_TAB_ALIASES[tab] : tab
+  return isTabKey(resolved) ? resolved : USER_SETTINGS_TAB_KEYS[0]
+}
+
+/** The tab to show: the one asked for if this viewer has it, else the first one they do. */
+export function visibleUserSettingsTab(
+  tab: UserSettingsTabKey,
+  visible: readonly UserSettingsTabKey[]
+): UserSettingsTabKey {
+  return visible.includes(tab) ? tab : (visible[0] ?? USER_SETTINGS_TAB_KEYS[0])
 }

@@ -3,14 +3,16 @@ import { Box } from '@mui/material'
 
 export interface TabPanelProps {
   children?: React.ReactNode
-  index: number
-  value: number
+  /** This panel's tab key. */
+  tab: string
+  /** The selected tab key. */
+  value: string
 }
 
-export function TabPanel({ children, value, index }: TabPanelProps) {
+export function TabPanel({ children, value, tab }: TabPanelProps) {
   return (
-    <div role="tabpanel" hidden={value !== index}>
-      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
+    <div role="tabpanel" hidden={value !== tab}>
+      {value === tab && <Box sx={{ pt: 3 }}>{children}</Box>}
     </div>
   )
 }

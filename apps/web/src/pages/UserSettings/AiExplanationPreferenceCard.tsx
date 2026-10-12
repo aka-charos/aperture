@@ -1,18 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-  Divider,
-  FormControlLabel,
-  Switch,
-  Typography,
-} from '@mui/material'
+import { Alert, Button, Switch } from '@mui/material'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { useTranslation } from 'react-i18next'
+import { SettingsCard } from './SettingsCard'
 
 interface AiExplanationPreference {
   overrideAllowed: boolean
@@ -22,26 +12,23 @@ interface AiExplanationPreference {
   canOverride: boolean
 }
 
+/**
+ * Whether each pick comes with a written "why". Offered only when the admin
+ * lets viewers choose; otherwise it renders nothing, and the settings grid
+ * gives the space to its neighbours.
+ */
 export function AiExplanationPreferenceCard() {
   const { t } = useTranslation()
   const [pref, setPref] = useState<AiExplanationPreference | null>(null)
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
 
   const fetchPref = useCallback(async () => {
-    setLoading(true)
     try {
       const response = await fetch('/api/settings/user/ai-explanation', { credentials: 'include' })
-      if (response.ok) {
-        const data = (await response.json()) as AiExplanationPreference
-        setPref(data)
-      }
+      if (response.ok) setPref((await response.json()) as AiExplanationPreference)
     } catch {
-      // Optional load failures may degrade gracefully
-    } finally {
-      setLoading(false)
+      // Not offered is what an unreadable preference looks like; the card stays hidden.
     }
   }, [])
 
@@ -53,7 +40,6 @@ export function AiExplanationPreferenceCard() {
     if (!pref) return
     setSaving(true)
     setError(null)
-    setSuccess(null)
     try {
       const response = await fetch('/api/settings/user/ai-explanation', {
         method: 'PATCH',
@@ -61,107 +47,52 @@ export function AiExplanationPreferenceCard() {
         credentials: 'include',
         body: JSON.stringify({ enabled }),
       })
-      if (response.ok) {
-        const data = (await response.json()) as {
-          userPreference: boolean | null
-          effectiveValue: boolean
-          message: string
-        }
-        setPref({
-          ...pref,
-          userPreference: data.userPreference,
-          effectiveValue: data.effectiveValue,
-        })
-        setSuccess(data.message)
-        window.setTimeout(() => setSuccess(null), 5000)
-      } else {
+      if (!response.ok) {
         const err = (await response.json().catch(() => ({}))) as { error?: string }
-        setError(err.error || t('userSettings.errSavePreference'))
+        throw new Error(err.error || t('userSettings.errSavePreference'))
       }
-    } catch {
-      setError(t('userSettings.errConnectServer'))
+      const data = (await response.json()) as { userPreference: boolean | null; effectiveValue: boolean }
+      setPref({ ...pref, userPreference: data.userPreference, effectiveValue: data.effectiveValue })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('userSettings.errConnectServer'))
     } finally {
       setSaving(false)
     }
   }
 
-  if (!pref?.canOverride) {
-    return null
-  }
+  if (!pref?.canOverride) return null
 
   return (
-    <Card sx={{ backgroundColor: 'background.default', borderRadius: 2, height: '100%' }}>
-      <CardContent>
-        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <AutoAwesomeIcon color="primary" />
-          {t('userSettings.aiExplanationTitle')}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" mb={3}>
-          {t('userSettings.aiExplanationSubtitle')}
-        </Typography>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
-            {success}
-          </Alert>
-        )}
-
-        {loading ? (
-          <Box display="flex" justifyContent="center" py={4}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={pref.userPreference ?? pref.globalEnabled}
-                  onChange={(e) => void savePref(e.target.checked)}
-                  disabled={saving}
-                />
-              }
-              label={
-                <Box>
-                  <Typography variant="body1" fontWeight="medium">
-                    {t('userSettings.aiExplanationIncludeTitle')}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {t('userSettings.aiExplanationIncludeBody')}
-                  </Typography>
-                </Box>
-              }
-              sx={{ alignItems: 'flex-start', ml: 0, mb: 2 }}
-            />
-
-            {pref.userPreference !== null && (
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => void savePref(null)}
-                disabled={saving}
-              >
-                {t('userSettings.aiExplanationReset', {
-                  state: pref.globalEnabled
-                    ? t('userSettings.stateEnabled')
-                    : t('userSettings.stateDisabled'),
-                })}
-              </Button>
-            )}
-
-            <Divider sx={{ my: 3 }} />
-
-            <Typography variant="caption" color="text.secondary">
-              {t('userSettings.aiExplanationFooter')}
-            </Typography>
-          </>
-        )}
-      </CardContent>
-    </Card>
+    <SettingsCard
+      icon={<AutoAwesomeIcon />}
+      title={t('userSettings.recs.explanationsTitle')}
+      description={t('userSettings.aiExplanationIncludeBody')}
+      action={
+        <Switch
+          checked={pref.userPreference ?? pref.globalEnabled}
+          onChange={(e) => void savePref(e.target.checked)}
+          disabled={saving}
+          slotProps={{ input: { 'aria-label': t('userSettings.recs.explanationsTitle') } }}
+        />
+      }
+      footer={t('userSettings.aiExplanationFooter')}
+    >
+      {(error || pref.userPreference !== null) && (
+        <>
+          {error && (
+            <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+          {pref.userPreference !== null && (
+            <Button variant="text" size="small" onClick={() => void savePref(null)} disabled={saving} sx={{ textTransform: 'none' }}>
+              {t('userSettings.aiExplanationReset', {
+                state: pref.globalEnabled ? t('userSettings.stateEnabled') : t('userSettings.stateDisabled'),
+              })}
+            </Button>
+          )}
+        </>
+      )}
+    </SettingsCard>
   )
 }

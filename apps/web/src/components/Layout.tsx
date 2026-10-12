@@ -29,7 +29,8 @@ import HistoryIcon from '@mui/icons-material/History'
 import PlaylistPlayIcon from '@mui/icons-material/PlaylistPlay'
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark'
 import LogoutIcon from '@mui/icons-material/Logout'
-import FingerprintIcon from '@mui/icons-material/Fingerprint'
+import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined'
+import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined'
 import TuneIcon from '@mui/icons-material/Tune'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import WhatshotIcon from '@mui/icons-material/Whatshot'
@@ -134,10 +135,10 @@ const userSettingsMenuItems: {
   /** Listed only for Emby accounts: the page it opens manages Emby home rows. */
   embyOnly?: boolean
 }[] = [
-  { textKey: 'userSettings.tabWatcherIdentity', icon: <FingerprintIcon fontSize="small" />, tab: 'watcher' },
-  { textKey: 'userSettings.tabAlgorithm', icon: <TuneIcon fontSize="small" />, tab: 'algorithm' },
-  { textKey: 'userSettings.tabPreferences', icon: <VideoLibraryIcon fontSize="small" />, tab: 'preferences' },
-  { textKey: 'userSettings.tabHomeScreen', icon: <HomeIcon fontSize="small" />, tab: 'home', embyOnly: true },
+  { textKey: 'userSettings.tabs.recommendations', icon: <TuneIcon fontSize="small" />, tab: 'recommendations' },
+  { textKey: 'userSettings.tabs.display', icon: <PaletteOutlinedIcon fontSize="small" />, tab: 'display' },
+  { textKey: 'userSettings.tabs.account', icon: <ManageAccountsOutlinedIcon fontSize="small" />, tab: 'account' },
+  { textKey: 'userSettings.tabs.home', icon: <HomeIcon fontSize="small" />, tab: 'home', embyOnly: true },
 ]
 
 /**

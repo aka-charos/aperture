@@ -1686,3 +1686,36 @@ Verified on the page that scored 0.67: its visible text is 21,246 characters, so
 **Verified.** `test:accounts` 20/20 (the presence rule included), `test:api-keys` 31/31 (the audit call-site scan sees the sync's new write), `test:exclusion` 17/17 (the count query uses `WATCH_HISTORY_PLAYED_SQL`), `test:migrations` 5/5, route guards and scope scan 20/20, web 83/83, `pnpm validate`. The section was rendered with the real component and a mocked API: the list, the confirmation naming what is deleted, a successful removal, a refusal shown in the dialog, and 375px with no horizontal scroll. The harness caught one fault before shipping: the confirmation printed a literal `{{provider}}`.
 
 **Not done.** Not run against a real Emby. The pause takes effect at the next user sync, not at the moment of deletion on Emby.
+
+## F-153
+
+**The user settings page was organised by storage, and it showed.** Three tabs (Watcher Identity, AI Algorithm, Preferences) plus the Emby home screen tab, which was the only one people found clear. The operator's complaint was "confusing, cluttered and all over the place"; reading the code behind the screenshots found that most of the clutter was structural rather than cosmetic.
+
+**What was wrong, by kind.**
+
+1. **Per-user data under a per-type switch.** Watcher Identity opened on a Movies/TV sub-tab, and under it sat custom interests (`user_custom_interests` has no media type; the POST sends none), the library list (one exclusion list in `user_preferences.settings`, filtered by collection type for display) and, until [F-112](#f-112)'s era, genre weights. Each read as two lists. Editing interests under TV changed them under Movies.
+2. **The rarest controls first.** "Min Franchise Size" and "Min Watched" — which change only which franchises get detected — were the first two controls on the page, beside an auto-refresh lock.
+3. **A dead card in the best slot.** AI Library Names led Preferences under a banner saying it had no effect (legacy output off), and left the right half of its row empty.
+4. **Labels that describe state.** "New Content Only" beside an off switch, "Using Default Weights" beside another; each reads as either answer.
+5. **Layout filler.** A full-width card holding only the Analyze button; an interests card stretched to its neighbour's height and mostly empty.
+
+**Three bugs found on the way.**
+
+- **Every franchise-threshold and auto-refresh save stored the value it was replacing.** The selects did `setX(value); setTimeout(handleSaveSettings, 100)`, and `handleSaveSettings` was the function from the render BEFORE the state update, so its closure posted every field's old value. Measured in the mock harness after the fix: the PATCH body is `{"mediaType":"series","isLocked":true}`, the changed field only. The PATCH route always accepted a partial body (`updateProfileSettings` skips undefined fields), so nothing server-side changed.
+- **A slider change made within 500ms of leaving the tab was lost.** Unmount cleared the debounce timers. The hook now flushes them; verified by nudging a genre and switching tabs in the same tick — the PUT arrived.
+- **The Trakt sign-in confirmation had never shown.** The OAuth callback redirected to `/#/settings?trakt=…`, a hash route, and the web app uses BrowserRouter, so the browser landed on `/` with an unread hash. The tokens were stored before the redirect, so connecting worked and only the confirmation was lost. It now returns to `/settings?tab=account&trakt=…`; the page shows the message and strips the params.
+
+**A second audit found four more, all in how saves overlap.** (1) **Switching your own weights off within the save delay of a slider move switched them back on** — inherited from the old page, whose weight save always sent `enabled: true`. The route keeps the stored value when `enabled` is absent, so the weight save no longer sends it, and the switch carries any waiting edit in the SAME request: the route reads the stored settings and merges, so two concurrent saves would let the second write back the first one's old values. Verified: one PATCH, `{"movie":{…},"enabled":false}`, and nothing after it. (2) **Deleting a genre or franchise within the delay of moving its slider brought it back**, since the delayed save arrived after the delete; the delete now cancels it. Verified: only the DELETE reaches the API. (3) **A rescan could be undone by a save still waiting**, which landed after the rebuild; the rescan now sends waiting saves first. Verified: the PUT precedes both rebuild POSTs. (4) **A failed delete reloaded the whole tab behind a spinner**, closing every open list; it now re-reads quietly. Also: an interest saved but not read back is no longer reported as a failed save, and the interests box lost a clear-all × that, on a controlled list, did nothing.
+
+**The rebuild.** Four tabs by subject (Recommendations, Display, Account, Emby home screen), one card anatomy (`SettingsCard`, the Emby tab's: icon square, title, description, the one control on the right), and the Recommendations tab in three sections: Your taste (interests, libraries that count, genres, franchises, with Rescan in the section header), Your picks (already-watched titles, low-rated titles, explanations), and Advanced, collapsed (own blend weights, auto-refresh per media type). The franchise card carries the only Movies/TV switch, because franchises are the only per-type list; the thresholds moved inside it. Weight lists show a summary of what leans each way with the sliders behind "Adjust", the Emby tab's placement pattern. Rescan runs for every media type the viewer has a library for and asks keep-or-reset once.
+
+**Rejected or deliberately left.**
+
+- **Index-addressed tabs.** Kept working only while the one conditional tab was last; with Account conditional too it could not. Tabs are keys now.
+- **Equal-height grid rows for the taste section.** Tried first and screenshotted: the interests card stretched into the same empty box the complaint was about. Two independent columns instead.
+- **Showing the Account tab while its contents are unknown.** It is hidden only once all three answers (email grant, Trakt configured, legacy output) are in and all are no, so a slow answer never hides it and a link to it still lands.
+- **"Found 1 new franchises"** is an existing string with two counts and no plural forms; left, since fixing it is a key migration across 14 locales unrelated to the layout.
+
+**Verified.** Web typecheck, lint at `--max-warnings 0`, 92 web tests (new `weights.test.ts`, rewritten `tabHelpers.test.ts`), the API typecheck and a production build. The page was rendered with the real components against a scratch mock API (the dev server needs the database), at 1600px and at 375px with no horizontal page scroll: both lists open, a debounced save sends one PUT with the final value, the flush on tab switch, the rescan (switches the franchise card to the type that found something, opens it, marks the find), the Trakt return, and the `?tab=preferences` and `?tab=profile` aliases.
+
+**Not done.** Not run against a real server. The other 13 locales carry the new strings in English until translated.

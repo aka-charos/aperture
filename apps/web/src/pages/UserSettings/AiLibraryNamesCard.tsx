@@ -1,47 +1,39 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-  Divider,
-  FormControl,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Alert, Box, Button, CircularProgress, TextField } from '@mui/material'
 import SaveIcon from '@mui/icons-material/Save'
 import TextFieldsIcon from '@mui/icons-material/TextFields'
 import { useTranslation } from 'react-i18next'
 import type { User } from '@/hooks/auth-context'
+import { SettingsCard } from './SettingsCard'
 
+/**
+ * Names for the viewer's generated libraries (legacy library output).
+ *
+ * Mounted only while that output is on — the settings page reads the decided
+ * `libraryOutputEnabled` and leaves this card out otherwise, since the names
+ * would rename libraries that are no longer created. It used to stay on the
+ * page greyed, under a banner saying it had no effect, in the most prominent
+ * slot of the tab. The names are kept, so switching the output back on brings
+ * the card back with them.
+ */
 export function AiLibraryNamesCard({ user }: { user: User | null }) {
   const { t } = useTranslation()
   const [defaultLibraryPrefix, setDefaultLibraryPrefix] = useState('AI Picks - ')
   const [moviesLibraryName, setMoviesLibraryName] = useState('')
   const [seriesLibraryName, setSeriesLibraryName] = useState('')
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  // Legacy library output switched off by an admin: these names rename
-  // libraries that are no longer created, so the card greys with it.
-  const [outputOff, setOutputOff] = useState(false)
 
   const fetchSettings = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
       const response = await fetch('/api/settings/user', { credentials: 'include' })
       if (response.ok) {
         const data = (await response.json()) as {
-          defaults?: { libraryNamePrefix?: string; libraryOutputEnabled?: boolean }
+          defaults?: { libraryNamePrefix?: string }
           settings?: { libraryName?: string; seriesLibraryName?: string }
         }
         setDefaultLibraryPrefix(data.defaults?.libraryNamePrefix || 'AI Picks - ')
-        // Absent is not false: an API from before the switch still writes them.
-        setOutputOff(data.defaults?.libraryOutputEnabled === false)
         setMoviesLibraryName(data.settings?.libraryName || '')
         setSeriesLibraryName(data.settings?.seriesLibraryName || '')
       } else {
@@ -50,8 +42,6 @@ export function AiLibraryNamesCard({ user }: { user: User | null }) {
       }
     } catch {
       setError(t('userSettings.errConnectServer'))
-    } finally {
-      setLoading(false)
     }
   }, [t])
 
@@ -87,114 +77,79 @@ export function AiLibraryNamesCard({ user }: { user: User | null }) {
     }
   }
 
+  const owner = user?.displayName || user?.username || 'User'
+
   return (
-    <Card sx={{ backgroundColor: 'background.default', borderRadius: 2, height: '100%' }}>
-      <CardContent>
-        <Box display="flex" alignItems="center" gap={1} mb={1}>
-          <TextFieldsIcon color="primary" />
-          <Typography variant="h6">{t('userSettings.aiLibraryNamesTitle')}</Typography>
+    <SettingsCard
+      icon={<TextFieldsIcon />}
+      title={t('userSettings.aiLibraryNamesTitle')}
+      description={t('userSettings.aiLibraryNamesSubtitle')}
+      footer={t('userSettings.aiLibraryFooter')}
+    >
+      {error && (
+        <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 1.5 }} onClose={() => setSuccess(null)}>
+          {success}
+        </Alert>
+      )}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <TextField
+          label={t('userSettings.moviesLibraryNameLabel')}
+          placeholder={`${defaultLibraryPrefix}${owner} - Movies`}
+          value={moviesLibraryName}
+          onChange={(e) => setMoviesLibraryName(e.target.value)}
+          size="small"
+          fullWidth
+          inputProps={{ maxLength: 100 }}
+          helperText={
+            moviesLibraryName
+              ? t('userSettings.libraryHelperNamedMovies', { name: moviesLibraryName })
+              : t('userSettings.libraryHelperEmpty')
+          }
+        />
+        <TextField
+          label={t('userSettings.seriesLibraryNameLabel')}
+          placeholder={`${defaultLibraryPrefix}${owner} - TV Series`}
+          value={seriesLibraryName}
+          onChange={(e) => setSeriesLibraryName(e.target.value)}
+          size="small"
+          fullWidth
+          inputProps={{ maxLength: 100 }}
+          helperText={
+            seriesLibraryName
+              ? t('userSettings.libraryHelperNamedSeries', { name: seriesLibraryName })
+              : t('userSettings.libraryHelperEmpty')
+          }
+        />
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
+            onClick={() => void saveSettings()}
+            disabled={saving}
+          >
+            {saving ? t('userSettings.saving') : t('common.save')}
+          </Button>
+          {(moviesLibraryName || seriesLibraryName) && (
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => {
+                setMoviesLibraryName('')
+                setSeriesLibraryName('')
+              }}
+              disabled={saving}
+            >
+              {t('userSettings.resetToDefaults')}
+            </Button>
+          )}
         </Box>
-        <Typography variant="body2" color="text.secondary" mb={3}>
-          {t('userSettings.aiLibraryNamesSubtitle')}
-        </Typography>
-
-        {outputOff && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            {t('userSettings.aiLibraryNamesOutputOff')}
-          </Alert>
-        )}
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
-            {success}
-          </Alert>
-        )}
-
-        {loading ? (
-          <Box display="flex" justifyContent="center" py={4}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <>
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <Typography variant="body2" fontWeight={500} gutterBottom>
-                {t('userSettings.moviesLibraryNameLabel')}
-              </Typography>
-              <TextField
-                placeholder={`${defaultLibraryPrefix}${user?.displayName || user?.username || 'User'} - Movies`}
-                value={moviesLibraryName}
-                onChange={(e) => setMoviesLibraryName(e.target.value)}
-                disabled={outputOff}
-                size="small"
-                fullWidth
-                inputProps={{ maxLength: 100 }}
-                helperText={
-                  moviesLibraryName
-                    ? t('userSettings.libraryHelperNamedMovies', { name: moviesLibraryName })
-                    : t('userSettings.libraryHelperEmpty')
-                }
-              />
-            </FormControl>
-
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <Typography variant="body2" fontWeight={500} gutterBottom>
-                {t('userSettings.seriesLibraryNameLabel')}
-              </Typography>
-              <TextField
-                placeholder={`${defaultLibraryPrefix}${user?.displayName || user?.username || 'User'} - TV Series`}
-                value={seriesLibraryName}
-                onChange={(e) => setSeriesLibraryName(e.target.value)}
-                disabled={outputOff}
-                size="small"
-                fullWidth
-                inputProps={{ maxLength: 100 }}
-                helperText={
-                  seriesLibraryName
-                    ? t('userSettings.libraryHelperNamedSeries', { name: seriesLibraryName })
-                    : t('userSettings.libraryHelperEmpty')
-                }
-              />
-            </FormControl>
-
-            <Box display="flex" gap={1}>
-              <Button
-                variant="contained"
-                startIcon={saving ? <CircularProgress size={16} /> : <SaveIcon />}
-                onClick={() => void saveSettings()}
-                disabled={saving || outputOff}
-                size="small"
-              >
-                {saving ? t('userSettings.saving') : t('common.save')}
-              </Button>
-              {(moviesLibraryName || seriesLibraryName) && (
-                <Button
-                  variant="outlined"
-                  onClick={() => {
-                    setMoviesLibraryName('')
-                    setSeriesLibraryName('')
-                  }}
-                  disabled={saving || outputOff}
-                  size="small"
-                >
-                  {t('userSettings.resetToDefaults')}
-                </Button>
-              )}
-            </Box>
-
-            <Divider sx={{ my: 3 }} />
-
-            <Typography variant="caption" color="text.secondary">
-              {t('userSettings.aiLibraryFooter')}
-            </Typography>
-          </>
-        )}
-      </CardContent>
-    </Card>
+      </Box>
+    </SettingsCard>
   )
 }

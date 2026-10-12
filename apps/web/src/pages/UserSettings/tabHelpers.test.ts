@@ -1,56 +1,47 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import {
-  CONDITIONAL_TAB_KEYS,
-  USER_SETTINGS_TAB_KEYS,
-  userSettingsTabIndexFromParam,
-  userSettingsTabParamFromIndex,
-} from './tabHelpers.js'
+import { USER_SETTINGS_TAB_KEYS, userSettingsTabFromParam, visibleUserSettingsTab } from './tabHelpers.js'
 
 describe('user settings tab params', () => {
-  it('round-trips every key', () => {
-    // The index is a position in a JSX list, so a key that does not round-trip
-    // sends ?tab=algorithm to a different panel than the Algorithm tab.
-    USER_SETTINGS_TAB_KEYS.forEach((key, index) => {
-      assert.equal(userSettingsTabIndexFromParam(key), index, `${key} -> index`)
-      assert.equal(userSettingsTabParamFromIndex(index), key, `index ${index} -> key`)
-    })
+  it('resolves every live key to itself', () => {
+    for (const key of USER_SETTINGS_TAB_KEYS) {
+      assert.equal(userSettingsTabFromParam(key), key)
+    }
   })
 
-  it('sends the retired profile tab to Preferences', () => {
-    // Not the default. Preferences is where the email address and notification
-    // opt-in went when the Profile tab was deleted, so that is the only landing
-    // spot where an old link still reaches what it was asking for.
-    assert.equal(
-      userSettingsTabIndexFromParam('profile'),
-      USER_SETTINGS_TAB_KEYS.indexOf('preferences')
-    )
+  it('sends each retired tab to where its settings went', () => {
+    // Not the default: an old bookmark has to reach what it could change.
+    assert.equal(userSettingsTabFromParam('watcher'), 'recommendations')
+    assert.equal(userSettingsTabFromParam('algorithm'), 'recommendations')
+    assert.equal(userSettingsTabFromParam('preferences'), 'display')
+    // Profile's one editable card was the email address and opt-in.
+    assert.equal(userSettingsTabFromParam('profile'), 'account')
   })
 
-  it('no longer treats profile as a live key', () => {
-    assert.equal(USER_SETTINGS_TAB_KEYS.includes('profile' as never), false)
+  it('no longer treats a retired name as a live key', () => {
+    for (const retired of ['watcher', 'algorithm', 'preferences', 'profile']) {
+      assert.equal(USER_SETTINGS_TAB_KEYS.includes(retired as never), false, retired)
+    }
   })
 
   it('falls back to the first tab for absent and unknown values', () => {
-    assert.equal(userSettingsTabIndexFromParam(null), 0)
-    assert.equal(userSettingsTabIndexFromParam(''), 0)
-    assert.equal(userSettingsTabIndexFromParam('nonsense'), 0)
+    assert.equal(userSettingsTabFromParam(null), USER_SETTINGS_TAB_KEYS[0])
+    assert.equal(userSettingsTabFromParam(''), USER_SETTINGS_TAB_KEYS[0])
+    assert.equal(userSettingsTabFromParam('nonsense'), USER_SETTINGS_TAB_KEYS[0])
+    // Inherited object keys are not aliases.
+    assert.equal(userSettingsTabFromParam('constructor'), USER_SETTINGS_TAB_KEYS[0])
+  })
+})
+
+describe('visibleUserSettingsTab', () => {
+  it('keeps a tab this viewer has', () => {
+    assert.equal(visibleUserSettingsTab('account', ['recommendations', 'display', 'account']), 'account')
   })
 
-  it('puts every conditional tab after every tab everyone sees', () => {
-    // Hiding a tab shifts every later index, so only the tail may be hidden.
-    const firstConditional = USER_SETTINGS_TAB_KEYS.findIndex((key) => CONDITIONAL_TAB_KEYS.has(key))
-    USER_SETTINGS_TAB_KEYS.forEach((key, index) => {
-      if (index > firstConditional && firstConditional >= 0) {
-        assert.ok(CONDITIONAL_TAB_KEYS.has(key), `${key} sits after a conditional tab`)
-      }
-    })
-  })
-
-  it('falls back to the first key for an out-of-range index', () => {
-    // Reachable if a tab is removed while a stale index sits in component
-    // state; undefined here would put `tab=undefined` in the address bar.
-    assert.equal(userSettingsTabParamFromIndex(99), USER_SETTINGS_TAB_KEYS[0])
-    assert.equal(userSettingsTabParamFromIndex(-1), USER_SETTINGS_TAB_KEYS[0])
+  it('lands a tab this viewer lacks on their first tab', () => {
+    // A Jellyfin account following a link to the Emby home screen tab.
+    assert.equal(visibleUserSettingsTab('home', ['recommendations', 'display', 'account']), 'recommendations')
+    // A hidden tab in the MIDDLE no longer shifts the ones after it: keys, not positions.
+    assert.equal(visibleUserSettingsTab('home', ['recommendations', 'display', 'home']), 'home')
   })
 })

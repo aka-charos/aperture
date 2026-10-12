@@ -1,16 +1,7 @@
-import {
-  Alert,
-  Box,
-  Card,
-  CardContent,
-  CircularProgress,
-  FormControlLabel,
-  Switch,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Alert, CircularProgress, Switch, TextField } from '@mui/material'
 import MailOutlineIcon from '@mui/icons-material/MailOutline'
 import { useTranslation } from 'react-i18next'
+import { SettingRow, SettingsCard } from './SettingsCard'
 
 /**
  * Email address and notification opt-in.
@@ -23,10 +14,8 @@ import { useTranslation } from 'react-i18next'
  *
  * State still lives in the parent: the whole card is gated on
  * `emailNotificationsAllowed`, an admin-granted per-user flag that arrives on
- * the same GET as the values, so the parent has to know it either way and
- * fetching it twice to make the card self-contained would be the more expensive
- * shape. The parent renders the Grid item conditionally, so a viewer without
- * the grant sees no hole in the layout rather than an empty column.
+ * the same GET as the values, and the parent also needs that flag to decide
+ * whether the Account tab has anything on it at all.
  */
 interface EmailNotificationsCardProps {
   email: string
@@ -60,71 +49,51 @@ export function EmailNotificationsCard({
   const { t } = useTranslation()
 
   return (
-    <Card sx={{ backgroundColor: 'background.default', borderRadius: 2, height: '100%' }}>
-      <CardContent>
-        <Box display="flex" alignItems="center" gap={1} mb={2}>
-          <MailOutlineIcon fontSize="small" color="action" />
-          <Typography variant="subtitle1" fontWeight={600}>
-            {t('userSettings.emailSectionTitle')}
-          </Typography>
-        </Box>
-
-        {emailError && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={onDismissEmailError}>
-            {emailError}
-          </Alert>
-        )}
-
-        {emailSuccess && (
-          <Alert severity="success" sx={{ mb: 2 }} onClose={onDismissSuccess}>
-            {emailSuccess}
-          </Alert>
-        )}
-
-        {loadingEmail ? (
-          <Box display="flex" justifyContent="center" py={2}>
-            <CircularProgress size={24} />
-          </Box>
-        ) : (
-          <>
-            <TextField
-              label={t('userSettings.emailAddress')}
-              value={email}
-              onChange={(e) => onEmailChange(e.target.value)}
-              fullWidth
-              margin="normal"
-              size="small"
-              placeholder={t('userSettings.emailPlaceholder')}
-              helperText={
-                emailLocked ? t('userSettings.emailHelperCustom') : t('userSettings.emailHelperSynced')
-              }
-              InputProps={{
-                endAdornment: savingEmail ? <CircularProgress size={16} /> : null,
-              }}
-              onBlur={onEmailBlur}
-            />
-
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={emailNotificationsEnabled}
-                  onChange={(e) => onNotificationsChange(e.target.checked)}
-                  disabled={savingEmail}
-                />
-              }
-              label={
-                <Box>
-                  <Typography variant="body2">{t('userSettings.emailNotificationsTitle')}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {t('userSettings.emailNotificationsSubtitle')}
-                  </Typography>
-                </Box>
-              }
-              sx={{ mt: 1, alignItems: 'flex-start' }}
-            />
-          </>
-        )}
-      </CardContent>
-    </Card>
+    <SettingsCard
+      icon={<MailOutlineIcon />}
+      title={t('userSettings.emailSectionTitle')}
+      description={t('userSettings.account.emailBody')}
+    >
+      {emailError && (
+        <Alert severity="error" sx={{ mb: 1.5 }} onClose={onDismissEmailError}>
+          {emailError}
+        </Alert>
+      )}
+      {emailSuccess && (
+        <Alert severity="success" sx={{ mb: 1.5 }} onClose={onDismissSuccess}>
+          {emailSuccess}
+        </Alert>
+      )}
+      {loadingEmail ? (
+        <CircularProgress size={22} />
+      ) : (
+        <>
+          <TextField
+            label={t('userSettings.emailAddress')}
+            value={email}
+            onChange={(e) => onEmailChange(e.target.value)}
+            onBlur={onEmailBlur}
+            fullWidth
+            size="small"
+            placeholder={t('userSettings.emailPlaceholder')}
+            helperText={emailLocked ? t('userSettings.emailHelperCustom') : t('userSettings.emailHelperSynced')}
+            InputProps={{ endAdornment: savingEmail ? <CircularProgress size={16} /> : null }}
+            sx={{ mb: 1.5 }}
+          />
+          <SettingRow
+            label={t('userSettings.emailNotificationsTitle')}
+            description={t('userSettings.emailNotificationsSubtitle')}
+            control={
+              <Switch
+                checked={emailNotificationsEnabled}
+                onChange={(e) => onNotificationsChange(e.target.checked)}
+                disabled={savingEmail}
+                slotProps={{ input: { 'aria-label': t('userSettings.emailNotificationsTitle') } }}
+              />
+            }
+          />
+        </>
+      )}
+    </SettingsCard>
   )
 }

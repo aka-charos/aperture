@@ -175,36 +175,36 @@ const traktRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (error) {
         fastify.log.warn({ error }, 'Trakt OAuth error')
-        return reply.redirect('/#/settings?trakt=error&message=' + encodeURIComponent(error))
+        return reply.redirect('/settings?tab=account&trakt=error&message=' + encodeURIComponent(error))
       }
 
       if (!state || !stateTokens.has(state)) {
-        return reply.redirect('/#/settings?trakt=error&message=' + encodeURIComponent('Invalid state token'))
+        return reply.redirect('/settings?tab=account&trakt=error&message=' + encodeURIComponent('Invalid state token'))
       }
 
       const stateData = stateTokens.get(state)!
       stateTokens.delete(state)
 
       if (!code) {
-        return reply.redirect('/#/settings?trakt=error&message=' + encodeURIComponent('No authorization code received'))
+        return reply.redirect('/settings?tab=account&trakt=error&message=' + encodeURIComponent('No authorization code received'))
       }
 
       const tokens = await exchangeCodeForTokens(code)
       if (!tokens) {
-        return reply.redirect('/#/settings?trakt=error&message=' + encodeURIComponent('Failed to exchange authorization code'))
+        return reply.redirect('/settings?tab=account&trakt=error&message=' + encodeURIComponent('Failed to exchange authorization code'))
       }
 
       const traktUser = await getTraktUser(tokens.accessToken)
       if (!traktUser) {
-        return reply.redirect('/#/settings?trakt=error&message=' + encodeURIComponent('Failed to get Trakt user info'))
+        return reply.redirect('/settings?tab=account&trakt=error&message=' + encodeURIComponent('Failed to get Trakt user info'))
       }
 
       await storeUserTraktTokens(stateData.userId, tokens, traktUser.username)
 
-      return reply.redirect('/#/settings?trakt=success&username=' + encodeURIComponent(traktUser.username))
+      return reply.redirect('/settings?tab=account&trakt=success&username=' + encodeURIComponent(traktUser.username))
     } catch (err) {
       fastify.log.error({ err }, 'Failed to handle Trakt callback')
-      return reply.redirect('/#/settings?trakt=error&message=' + encodeURIComponent('An unexpected error occurred'))
+      return reply.redirect('/settings?tab=account&trakt=error&message=' + encodeURIComponent('An unexpected error occurred'))
     }
   })
 
