@@ -3029,12 +3029,7 @@
     "hintChipClose": "Esc",
     "hintAriaNavigate": "Клавиши со стрелками для перемещения",
     "hintAriaSelect": "Войдите, чтобы выбрать",
-    "hintAriaClose": "Побег, чтобы закрыть",
-    "sectionPeople": "People",
-    "sectionFranchises": "Franchises",
-    "sectionTitles": "Movies & series",
-    "franchiseMovies_one": "{{count}} movie in your library",
-    "franchiseMovies_other": "{{count}} movies in your library"
+    "hintAriaClose": "Побег, чтобы закрыть"
   },
   "assistant": {
     "fabTooltip": "ИИ-помощник",

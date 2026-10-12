@@ -3056,12 +3056,7 @@
     "hintChipClose": "Esc",
     "hintAriaNavigate": "이동하려면 화살표 키",
     "hintAriaSelect": "선택하려면 입력하세요.",
-    "hintAriaClose": "닫으려면 탈출하세요",
-    "sectionPeople": "People",
-    "sectionFranchises": "Franchises",
-    "sectionTitles": "Movies & series",
-    "franchiseMovies_one": "{{count}} movie in your library",
-    "franchiseMovies_other": "{{count}} movies in your library"
+    "hintAriaClose": "닫으려면 탈출하세요"
   },
   "assistant": {
     "fabTooltip": "AI 어시스턴트",

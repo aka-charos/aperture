@@ -1,6 +1,6 @@
 # Global Search
 
-Search your library for movies, series, people and franchises — from a quick palette in the header, or a full search page with filters and an optional AI semantic mode.
+Search your library for movies and series — from a quick palette in the header, or a full search page with filters and an optional AI semantic mode.
 
 ![Dashboard with Search](../images/features/dashboard.png)
 
@@ -10,14 +10,11 @@ Search your library for movies, series, people and franchises — from a quick p
 
 Click the **search icon** in the top bar (or press **⌘K** / **Ctrl+K**):
 
-- Results appear as you type (after two characters), in up to three sections:
-  - **People** — actors and directors credited on titles you can see; opens their person page
-  - **Franchises** — movie collections in your library; opens the franchise page
-  - **Movies & series** — posters, title, year, and a Movie/Series chip
-- **"View all results for … →"** sits right under the search box and takes you to the full search page (pressing **↵** with nothing selected does the same)
+- Results appear as you type (after two characters): posters, title, year, and a Movie/Series chip
 - **↑↓** to navigate, **↵** to open, **Esc** to close
+- **"View all results for … →"** takes you to the full search page
 
-Titles match by title and original title (and, more loosely, by cast, crew, keywords and synopsis). People and franchises match by **name**, where a word in the name starts with what you typed: *nol* finds Christopher Nolan, *star w* finds the Star Wars collection. Accents and apostrophes don't matter. The palette shows a few of each; for the full lists use [Browse](browse.md)'s People tab or the [Franchise Tracker](franchises.md).
+The palette matches **movies and series** — by title and original title. It doesn't search people or franchises; use [Browse](browse.md)'s People tab or the [Franchise Tracker](franchises.md) for those.
 
 ### The Search Page
 
@@ -47,8 +44,8 @@ The header palette always searches literally; switch to the full page and toggle
 |-------------|---------|
 | A specific title | Type it — partial titles work ("dark knight") |
 | A concept or mood | Full page → **AI Search** on ("time travel romance") |
-| An actor or director | Type their name — they appear under **People** in the palette (or use [Browse](browse.md) → People) |
-| A franchise | Type its name — it appears under **Franchises** in the palette (or use the [Franchise Tracker](franchises.md)) |
+| An actor or director | Go through a title's detail page, or [Browse](browse.md) → People |
+| A franchise | [Franchise Tracker](franchises.md), or the Franchise filter on Browse → Movies |
 
 ---
 

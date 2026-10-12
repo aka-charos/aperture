@@ -61,9 +61,6 @@ const EXEMPT: Record<string, string> = {
     'rankings are cards (filtered by withLibraryScope); stats, genres and studios are aggregates naming no title',
   // Hydration of items a scoped builder already chose.
   'channels/handlers/playlist.ts': "hydrates items the channel builder chose within the owner's scope",
-  // Pure SQL builders: the route passes scopeClause in, and the builder's own
-  // test asserts every table read carries it.
-  'search/nameSearch.ts': 'pure builder; scope injected by search/index.ts (pinned in nameSearch.test.ts)',
   // Admin-only surfaces.
   'gap-analysis/index.ts': 'admin only',
   'users/handlers/goneAccounts.ts': 'admin only; counts the titles a removed account watched, naming none',

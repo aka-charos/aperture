@@ -3072,12 +3072,7 @@
     "hintChipClose": "خروج",
     "hintAriaNavigate": "مفاتيح الأسهم للتحرك",
     "hintAriaSelect": "أدخل للتحديد",
-    "hintAriaClose": "الهروب إلى الإغلاق",
-    "sectionPeople": "People",
-    "sectionFranchises": "Franchises",
-    "sectionTitles": "Movies & series",
-    "franchiseMovies_one": "{{count}} movie in your library",
-    "franchiseMovies_other": "{{count}} movies in your library"
+    "hintAriaClose": "الهروب إلى الإغلاق"
   },
   "assistant": {
     "fabTooltip": "مساعد الذكاء الاصطناعي",

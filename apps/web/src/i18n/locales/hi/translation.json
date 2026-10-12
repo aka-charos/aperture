@@ -3056,12 +3056,7 @@
     "hintChipClose": "ईएससी",
     "hintAriaNavigate": "स्थानांतरित करने के लिए तीर कुंजी",
     "hintAriaSelect": "चयन करने के लिए दर्ज करें",
-    "hintAriaClose": "बंद करने के लिए भागो",
-    "sectionPeople": "People",
-    "sectionFranchises": "Franchises",
-    "sectionTitles": "Movies & series",
-    "franchiseMovies_one": "{{count}} movie in your library",
-    "franchiseMovies_other": "{{count}} movies in your library"
+    "hintAriaClose": "बंद करने के लिए भागो"
   },
   "assistant": {
     "fabTooltip": "एआई सहायक",

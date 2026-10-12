@@ -4030,12 +4030,7 @@
     "hintChipClose": "Esc",
     "hintAriaNavigate": "Βέλη για μετακίνηση",
     "hintAriaSelect": "Enter για επιλογή",
-    "hintAriaClose": "Escape για κλείσιμο",
-    "sectionPeople": "Πρόσωπα",
-    "sectionFranchises": "Franchise",
-    "sectionTitles": "Ταινίες & σειρές",
-    "franchiseMovies_one": "{{count}} ταινία στη βιβλιοθήκη σας",
-    "franchiseMovies_other": "{{count}} ταινίες στη βιβλιοθήκη σας"
+    "hintAriaClose": "Escape για κλείσιμο"
   },
   "settingsStreamingDiscovery": {
     "title": "Ανακάλυψη streaming (JustWatch)",
