@@ -21,14 +21,19 @@ import {
   useTheme,
   Tooltip,
   ButtonBase,
+  ListSubheader,
 } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import ManageSearchIcon from '@mui/icons-material/ManageSearch'
+import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import CloseIcon from '@mui/icons-material/Close'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { matchSearchShortcut } from '@/lib/searchShortcut'
+import { usePersonPortrait } from '@/hooks/usePersonPortrait'
+import type { BrowsePerson } from '@/pages/browse/types'
+import { personSubtitle } from '@/pages/browse/utils/personSubtitle'
 
 interface SearchResult {
   id: string
@@ -50,6 +55,32 @@ interface SearchResult {
  */
 type SearchStatus = 'idle' | 'loading' | 'done' | 'error'
 
+interface FranchiseResult {
+  /** The TMDb collection id `/franchises/:id` takes. */
+  id: string
+  name: string
+  movieCount: number
+  posterUrl: string | null
+}
+
+interface NameResults {
+  people: BrowsePerson[]
+  franchises: FranchiseResult[]
+}
+
+const NO_NAMES: NameResults = { people: [], franchises: [] }
+
+/**
+ * One list for the arrow keys, in the order the sections are drawn: people,
+ * franchises, then titles. Names come first because they are few and short,
+ * and a name someone typed on purpose ("nolan") would otherwise sit below ten
+ * of that person's films.
+ */
+type PaletteEntry =
+  | { kind: 'person'; person: BrowsePerson }
+  | { kind: 'franchise'; franchise: FranchiseResult }
+  | { kind: 'title'; result: SearchResult }
+
 export function GlobalSearch() {
   const { t } = useTranslation()
   const fullScreen = useIsPhone()
@@ -65,6 +96,7 @@ export function GlobalSearch() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
+  const [names, setNames] = useState<NameResults>(NO_NAMES)
   const [status, setStatus] = useState<SearchStatus>('idle')
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -87,6 +119,7 @@ export function GlobalSearch() {
     setOpen(false)
     setQuery('')
     setResults([])
+    setNames(NO_NAMES)
     setStatus('idle')
     setSelectedIndex(-1)
   }, [])
@@ -123,6 +156,7 @@ export function GlobalSearch() {
     const term = query.trim()
     if (term.length < 2) {
       setResults([])
+      setNames(NO_NAMES)
       setStatus('idle')
       setSelectedIndex(-1)
       return
@@ -133,18 +167,31 @@ export function GlobalSearch() {
     setStatus('loading')
     const controller = new AbortController()
     const timer = setTimeout(async () => {
+      const q = encodeURIComponent(term)
+      // Names are a second request so a failure there costs two sections, not
+      // the answer: the status follows the title search alone.
+      const namesRequest = fetch(`/api/search/names?q=${q}`, {
+        credentials: 'include',
+        signal: controller.signal,
+      })
+        .then((res) => (res.ok ? (res.json() as Promise<NameResults>) : NO_NAMES))
+        .catch(() => NO_NAMES)
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(term)}&limit=10`, {
+        const res = await fetch(`/api/search?q=${q}&limit=10`, {
           credentials: 'include',
           signal: controller.signal,
         })
         if (!res.ok) throw new Error(`Search failed with HTTP ${res.status}`)
         const data = (await res.json()) as { results: SearchResult[] }
+        const nameData = await namesRequest
+        if (controller.signal.aborted) return
         setResults(data.results)
+        setNames({ people: nameData.people ?? [], franchises: nameData.franchises ?? [] })
         setStatus('done')
       } catch {
         if (controller.signal.aborted) return
         setResults([])
+        setNames(NO_NAMES)
         setStatus('error')
       }
       setSelectedIndex(-1)
@@ -156,12 +203,34 @@ export function GlobalSearch() {
     }
   }, [query])
 
-  const handleResultClick = useCallback(
-    (result: SearchResult) => {
-      navigate(`/${result.type === 'movie' ? 'movies' : 'series'}/${result.id}`)
+  const entries = useMemo<PaletteEntry[]>(
+    () => [
+      ...names.people.map((person) => ({ kind: 'person' as const, person })),
+      ...names.franchises.map((franchise) => ({ kind: 'franchise' as const, franchise })),
+      ...results.map((result) => ({ kind: 'title' as const, result })),
+    ],
+    [names, results]
+  )
+  const franchiseOffset = names.people.length
+  const titleOffset = franchiseOffset + names.franchises.length
+
+  const handleEntryClick = useCallback(
+    (entry: PaletteEntry) => {
+      if (entry.kind === 'person') {
+        navigate(`/person/${encodeURIComponent(entry.person.name)}`)
+      } else if (entry.kind === 'franchise') {
+        navigate(`/franchises/${encodeURIComponent(entry.franchise.id)}`)
+      } else {
+        navigate(`/${entry.result.type === 'movie' ? 'movies' : 'series'}/${entry.result.id}`)
+      }
       handleClose()
     },
     [navigate, handleClose]
+  )
+
+  const handleResultClick = useCallback(
+    (result: SearchResult) => handleEntryClick({ kind: 'title', result }),
+    [handleEntryClick]
   )
 
   const handleViewAllResults = useCallback(() => {
@@ -175,20 +244,20 @@ export function GlobalSearch() {
     (e: React.KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setSelectedIndex((prev) => Math.min(prev + 1, results.length - 1))
+        setSelectedIndex((prev) => Math.min(prev + 1, entries.length - 1))
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
         setSelectedIndex((prev) => Math.max(prev - 1, -1))
       } else if (e.key === 'Enter' && query.trim()) {
         e.preventDefault()
-        if (selectedIndex >= 0 && selectedIndex < results.length) {
-          handleResultClick(results[selectedIndex])
+        if (selectedIndex >= 0 && selectedIndex < entries.length) {
+          handleEntryClick(entries[selectedIndex])
         } else {
           handleViewAllResults()
         }
       }
     },
-    [results, selectedIndex, handleResultClick, handleViewAllResults, query]
+    [entries, selectedIndex, handleEntryClick, handleViewAllResults, query]
   )
 
   return (
@@ -318,7 +387,7 @@ export function GlobalSearch() {
               </Box>
             )}
 
-            {status === 'done' && results.length === 0 && (
+            {status === 'done' && entries.length === 0 && (
               <Box p={4} textAlign="center">
                 <Typography color="text.secondary">
                   {t('globalSearch.noResults', { query: query.trim() })}
@@ -332,9 +401,54 @@ export function GlobalSearch() {
               </Box>
             )}
 
+            {names.people.length > 0 && (
+              <List sx={{ py: 0 }} subheader={<SectionHeader label={t('globalSearch.sectionPeople')} />}>
+                {names.people.map((person, index) => (
+                  <PersonResultRow
+                    key={person.name}
+                    person={person}
+                    index={index}
+                    selected={index === selectedIndex}
+                    onSelect={() => handleEntryClick({ kind: 'person', person })}
+                  />
+                ))}
+              </List>
+            )}
+
+            {names.franchises.length > 0 && (
+              <List sx={{ py: 0 }} subheader={<SectionHeader label={t('globalSearch.sectionFranchises')} />}>
+                {names.franchises.map((franchise, index) => (
+                  <CompactRow
+                    key={franchise.id}
+                    index={franchiseOffset + index}
+                    selected={franchiseOffset + index === selectedIndex}
+                    onSelect={() => handleEntryClick({ kind: 'franchise', franchise })}
+                    avatar={
+                      <Avatar
+                        variant="rounded"
+                        src={getProxiedImageUrl(franchise.posterUrl)}
+                        sx={{ width: 32, height: 48, borderRadius: 0.5 }}
+                      >
+                        <CollectionsBookmarkIcon fontSize="small" />
+                      </Avatar>
+                    }
+                    primary={franchise.name}
+                    secondary={t('globalSearch.franchiseMovies', { count: franchise.movieCount })}
+                  />
+                ))}
+              </List>
+            )}
+
             {results.length > 0 && (
-                <List sx={{ py: 0 }}>
-                  {results.map((result, index) => (
+                <List
+                  sx={{ py: 0 }}
+                  subheader={
+                    titleOffset > 0 ? <SectionHeader label={t('globalSearch.sectionTitles')} /> : undefined
+                  }
+                >
+                  {results.map((result, resultIndex) => {
+                    const index = titleOffset + resultIndex
+                    return (
                     <ListItem
                       key={`${result.type}-${result.id}`}
                       data-result-index={index}
@@ -414,7 +528,8 @@ export function GlobalSearch() {
                         }
                       />
                     </ListItem>
-                  ))}
+                    )
+                  })}
                 </List>
             )}
           </Box>
@@ -475,3 +590,96 @@ export function GlobalSearch() {
   )
 }
 
+
+function SectionHeader({ label }: { label: string }) {
+  return (
+    <ListSubheader
+      disableSticky
+      sx={{
+        lineHeight: 1,
+        pt: 1.5,
+        pb: 0.75,
+        bgcolor: 'transparent',
+        fontSize: '0.7rem',
+        fontWeight: 600,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        color: 'text.secondary',
+      }}
+    >
+      {label}
+    </ListSubheader>
+  )
+}
+
+interface CompactRowProps {
+  index: number
+  selected: boolean
+  onSelect: () => void
+  avatar: React.ReactNode
+  primary: string
+  secondary: string
+}
+
+/** A one-line row for a name: shorter than a title row, since a name has no genres, scores or year. */
+function CompactRow({ index, selected, onSelect, avatar, primary, secondary }: CompactRowProps) {
+  const theme = useTheme()
+  return (
+    <ListItem
+      data-result-index={index}
+      onClick={onSelect}
+      sx={{
+        cursor: 'pointer',
+        py: 0.75,
+        gap: 1.5,
+        bgcolor: selected ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
+      }}
+    >
+      <Box sx={{ width: 48, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>{avatar}</Box>
+      <ListItemText
+        primary={primary}
+        secondary={secondary}
+        primaryTypographyProps={{ fontWeight: 500, noWrap: true }}
+        secondaryTypographyProps={{ variant: 'caption', noWrap: true }}
+        sx={{ minWidth: 0, my: 0 }}
+      />
+    </ListItem>
+  )
+}
+
+interface PersonResultRowProps {
+  person: BrowsePerson
+  index: number
+  selected: boolean
+  onSelect: () => void
+}
+
+/** The portrait Browse → People shows: the media server's, then TMDb's. */
+function PersonResultRow({ person, index, selected, onSelect }: PersonResultRowProps) {
+  const { t } = useTranslation()
+  const { displaySrc, phase, onImageError } = usePersonPortrait({
+    personName: person.name,
+    mediaImageUrl: `/api/media/images/Persons/${encodeURIComponent(person.name)}/Images/Primary`,
+    fetchTmdbFallback: true,
+  })
+  return (
+    <CompactRow
+      index={index}
+      selected={selected}
+      onSelect={onSelect}
+      avatar={
+        <Avatar
+          src={phase === 'none' ? undefined : displaySrc}
+          onError={onImageError}
+          alt=""
+          sx={{ width: 40, height: 40 }}
+        >
+          {person.name.charAt(0)}
+        </Avatar>
+      }
+      primary={person.name}
+      secondary={personSubtitle(person, t)}
+    />
+  )
+}

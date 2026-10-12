@@ -187,3 +187,19 @@ export const searchFiltersSchema = {
   summary: 'Get search filter options',
   description: 'Get available filter options for building search UI including genres, collections, networks, and year ranges.',
 }
+
+export const searchNamesSchema = {
+  tags: ['search'],
+  summary: 'Search people and franchises by name',
+  description:
+    'People (actors and directors) and movie franchises whose name has a word starting with the query, from the libraries the viewer may see. Used by the search palette beside title search.',
+  querystring: {
+    type: 'object',
+    required: ['q'],
+    properties: {
+      q: { type: 'string', description: 'Search query (at least two characters to match anything)', example: 'nolan' },
+      peopleLimit: { type: 'string', description: 'Maximum people to return (0-10)', default: '4' },
+      franchiseLimit: { type: 'string', description: 'Maximum franchises to return (0-10)', default: '3' },
+    },
+  },
+}

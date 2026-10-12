@@ -3056,7 +3056,12 @@
     "hintChipClose": "ESC",
     "hintAriaNavigate": "移動するには矢印キー",
     "hintAriaSelect": "入力して選択します",
-    "hintAriaClose": "エスケープして閉じる"
+    "hintAriaClose": "エスケープして閉じる",
+    "sectionPeople": "People",
+    "sectionFranchises": "Franchises",
+    "sectionTitles": "Movies & series",
+    "franchiseMovies_one": "{{count}} movie in your library",
+    "franchiseMovies_other": "{{count}} movies in your library"
   },
   "assistant": {
     "fabTooltip": "AIアシスタント",

@@ -3060,7 +3060,12 @@
     "hintChipClose": "ESC",
     "hintAriaNavigate": "Teclas de flecha para mover",
     "hintAriaSelect": "Entra para seleccionar",
-    "hintAriaClose": "escapar para cerrar"
+    "hintAriaClose": "escapar para cerrar",
+    "sectionPeople": "People",
+    "sectionFranchises": "Franchises",
+    "sectionTitles": "Movies & series",
+    "franchiseMovies_one": "{{count}} movie in your library",
+    "franchiseMovies_other": "{{count}} movies in your library"
   },
   "assistant": {
     "fabTooltip": "Asistente de IA",

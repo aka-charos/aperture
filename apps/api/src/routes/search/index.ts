@@ -3,7 +3,14 @@ import { query, queryOne } from '../../lib/db.js'
 import { requireAuth } from '../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../lib/viewerScope.js'
 import { getEmbeddingInvocation, getActiveEmbeddingTableName, libraryScopeSql } from '@aperture/core'
-import { searchSchemas, searchSchema, searchSuggestionsSchema, searchFiltersSchema } from './schemas.js'
+import { searchSchemas, searchSchema, searchSuggestionsSchema, searchFiltersSchema, searchNamesSchema } from './schemas.js'
+import {
+  FRANCHISE_LIMIT_DEFAULT,
+  PEOPLE_LIMIT_DEFAULT,
+  buildFranchiseSearch,
+  buildPeopleSearch,
+  clampNameLimit,
+} from './nameSearch.js'
 import {
   MOVIE_SEARCH,
   SERIES_SEARCH,
@@ -324,6 +331,65 @@ const searchRoutes: FastifyPluginAsync = async (fastify) => {
         type: r.type,
         year: r.year,
         label: r.year ? `${r.title} (${r.year})` : r.title,
+      })),
+    })
+  })
+
+  /**
+   * GET /api/search/names
+   * People and franchises whose NAME matches, for the search palette. Separate
+   * from /api/search so title results never wait on it, and so a failure here
+   * costs the palette two sections rather than the whole answer.
+   */
+  fastify.get<{
+    Querystring: {
+      q: string
+      peopleLimit?: string
+      franchiseLimit?: string
+    }
+  }>('/api/search/names', { preHandler: requireAuth, schema: searchNamesSchema }, async (request, reply) => {
+    const term = request.query.q?.trim() ?? ''
+    if (term.length < 2) {
+      return reply.send({ people: [], franchises: [] })
+    }
+
+    const peopleLimit = clampNameLimit(request.query.peopleLimit, PEOPLE_LIMIT_DEFAULT)
+    const franchiseLimit = clampNameLimit(request.query.franchiseLimit, FRANCHISE_LIMIT_DEFAULT)
+
+    // Only names credited on titles this viewer may see (lib/viewerScope.ts):
+    // a person or franchise found only in a hidden library is itself the leak.
+    const scope = await viewerScope(request)
+    const bind = (alias: string, params: unknown[]) => scopeClause(scope, alias, params)
+    const people = buildPeopleSearch(term, peopleLimit, bind)
+    const franchises = buildFranchiseSearch(term, franchiseLimit, bind)
+
+    const [peopleRows, franchiseRows] = await Promise.all([
+      peopleLimit > 0
+        ? query<{ name: string; credits: number; movie_credits: number; series_credits: number }>(
+            people.sql,
+            people.params
+          )
+        : null,
+      franchiseLimit > 0
+        ? query<{ id: string; name: string; movie_count: number; poster_url: string | null }>(
+            franchises.sql,
+            franchises.params
+          )
+        : null,
+    ])
+
+    return reply.send({
+      people: (peopleRows?.rows ?? []).map((r) => ({
+        name: r.name,
+        credits: r.credits,
+        movieCredits: r.movie_credits,
+        seriesCredits: r.series_credits,
+      })),
+      franchises: (franchiseRows?.rows ?? []).map((r) => ({
+        id: r.id,
+        name: r.name,
+        movieCount: r.movie_count,
+        posterUrl: r.poster_url,
       })),
     })
   })
