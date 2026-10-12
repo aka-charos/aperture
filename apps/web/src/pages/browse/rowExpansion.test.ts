@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { rowOf, toggleRow } from './rowExpansion.js'
+import { fillOpenRows, rowOf, toggleRow } from './rowExpansion.js'
 
 const grid = [
   { id: 'a', top: 100 },
@@ -42,5 +42,24 @@ describe('toggleRow', () => {
     const before = new Set(['x'])
     toggleRow(before, ['a'], 'a')
     assert.deepEqual([...before], ['x'])
+  })
+})
+
+describe('fillOpenRows', () => {
+  it('opens cards appended into an open row, and only that row', () => {
+    const next = fillOpenRows(grid, new Set(['a', 'b']))
+    assert.deepEqual([...next].sort(), ['a', 'b', 'c'])
+  })
+
+  it('returns the very same set when every open row is already whole', () => {
+    const open = new Set(['d', 'e'])
+    assert.equal(fillOpenRows(grid, open), open)
+    const none = new Set<string>()
+    assert.equal(fillOpenRows(grid, none), none)
+  })
+
+  it('ignores open ids no longer on the page', () => {
+    const open = new Set(['gone'])
+    assert.equal(fillOpenRows(grid, open), open)
   })
 })

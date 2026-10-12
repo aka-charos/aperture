@@ -143,7 +143,7 @@ function OverviewBelow({
     const observer = new ResizeObserver(measure)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [expanded, text])
+  }, [expanded, text, lines])
 
   return (
     <Box mt={0.75}>
@@ -167,6 +167,7 @@ function OverviewBelow({
           type="button"
           variant="caption"
           underline="hover"
+          aria-expanded={expanded}
           onClick={(e: React.MouseEvent) => {
             // The card navigates on click; this only opens the text.
             e.stopPropagation()

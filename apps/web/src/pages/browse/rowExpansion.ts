@@ -24,6 +24,24 @@ export function rowOf(cards: readonly CardPosition[], id: string): string[] {
 }
 
 /**
+ * Every row holding an open card, opened whole. Infinite scroll appends cards
+ * into a partly filled last row, and an open row would otherwise take closed
+ * newcomers, which is exactly the hole row expansion exists to prevent. Returns
+ * the same set when nothing changes, so a caller can skip the state update.
+ */
+export function fillOpenRows(cards: readonly CardPosition[], expanded: ReadonlySet<string>): ReadonlySet<string> {
+  if (expanded.size === 0) return expanded
+  const openTops = cards.filter((card) => expanded.has(card.id)).map((card) => card.top)
+  const missing = cards.filter(
+    (card) => !expanded.has(card.id) && openTops.some((top) => Math.abs(card.top - top) < 1)
+  )
+  if (missing.length === 0) return expanded
+  const next = new Set(expanded)
+  for (const card of missing) next.add(card.id)
+  return next
+}
+
+/**
  * Pressing "more" opens every card in the row; pressing "less" closes them.
  * Decided by the pressed card's own state, so a row holding a card left open
  * from a different layout (the pane was resized since) still toggles as one.

@@ -77,7 +77,7 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
-  const plots = useRowExpansion()
+  const plots = useRowExpansion(series.series.length)
   const resetPlots = plots.reset
   // A fresh list (new filters, new sort) lays out new rows; nothing stays open.
   useEffect(() => {
