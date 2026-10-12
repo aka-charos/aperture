@@ -13,6 +13,7 @@ import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
+import { LIBRARY_SEASON_COUNT_SQL } from '../seasonCount.js'
 import {
   genresSchema,
   networksSchema,
@@ -216,8 +217,8 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
         `SELECT 
           MIN(year) as min_year,
           MAX(year) as max_year,
-          MIN(total_seasons) as min_seasons,
-          MAX(total_seasons) as max_seasons,
+          MIN(${LIBRARY_SEASON_COUNT_SQL}) as min_seasons,
+          MAX(${LIBRARY_SEASON_COUNT_SQL}) as max_seasons,
           MIN(community_rating) as min_rating,
           MAX(community_rating) as max_rating
          FROM series 

@@ -1782,11 +1782,12 @@
       "year": "YEAR",
       "contentRating": "CONTENT RATING",
       "productionCountry": "PRODUCTION COUNTRY",
-      "libraryAudience": "LIBRARY & AUDIENCE",
       "runtime": "RUNTIME",
       "videoQuality": "VIDEO QUALITY",
       "seasons": "SEASONS",
-      "status": "STATUS"
+      "status": "STATUS",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "Community Rating",
     "rtCriticScore": "RT Critic Score",
@@ -1794,7 +1795,6 @@
     "releaseYear": "Release Year",
     "duration": "Duration",
     "numberOfSeasons": "Number of Seasons",
-    "watchStatusCaption": "Your watch status",
     "watchAny": "Any",
     "watchWatched": "Watched",
     "watchUnwatched": "Unwatched",
@@ -5077,7 +5077,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "channels": {
     "title": "Channels",

@@ -1570,11 +1570,12 @@
       "year": "JAAR",
       "contentRating": "INHOUD BEOORDELING",
       "productionCountry": "PRODUCTIELAND",
-      "libraryAudience": "BIBLIOTHEEK & PUBLIEK",
       "runtime": "RUNTIME",
       "videoQuality": "VIDEOKWALITEIT",
       "seasons": "SEIZOENEN",
-      "status": "STATUS"
+      "status": "STATUS",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "Gemeenschapsbeoordeling",
     "rtCriticScore": "RT-criticusscore",
@@ -1582,7 +1583,6 @@
     "releaseYear": "Jaar van uitgave",
     "duration": "Duur",
     "numberOfSeasons": "Aantal seizoenen",
-    "watchStatusCaption": "Uw horlogestatus",
     "watchAny": "Elk",
     "watchWatched": "Bekeken",
     "watchUnwatched": "Niet bekeken",
@@ -3754,7 +3754,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "channels": {
     "title": "Kanalen",

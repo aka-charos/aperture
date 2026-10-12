@@ -1175,7 +1175,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "login": {
     "title": "Willkommen zurück",
@@ -1635,11 +1637,12 @@
       "year": "JAHR",
       "contentRating": "INHALTSBEWERTUNG",
       "productionCountry": "HERSTELLUNGSORT",
-      "libraryAudience": "BIBLIOTHEK & PUBLIKUM",
       "runtime": "LAUFZEIT",
       "videoQuality": "VIDEOQUALITÄT",
       "seasons": "STAFFELN",
-      "status": "STATUS"
+      "status": "STATUS",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "Community-Bewertung",
     "rtCriticScore": "RT Kritikerbewertung",
@@ -1647,7 +1650,6 @@
     "releaseYear": "Erscheinungsjahr",
     "duration": "Dauer",
     "numberOfSeasons": "Anzahl der Staffeln",
-    "watchStatusCaption": "Dein Sehstatus",
     "watchAny": "Beliebig",
     "watchWatched": "Gesehen",
     "watchUnwatched": "Ungesehen",

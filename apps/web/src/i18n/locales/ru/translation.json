@@ -1578,11 +1578,12 @@
       "year": "ГОД",
       "contentRating": "РЕЙТИНГ КОНТЕНТА",
       "productionCountry": "СТРАНА ПРОИЗВОДСТВА",
-      "libraryAudience": "БИБЛИОТЕКА И АУДИТОРИЯ",
       "runtime": "ВРЕМЯ РАБОТЫ",
       "videoQuality": "КАЧЕСТВО ВИДЕО",
       "seasons": "СЕЗОНЫ",
-      "status": "СТАТУС"
+      "status": "СТАТУС",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "Рейтинг сообщества",
     "rtCriticScore": "Оценка критиков RT",
@@ -1590,7 +1591,6 @@
     "releaseYear": "Год выпуска",
     "duration": "Продолжительность",
     "numberOfSeasons": "Количество сезонов",
-    "watchStatusCaption": "Статус ваших часов",
     "watchAny": "Любой",
     "watchWatched": "Смотрел",
     "watchUnwatched": "Непросмотренный",
@@ -3762,7 +3762,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "channels": {
     "title": "Каналы",

@@ -1179,7 +1179,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "login": {
     "title": "Bienvenido de nuevo",
@@ -1639,11 +1641,12 @@
       "year": "AÑO",
       "contentRating": "CLASIFICACIÓN",
       "productionCountry": "PAÍS DE PRODUCCIÓN",
-      "libraryAudience": "BIBLIOTECA Y AUDIENCIA",
       "runtime": "DURACIÓN",
       "videoQuality": "CALIDAD DE VÍDEO",
       "seasons": "TEMPORADAS",
-      "status": "ESTADO"
+      "status": "ESTADO",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "Valoración de la comunidad",
     "rtCriticScore": "Puntuación RT (críticos)",
@@ -1651,7 +1654,6 @@
     "releaseYear": "Año de estreno",
     "duration": "Duración",
     "numberOfSeasons": "Número de temporadas",
-    "watchStatusCaption": "Tu estado de visionado",
     "watchAny": "Cualquiera",
     "watchWatched": "Visto",
     "watchUnwatched": "No visto",

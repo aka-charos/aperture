@@ -1328,7 +1328,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "mediaDetail": {
     "movieNotFound": "未找到电影",
@@ -1635,11 +1637,12 @@
       "year": "年份",
       "contentRating": "内容分级",
       "productionCountry": "出品国家/地区",
-      "libraryAudience": "媒体库与观众",
       "runtime": "片长",
       "videoQuality": "视频质量",
       "seasons": "季数",
-      "status": "状态"
+      "status": "状态",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "社区评分",
     "rtCriticScore": "RT 影评人评分",
@@ -1647,7 +1650,6 @@
     "releaseYear": "发行年份",
     "duration": "片长",
     "numberOfSeasons": "季数",
-    "watchStatusCaption": "你的观看状态",
     "watchAny": "不限",
     "watchWatched": "已看",
     "watchUnwatched": "未看",

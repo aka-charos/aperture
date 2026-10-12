@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -32,6 +32,7 @@ import {
   type SeriesFilters,
 } from './components'
 import { useBrowseFilterPresets, useBrowseSeries } from './hooks'
+import { useRowExpansion } from './hooks/useRowExpansion'
 
 type BrowseSeriesHook = ReturnType<typeof useBrowseSeries>
 type BrowsePresetsHook = ReturnType<typeof useBrowseFilterPresets>
@@ -76,6 +77,12 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
+  const plots = useRowExpansion()
+  const resetPlots = plots.reset
+  // A fresh list (new filters, new sort) lays out new rows; nothing stays open.
+  useEffect(() => {
+    if (series.seriesLoading) resetPlots()
+  }, [series.seriesLoading, resetPlots])
   const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
 
@@ -186,6 +193,9 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
             ranges={series.seriesRanges}
           />
 
+          {/* What to show on the left, how to order and save it on the right. */}
+          <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'block' } }} />
+
           <SortPopper
             type="series"
             sortBy={series.seriesSortBy}
@@ -239,9 +249,9 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
       ) : (
         <>
           {viewMode === 'grid' ? (
-            <Grid container spacing={2}>
+            <Grid container spacing={2} ref={plots.containerRef}>
               {series.series.map((show) => (
-                <Grid item xs={6} sm={4} md={3} lg={2} key={show.id}>
+                <Grid item xs={6} sm={4} md={3} lg={2} key={show.id} data-row-card={show.id}>
                   <MoviePoster
                     title={show.title}
                     year={show.year}
@@ -249,6 +259,12 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
                     rating={show.community_rating}
                     genres={show.genres}
                     overview={show.overview}
+                    overviewBelow={{
+                      expanded: plots.isExpanded(show.id),
+                      onToggle: () => plots.toggle(show.id),
+                      moreLabel: t('browse.overviewMore'),
+                      lessLabel: t('browse.overviewLess'),
+                    }}
                     userRating={getRating('series', show.id)}
                     watched={isWatched('series', show.id)}
                     episodeProgress={getEpisodeProgress('series', show.id)}

@@ -1175,7 +1175,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "login": {
     "title": "वापसी पर स्वागत है",
@@ -1635,11 +1637,12 @@
       "year": "वर्ष",
       "contentRating": "सामग्री रेटिंग",
       "productionCountry": "निर्माण देश",
-      "libraryAudience": "लाइब्रेरी और दर्शक",
       "runtime": "अवधि",
       "videoQuality": "वीडियो गुणवत्ता",
       "seasons": "सीज़न",
-      "status": "स्थिति"
+      "status": "स्थिति",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "समुदाय रेटिंग",
     "rtCriticScore": "RT आलोचक स्कोर",
@@ -1647,7 +1650,6 @@
     "releaseYear": "रिलीज़ वर्ष",
     "duration": "अवधि",
     "numberOfSeasons": "सीज़न की संख्या",
-    "watchStatusCaption": "आपकी देखने की स्थिति",
     "watchAny": "कोई भी",
     "watchWatched": "देखा गया",
     "watchUnwatched": "नहीं देखा",

@@ -1179,7 +1179,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "login": {
     "title": "Bon retour",
@@ -1639,11 +1641,12 @@
       "year": "ANNÉE",
       "contentRating": "CLASSIFICATION",
       "productionCountry": "PAYS DE PRODUCTION",
-      "libraryAudience": "BIBLIOTHÈQUE & PUBLIC",
       "runtime": "DURÉE",
       "videoQuality": "QUALITÉ VIDÉO",
       "seasons": "SAISONS",
-      "status": "STATUT"
+      "status": "STATUT",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "Note communauté",
     "rtCriticScore": "Score RT (critiques)",
@@ -1651,7 +1654,6 @@
     "releaseYear": "Année de sortie",
     "duration": "Durée",
     "numberOfSeasons": "Nombre de saisons",
-    "watchStatusCaption": "Votre statut de visionnage",
     "watchAny": "Tous",
     "watchWatched": "Vu",
     "watchUnwatched": "Non vu",

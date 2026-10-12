@@ -59,6 +59,9 @@ const EXEMPT: Record<string, string> = {
   'assistant/tools/recommendations.ts': 'card results, filtered by withLibraryScope',
   'assistant/tools/library.ts':
     'rankings are cards (filtered by withLibraryScope); stats, genres and studios are aggregates naming no title',
+  // A SQL fragment, correlated on a series row the query embedding it has already
+  // scoped (series/handlers/list.ts, filters.ts); it counts and names nothing.
+  'series/seasonCount.ts': 'season count fragment, embedded in queries that apply the scope',
   // Hydration of items a scoped builder already chose.
   'channels/handlers/playlist.ts': "hydrates items the channel builder chose within the owner's scope",
   // Admin-only surfaces.

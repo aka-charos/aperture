@@ -1179,7 +1179,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "login": {
     "title": "Bem-vindo de volta",
@@ -1639,11 +1641,12 @@
       "year": "ANO",
       "contentRating": "CLASSIFICAÇÃO",
       "productionCountry": "PAÍS DE PRODUÇÃO",
-      "libraryAudience": "BIBLIOTECA E PÚBLICO",
       "runtime": "DURAÇÃO",
       "videoQuality": "QUALIDADE DE VÍDEO",
       "seasons": "TEMPORADAS",
-      "status": "STATUS"
+      "status": "STATUS",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "Avaliação da comunidade",
     "rtCriticScore": "Pontuação RT (críticos)",
@@ -1651,7 +1654,6 @@
     "releaseYear": "Ano de lançamento",
     "duration": "Duração",
     "numberOfSeasons": "Número de temporadas",
-    "watchStatusCaption": "Seu status de exibição",
     "watchAny": "Qualquer",
     "watchWatched": "Assistido",
     "watchUnwatched": "Não assistido",

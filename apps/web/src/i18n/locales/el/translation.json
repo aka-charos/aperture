@@ -1758,7 +1758,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "περισσότερα",
+    "overviewLess": "λιγότερα"
   },
   "settingsRecAlgo": {
     "title": "Αλγόριθμος Συστάσεων",
@@ -3589,11 +3591,12 @@
       "year": "ΕΤΟΣ",
       "contentRating": "ΚΑΤΑΛΛΗΛΟΤΗΤΑ",
       "productionCountry": "ΧΩΡΑ ΠΑΡΑΓΩΓΗΣ",
-      "libraryAudience": "ΒΙΒΛΙΟΘΗΚΗ ΚΑΙ ΚΟΙΝΟ",
       "runtime": "ΔΙΑΡΚΕΙΑ",
       "videoQuality": "ΠΟΙΟΤΗΤΑ ΕΙΚΟΝΑΣ",
       "seasons": "ΣΕΖΟΝ",
-      "status": "ΚΑΤΑΣΤΑΣΗ"
+      "status": "ΚΑΤΑΣΤΑΣΗ",
+      "watchStatus": "ΑΝ ΤΟ ΕΧΕΤΕ ΔΕΙ",
+      "audience": "ΚΟΙΝΟ"
     },
     "communityRating": "Βαθμολογία κοινού",
     "rtCriticScore": "Βαθμολογία κριτικών RT",
@@ -3601,7 +3604,6 @@
     "releaseYear": "Έτος κυκλοφορίας",
     "duration": "Διάρκεια",
     "numberOfSeasons": "Αριθμός σεζόν",
-    "watchStatusCaption": "Αν το έχετε δει",
     "watchAny": "Αδιάφορο",
     "watchWatched": "Το είδα",
     "watchUnwatched": "Δεν το είδα",

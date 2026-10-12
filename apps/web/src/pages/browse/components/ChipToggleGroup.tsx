@@ -35,9 +35,11 @@ export function ChipToggleGroup({
 
   return (
     <Box>
-      <Typography variant="body2" fontWeight={500} mb={1}>
-        {label}
-      </Typography>
+      {label && (
+        <Typography variant="body2" fontWeight={500} mb={1}>
+          {label}
+        </Typography>
+      )}
       <Box display="flex" flexWrap="wrap" gap={0.75}>
         {options.map((option) => {
           const isSelected = selected.includes(option.value)

@@ -1175,7 +1175,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "login": {
     "title": "다시 오신 것을 환영합니다",
@@ -1635,11 +1637,12 @@
       "year": "연도",
       "contentRating": "콘텐츠 등급",
       "productionCountry": "제작 국가",
-      "libraryAudience": "라이브러리 및 시청자",
       "runtime": "상영 시간",
       "videoQuality": "영상 품질",
       "seasons": "시즌",
-      "status": "상태"
+      "status": "상태",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "커뮤니티 평점",
     "rtCriticScore": "RT 평론가 점수",
@@ -1647,7 +1650,6 @@
     "releaseYear": "개봉 연도",
     "duration": "상영 시간",
     "numberOfSeasons": "시즌 수",
-    "watchStatusCaption": "내 시청 상태",
     "watchAny": "전체",
     "watchWatched": "시청함",
     "watchUnwatched": "미시청",

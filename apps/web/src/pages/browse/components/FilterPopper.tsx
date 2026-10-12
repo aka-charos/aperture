@@ -104,6 +104,34 @@ const defaultSeriesFilters: SeriesFilters = {
   maxWatchers: null,
 }
 
+/**
+ * One titled block of the panel. Module scope, not a closure in the component:
+ * a component type recreated on every render remounts its children, and the
+ * watcher fields would lose focus after each keystroke.
+ */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Box sx={{ minWidth: 0 }}>
+      <Typography
+        variant="overline"
+        component="div"
+        color="text.secondary"
+        sx={{ fontWeight: 700, letterSpacing: '0.08em', lineHeight: 1.6, mb: 1 }}
+      >
+        {title}
+      </Typography>
+      {children}
+    </Box>
+  )
+}
+
+const COLUMNS = {
+  display: 'grid',
+  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+  columnGap: 3,
+  rowGap: 2.5,
+} as const
+
 export function FilterPopper({
   type,
   filters,
@@ -115,21 +143,9 @@ export function FilterPopper({
   const { t } = useTranslation()
   const theme = useTheme()
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    scores: true,
-    year: true,
-    content: false,
-    runtime: true,
-    quality: true,
-    status: true,
-    audience: true,
-  })
+  const [contentOpen, setContentOpen] = useState(false)
 
   const open = Boolean(anchorEl)
-
-  const toggleSection = (section: string) => {
-    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }))
-  }
 
   const handleReset = () => {
     // Countries live in the dedicated country filter button; only reset what this popper shows.
@@ -194,37 +210,12 @@ export function FilterPopper({
 
   const activeCount = getActiveFilterCount()
 
-  const SectionHeader = ({
-    titleKey,
-    section,
-  }: {
-    titleKey: string
-    section: string
-  }) => (
-    <Box
-      onClick={() => toggleSection(section)}
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        cursor: 'pointer',
-        py: 1,
-        '&:hover': { backgroundColor: alpha(theme.palette.action.hover, 0.04) },
-        borderRadius: 1,
-        mx: -1,
-        px: 1,
-      }}
-    >
-      <Typography variant="subtitle2" fontWeight={600} color="text.secondary">
-        {t(titleKey)}
-      </Typography>
-      {expandedSections[section] ? (
-        <ExpandLessIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-      ) : (
-        <ExpandMoreIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-      )}
-    </Box>
-  )
+  // The status-like choices (watch state, airing/ended, video quality) are what
+  // people reach for most, so they open the panel instead of trailing its last
+  // section; ranges and scores sit side by side under them. Only content rating
+  // folds away, since a library can carry twenty of them.
+  const movieFilters = type === 'movies' ? (filters as MovieFilters) : null
+  const seriesFilters = type === 'series' ? (filters as SeriesFilters) : null
 
   return (
     <>
@@ -257,15 +248,21 @@ export function FilterPopper({
         anchorEl={anchorEl}
         placement="bottom-start"
         sx={{ zIndex: 1300 }}
-        modifiers={[{ name: 'offset', options: { offset: [0, 8] } }]}
+        modifiers={[
+          { name: 'offset', options: { offset: [0, 8] } },
+          { name: 'preventOverflow', options: { padding: 8 } },
+        ]}
       >
         <ClickAwayListener onClickAway={() => setAnchorEl(null)}>
           <Paper
             elevation={8}
             sx={{
-              width: 'min(340px, calc(100vw - 16px))',
-              maxHeight: '70vh',
-              overflow: 'auto',
+              width: 'min(620px, calc(100vw - 16px))',
+              maxHeight: 'min(78vh, 760px)',
+              overflowY: 'auto',
+              // A slider thumb at either end sits half outside its track; without
+              // this it put a horizontal scrollbar under the whole panel.
+              overflowX: 'hidden',
               borderRadius: 2,
               border: 1,
               borderColor: 'divider',
@@ -274,7 +271,8 @@ export function FilterPopper({
             {/* Header */}
             <Box
               sx={{
-                p: 2,
+                px: 2.5,
+                py: 1.5,
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -294,220 +292,213 @@ export function FilterPopper({
               </IconButton>
             </Box>
 
-            {/* Content */}
-            <Box sx={{ p: 2 }}>
-              {/* Scores Section */}
-              <SectionHeader titleKey="filterPopper.sections.scores" section="scores" />
-              <Collapse in={expandedSections.scores}>
-                <Box sx={{ py: 1.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <RangeSlider
-                    label={t('filterPopper.communityRating')}
-                    value={filters.communityRating}
-                    onChange={(value) => onChange({ ...filters, communityRating: value })}
-                    min={0}
-                    max={10}
-                    step={0.5}
-                    formatValue={(v) => v.toFixed(1)}
-                  />
-                  <RangeSlider
-                    label={t('filterPopper.rtCriticScore')}
-                    value={filters.rtScore}
-                    onChange={(value) => onChange({ ...filters, rtScore: value })}
-                    min={0}
-                    max={100}
-                    step={5}
-                    formatValue={(v) => `${v}%`}
-                  />
-                  <RangeSlider
-                    label={t('filterPopper.metacritic')}
-                    value={filters.metacritic}
-                    onChange={(value) => onChange({ ...filters, metacritic: value })}
-                    min={0}
-                    max={100}
-                    step={5}
-                    formatValue={(v) => `${v}`}
-                  />
-                </Box>
-              </Collapse>
+            <Box sx={{ px: 2.5, py: 2, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              {/* Status-like choices first */}
+              <Box sx={COLUMNS}>
+                <Section title={t('filterPopper.sections.watchStatus')}>
+                  <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    fullWidth
+                    value={filters.watchStatus}
+                    onChange={(_, v: WatchStatusFilter | null) => {
+                      if (v !== null) onChange({ ...filters, watchStatus: v })
+                    }}
+                  >
+                    <ToggleButton value="any">{t('filterPopper.watchAny')}</ToggleButton>
+                    <ToggleButton value="watched">{t('filterPopper.watchWatched')}</ToggleButton>
+                    <ToggleButton value="unwatched">{t('filterPopper.watchUnwatched')}</ToggleButton>
+                  </ToggleButtonGroup>
+                </Section>
 
-              <Divider sx={{ my: 1.5 }} />
-
-              {/* Year Section */}
-              <SectionHeader titleKey="filterPopper.sections.year" section="year" />
-              <Collapse in={expandedSections.year}>
-                <Box sx={{ py: 1.5 }}>
-                  <RangeSlider
-                    label={t('filterPopper.releaseYear')}
-                    value={filters.yearRange}
-                    onChange={(value) => onChange({ ...filters, yearRange: value })}
-                    min={ranges.year.min}
-                    max={ranges.year.max}
-                    step={1}
-                  />
-                </Box>
-              </Collapse>
-
-              <Divider sx={{ my: 1.5 }} />
-
-              {/* Watch status & household reach */}
-              <SectionHeader titleKey="filterPopper.sections.libraryAudience" section="audience" />
-              <Collapse in={expandedSections.audience}>
-                <Box sx={{ py: 1.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
-                      {t('filterPopper.watchStatusCaption')}
-                    </Typography>
-                    <ToggleButtonGroup
-                      exclusive
-                      size="small"
-                      fullWidth
-                      value={filters.watchStatus}
-                      onChange={(_, v: WatchStatusFilter | null) => {
-                        if (v !== null) onChange({ ...filters, watchStatus: v })
-                      }}
-                    >
-                      <ToggleButton value="any">{t('filterPopper.watchAny')}</ToggleButton>
-                      <ToggleButton value="watched">{t('filterPopper.watchWatched')}</ToggleButton>
-                      <ToggleButton value="unwatched">{t('filterPopper.watchUnwatched')}</ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
-                  <Box display="flex" gap={1}>
-                    <TextField
-                      label={t('filterPopper.minWatchers')}
-                      type="number"
-                      size="small"
-                      fullWidth
-                      inputProps={{ min: 0 }}
-                      value={filters.minWatchers ?? ''}
-                      onChange={(e) =>
-                        onChange({
-                          ...filters,
-                          minWatchers: parseOptionalInt(e.target.value),
-                        })
-                      }
-                      helperText={t('filterPopper.watchersHelper')}
+                {seriesFilters && (
+                  <Section title={t('filterPopper.sections.status')}>
+                    <ChipToggleGroup
+                      label=""
+                      options={[
+                        { value: 'Continuing', label: t('filterPopper.seriesAiring') },
+                        { value: 'Ended', label: t('filterPopper.seriesEnded') },
+                      ]}
+                      selected={seriesFilters.status}
+                      onChange={(selected) => onChange({ ...filters, status: selected })}
                     />
-                    <TextField
-                      label={t('filterPopper.maxWatchers')}
-                      type="number"
-                      size="small"
-                      fullWidth
-                      inputProps={{ min: 0 }}
-                      value={filters.maxWatchers ?? ''}
-                      onChange={(e) =>
-                        onChange({
-                          ...filters,
-                          maxWatchers: parseOptionalInt(e.target.value),
-                        })
-                      }
+                  </Section>
+                )}
+
+                {movieFilters && resolutions && resolutions.length > 0 && (
+                  <Section title={t('filterPopper.sections.videoQuality')}>
+                    <ChipToggleGroup
+                      label=""
+                      options={resolutions.map((r) => ({
+                        value: r.resolution,
+                        label: r.resolution,
+                        count: r.count,
+                      }))}
+                      selected={movieFilters.resolutions}
+                      onChange={(selected) => onChange({ ...filters, resolutions: selected })}
                     />
-                  </Box>
-                </Box>
-              </Collapse>
+                  </Section>
+                )}
+              </Box>
 
-              <Divider sx={{ my: 1.5 }} />
+              <Divider />
 
-              {/* Movies: Runtime Section */}
-              {type === 'movies' && ranges.runtime && (
-                <>
-                  <SectionHeader titleKey="filterPopper.sections.runtime" section="runtime" />
-                  <Collapse in={expandedSections.runtime}>
-                    <Box sx={{ py: 1.5 }}>
+              {/* Ranges beside scores */}
+              <Box sx={COLUMNS}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, minWidth: 0 }}>
+                  <Section title={t('filterPopper.sections.year')}>
+                    <RangeSlider
+                      label={t('filterPopper.releaseYear')}
+                      value={filters.yearRange}
+                      onChange={(value) => onChange({ ...filters, yearRange: value })}
+                      min={ranges.year.min}
+                      max={ranges.year.max}
+                      step={1}
+                    />
+                  </Section>
+
+                  {seriesFilters && ranges.seasons && (
+                    <Section title={t('filterPopper.sections.seasons')}>
+                      <RangeSlider
+                        label={t('filterPopper.numberOfSeasons')}
+                        value={seriesFilters.seasonsRange}
+                        onChange={(value) => onChange({ ...filters, seasonsRange: value })}
+                        min={ranges.seasons.min}
+                        max={ranges.seasons.max}
+                        step={1}
+                      />
+                    </Section>
+                  )}
+
+                  {movieFilters && ranges.runtime && (
+                    <Section title={t('filterPopper.sections.runtime')}>
                       <RangeSlider
                         label={t('filterPopper.duration')}
-                        value={(filters as MovieFilters).runtimeRange}
+                        value={movieFilters.runtimeRange}
                         onChange={(value) => onChange({ ...filters, runtimeRange: value })}
                         min={ranges.runtime.min}
                         max={ranges.runtime.max}
                         step={10}
                         formatValue={(v) => `${v} min`}
                       />
-                    </Box>
-                  </Collapse>
-                  <Divider sx={{ my: 1.5 }} />
-                </>
-              )}
+                    </Section>
+                  )}
+                </Box>
 
-              {/* Movies: Quality Section */}
-              {type === 'movies' && resolutions && resolutions.length > 0 && (
-                <>
-                  <SectionHeader titleKey="filterPopper.sections.videoQuality" section="quality" />
-                  <Collapse in={expandedSections.quality}>
-                    <Box sx={{ py: 1.5 }}>
-                      <ChipToggleGroup
-                        label=""
-                        options={resolutions.map((r) => ({
-                          value: r.resolution,
-                          label: r.resolution,
-                          count: r.count,
-                        }))}
-                        selected={(filters as MovieFilters).resolutions}
-                        onChange={(selected) => onChange({ ...filters, resolutions: selected })}
-                      />
-                    </Box>
-                  </Collapse>
-                </>
-              )}
+                <Section title={t('filterPopper.sections.scores')}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    <RangeSlider
+                      label={t('filterPopper.communityRating')}
+                      value={filters.communityRating}
+                      onChange={(value) => onChange({ ...filters, communityRating: value })}
+                      min={0}
+                      max={10}
+                      step={0.5}
+                      formatValue={(v) => v.toFixed(1)}
+                    />
+                    <RangeSlider
+                      label={t('filterPopper.rtCriticScore')}
+                      value={filters.rtScore}
+                      onChange={(value) => onChange({ ...filters, rtScore: value })}
+                      min={0}
+                      max={100}
+                      step={5}
+                      formatValue={(v) => `${v}%`}
+                    />
+                    <RangeSlider
+                      label={t('filterPopper.metacritic')}
+                      value={filters.metacritic}
+                      onChange={(value) => onChange({ ...filters, metacritic: value })}
+                      min={0}
+                      max={100}
+                      step={5}
+                      formatValue={(v) => `${v}`}
+                    />
+                  </Box>
+                </Section>
+              </Box>
 
-              {/* Series: Seasons Section */}
-              {type === 'series' && ranges.seasons && (
-                <>
-                  <SectionHeader titleKey="filterPopper.sections.seasons" section="runtime" />
-                  <Collapse in={expandedSections.runtime}>
-                    <Box sx={{ py: 1.5 }}>
-                      <RangeSlider
-                        label={t('filterPopper.numberOfSeasons')}
-                        value={(filters as SeriesFilters).seasonsRange}
-                        onChange={(value) => onChange({ ...filters, seasonsRange: value })}
-                        min={ranges.seasons.min}
-                        max={ranges.seasons.max}
-                        step={1}
-                      />
-                    </Box>
-                  </Collapse>
-                  <Divider sx={{ my: 1.5 }} />
-                </>
-              )}
+              <Divider />
 
-              {/* Series: Status Section */}
-              {type === 'series' && (
-                <>
-                  <SectionHeader titleKey="filterPopper.sections.status" section="status" />
-                  <Collapse in={expandedSections.status}>
-                    <Box sx={{ py: 1.5 }}>
-                      <ChipToggleGroup
-                        label=""
-                        options={[
-                          { value: 'Continuing', label: t('filterPopper.seriesAiring') },
-                          { value: 'Ended', label: t('filterPopper.seriesEnded') },
-                        ]}
-                        selected={(filters as SeriesFilters).status}
-                        onChange={(selected) => onChange({ ...filters, status: selected })}
-                      />
-                    </Box>
-                  </Collapse>
-                </>
-              )}
+              {/* Household reach */}
+              <Section title={t('filterPopper.sections.audience')}>
+                <Box sx={COLUMNS}>
+                  <TextField
+                    label={t('filterPopper.minWatchers')}
+                    type="number"
+                    size="small"
+                    fullWidth
+                    inputProps={{ min: 0 }}
+                    value={filters.minWatchers ?? ''}
+                    onChange={(e) => onChange({ ...filters, minWatchers: parseOptionalInt(e.target.value) })}
+                  />
+                  <TextField
+                    label={t('filterPopper.maxWatchers')}
+                    type="number"
+                    size="small"
+                    fullWidth
+                    inputProps={{ min: 0 }}
+                    value={filters.maxWatchers ?? ''}
+                    onChange={(e) => onChange({ ...filters, maxWatchers: parseOptionalInt(e.target.value) })}
+                  />
+                </Box>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
+                  {t('filterPopper.watchersHelper')}
+                </Typography>
+              </Section>
 
-              {/* Content Rating Section — kept last and collapsed by default */}
+              {/* Content rating — folded by default, it can run to twenty chips */}
               {contentRatings.length > 0 && (
                 <>
-                  <Divider sx={{ my: 1.5 }} />
-                  <SectionHeader titleKey="filterPopper.sections.contentRating" section="content" />
-                  <Collapse in={expandedSections.content}>
-                    <Box sx={{ py: 1.5 }}>
-                      <ChipToggleGroup
-                        label=""
-                        options={contentRatings.map((r) => ({
-                          value: r.rating,
-                          label: r.rating,
-                          count: r.count,
-                        }))}
-                        selected={filters.contentRatings}
-                        onChange={(selected) => onChange({ ...filters, contentRatings: selected })}
-                      />
+                  <Divider />
+                  <Box>
+                    <Box
+                      component="button"
+                      type="button"
+                      onClick={() => setContentOpen((prev) => !prev)}
+                      aria-expanded={contentOpen}
+                      sx={{
+                        all: 'unset',
+                        boxSizing: 'border-box',
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer',
+                        borderRadius: 1,
+                        '&:focus-visible': { outline: `2px solid ${theme.palette.primary.main}` },
+                      }}
+                    >
+                      <Typography
+                        variant="overline"
+                        component="span"
+                        color={filters.contentRatings.length > 0 ? 'primary.main' : 'text.secondary'}
+                        sx={{ fontWeight: 700, letterSpacing: '0.08em', lineHeight: 1.6 }}
+                      >
+                        {t('filterPopper.sections.contentRating')}
+                        {filters.contentRatings.length > 0 && ` · ${filters.contentRatings.length}`}
+                      </Typography>
+                      {contentOpen ? (
+                        <ExpandLessIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                      ) : (
+                        <ExpandMoreIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                      )}
                     </Box>
-                  </Collapse>
+                    <Collapse in={contentOpen}>
+                      <Box sx={{ pt: 1 }}>
+                        <ChipToggleGroup
+                          label=""
+                          options={contentRatings.map((r) => ({
+                            value: r.rating,
+                            label: r.rating,
+                            count: r.count,
+                          }))}
+                          selected={filters.contentRatings}
+                          onChange={(selected) => onChange({ ...filters, contentRatings: selected })}
+                        />
+                      </Box>
+                    </Collapse>
+                  </Box>
                 </>
               )}
             </Box>

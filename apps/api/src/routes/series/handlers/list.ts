@@ -9,6 +9,7 @@ import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
 import { listSeriesSchema } from '../schemas.js'
+import { LIBRARY_SEASON_COUNT_SQL } from '../seasonCount.js'
 import type { SeriesRow, SeriesListResponse, SeriesListQuerystring } from '../types.js'
 
 function parseCountryQuery(country: string | string[] | undefined): string[] {
@@ -124,7 +125,7 @@ export function registerListHandler(fastify: FastifyInstance) {
         const seasons = parseInt(minSeasons, 10)
         if (!isNaN(seasons)) {
           whereClause += whereClause ? ' AND ' : ' WHERE '
-          whereClause += `total_seasons >= $${paramIndex++}`
+          whereClause += `${LIBRARY_SEASON_COUNT_SQL} >= $${paramIndex++}`
           params.push(seasons)
         }
       }
@@ -132,7 +133,7 @@ export function registerListHandler(fastify: FastifyInstance) {
         const seasons = parseInt(maxSeasons, 10)
         if (!isNaN(seasons)) {
           whereClause += whereClause ? ' AND ' : ' WHERE '
-          whereClause += `total_seasons <= $${paramIndex++}`
+          whereClause += `${LIBRARY_SEASON_COUNT_SQL} <= $${paramIndex++}`
           params.push(seasons)
         }
       }
@@ -237,7 +238,7 @@ export function registerListHandler(fastify: FastifyInstance) {
           orderClause = `metacritic_score ${order} ${nullsPosition}, title ASC`
           break
         case 'seasons':
-          orderClause = `total_seasons ${order} ${nullsPosition}, title ASC`
+          orderClause = `${LIBRARY_SEASON_COUNT_SQL} ${order} ${nullsPosition}, title ASC`
           break
         case 'added':
           orderClause = `created_at ${order}, title ASC`
@@ -250,7 +251,7 @@ export function registerListHandler(fastify: FastifyInstance) {
       params.push(pageSize, offset)
       const result = await query<SeriesRow>(
         `SELECT id, provider_item_id, title, original_title, year, end_year, genres, overview,
-                community_rating, status, total_seasons, total_episodes, network,
+                community_rating, status, ${LIBRARY_SEASON_COUNT_SQL} AS total_seasons, total_episodes, network,
                 poster_url, backdrop_url, created_at, updated_at,
                 rt_critic_score, awards_summary
          FROM series${whereClause}

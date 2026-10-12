@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Box, Typography, Paper, Chip, Skeleton, Tooltip, IconButton, useMediaQuery } from '@mui/material'
+import React, { useLayoutEffect, useRef, useState } from 'react'
+import { Box, Typography, Paper, Chip, Skeleton, Tooltip, IconButton, Link, useMediaQuery } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import Star from '@mui/icons-material/Star'
 import AddToQueue from '@mui/icons-material/AddToQueue'
@@ -89,7 +89,96 @@ export interface MoviePosterProps {
    * so cards in a row still line up.
    */
   titleLines?: 1 | 2
+  /**
+   * Print the plot under the card instead of in the hover overlay, clamped to a
+   * few lines with a "more" control. The overlay is dropped in this mode: title,
+   * year and genres are already under the poster, so it would only repeat them.
+   *
+   * Expansion is CONTROLLED, because a grid wants a whole row to open together
+   * (one tall card beside three short ones leaves three holes). The labels come
+   * from the caller since this package carries no translations.
+   */
+  overviewBelow?: {
+    expanded: boolean
+    onToggle: () => void
+    moreLabel: string
+    lessLabel: string
+    /** Lines shown while collapsed. Defaults to 3. */
+    lines?: number
+  }
   children?: React.ReactNode
+}
+
+/**
+ * The plot under a card, clamped until expanded. "more" is offered only when
+ * the clamp actually cut something, measured rather than guessed from length,
+ * since what fits three lines depends on the card's width.
+ */
+function OverviewBelow({
+  text,
+  expanded,
+  onToggle,
+  moreLabel,
+  lessLabel,
+  lines,
+}: {
+  text: string
+  expanded: boolean
+  onToggle: () => void
+  moreLabel: string
+  lessLabel: string
+  lines: number
+}) {
+  const ref = useRef<HTMLSpanElement | null>(null)
+  const [clamped, setClamped] = useState(false)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    // Only a collapsed block can say whether it is cut; while expanded the last
+    // answer stands, so "less" stays offered on the card that needed it.
+    if (!el || expanded) return
+    const measure = () => setClamped(el.scrollHeight > el.clientHeight + 1)
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [expanded, text])
+
+  return (
+    <Box mt={0.75}>
+      <Typography
+        ref={ref}
+        variant="caption"
+        color="text.secondary"
+        sx={{
+          display: expanded ? 'block' : '-webkit-box',
+          WebkitLineClamp: expanded ? 'unset' : lines,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+          lineHeight: 1.45,
+        }}
+      >
+        {text}
+      </Typography>
+      {clamped && (
+        <Link
+          component="button"
+          type="button"
+          variant="caption"
+          underline="hover"
+          onClick={(e: React.MouseEvent) => {
+            // The card navigates on click; this only opens the text.
+            e.stopPropagation()
+            onToggle()
+          }}
+          sx={{ fontWeight: 600, verticalAlign: 'baseline' }}
+        >
+          {expanded ? lessLabel : moreLabel}
+        </Link>
+      )}
+    </Box>
+  )
 }
 
 const sizeConfig = {
@@ -126,6 +215,7 @@ export function MoviePoster({
   loading = false,
   responsive = false,
   titleLines = 1,
+  overviewBelow,
   children,
 }: MoviePosterProps) {
   const [isHovered, setIsHovered] = useState(false)
@@ -407,7 +497,9 @@ export function MoviePoster({
         {/* Custom children (for badges like play count, favorite icon, etc.) */}
         {children}
 
-        {/* Hover overlay with details */}
+        {/* Hover overlay with details — not drawn when the plot sits under the
+            card, where everything it would show is already printed. */}
+        {!overviewBelow && (
         <Box
           sx={{
             position: 'absolute',
@@ -484,6 +576,7 @@ export function MoviePoster({
             </Typography>
           )}
         </Box>
+        )}
 
         {/* Personalized match score badge - only on recommendations */}
         {showScore && score !== undefined && score !== null && (
@@ -516,37 +609,80 @@ export function MoviePoster({
 
       {/* Title and metadata below poster */}
       <Box mt={1}>
-        <Typography
-          variant="body2"
-          fontWeight={500}
-          noWrap={titleLines === 1}
-          title={title}
-          sx={{
-            lineHeight: 1.3,
-            ...(titleLines > 1 && {
-              display: '-webkit-box',
-              WebkitLineClamp: titleLines,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              // Reserved whether or not the second line is used, so a one-line
-              // title does not shorten its card and stagger the row.
-              minHeight: `${1.3 * titleLines}em`,
-            }),
-          }}
-        >
-          {title}
-        </Typography>
-        {!hideYear && (
+        {/* "Title (2016)" on one line: a year on a line of its own spent a whole
+            row of every card on four digits. The year sits outside the
+            ellipsis, so a long title is clipped and its year still reads. A
+            caller's metaLine ("2024 · 2h 15m") keeps its own line, since it
+            carries more than the year. */}
+        {(() => {
+          const inlineYear = !hideYear && !(metaLine != null && metaLine !== '') && year != null
+          const yearText = inlineYear ? `(${year})` : null
+          return titleLines > 1 ? (
+            <Typography
+              variant="body2"
+              fontWeight={500}
+              title={yearText ? `${title} ${yearText}` : title}
+              sx={{
+                lineHeight: 1.3,
+                display: '-webkit-box',
+                WebkitLineClamp: titleLines,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                // Reserved whether or not the second line is used, so a one-line
+                // title does not shorten its card and stagger the row.
+                minHeight: `${1.3 * titleLines}em`,
+              }}
+            >
+              {title}
+              {yearText && (
+                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>
+                  {' '}
+                  {yearText}
+                </Box>
+              )}
+            </Typography>
+          ) : (
+            <Box
+              display="flex"
+              alignItems="baseline"
+              gap={0.5}
+              minWidth={0}
+              title={yearText ? `${title} ${yearText}` : title}
+            >
+              <Typography variant="body2" fontWeight={500} noWrap sx={{ lineHeight: 1.3, minWidth: 0 }}>
+                {title}
+              </Typography>
+              {yearText && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ lineHeight: 1.3, flexShrink: 0 }}
+                >
+                  {yearText}
+                </Typography>
+              )}
+            </Box>
+          )
+        })()}
+        {!hideYear && metaLine != null && metaLine !== '' && (
           <Typography variant="caption" color="text.secondary" display="block">
-            {metaLine != null && metaLine !== ''
-              ? metaLine
-              : year || 'Unknown year'}
+            {metaLine}
           </Typography>
         )}
         {genres && genres.length > 0 && (
-          <Typography variant="caption" color="text.secondary" noWrap>
-            {genres[0]}
+          <Typography variant="caption" color="text.secondary" noWrap display="block" title={genres.join(', ')}>
+            {genres.slice(0, 3).join(' · ')}
           </Typography>
+        )}
+        {overviewBelow && overview && (
+          <OverviewBelow
+            text={overview}
+            expanded={overviewBelow.expanded}
+            onToggle={overviewBelow.onToggle}
+            moreLabel={overviewBelow.moreLabel}
+            lessLabel={overviewBelow.lessLabel}
+            lines={overviewBelow.lines ?? 3}
+          />
         )}
       </Box>
     </Box>

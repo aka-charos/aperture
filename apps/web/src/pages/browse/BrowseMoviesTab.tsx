@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -31,6 +31,7 @@ import {
   type MovieFilters,
 } from './components'
 import { useBrowseFilterPresets, useBrowseMovies } from './hooks'
+import { useRowExpansion } from './hooks/useRowExpansion'
 
 type BrowseMoviesHook = ReturnType<typeof useBrowseMovies>
 type BrowsePresetsHook = ReturnType<typeof useBrowseFilterPresets>
@@ -75,6 +76,12 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getRating, setRating } = useUserRatings()
+  const plots = useRowExpansion()
+  const resetPlots = plots.reset
+  // A fresh list (new filters, new sort) lays out new rows; nothing stays open.
+  useEffect(() => {
+    if (movies.moviesLoading) resetPlots()
+  }, [movies.moviesLoading, resetPlots])
   const { isWatched } = useWatchStatus()
 
   const handleRateMovie = useCallback(
@@ -197,6 +204,9 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
             ranges={movies.movieRanges}
           />
 
+          {/* What to show on the left, how to order and save it on the right. */}
+          <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'block' } }} />
+
           <SortPopper
             type="movies"
             sortBy={movies.movieSortBy}
@@ -250,9 +260,9 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
       ) : (
         <>
           {viewMode === 'grid' ? (
-            <Grid container spacing={2}>
+            <Grid container spacing={2} ref={plots.containerRef}>
               {movies.movies.map((movie) => (
-                <Grid item xs={6} sm={4} md={3} lg={2} key={movie.id}>
+                <Grid item xs={6} sm={4} md={3} lg={2} key={movie.id} data-row-card={movie.id}>
                   <MoviePoster
                     title={movie.title}
                     year={movie.year}
@@ -260,6 +270,12 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
                     rating={movie.community_rating}
                     genres={movie.genres}
                     overview={movie.overview}
+                    overviewBelow={{
+                      expanded: plots.isExpanded(movie.id),
+                      onToggle: () => plots.toggle(movie.id),
+                      moreLabel: t('browse.overviewMore'),
+                      lessLabel: t('browse.overviewLess'),
+                    }}
                     userRating={getRating('movie', movie.id)}
                     watched={isWatched('movie', movie.id)}
                     onRate={(rating) => void handleRateMovie(movie.id, rating)}

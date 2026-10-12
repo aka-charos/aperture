@@ -1191,7 +1191,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "login": {
     "title": "مرحبًا بعودتك",
@@ -1651,11 +1653,12 @@
       "year": "السنة",
       "contentRating": "التصنيف العمري",
       "productionCountry": "بلد الإنتاج",
-      "libraryAudience": "المكتبة والجمهور",
       "runtime": "المدة",
       "videoQuality": "جودة الفيديو",
       "seasons": "المواسم",
-      "status": "الحالة"
+      "status": "الحالة",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "تقييم المجتمع",
     "rtCriticScore": "درجة RT (النقاد)",
@@ -1663,7 +1666,6 @@
     "releaseYear": "سنة الإصدار",
     "duration": "المدة",
     "numberOfSeasons": "عدد المواسم",
-    "watchStatusCaption": "حالة المشاهدة لديك",
     "watchAny": "أي",
     "watchWatched": "مُشاهَد",
     "watchUnwatched": "غير مُشاهَد",

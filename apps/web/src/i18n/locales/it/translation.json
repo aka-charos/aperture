@@ -1179,7 +1179,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "login": {
     "title": "Bentornato",
@@ -1639,11 +1641,12 @@
       "year": "ANNO",
       "contentRating": "CLASSIFICAZIONE",
       "productionCountry": "PAESE DI PRODUZIONE",
-      "libraryAudience": "LIBRERIA & PUBBLICO",
       "runtime": "DURATA",
       "videoQuality": "QUALITÀ VIDEO",
       "seasons": "STAGIONI",
-      "status": "STATO"
+      "status": "STATO",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "Valutazione community",
     "rtCriticScore": "Punteggio RT (critici)",
@@ -1651,7 +1654,6 @@
     "releaseYear": "Anno di uscita",
     "duration": "Durata",
     "numberOfSeasons": "Numero di stagioni",
-    "watchStatusCaption": "Stato di visione",
     "watchAny": "Qualsiasi",
     "watchWatched": "Visto",
     "watchUnwatched": "Non visto",

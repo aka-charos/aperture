@@ -1328,7 +1328,9 @@
       "sourceLabel": "Franchise",
       "errorLoad": "Failed to load this franchise",
       "notFound": "Franchise not found"
-    }
+    },
+    "overviewMore": "more",
+    "overviewLess": "less"
   },
   "mediaDetail": {
     "movieNotFound": "映画が見つかりません",
@@ -1635,11 +1637,12 @@
       "year": "年",
       "contentRating": "レーティング",
       "productionCountry": "製作国",
-      "libraryAudience": "ライブラリと視聴者",
       "runtime": "上映時間",
       "videoQuality": "画質",
       "seasons": "シーズン",
-      "status": "ステータス"
+      "status": "ステータス",
+      "watchStatus": "WATCH STATUS",
+      "audience": "AUDIENCE"
     },
     "communityRating": "コミュニティ評価",
     "rtCriticScore": "RT批評家スコア",
@@ -1647,7 +1650,6 @@
     "releaseYear": "公開年",
     "duration": "上映時間",
     "numberOfSeasons": "シーズン数",
-    "watchStatusCaption": "視聴ステータス",
     "watchAny": "すべて",
     "watchWatched": "視聴済み",
     "watchUnwatched": "未視聴",
