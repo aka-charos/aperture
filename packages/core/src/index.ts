@@ -559,6 +559,7 @@ export {
 } from './lib/locales.js'
 export {
   AI_LANGUAGE_FOLLOWS_APP,
+  aiLanguageFollowsApp,
   resolveUiLanguage,
   resolveAiLanguage,
   languagePreferenceRefusal,

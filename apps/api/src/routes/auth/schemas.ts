@@ -180,7 +180,7 @@ export const updatePreferencesSchema = {
       aiLanguage: {
         type: ['string', 'null'],
         description:
-          "AI output locale override; 'app' follows the UI language; null clears to system default",
+          "Recommendations locale override; null or 'app' follows the UI language",
       },
     },
   },

@@ -32,8 +32,8 @@ interface LanguageState {
   enabledUi: string[]
   enabledAi: string[]
   defaultAi: string
-  /** The stored recommendations-language choice: a language, FOLLOW_APP, or null (the server default). */
-  aiChoice: string | null
+  /** Whether recommendations follow the app language — decided by the API (absent counts as following). */
+  aiFollows: boolean
   effectiveUi: string
   effectiveAi: string
   /** What recommendations would be written in under FOLLOW_APP — decided by the API. */
@@ -41,7 +41,7 @@ interface LanguageState {
 }
 
 interface PrefsResponse {
-  aiLanguage?: string | null
+  aiFollowsApp?: boolean
   effectiveUiLanguage?: string
   effectiveAiLanguage?: string
   aiLanguageFollowingApp?: string
@@ -50,7 +50,7 @@ interface PrefsResponse {
 function applyPrefs(prev: LanguageState, prefs: PrefsResponse): LanguageState {
   return {
     ...prev,
-    aiChoice: prefs.aiLanguage ?? null,
+    aiFollows: prefs.aiFollowsApp === true,
     effectiveUi: prefs.effectiveUiLanguage || prev.effectiveUi,
     effectiveAi: prefs.effectiveAiLanguage || prev.effectiveAi,
     aiFollowingApp: prefs.aiLanguageFollowingApp || prev.aiFollowingApp,
@@ -63,6 +63,12 @@ function applyPrefs(prev: LanguageState, prefs: PrefsResponse): LanguageState {
  * for the language recommendations are written in (and with them the Watcher
  * Identity, playlist text and the assistant). Someone can read the app in
  * Greek and have recommendations written in English.
+ *
+ * Recommendations follow the app language unless the viewer chose otherwise
+ * (core `languagePreference.ts`), so the flag alone is enough for most people.
+ * Switching the app language here also keeps recommendations that MATCHED the
+ * app matching it, even when that match was an explicit choice — only a
+ * deliberate split (Greek app, English recommendations) stays put.
  *
  * The toggle is deliberately two options, not a second language list: the
  * app's own language (stored as FOLLOW_APP, so it moves when the app language
@@ -109,7 +115,7 @@ export function LanguageMenuButton() {
         enabledUi: Array.isArray(defaults.enabledUiLanguages) ? defaults.enabledUiLanguages : all,
         enabledAi: Array.isArray(defaults.enabledAiLanguages) ? defaults.enabledAiLanguages : all,
         defaultAi: defaults.defaultAiLanguage || 'en',
-        aiChoice: null,
+        aiFollows: true,
         effectiveUi: i18n.language,
         effectiveAi: defaults.defaultAiLanguage || 'en',
         aiFollowingApp: defaults.defaultAiLanguage || 'en',
@@ -138,7 +144,7 @@ export function LanguageMenuButton() {
       ? state.defaultAi
       : state.enabledAi.find((code) => code !== sameLang && state.locales.some((l) => l.code === code))
   const toggleValue =
-    state.aiChoice === FOLLOW_APP || state.effectiveAi === sameLang
+    state.aiFollows || state.effectiveAi === sameLang
       ? FOLLOW_APP
       : state.effectiveAi === otherLang
         ? otherLang
@@ -185,7 +191,10 @@ export function LanguageMenuButton() {
     // in the language just picked, which is its own confirmation.
     await applyEffectiveUiLanguage(code)
     if (readOnly) return
-    const prefs = await save({ uiLanguage: code })
+    // Recommendations in the same language as the app keep matching it, even
+    // when that language was picked explicitly; a deliberate split stays.
+    const keepTogether = !state.aiFollows && state.effectiveAi === previous
+    const prefs = await save(keepTogether ? { uiLanguage: code, aiLanguage: FOLLOW_APP } : { uiLanguage: code })
     if (!prefs) await applyEffectiveUiLanguage(previous)
   }
 

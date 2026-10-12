@@ -119,19 +119,26 @@ async function decidedCapabilities(user: SessionUser): Promise<Record<string, bo
 
 /**
  * The language facts a preferences response carries, all DECIDED here: which
- * language the app is in, which one AI writes in, and which one it WOULD write
- * in if the viewer chose "same as the app" — so the switcher can label that
- * option truthfully without holding a copy of the rule.
+ * language the app is in, which one recommendations are written in, which one
+ * they WOULD be written in if they followed the app, and whether they do — so
+ * the switcher shows what is stored without holding a copy of the rule
+ * (absent follows the app, which is not something the bundle should know).
  */
 async function languageFacts(preferences: { uiLanguage?: string | null; aiLanguage?: string | null }) {
-  const { getSystemLanguageDefaults, resolveUiLanguage, resolveAiLanguage, AI_LANGUAGE_FOLLOWS_APP } =
-    await import('@aperture/core')
+  const {
+    getSystemLanguageDefaults,
+    resolveUiLanguage,
+    resolveAiLanguage,
+    aiLanguageFollowsApp,
+    AI_LANGUAGE_FOLLOWS_APP,
+  } = await import('@aperture/core')
   const defaults = await getSystemLanguageDefaults()
   const effectiveUiLanguage = resolveUiLanguage(preferences.uiLanguage, defaults)
   return {
     effectiveUiLanguage,
     effectiveAiLanguage: resolveAiLanguage(preferences.aiLanguage, effectiveUiLanguage, defaults),
     aiLanguageFollowingApp: resolveAiLanguage(AI_LANGUAGE_FOLLOWS_APP, effectiveUiLanguage, defaults),
+    aiFollowsApp: aiLanguageFollowsApp(preferences.aiLanguage),
   }
 }
 

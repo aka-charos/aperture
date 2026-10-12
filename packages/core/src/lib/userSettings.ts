@@ -93,7 +93,7 @@ export interface UserUiPreferences {
   uiLanguage?: string | null
   /**
    * Locale AI writes to this viewer in (Watcher Identity, explanations, playlists, assistant).
-   * Omit or null to use the system default; `'app'` (AI_LANGUAGE_FOLLOWS_APP) follows the UI language.
+   * Omit, null or `'app'` (AI_LANGUAGE_FOLLOWS_APP) follows the UI language; see `languagePreference.ts`.
    */
   aiLanguage?: string | null
 }

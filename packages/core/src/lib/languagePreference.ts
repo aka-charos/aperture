@@ -5,14 +5,18 @@
  * The two are separate settings on purpose: someone can want the app in Greek
  * and the recommendations, the Watcher Identity, playlist text and the
  * assistant in English (or the other way round). Each is stored on the
- * viewer's UI preferences as an override; absent or null means the instance
- * default the admin chose, which is what every viewer had before overrides
- * existed and is what an absent value must keep meaning.
+ * viewer's UI preferences as an override.
  *
- * The AI side has one more value, `AI_LANGUAGE_FOLLOWS_APP`, meaning "write
- * to me in whatever language I read the app in". It is a stored choice, never
- * the reading of an absent one, so switching the app language from the header
- * moves AI text along with it only for viewers who asked for that.
+ * An absent app language means the instance default. An absent
+ * recommendations language means FOLLOW THE APP — the same as the explicit
+ * `AI_LANGUAGE_FOLLOWS_APP`. That is a deliberate departure from "absent keeps
+ * the old meaning" (it used to mean the admin's AI default): once the app
+ * language became a flag anyone flips from the top bar, recommendations that
+ * stayed behind read as a bug to the first person who tried it. Only a viewer
+ * who never chose a recommendations language AND reads the app in a language
+ * other than the AI default moves; anyone who chose one keeps it. The admin's
+ * AI default is now the fallback for an app language that is not enabled for
+ * AI output.
  */
 import { isValidAppLocale, type AppLocaleCode } from './locales.js'
 
@@ -38,20 +42,28 @@ export function resolveUiLanguage(
 /**
  * The language AI writes to this viewer in.
  *
- * Following the app falls back to the AI default when the app language is not
- * one the admin enabled for AI output — never to the app language anyway, or
- * an admin who disabled a language for AI would see it used regardless.
+ * Absent and `AI_LANGUAGE_FOLLOWS_APP` both follow the app. Following falls
+ * back to the AI default when the app language is not one the admin enabled
+ * for AI output — never to the app language anyway, or an admin who disabled
+ * a language for AI would see it used regardless. An explicit language the
+ * admin has since disabled also falls back to the AI default, not to the app:
+ * that viewer did choose, just something no longer offered.
  */
 export function resolveAiLanguage(
   aiPref: string | null | undefined,
   uiLanguage: AppLocaleCode,
   defaults: LanguageDefaults
 ): AppLocaleCode {
-  if (aiPref === AI_LANGUAGE_FOLLOWS_APP) {
+  if (aiPref == null || aiPref === AI_LANGUAGE_FOLLOWS_APP) {
     return defaults.enabledAiLanguages.includes(uiLanguage) ? uiLanguage : defaults.defaultAiLanguage
   }
   if (isValidAppLocale(aiPref) && defaults.enabledAiLanguages.includes(aiPref)) return aiPref
   return defaults.defaultAiLanguage
+}
+
+/** True when the stored choice follows the app language (absent included). */
+export function aiLanguageFollowsApp(aiPref: string | null | undefined): boolean {
+  return aiPref == null || aiPref === AI_LANGUAGE_FOLLOWS_APP
 }
 
 /**

@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   AI_LANGUAGE_FOLLOWS_APP,
+  aiLanguageFollowsApp,
   languagePreferenceRefusal,
   resolveAiLanguage,
   resolveUiLanguage,
@@ -15,16 +16,27 @@ const defaults: LanguageDefaults = {
   enabledAiLanguages: ['en', 'el'],
 }
 
-test('an absent override means the instance default, on both sides', () => {
+test('an absent app language means the instance default', () => {
   assert.equal(resolveUiLanguage(undefined, defaults), 'en')
   assert.equal(resolveUiLanguage(null, defaults), 'en')
-  // The app in Greek does not move AI text for someone who never asked:
-  // absent kept meaning "the AI default" when following the app was added.
-  assert.equal(resolveAiLanguage(null, 'el', defaults), 'en')
-  assert.equal(resolveAiLanguage(undefined, 'el', defaults), 'en')
 })
 
-test('the app and AI text can be in different languages', () => {
+test('an absent recommendations language follows the app', () => {
+  // Deliberately NOT the AI default any more: switching the app to Greek from
+  // the top bar must move recommendations for someone who never chose.
+  assert.equal(resolveAiLanguage(null, 'el', defaults), 'el')
+  assert.equal(resolveAiLanguage(undefined, 'el', defaults), 'el')
+  assert.equal(aiLanguageFollowsApp(null), true)
+  assert.equal(aiLanguageFollowsApp(undefined), true)
+  assert.equal(aiLanguageFollowsApp(AI_LANGUAGE_FOLLOWS_APP), true)
+  assert.equal(aiLanguageFollowsApp('en'), false)
+})
+
+test('an absent choice still cannot pass the admin', () => {
+  assert.equal(resolveAiLanguage(null, 'de', defaults), 'en')
+})
+
+test('a chosen language stays put when the app language changes', () => {
   const ui = resolveUiLanguage('el', defaults)
   assert.equal(ui, 'el')
   assert.equal(resolveAiLanguage('en', ui, defaults), 'en')
