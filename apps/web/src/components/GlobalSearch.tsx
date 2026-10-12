@@ -20,8 +20,10 @@ import {
   alpha,
   useTheme,
   Tooltip,
+  ButtonBase,
 } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
+import ManageSearchIcon from '@mui/icons-material/ManageSearch'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import CloseIcon from '@mui/icons-material/Close'
@@ -66,6 +68,20 @@ export function GlobalSearch() {
   const [status, setStatus] = useState<SearchStatus>('idle')
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
+  const hasTerm = query.trim().length >= 2
+
+  // Arrow keys move the highlight; without this it walks off the bottom of
+  // the list and the reader cannot see what Enter would open.
+  useEffect(() => {
+    if (selectedIndex < 0) {
+      resultsRef.current?.scrollTo({ top: 0 })
+      return
+    }
+    resultsRef.current
+      ?.querySelector(`[data-result-index="${selectedIndex}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [selectedIndex])
 
   const handleClose = useCallback(() => {
     setOpen(false)
@@ -202,17 +218,17 @@ export function GlobalSearch() {
           },
         }}
       >
-        <DialogContent sx={{ p: 0 }}>
+        {/*
+          * One scroll area, not two: the content is a column whose only
+          * scrolling child is the result list, so the input, the "view all"
+          * row and the shortcut hints stay put while the results move.
+          */}
+        <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Search Input */}
           <Box
             sx={{
               p: 2,
-              borderBottom: 1,
-              borderColor: 'divider',
-              position: 'sticky',
-              top: 0,
-              bgcolor: 'background.paper',
-              zIndex: 1,
+              flexShrink: 0,
               display: 'flex',
               alignItems: 'center',
               gap: 1,
@@ -257,8 +273,40 @@ export function GlobalSearch() {
             )}
           </Box>
 
+          {/*
+            * The way to the full search page sits under the input, not after
+            * the results: below ten results it was off-screen, so the one link
+            * that offers filters and AI search was the last thing anyone found.
+            * Highlighted while no result is selected, because that is when
+            * Enter opens it.
+            */}
+          {hasTerm && (
+            <ButtonBase
+              onClick={handleViewAllResults}
+              sx={{
+                flexShrink: 0,
+                width: '100%',
+                justifyContent: 'flex-start',
+                gap: 1,
+                px: 2.5,
+                py: 1.25,
+                color: 'primary.main',
+                bgcolor: selectedIndex === -1 ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
+              }}
+            >
+              <ManageSearchIcon fontSize="small" />
+              <Typography variant="body2" fontWeight={500} noWrap sx={{ minWidth: 0 }}>
+                {t('globalSearch.viewAllForQuery', { query: query.trim() })}
+              </Typography>
+            </ButtonBase>
+          )}
+
           {/* Results */}
-          <Box sx={{ maxHeight: fullScreen ? 'none' : 'calc(80dvh - 120px)', overflowY: 'auto' }}>
+          <Box
+            ref={resultsRef}
+            sx={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: 1, borderColor: 'divider' }}
+          >
             {status === 'idle' && (
               <Box p={4} textAlign="center">
                 <Typography color="text.secondary">
@@ -285,11 +333,11 @@ export function GlobalSearch() {
             )}
 
             {results.length > 0 && (
-              <>
                 <List sx={{ py: 0 }}>
                   {results.map((result, index) => (
                     <ListItem
                       key={`${result.type}-${result.id}`}
+                      data-result-index={index}
                       onClick={() => handleResultClick(result)}
                       sx={{
                         cursor: 'pointer',
@@ -368,26 +416,6 @@ export function GlobalSearch() {
                     </ListItem>
                   ))}
                 </List>
-
-                {/* View all results link */}
-                <Box
-                  sx={{
-                    p: 2,
-                    borderTop: 1,
-                    borderColor: 'divider',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    '&:hover': {
-                      bgcolor: 'action.hover',
-                    },
-                  }}
-                  onClick={handleViewAllResults}
-                >
-                  <Typography variant="body2" color="primary">
-                    {t('globalSearch.viewAllForQuery', { query })}
-                  </Typography>
-                </Box>
-              </>
             )}
           </Box>
 
@@ -395,6 +423,7 @@ export function GlobalSearch() {
           <Box
             sx={{
               ...(fullScreen && { display: 'none' }),
+              flexShrink: 0,
               p: 1.5,
               borderTop: 1,
               borderColor: 'divider',
