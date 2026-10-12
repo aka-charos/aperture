@@ -45,7 +45,14 @@ interface Row {
   name: string
   mediaServer: { id: string; name: string; disabled: boolean; admin: boolean; lastActivity: string | null } | null
   lldap: { id: string; displayName: string | null; email: string | null; created: string | null; groups: string[] } | null
-  aperture: { id: string; username: string; email: string | null; emailLocked: boolean; accessEnabled: boolean } | null
+  aperture: {
+    id: string
+    username: string
+    email: string | null
+    emailLocked: boolean
+    accessEnabled: boolean
+    pausedSince?: string | null
+  } | null
   findings: Finding[]
   status: RowStatus
 }
@@ -181,7 +188,11 @@ export function AccountDriftSection() {
           : t('settingsAccountDrift.detail.noAddress')
       )
       details.push(
-        row.aperture.accessEnabled ? t('settingsAccountDrift.detail.accessOn') : t('settingsAccountDrift.detail.accessOff')
+        row.aperture.pausedSince
+          ? t('settingsAccountDrift.detail.paused', { when: when(row.aperture.pausedSince) })
+          : row.aperture.accessEnabled
+            ? t('settingsAccountDrift.detail.accessOn')
+            : t('settingsAccountDrift.detail.accessOff')
       )
     }
 

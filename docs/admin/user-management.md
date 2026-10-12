@@ -32,6 +32,16 @@ Tabs across the top:
 
 Disabling a user (or both media toggles) blocks login even with valid media-server credentials — the login page tells them to contact an administrator. Re-enabling restores access.
 
+## Accounts No Longer on the Media Server
+
+The list is built from the media server's own users, so an account deleted there has no row in it. Such accounts are listed separately under it, as **No longer on Emby** (or Jellyfin), with when they were created, when they last signed in, and how much history they hold.
+
+- The user sync (every 30 minutes) notices them: it signs them out, stops their API keys and pauses everything done for them (recommendations, home rows, generated libraries), and keeps everything stored. Until the next sync runs the row says **Pauses at the next user sync**.
+- **Remove** deletes the account for good, with its watch history, ratings, recommendations, playlists and settings, after a confirmation. It asks the media server again first and refuses if the account is still there. Nothing changes on the media server itself.
+- If the account comes back on the media server, or signs in, the next sync or the sign-in lifts the pause.
+
+The sync refuses to treat anyone as gone when the media server lists nobody, or lists none of the accounts it knows (usually a changed server address), and says so in its job log.
+
 ## Emails
 
 Emails come from the media-server sync, **manual entry**, or the [LLDAP integration](integrations-overview.md) (`sync-lldap-emails` job).

@@ -131,7 +131,8 @@ async function readAperture(): Promise<DriftApertureAccount[]> {
     email: string | null
     email_locked: boolean | null
     is_enabled: boolean | null
-  }>('SELECT id, username, provider_user_id, email, email_locked, is_enabled FROM users')
+    provider_missing_at: Date | null
+  }>('SELECT id, username, provider_user_id, email, email_locked, is_enabled, provider_missing_at FROM users')
   return result.rows.map((r) => ({
     id: r.id,
     username: r.username,
@@ -139,6 +140,7 @@ async function readAperture(): Promise<DriftApertureAccount[]> {
     email: r.email,
     emailLocked: r.email_locked === true,
     accessEnabled: r.is_enabled === true,
+    pausedSince: r.provider_missing_at ? r.provider_missing_at.toISOString() : null,
   }))
 }
 

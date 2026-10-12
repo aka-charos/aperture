@@ -63,6 +63,7 @@ const EXEMPT: Record<string, string> = {
   'channels/handlers/playlist.ts': "hydrates items the channel builder chose within the owner's scope",
   // Admin-only surfaces.
   'gap-analysis/index.ts': 'admin only',
+  'users/handlers/goneAccounts.ts': 'admin only; counts the titles a removed account watched, naming none',
   'mdblist/index.ts': 'admin only',
   'settings/handlers/aiConfig.ts': 'admin only',
   'settings/handlers/legacyAiModels.ts': 'admin only',

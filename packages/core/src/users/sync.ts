@@ -7,6 +7,8 @@
  * - Updates admin status
  * - Updates provider_disabled from media server Policy.IsDisabled
  * - Refreshes each account's library access (lib/libraryScope.ts)
+ * - Marks an account the media server no longer lists (provider_missing_at,
+ *   with provider_disabled), and unmarks it when it is listed again
  */
 
 import { randomUUID } from 'crypto'
@@ -25,7 +27,8 @@ import {
 import { cleanupUserLibraries } from '../strm/cleanup.js'
 // The audit trail: this job is the only writer of provider_disabled, and one of
 // two writers of is_admin, so a change here is invisible unless it says so.
-import { auditUserPermissions, SYSTEM_ACTORS } from '../permissionAudit.js'
+import { auditUserPermissions, diffUserPermissions, recordPermissionChanges, SYSTEM_ACTORS } from '../permissionAudit.js'
+import { accountsGoneFromMediaServer } from './providerPresence.js'
 import { libraryIdsFromFolderAccess, saveUserLibraryAccess } from '../lib/libraryScope.js'
 import type { Library } from '../media/types.js'
 
@@ -34,6 +37,8 @@ const logger = createChildLogger('user-sync')
 export interface SyncUsersResult {
   imported: number
   updated: number
+  /** Accounts marked this run as no longer on the media server. */
+  gone: number
   total: number
   jobId: string
 }
@@ -45,7 +50,7 @@ export async function syncUsersFromMediaServer(
   existingJobId?: string
 ): Promise<SyncUsersResult> {
   const jobId = existingJobId || randomUUID()
-  createJobProgress(jobId, 'sync-users', 2)
+  createJobProgress(jobId, 'sync-users', 3)
 
   try {
     const provider = await getMediaServerProvider()
@@ -70,12 +75,29 @@ export async function syncUsersFromMediaServer(
       email_locked: boolean
       is_admin: boolean
       provider_disabled: boolean
+      provider_missing_at: Date | null
       library_access: string[] | null
     }>(
-      'SELECT id, provider_user_id, email, email_locked, is_admin, provider_disabled, library_access FROM users WHERE provider_user_id IS NOT NULL'
+      'SELECT id, provider_user_id, email, email_locked, is_admin, provider_disabled, provider_missing_at, library_access FROM users WHERE provider_user_id IS NOT NULL'
     )
     const existingUserMap = new Map(
       existingUsers.rows.map(u => [u.provider_user_id, u])
+    )
+
+    // Which accounts the server no longer lists, decided against the accounts
+    // that existed BEFORE this run imports anything: a listing from a
+    // different server would otherwise import its own users first and then
+    // look like it shares accounts with Aperture (see providerPresence.ts).
+    const allAccounts = await query<{
+      id: string
+      username: string
+      provider_user_id: string | null
+      provider_disabled: boolean
+      provider_missing_at: Date | null
+    }>('SELECT id, username, provider_user_id, provider_disabled, provider_missing_at FROM users')
+    const goneDecision = accountsGoneFromMediaServer(
+      allAccounts.rows.map((row) => ({ ...row, providerUserId: row.provider_user_id })),
+      providerUsers.map((pu) => pu.id)
     )
 
     // Step 2: Process users
@@ -183,6 +205,13 @@ export async function syncUsersFromMediaServer(
           paramIndex++
         }
 
+        // Listed again after being marked gone: the mark goes, and
+        // provider_disabled then follows the server just below.
+        if (existing.provider_missing_at) {
+          updates.push('provider_missing_at = NULL')
+          addLog(jobId, 'info', `↩️ Back on the media server: ${pu.name}`)
+        }
+
         // Sync media-server disabled flag (recommendation jobs skip these users)
         if (existing.provider_disabled !== !!pu.isDisabled) {
           updates.push(`provider_disabled = $${paramIndex}`)
@@ -229,9 +258,53 @@ export async function syncUsersFromMediaServer(
 
     updateJobProgress(jobId, providerUsers.length, providerUsers.length)
 
+    // Step 3: accounts the media server no longer has. Marked, never deleted:
+    // provider_disabled is what every sign-in door and per-user job already
+    // refuses on, so setting it signs the account out and pauses its work
+    // while keeping everything stored for it. Removing it is the admin's act
+    // (the Users page). provider_missing_at says why the flag is set.
+    setJobStep(jobId, 2, 'Checking for accounts the media server no longer has')
+    let gone = 0
+    if (!goneDecision.ok) {
+      addLog(
+        jobId,
+        'warn',
+        goneDecision.reason === 'emptyListing'
+          ? '⚠️ The media server listed no users, so no account is treated as removed'
+          : '⚠️ The media server lists none of the accounts Aperture knows (a different server?), so no account is treated as removed'
+      )
+    } else {
+      for (const account of goneDecision.gone) {
+        if (account.provider_missing_at) continue
+        const marked = await queryOne<{ id: string }>(
+          `UPDATE users SET provider_missing_at = NOW(), provider_disabled = true, updated_at = NOW()
+           WHERE id = $1 AND provider_missing_at IS NULL
+           RETURNING id`,
+          [account.id]
+        )
+        if (!marked) continue
+        gone++
+        await recordPermissionChanges(
+          SYSTEM_ACTORS.userSync,
+          { kind: 'user', id: account.id, label: account.username },
+          diffUserPermissions(
+            { provider_disabled: account.provider_disabled },
+            { provider_disabled: true }
+          ).map((change) => ({ ...change, detail: 'no longer on the media server' }))
+        )
+        addLog(jobId, 'info', `👋 No longer on the media server: ${account.username} (signed out, work paused)`)
+        if (!account.provider_disabled) {
+          void cleanupUserLibraries(account.id).catch((err) =>
+            logger.error({ err, userId: account.id }, 'Failed to clean STRM libraries after user left the media server')
+          )
+        }
+      }
+    }
+
     const result = {
       imported,
       updated,
+      gone,
       total: providerUsers.length,
       jobId,
     }
@@ -246,7 +319,11 @@ export async function syncUsersFromMediaServer(
         `⚠️ ${accessUntranslated} user(s): permitted folders matched no library, access left unchanged`
       )
     }
-    addLog(jobId, 'info', `✅ User sync complete: ${imported} imported, ${updated} updated, ${providerUsers.length} total`)
+    addLog(
+      jobId,
+      'info',
+      `✅ User sync complete: ${imported} imported, ${updated} updated, ${gone} no longer on the media server, ${providerUsers.length} total`
+    )
     completeJob(jobId, result)
 
     logger.info(result, 'User sync completed')

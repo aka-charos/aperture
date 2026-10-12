@@ -57,6 +57,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
 import GroupIcon from '@mui/icons-material/Group'
 import { UserConnectionsDialog } from './UserConnectionsDialog'
+import { GoneAccountsSection, type GoneAccount } from './users/GoneAccountsSection'
 import { usePageHeader } from '@/hooks/usePageHeader'
 import { useAuth } from '@/hooks/useAuth'
 import { useLegacyLibraryOutput } from '@/hooks/legacyLibraryOutput'
@@ -131,6 +132,8 @@ export function UsersPage() {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const [providerUsers, setProviderUsers] = useState<ProviderUser[]>([])
+  // Accounts the media server no longer lists, which the table cannot show.
+  const [goneAccounts, setGoneAccounts] = useState<GoneAccount[] | null>(null)
   const [provider, setProvider] = useState<string>('emby')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -178,6 +181,7 @@ export function UsersPage() {
       if (response.ok) {
         const data = await response.json()
         setProviderUsers(data.users)
+        setGoneAccounts(data.goneAccounts ?? null)
         setProvider(data.provider)
         setError(null)
       } else {
@@ -644,6 +648,17 @@ export function UsersPage() {
 
   const isJobRunning = (userId: string) => runningJobs.has(userId)
   const providerLabel = provider.charAt(0).toUpperCase() + provider.slice(1)
+
+  const goneAccountsSection = (
+    <GoneAccountsSection
+      accounts={goneAccounts}
+      provider={providerLabel}
+      onRemoved={(account) => {
+        setGoneAccounts((current) => current?.filter((a) => a.id !== account.id) ?? null)
+        setSnackbar({ open: true, message: t('admin.usersPage.gone.removed', { name: account.username }), severity: 'success' })
+      }}
+    />
+  )
 
   // Whether the account can sign in to this app: users.is_enabled, an admin
   // decision of its own (F-135). It used to be derived from the feature switches,
@@ -1134,6 +1149,8 @@ export function UsersPage() {
           {renderConnectionsMenuItem()}
         </Menu>
 
+        {goneAccountsSection}
+
         {connectionsDialog}
 
         {/* Snackbar for notifications */}
@@ -1572,6 +1589,8 @@ export function UsersPage() {
         {renderViewAsMenuItem()}
         {renderConnectionsMenuItem()}
       </Menu>
+
+      {goneAccountsSection}
 
       {connectionsDialog}
 

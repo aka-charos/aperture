@@ -56,7 +56,7 @@ Each person is one row, with a chip per place they have an account (hover a chip
 | Finding | What it means |
 |---|---|
 | In LLDAP only | No media-server account and none in Aperture. If they were removed from the media server, remove them from LLDAP too. If the media server signs people in through LDAP, someone who has never signed in shows here as well. |
-| No longer on the media server | Aperture still has the account, and usually an address it could one day email. |
+| No longer on the media server | Aperture still has the account, and usually an address it could one day email. The user sync signs it out and pauses its work; remove it from the Users page ([User management](user-management.md#accounts-no-longer-on-the-media-server)). |
 | Still in LLDAP | Shown with the one above. With LDAP sign-in, they can sign in again and get a new account. |
 | Left over | The media server has a newer account with the same name, and the email import gives the old one the same address. |
 | No LLDAP account | On the media server with no LLDAP account of that name, so no address is imported for them. Common for a local admin account. |

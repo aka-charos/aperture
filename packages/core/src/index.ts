@@ -1725,6 +1725,12 @@ export {
   type DriftSummary,
 } from './users/accountDrift.js'
 export { loadAccountDriftReport, type AccountDriftReport, type DriftSource } from './users/accountDriftReport.js'
+export {
+  accountsGoneFromMediaServer,
+  type GoneDecision,
+  type GoneRefusal,
+  type LinkedAccount,
+} from './users/providerPresence.js'
 
 // API Keys
 export {

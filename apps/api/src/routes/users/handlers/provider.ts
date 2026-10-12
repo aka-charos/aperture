@@ -9,6 +9,7 @@ import {
   resolveLibraryScope,
 } from '@aperture/core'
 import { isAccountEnabled } from '../../../lib/accountEnabled.js'
+import { loadGoneAccounts } from './goneAccounts.js'
 import type { UserRow } from '../types.js'
 
 export function registerProviderHandlers(fastify: FastifyInstance) {
@@ -97,6 +98,9 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
         return reply.send({
           provider: provider.type,
           users: usersWithStatus,
+          // Accounts this listing no longer contains, which the list above
+          // cannot show; null when the listing cannot be trusted to say.
+          goneAccounts: await loadGoneAccounts(providerUsers.map((user) => user.id)),
         })
       } catch (error) {
         fastify.log.error({ error }, 'Failed to fetch provider users')

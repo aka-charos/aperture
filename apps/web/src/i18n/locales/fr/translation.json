@@ -297,7 +297,26 @@
       "recsKindsTooltip": "The kinds follow from the libraries {{provider}} lets this account see, among those enabled here.",
       "recsKindsUnreadTooltip": "This account's library access hasn't been read from {{provider}} yet; it will be at the next user sync or sign-in. Until then every enabled library counts.",
       "menuConnections": "Connexions…",
-      "menuConnectionsSecondary": "Avec qui cette personne partage ce qu'elle regarde"
+      "menuConnectionsSecondary": "Avec qui cette personne partage ce qu'elle regarde",
+      "gone": {
+        "title": "No longer on {{provider}} ({{count}})",
+        "description": "{{appName}} still holds these accounts, but {{provider}} no longer has them, so they cannot appear in the list above. The user sync signs them out and pauses everything done for them; removing one deletes it for good.",
+        "created": "Created {{when}}",
+        "lastSignIn": "last signed in {{when}}",
+        "neverSignedIn": "never signed in",
+        "watched_one": "{{count}} title watched",
+        "watched_other": "{{count}} titles watched",
+        "rated_one": "{{count}} rating",
+        "rated_other": "{{count}} ratings",
+        "paused": "Signed out and paused {{when}}",
+        "notPausedYet": "Pauses at the next user sync",
+        "remove": "Remove",
+        "confirmTitle": "Remove {{name}}?",
+        "confirmBody": "This deletes {{name}} from {{appName}} with everything stored for them: {{watched}}, {{rated}}, their recommendations, playlists and settings. Nothing changes on {{provider}}. It cannot be undone.",
+        "confirmRemove": "Remove for good",
+        "removeError": "Could not remove the account.",
+        "removed": "{{name}} removed"
+      }
     },
     "userDetail": {
       "userNotFound": "Utilisateur introuvable",
@@ -6124,13 +6143,14 @@
       "address": "Address on file: {{email}}",
       "noAddress": "No address on file",
       "accessOn": "Access on",
-      "accessOff": "Access off"
+      "accessOff": "Access off",
+      "paused": "Signed out and paused {{when}}"
     },
     "findings": {
       "lldapOnly": "In LLDAP only: no {{provider}} account and none in {{appName}}. If they were removed from {{provider}}, remove them from LLDAP too.",
       "lldapServiceAccount": "The account {{appName}} signs in to LLDAP with. A service account, so it needs no {{provider}} account.",
-      "goneFromMediaServer": "No longer on {{provider}}, but {{appName}} still has the account.",
-      "goneFromMediaServerWithEmail": "No longer on {{provider}}, but {{appName}} still has the account and its address, {{email}}.",
+      "goneFromMediaServer": "No longer on {{provider}}, but {{appName}} still has the account. Remove it on the Users page.",
+      "goneFromMediaServerWithEmail": "No longer on {{provider}}, but {{appName}} still has the account and its address, {{email}}. Remove it on the Users page.",
       "replacedOnMediaServer": "Left over: {{provider}} has a newer account with this name, and the email import gives this one the same address.",
       "stillInLldap": "Still in LLDAP. If {{provider}} signs people in through LDAP, they can sign in again and get a new account.",
       "noLldapAccount": "No LLDAP account named {{name}}, so no address is imported for them.",

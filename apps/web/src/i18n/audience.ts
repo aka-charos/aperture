@@ -58,6 +58,8 @@ export const ADMIN_SURFACE_PATHS: readonly string[] = [
   'pages/UserDetail.tsx',
   // Opened only from the Users page's row menu; people never manage connections.
   'pages/UserConnectionsDialog.tsx',
+  // Sections of the Users page split into their own files.
+  'pages/users/',
   'components/Admin',
   'components/AIFallbackModels.tsx',
   'components/AIFunctionCard.tsx',

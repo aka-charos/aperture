@@ -46,6 +46,8 @@ export interface DriftApertureAccount {
   email: string | null
   emailLocked: boolean
   accessEnabled: boolean
+  /** When the user sync marked it gone from the media server (signed out, work paused), if it has. */
+  pausedSince?: string | null
 }
 
 export const DRIFT_FINDINGS = [

@@ -264,6 +264,9 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
             -- provider-disabled account, and without this the only way back from
             -- a wrong flag would be waiting for the next user sync.
             provider_disabled = false,
+            -- The same evidence says the media server still has the account,
+            -- so a mark that it was gone (0199) goes with the flag.
+            provider_missing_at = NULL,
             updated_at = NOW()
            WHERE id = $4
            RETURNING ${USER_COLUMNS('users')}`,
