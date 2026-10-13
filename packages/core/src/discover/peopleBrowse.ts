@@ -30,7 +30,7 @@ export interface ListPeopleBrowseResult {
 }
 
 /**
- * List distinct people (actors + directors) appearing in synced movies and series,
+ * List distinct people (cast, directors, writers, show creators) appearing in synced movies and series,
  * with optional library visibility matching the main Browse lists.
  */
 export async function listPeopleForBrowse(
@@ -79,39 +79,42 @@ export async function listPeopleForBrowse(
 
   const sql = `
 WITH all_contributions AS (
-  SELECT trim(a->>'name') AS name, 'movie'::text AS media_kind
+  -- One row per (person, title, credit). Cast, directors and writers come from
+  -- the media server; a show's directors column also holds its Creator people,
+  -- and TMDb's creators sit beside it in tmdb_creators. The same population
+  -- the person page lists, so the two agree on who is here.
+  SELECT trim(p.name) AS name, 'movie'::text AS media_kind, m.id AS item_id
   FROM movies m
-  CROSS JOIN LATERAL jsonb_array_elements(COALESCE(m.actors, '[]'::jsonb)) AS a
-  WHERE trim(COALESCE(a->>'name', '')) != ''
+  CROSS JOIN LATERAL (
+    SELECT a->>'name' FROM jsonb_array_elements(COALESCE(m.actors, '[]'::jsonb)) AS a
+    UNION ALL SELECT unnest(COALESCE(m.directors, ARRAY[]::text[]))
+    UNION ALL SELECT unnest(COALESCE(m.writers, ARRAY[]::text[]))
+  ) AS p(name)
+  WHERE trim(COALESCE(p.name, '')) != ''
   AND (${libMovie})
   UNION ALL
-  SELECT trim(dir) AS name, 'movie'::text
-  FROM movies m
-  CROSS JOIN LATERAL unnest(COALESCE(m.directors, ARRAY[]::text[])) AS u(dir)
-  WHERE trim(dir) != ''
-  AND (${libMovie})
-  UNION ALL
-  SELECT trim(a->>'name') AS name, 'series'::text
+  SELECT trim(p.name) AS name, 'series'::text, s.id
   FROM series s
-  CROSS JOIN LATERAL jsonb_array_elements(COALESCE(s.actors, '[]'::jsonb)) AS a
-  WHERE trim(COALESCE(a->>'name', '')) != ''
-  AND (${libSeries})
-  UNION ALL
-  SELECT trim(dir) AS name, 'series'::text
-  FROM series s
-  CROSS JOIN LATERAL unnest(COALESCE(s.directors, ARRAY[]::text[])) AS u(dir)
-  WHERE trim(dir) != ''
+  CROSS JOIN LATERAL (
+    SELECT a->>'name' FROM jsonb_array_elements(COALESCE(s.actors, '[]'::jsonb)) AS a
+    UNION ALL SELECT unnest(COALESCE(s.directors, ARRAY[]::text[]))
+    UNION ALL SELECT unnest(COALESCE(s.writers, ARRAY[]::text[]))
+    UNION ALL SELECT unnest(COALESCE(s.tmdb_creators, ARRAY[]::text[]))
+  ) AS p(name)
+  WHERE trim(COALESCE(p.name, '')) != ''
   AND (${libSeries})
 ),
 agg AS (
+  -- Titles, not credits: someone who wrote and directed a film has one film.
   SELECT
     name,
-    COUNT(*)::int AS credits,
-    COUNT(*) FILTER (WHERE media_kind = 'movie')::int AS movie_credits,
-    COUNT(*) FILTER (WHERE media_kind = 'series')::int AS series_credits
+    COUNT(DISTINCT item_id)::int AS credits,
+    COUNT(DISTINCT item_id) FILTER (WHERE media_kind = 'movie')::int AS movie_credits,
+    COUNT(DISTINCT item_id) FILTER (WHERE media_kind = 'series')::int AS series_credits
   FROM all_contributions
   GROUP BY name
 ),
+
 filtered AS (
   SELECT * FROM agg
   WHERE ($1::text IS NULL OR name ILIKE '%' || $1 || '%')

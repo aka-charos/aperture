@@ -242,9 +242,17 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
             SELECT 1 FROM jsonb_array_elements(${alias}.actors) AS a
             WHERE a->>'name' ILIKE $1
           ) AS is_actor,
-          $1 = ANY(${alias}.directors) AS is_director,
+          ${
+            // A show's directors column is the media server's Director AND
+            // Creator people in one list (both mappers), and at series level
+            // those are its creators; it is read as Creator, with TMDb's.
+            alias === 's'
+              ? `false AS is_director,
+          ($1 = ANY(COALESCE(s.directors, '{}')) OR $1 = ANY(COALESCE(s.tmdb_creators, '{}'))) AS is_creator,`
+              : `$1 = ANY(COALESCE(m.directors, '{}')) AS is_director,
+          false AS is_creator,`
+          }
           $1 = ANY(COALESCE(${alias}.writers, '{}')) AS is_writer,
-          ${alias === 's' ? `$1 = ANY(COALESCE(s.tmdb_creators, '{}'))` : 'false'} AS is_creator,
           (
             SELECT a->>'role' FROM jsonb_array_elements(${alias}.actors) AS a
             WHERE a->>'name' ILIKE $1

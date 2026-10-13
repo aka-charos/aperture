@@ -75,6 +75,10 @@ export function groupLibraryCredits<T extends LibraryCreditItem>(
       if (item.tmdbId) {
         for (const role of tmdbRoles.get(`${media}:${item.tmdbId}`) ?? []) roles.add(role)
       }
+      // "Other crew" is where a title goes when no named role fits, not a row
+      // of its own beside one: TMDb files a novelist's "Novel" credit there,
+      // and every adaptation would otherwise sit under Writer AND Other crew.
+      if (roles.size > 1) roles.delete('other')
       // Every title here was found BY a credit, so an empty set means the
       // server did not say which one; it is still this person's title.
       if (roles.size === 0) roles.add('other')

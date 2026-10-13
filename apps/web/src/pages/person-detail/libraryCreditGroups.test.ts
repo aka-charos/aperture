@@ -32,6 +32,22 @@ describe('groupLibraryCredits', () => {
     assert.deepEqual(keys(groups), ['movie:actor=m1', 'movie:producer=m1', 'tv:actor=s1'])
   })
 
+  it('files a title under other crew only when no named role fits', () => {
+    const groups = groupLibraryCredits(
+      [
+        { id: 'm1', tmdbId: '1', credits: ['writer'] },
+        { id: 'm2', tmdbId: '2', credits: [] },
+      ],
+      [],
+      [
+        { tmdbId: 1, mediaType: 'movie', roleKind: 'other' },
+        { tmdbId: 2, mediaType: 'movie', roleKind: 'other' },
+      ]
+    )
+    // The novelist's adaptation stays under Writer alone; a thanks-only credit is other crew.
+    assert.deepEqual(keys(groups), ['movie:writer=m1', 'movie:other=m2'])
+  })
+
   it('never drops a title: no known role reads as other crew', () => {
     const groups = groupLibraryCredits([{ id: 'm1' }, { id: 'm2', credits: ['bogus'] }], [], [])
     assert.deepEqual(keys(groups), ['movie:other=m1,m2'])
