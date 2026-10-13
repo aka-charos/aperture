@@ -95,7 +95,7 @@ import { getDislikedSeriesIds } from './taste.js'
 import { getWatchedGenreCounts } from '../genreFamiliarity.js'
 import { getWatchedYears, summarizeEraFit } from '../eraDiagnostics.js'
 import { getEffectiveAiExplanationSetting } from '../../lib/userSettings.js'
-import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
+import { WATCH_HISTORY_PLAYED_SQL, WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
 import { libraryEpisodeCountSql, REGULAR_EPISODE_SQL, seriesCompletionRate } from './libraryEpisodes.js'
 import { loadConfigForUser } from '../config.js'
 import {
@@ -178,7 +178,10 @@ async function getSeriesWatchHistory(userId: string, limit: number): Promise<Wat
     `SELECT 
        e.series_id,
        COUNT(DISTINCT wh.episode_id) as episodes_watched,
-       COUNT(DISTINCT wh.episode_id) FILTER (WHERE ${REGULAR_EPISODE_SQL}) as regular_watched,
+       -- Completion counts PLAYED episodes only. The rows above pass the taste
+       -- predicate, which also admits favorited-unplayed episodes; counting
+       -- those would read a bookmark as progress (the poster pill counts played).
+       COUNT(DISTINCT wh.episode_id) FILTER (WHERE ${REGULAR_EPISODE_SQL} AND ${WATCH_HISTORY_PLAYED_SQL}) as regular_watched,
        ${libraryEpisodeCountSql('e.series_id')} as total_episodes,
        BOOL_OR(wh.is_favorite) as has_favorites,
        MAX(wh.last_played_at) as last_played_at

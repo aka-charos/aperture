@@ -57,7 +57,7 @@ test('any scope is membership in co-producers PLUS origin, so it is a superset o
   assert.match(ALL_COUNTRIES_SQL, /production_countries \|\| COALESCE\(origin_countries/)
 })
 
-test('absent parameters keep the behaviour API callers always had: anywhere, AND', () => {
+test('absent parameters mean any scope and AND (any now includes the origin)', () => {
   assert.equal(build(['Greece', 'Cyprus']).sql, `${ALL_COUNTRIES_SQL} @> $1::text[]`)
 })
 

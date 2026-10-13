@@ -16,9 +16,10 @@
  *
  * And a MATCH for several countries: `any` (OR) or `all` (AND).
  *
- * Absent parameters keep the pre-existing behaviour (`any` scope, `all` match)
- * for API callers that never heard of either; the Browse page sends both
- * explicitly, and its own defaults are primary + OR.
+ * Absent parameters mean `any` scope and `all` match, the shape API callers
+ * always had — but `any` now also matches `origin_countries`, so a caller
+ * asking for a country can get titles whose only link to it is TMDb's origin.
+ * The Browse page sends both explicitly; its own defaults are primary + OR.
  *
  * Pure so the combinations are pinned by a test. Column names are bare, as the
  * list queries read the unaliased table.

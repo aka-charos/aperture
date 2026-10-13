@@ -23,6 +23,9 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import { RangeSlider } from './RangeSlider'
 import { ChipToggleGroup } from './ChipToggleGroup'
+// One copy of the defaults, shared with the page's initial state, so Reset and a
+// fresh load cannot drift apart. constants.ts imports only types from here.
+import { defaultMovieFilters, defaultSeriesFilters } from '../constants'
 import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
 
 export type WatchStatusFilter = 'any' | 'watched' | 'unwatched'
@@ -77,38 +80,6 @@ interface FilterPopperProps {
     seasons?: { min: number; max: number }
     rating: { min: number; max: number }
   }
-}
-
-const defaultMovieFilters: MovieFilters = {
-  yearRange: [1900, new Date().getFullYear()],
-  runtimeRange: [0, 300],
-  communityRating: [0, 10],
-  rtScore: [0, 100],
-  metacritic: [0, 100],
-  contentRatings: [],
-  resolutions: [],
-  countries: [],
-  countryMatch: 'any',
-  includeSecondaryCountries: false,
-  watchStatus: 'any',
-  minWatchers: null,
-  maxWatchers: null,
-}
-
-const defaultSeriesFilters: SeriesFilters = {
-  yearRange: [1950, new Date().getFullYear()],
-  seasonsRange: [1, 30],
-  communityRating: [0, 10],
-  rtScore: [0, 100],
-  metacritic: [0, 100],
-  contentRatings: [],
-  status: [],
-  countries: [],
-  countryMatch: 'any',
-  includeSecondaryCountries: false,
-  watchStatus: 'any',
-  minWatchers: null,
-  maxWatchers: null,
 }
 
 /**

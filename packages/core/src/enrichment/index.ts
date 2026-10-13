@@ -852,12 +852,30 @@ async function fillMissingSeriesCreators(jobId: string): Promise<{ filled: numbe
 const ORIGIN_FIELD_MISSING_LIMIT = 20
 
 /**
+ * How long a title TMDb gave no answer for waits before it is asked again.
+ * The client returns null for a 404 and for a failed request alike, so "not on
+ * TMDb" cannot be told from "TMDb was down": a window bounds both, instead of
+ * re-asking every unmatched title on every run forever.
+ */
+const ORIGIN_RETRY_DAYS = 7
+
+/**
+ * Titles due for an origin lookup: never asked, or asked without an answer
+ * longer ago than the retry window. Shared by the count and the selection, so
+ * the progress total is the work the loop actually does.
+ */
+const ORIGIN_PENDING_SQL = `(origin_countries_fetched_at IS NULL
+  OR (origin_countries IS NULL AND origin_countries_fetched_at < NOW() - INTERVAL '${ORIGIN_RETRY_DAYS} days'))`
+
+/**
  * Fill origin_countries for titles enriched before the column existed (0200).
  *
  * Same shape as fillMissingSeriesCreators: ONE TMDb details request per title
  * (plus an id lookup when it has no TMDb id), never OMDb, each title asked at
- * most once per run, and a failure stays pending for the next run. An empty
- * origin list is stamped, since it is TMDb's answer.
+ * most once per run. An empty origin list is stamped, since it is TMDb's
+ * answer. A title TMDb gives nothing for (no match, no details) is stamped with
+ * origin NULL and waits ORIGIN_RETRY_DAYS, so an unmatched title costs one
+ * request a week rather than one per run.
  *
  * One guard the creators backfill does not need: if TMDb answers without the
  * field at all, nothing can be filled, so after ORIGIN_FIELD_MISSING_LIMIT such
@@ -880,7 +898,7 @@ async function fillMissingOriginCountries(
   const label = table === 'movies' ? 'movies' : 'series'
 
   const pending = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) AS count FROM ${table} WHERE origin_countries_fetched_at IS NULL AND ${hasId}`
+    `SELECT COUNT(*) AS count FROM ${table} WHERE ${ORIGIN_PENDING_SQL} AND ${hasId}`
   )
   const total = parseInt(pending?.count || '0', 10)
   if (total === 0) return outcome
@@ -891,7 +909,7 @@ async function fillMissingOriginCountries(
   while (!isJobCancelled(jobId)) {
     const batch = await query<{ id: string; title: string; tmdb_id: string | null; imdb_id: string | null; tvdb_id: string | null }>(
       `SELECT id, title, ${idColumns} FROM ${table}
-       WHERE origin_countries_fetched_at IS NULL AND ${hasId}
+       WHERE ${ORIGIN_PENDING_SQL} AND ${hasId}
        ORDER BY id
        LIMIT $1`,
       [BATCH_SIZE + attempted.size]
@@ -910,17 +928,26 @@ async function fillMissingOriginCountries(
           const onLog = createApiLogger(jobId, row.title)
           let tmdbId = row.tmdb_id ? parseInt(row.tmdb_id, 10) : null
           let details: { origin_country?: string[] } | null = null
+          // No answer from TMDb: record the attempt with origin NULL, so the
+          // title waits ORIGIN_RETRY_DAYS instead of being asked every run.
+          const noAnswer = async (): Promise<'failed'> => {
+            await query(
+              `UPDATE ${table} SET origin_countries_fetched_at = NOW() WHERE id = $1 AND origin_countries IS NULL`,
+              [row.id]
+            )
+            return 'failed'
+          }
           if (table === 'movies') {
             if (!tmdbId && row.imdb_id) tmdbId = await findMovieByImdbId(row.imdb_id, { onLog })
-            if (!tmdbId) return 'failed'
+            if (!tmdbId) return await noAnswer()
             details = await getMovieDetails(tmdbId, { onLog })
           } else {
             if (!tmdbId && row.imdb_id) tmdbId = await findTVByImdbId(row.imdb_id, { onLog })
             if (!tmdbId && row.tvdb_id) tmdbId = await findTVByTvdbId(row.tvdb_id, { onLog })
-            if (!tmdbId) return 'failed'
+            if (!tmdbId) return await noAnswer()
             details = await getTVDetails(tmdbId, { onLog })
           }
-          if (!details) return 'failed'
+          if (!details) return await noAnswer()
           const origin = originCountryNames(details)
           if (origin === null) return 'missing'
           await query(
@@ -958,7 +985,7 @@ async function fillMissingOriginCountries(
   addLog(
     jobId,
     'info',
-    `🌍 ${label[0].toUpperCase()}${label.slice(1)} origin countries: ${outcome.filled} filled, ${outcome.failed} not found or failed (retried next run)`
+    `🌍 ${label[0].toUpperCase()}${label.slice(1)} origin countries: ${outcome.filled} filled, ${outcome.failed} not found or failed (asked again after ${ORIGIN_RETRY_DAYS} days)`
   )
   return outcome
 }

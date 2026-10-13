@@ -12,7 +12,7 @@
 
 import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
-import { WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
+import { WATCH_HISTORY_PLAYED_SQL, WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
 import {
   libraryEpisodeCountSql,
   REGULAR_EPISODE_SQL,
@@ -519,7 +519,10 @@ async function getSeriesWatchHistory(userId: string): Promise<WatchedItem[]> {
        s.id,
        s.title,
        COUNT(DISTINCT wh.episode_id) as episodes_watched,
-       COUNT(DISTINCT wh.episode_id) FILTER (WHERE ${REGULAR_EPISODE_SQL}) as regular_watched,
+       -- Completion counts PLAYED episodes only. The rows above pass the taste
+       -- predicate, which also admits favorited-unplayed episodes; counting
+       -- those would read a bookmark as progress (the poster pill counts played).
+       COUNT(DISTINCT wh.episode_id) FILTER (WHERE ${REGULAR_EPISODE_SQL} AND ${WATCH_HISTORY_PLAYED_SQL}) as regular_watched,
        ${libraryEpisodeCountSql('s.id')} as total_episodes,
        BOOL_OR(wh.is_favorite) as has_favorites,
        MAX(wh.last_played_at) as last_played_at,

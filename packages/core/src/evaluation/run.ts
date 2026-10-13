@@ -207,10 +207,18 @@ async function fetchHistory(
           // series.total_episodes, which Emby leaves NULL — that made progress
           // NULL for every show. `played` is false on purpose: per row it is
           // ONE episode's flag, and OR-ing it graded a show sampled once as
-          // finished; gradeRelevance reads progress instead.
+          // finished; gradeRelevance reads progress instead. play_count is the
+          // same mistake one step over: MAX over episodes made a show sampled
+          // twice, one episode replayed, "rewatched" (the top grade). A show is
+          // rewatched when EVERY library episode was played and the least-played
+          // one twice, so the count is the minimum over a finished show and 1
+          // otherwise (NULL library count compares NULL and takes the ELSE).
           `SELECT e.series_id AS item_id,
                   MAX(wh.last_played_at) AS last_played_at,
-                  MAX(wh.play_count) AS play_count,
+                  CASE WHEN COUNT(DISTINCT wh.episode_id) FILTER (WHERE wh.played AND ${REGULAR_EPISODE_SQL})
+                              = ${libraryEpisodeCountSql('e.series_id')}
+                       THEN MIN(wh.play_count) FILTER (WHERE wh.played AND ${REGULAR_EPISODE_SQL})
+                       ELSE 1 END AS play_count,
                   BOOL_OR(wh.is_favorite) AS is_favorite,
                   false AS played,
                   COUNT(DISTINCT wh.episode_id) FILTER (WHERE wh.played AND ${REGULAR_EPISODE_SQL})::numeric
