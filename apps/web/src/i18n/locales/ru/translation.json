@@ -1538,7 +1538,20 @@
     "diedAge": "Died: {{date}} (aged {{age}})",
     "biography": "Biography",
     "bioMore": "More",
-    "bioLess": "Less"
+    "bioLess": "Less",
+    "creditGroup": {
+      "title": "{{media}} · {{role}}",
+      "inLibrary_one": "{{count}} in your library",
+      "inLibrary_other": "{{count}} in your library",
+      "role": {
+        "actor": "Acting",
+        "director": "Director",
+        "producer": "Producer",
+        "writer": "Writer",
+        "creator": "Creator",
+        "other": "Other crew"
+      }
+    }
   },
   "search": {
     "title": "Поиск",

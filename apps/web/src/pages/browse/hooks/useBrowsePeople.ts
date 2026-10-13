@@ -37,7 +37,7 @@ export function useBrowsePeople({ tabIndex, initialTabIsPeople }: UseBrowsePeopl
   const [peopleLoadingMore, setPeopleLoadingMore] = useState(false)
   const [peopleError, setPeopleError] = useState<string | null>(null)
   const [peopleSearch, setPeopleSearch] = useState('')
-  const [peopleSortBy, setPeopleSortBy] = useState<PeopleSortBy>('name')
+  const [peopleSortBy, setPeopleSortBy] = useState<PeopleSortBy>('credits')
   const [peoplePage, setPeoplePage] = useState(1)
   const [peopleHasMore, setPeopleHasMore] = useState(true)
   const [peopleTotal, setPeopleTotal] = useState(0)

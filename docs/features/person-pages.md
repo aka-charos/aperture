@@ -24,7 +24,9 @@ Header chips summarize the person's footprint in your library: **"12 as Actor"**
 
 ### Filmography From Your Library
 
-Two poster carousels — **Movies** and **TV Series** — covering everything of theirs your library holds. Cards carry the standard overlays:
+Everything of theirs your library holds, in poster carousels **grouped by media type and role** — the same grouping as the TMDb section below: *Movies · Acting*, *Movies · Director*, *TV Series · Creator*, and so on. A title they both acted in and directed appears in both rows.
+
+Roles come from your media server's credits (cast, directors, writers) plus a show's creators, and TMDb adds the rest — producing and other crew — for titles it can match. Cards carry the standard overlays:
 
 - Watched tick, or an **episode-progress badge** (8/24) for series
 - Your **star rating**, hover-rateable

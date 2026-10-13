@@ -1106,7 +1106,20 @@
     "diedAge": "Πέθανε: {{date}} (σε ηλικία {{age}})",
     "biography": "Βιογραφικό",
     "bioMore": "Περισσότερα",
-    "bioLess": "Λιγότερα"
+    "bioLess": "Λιγότερα",
+    "creditGroup": {
+      "title": "{{media}} · {{role}}",
+      "inLibrary_one": "{{count}} στη βιβλιοθήκη σας",
+      "inLibrary_other": "{{count}} στη βιβλιοθήκη σας",
+      "role": {
+        "actor": "Ερμηνεία",
+        "director": "Σκηνοθεσία",
+        "producer": "Παραγωγή",
+        "writer": "Σενάριο",
+        "creator": "Δημιουργία",
+        "other": "Λοιποί συντελεστές"
+      }
+    }
   },
   "settingsWatching": {
     "title": "Σειρές που Παρακολουθείτε",

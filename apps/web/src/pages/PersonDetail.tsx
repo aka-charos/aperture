@@ -37,6 +37,7 @@ import { SeasonSelectModal, type SeasonInfo } from './discovery/components/Seaso
 import { useSeerrRequest } from './discovery/hooks/useSeerrRequest'
 import { RequestSeerrOptionsDialog } from '../components/RequestSeerrOptionsDialog'
 import type { SeerrRequestOptions } from '../types/seerrRequest'
+import { groupLibraryCredits } from './person-detail/libraryCreditGroups'
 import {
   TmdbExternalDetailModal,
   type TmdbExternalDetailPayload,
@@ -52,6 +53,8 @@ interface ContentItem {
   genres: string[]
   communityRating: number | null
   role?: string
+  tmdbId?: string | null
+  credits?: string[]
 }
 
 interface PersonData {
@@ -271,6 +274,14 @@ export function PersonDetailPage() {
     const seriesBackdrops = data.series.map(s => s.backdropUrl)
     return [...movieBackdrops, ...seriesBackdrops]
   }, [data])
+
+  // Library titles by medium and role, like the TMDb section below. TMDb's
+  // roles join once the credits lookup lands; until then the media server's.
+  const libraryCreditGroups = useMemo(() => {
+    if (!data) return []
+    const tmdbInLibrary = (creditsGap?.inLibrary ?? []).flatMap((group) => group.rows)
+    return groupLibraryCredits(data.movies, data.series, tmdbInLibrary)
+  }, [data, creditsGap?.inLibrary])
 
   const creditsMissingGroupsFiltered = useMemo(() => {
     if (!creditsGap?.missing) return []
@@ -648,16 +659,20 @@ export function PersonDetailPage() {
           </Box>
         )}
 
-        {/* Movies Carousel */}
-        {data.movies.length > 0 && (
-          <Box mb={4}>
+        {/* In the library, by medium and role */}
+        {libraryCreditGroups.map((group) => (
+          <Box key={group.groupKey} mb={4}>
             <BaseCarousel
-              title={t('personDetail.moviesCarousel')}
-              subtitle={`${data.movies.length} movies featuring ${decodedName}`}
-              hasItems={data.movies.length > 0}
+              title={t('personDetail.creditGroup.title', {
+                media: t(group.media === 'movie' ? 'personDetail.moviesCarousel' : 'personDetail.seriesCarousel'),
+                role: t(`personDetail.creditGroup.role.${group.role}`),
+              })}
+              subtitle={t('personDetail.creditGroup.inLibrary', { count: group.items.length })}
+              hasItems={group.items.length > 0}
               fitItems
             >
-              {data.movies.map((movie) => (
+              {group.media === 'movie'
+                ? group.items.map((movie) => (
                 <CarouselItem key={movie.id}>
                   <MoviePoster
                     title={movie.title}
@@ -673,21 +688,8 @@ export function PersonDetailPage() {
                     responsive
                   />
                 </CarouselItem>
-              ))}
-            </BaseCarousel>
-          </Box>
-        )}
-
-        {/* Series Carousel */}
-        {data.series.length > 0 && (
-          <Box mb={4}>
-            <BaseCarousel
-              title={t('personDetail.seriesCarousel')}
-              subtitle={`${data.series.length} series featuring ${decodedName}`}
-              hasItems={data.series.length > 0}
-              fitItems
-            >
-              {data.series.map((series) => (
+                  ))
+                : group.items.map((series) => (
                 <CarouselItem key={series.id}>
                   <MoviePoster
                     title={series.title}
@@ -706,10 +708,10 @@ export function PersonDetailPage() {
                     responsive
                   />
                 </CarouselItem>
-              ))}
+                  ))}
             </BaseCarousel>
           </Box>
-        )}
+        ))}
 
         {creditsGapLoading && (
           <Box display="flex" justifyContent="center" py={2}>

@@ -10,7 +10,7 @@ The Browse page is your library explorer: every title you have, with deep filter
 
 - **Movies** — your movie library
 - **Series** — your TV series library
-- **People** — every actor, director, and creator in your library, searchable, with Name / Credits sorting and its own grid/list mode (People defaults to **list**)
+- **People** — every actor, director, and creator in your library, searchable, with Credits (most first, the default) / Name sorting and its own grid/list mode (People defaults to **list**)
 
 Each tab keeps its own filters, sort preference, and view mode (see [Grid & List Views](grid-list-views.md)).
 

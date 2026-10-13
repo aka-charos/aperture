@@ -1733,6 +1733,19 @@
     "notFound": "Person not found",
     "moviesCarousel": "Movies",
     "seriesCarousel": "TV Series",
+    "creditGroup": {
+      "title": "{{media}} · {{role}}",
+      "inLibrary_one": "{{count}} in your library",
+      "inLibrary_other": "{{count}} in your library",
+      "role": {
+        "actor": "Acting",
+        "director": "Director",
+        "producer": "Producer",
+        "writer": "Writer",
+        "creator": "Creator",
+        "other": "Other crew"
+      }
+    },
     "failedLoadDetails": "Failed to load details",
     "creditsFilterMedia": "Media",
     "creditsFilterRole": "Role",

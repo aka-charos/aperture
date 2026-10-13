@@ -27,7 +27,13 @@ interface ContentItem {
   genres: string[]
   communityRating: number | null
   role?: string // For actors - their role in this content
+  /** Person page only: the TMDb id, so TMDb's credit roles can join the media server's. */
+  tmdbId?: string | null
+  /** Person page only: how the person is credited on this title, from the media server. */
+  credits?: PersonCreditKind[]
 }
+
+type PersonCreditKind = 'actor' | 'director' | 'writer' | 'creator'
 
 interface PersonResponse {
   name: string
@@ -218,49 +224,42 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
       const seriesParams: unknown[] = [decodedName]
       const seriesInScope = scopeClause(scope, 's', seriesParams)
 
-      // Query movies where person is actor or director
-      const movieResults = await query<{
-        id: string
-        title: string
-        year: number | null
-        poster_url: string | null
-        backdrop_url: string | null
-        genres: string[]
-        community_rating: number | null
-        is_actor: boolean
-        is_director: boolean
-        role: string | null
-      }>(
-        `SELECT 
-          m.id,
-          m.title,
-          m.year,
-          m.poster_url,
-          m.backdrop_url,
-          m.genres,
-          m.community_rating,
+      // Titles where the person is credited, with HOW: the page groups them by
+      // medium and role, the way its "Not in your library" section groups TMDb's.
+      // The media server records cast, directors and writers; a show's creators
+      // come from TMDb in their own column (series.directors is empty for nearly
+      // every show — see CLAUDE.md, creators rule).
+      const creditColumns = (alias: 'm' | 's') => `
+          ${alias}.id,
+          ${alias}.tmdb_id::text AS tmdb_id,
+          ${alias}.title,
+          ${alias}.year,
+          ${alias}.poster_url,
+          ${alias}.backdrop_url,
+          ${alias}.genres,
+          ${alias}.community_rating,
           EXISTS(
-            SELECT 1 FROM jsonb_array_elements(m.actors) AS a 
+            SELECT 1 FROM jsonb_array_elements(${alias}.actors) AS a
             WHERE a->>'name' ILIKE $1
-          ) as is_actor,
-          $1 = ANY(m.directors) as is_director,
+          ) AS is_actor,
+          $1 = ANY(${alias}.directors) AS is_director,
+          $1 = ANY(COALESCE(${alias}.writers, '{}')) AS is_writer,
+          ${alias === 's' ? `$1 = ANY(COALESCE(s.tmdb_creators, '{}'))` : 'false'} AS is_creator,
           (
-            SELECT a->>'role' FROM jsonb_array_elements(m.actors) AS a 
+            SELECT a->>'role' FROM jsonb_array_elements(${alias}.actors) AS a
             WHERE a->>'name' ILIKE $1
             LIMIT 1
-          ) as role
-        FROM movies m
-        WHERE
-          (EXISTS(SELECT 1 FROM jsonb_array_elements(m.actors) AS a WHERE a->>'name' ILIKE $1)
-          OR $1 = ANY(m.directors))
-          AND ${moviesInScope}
-        ORDER BY m.year DESC NULLS LAST, m.title ASC`,
-        movieParams
-      )
+          ) AS role`
+      const creditedWhere = (alias: 'm' | 's') => `(
+          EXISTS(SELECT 1 FROM jsonb_array_elements(${alias}.actors) AS a WHERE a->>'name' ILIKE $1)
+          OR $1 = ANY(${alias}.directors)
+          OR $1 = ANY(COALESCE(${alias}.writers, '{}'))
+          ${alias === 's' ? `OR $1 = ANY(COALESCE(s.tmdb_creators, '{}'))` : ''}
+        )`
 
-      // Query series where person is actor or director
-      const seriesResults = await query<{
+      type CreditRow = {
         id: string
+        tmdb_id: string | null
         title: string
         year: number | null
         poster_url: string | null
@@ -269,34 +268,46 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
         community_rating: number | null
         is_actor: boolean
         is_director: boolean
+        is_writer: boolean
+        is_creator: boolean
         role: string | null
-      }>(
-        `SELECT 
-          s.id,
-          s.title,
-          s.year,
-          s.poster_url,
-          s.backdrop_url,
-          s.genres,
-          s.community_rating,
-          EXISTS(
-            SELECT 1 FROM jsonb_array_elements(s.actors) AS a 
-            WHERE a->>'name' ILIKE $1
-          ) as is_actor,
-          $1 = ANY(s.directors) as is_director,
-          (
-            SELECT a->>'role' FROM jsonb_array_elements(s.actors) AS a 
-            WHERE a->>'name' ILIKE $1
-            LIMIT 1
-          ) as role
-        FROM series s
-        WHERE
-          (EXISTS(SELECT 1 FROM jsonb_array_elements(s.actors) AS a WHERE a->>'name' ILIKE $1)
-          OR $1 = ANY(s.directors))
-          AND ${seriesInScope}
-        ORDER BY s.year DESC NULLS LAST, s.title ASC`,
-        seriesParams
-      )
+      }
+
+      const [movieResults, seriesResults] = await Promise.all([
+        query<CreditRow>(
+          `SELECT ${creditColumns('m')}
+           FROM movies m
+           WHERE ${creditedWhere('m')} AND ${moviesInScope}
+           ORDER BY m.year DESC NULLS LAST, m.title ASC`,
+          movieParams
+        ),
+        query<CreditRow>(
+          `SELECT ${creditColumns('s')}
+           FROM series s
+           WHERE ${creditedWhere('s')} AND ${seriesInScope}
+           ORDER BY s.year DESC NULLS LAST, s.title ASC`,
+          seriesParams
+        ),
+      ])
+
+      const creditsOf = (r: CreditRow): PersonCreditKind[] => [
+        ...(r.is_actor ? (['actor'] as const) : []),
+        ...(r.is_director ? (['director'] as const) : []),
+        ...(r.is_writer ? (['writer'] as const) : []),
+        ...(r.is_creator ? (['creator'] as const) : []),
+      ]
+      const toItem = (r: CreditRow): ContentItem => ({
+        id: r.id,
+        tmdbId: r.tmdb_id,
+        title: r.title,
+        year: r.year,
+        posterUrl: r.poster_url,
+        backdropUrl: r.backdrop_url,
+        genres: r.genres || [],
+        communityRating: r.community_rating,
+        role: r.role || undefined,
+        credits: creditsOf(r),
+      })
 
       // Build person image URL through our proxy
       const imageUrl = `/api/media/images/Persons/${encodeURIComponent(decodedName)}/Images/Primary`
@@ -320,26 +331,8 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
         birthDate: personDetails?.birthDate ?? null,
         deathDate: personDetails?.deathDate ?? null,
         birthPlace: personDetails?.birthPlace ?? null,
-        movies: movieResults.rows.map(r => ({
-          id: r.id,
-          title: r.title,
-          year: r.year,
-          posterUrl: r.poster_url,
-          backdropUrl: r.backdrop_url,
-          genres: r.genres || [],
-          communityRating: r.community_rating,
-          role: r.role || undefined,
-        })),
-        series: seriesResults.rows.map(r => ({
-          id: r.id,
-          title: r.title,
-          year: r.year,
-          posterUrl: r.poster_url,
-          backdropUrl: r.backdrop_url,
-          genres: r.genres || [],
-          communityRating: r.community_rating,
-          role: r.role || undefined,
-        })),
+        movies: movieResults.rows.map(toItem),
+        series: seriesResults.rows.map(toItem),
         stats: {
           totalMovies: movieResults.rows.length,
           totalSeries: seriesResults.rows.length,
