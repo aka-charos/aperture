@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Box,
@@ -80,6 +80,7 @@ export function TranslationsPage() {
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [listVersion, setListVersion] = useState(0)
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
 
   // English is the default column already, so it is not a language to pick.
   const languageOptions = useMemo(() => locales.filter((l) => l.code !== 'en'), [locales])
@@ -95,24 +96,34 @@ export function TranslationsPage() {
   const textRef = useRef({ effective, overrides })
   textRef.current = { effective, overrides }
 
-  const filteredKeys = useMemo(() => {
-    const filter = {
-      query: search.trim().toLowerCase(),
-      namespace: namespace === NAMESPACE_ALL ? null : namespace,
-      locale: language,
-      onlyOverridden,
-      onlyUntranslated,
-    }
-    const data = { english: defaults.en ?? {}, ...textRef.current }
-    return keys.filter((key) => {
-      if (audience !== AUDIENCE_ALL && keyAudience(key) !== audience) return false
-      return keyMatchesFilter(key, filter, data)
-    })
+  // The filter, applied to whichever text it is handed: the held-still text
+  // for the table, the live text for an export.
+  const selectKeys = useCallback(
+    (text: { effective: Record<string, Record<string, string>>; overrides: Record<string, Record<string, string>> }) => {
+      const filter = {
+        query: search.trim().toLowerCase(),
+        namespace: namespace === NAMESPACE_ALL ? null : namespace,
+        locale: language,
+        onlyOverridden,
+        onlyUntranslated,
+      }
+      const data = { english: defaults.en ?? {}, ...text }
+      return keys.filter((key) => {
+        if (audience !== AUDIENCE_ALL && keyAudience(key) !== audience) return false
+        return keyMatchesFilter(key, filter, data)
+      })
+    },
+    [keys, audience, namespace, language, onlyOverridden, onlyUntranslated, search, defaults]
+  )
+
+  const filteredKeys = useMemo(
+    () => selectKeys(textRef.current),
     // `loading` and `listVersion` are dependencies so the list is formed
     // again once the overrides arrive and after an import; the text itself
     // deliberately is not (see above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keys, audience, namespace, language, onlyOverridden, onlyUntranslated, search, defaults, loading, listVersion])
+    [selectKeys, loading, listVersion]
+  )
 
   // Narrowed so the namespace list answers the audience already chosen. The
   // selection resets with it rather than being carried across: a MUI Select
@@ -136,17 +147,21 @@ export function TranslationsPage() {
     [keys, audience, namespace]
   )
 
-  // Live, unlike the list: each save lowers the count straight away.
+  // Live, unlike the list: each save lowers the count straight away. Only
+  // the chosen language is counted on a save; the other languages' counts are
+  // for the picker, so they are taken only while its menu is open.
+  const untranslatedCount = useMemo(
+    () => (language ? countUntranslated(scopeKeys, language, defaults.en ?? {}, effective) : 0),
+    [scopeKeys, language, defaults, effective]
+  )
   const untranslatedByLanguage = useMemo(() => {
-    const english = defaults.en ?? {}
     const counts: Record<string, number> = {}
+    if (!languageMenuOpen) return counts
     for (const locale of languageOptions) {
-      counts[locale.code] = countUntranslated(scopeKeys, locale.code, english, effective)
+      counts[locale.code] = countUntranslated(scopeKeys, locale.code, defaults.en ?? {}, effective)
     }
     return counts
-  }, [scopeKeys, languageOptions, defaults, effective])
-
-  const untranslatedCount = language ? untranslatedByLanguage[language] ?? 0 : 0
+  }, [languageMenuOpen, scopeKeys, languageOptions, defaults, effective])
   const translatedShare =
     scopeKeys.length > 0 ? Math.floor(((scopeKeys.length - untranslatedCount) / scopeKeys.length) * 100) : 100
 
@@ -164,8 +179,11 @@ export function TranslationsPage() {
   // partial export is otherwise indistinguishable from a full one.
   // With a language chosen the file is key, en and that language — what one
   // translator works on — and the language rides in the filename too.
+  // The rows are chosen again from the LIVE text: the table is held still
+  // while editing, so after translating inline under "Only untranslated" it
+  // still lists rows that are done, and the file should not.
   const handleExport = () => {
-    const csv = buildOverridesCsv(locales, filteredKeys, effective, language)
+    const csv = buildOverridesCsv(locales, selectKeys({ effective, overrides }), effective, language)
     const scope = language ? `${audience}-${language}` : audience
     downloadCsv(csv, `aperture-translations-${scope}-${new Date().toISOString().slice(0, 10)}.csv`)
   }
@@ -239,6 +257,8 @@ export function TranslationsPage() {
           <InputLabel id="translations-language-label">{t('admin.translationsPage.languageLabel')}</InputLabel>
           <Select
             labelId="translations-language-label"
+            onOpen={() => setLanguageMenuOpen(true)}
+            onClose={() => setLanguageMenuOpen(false)}
             label={t('admin.translationsPage.languageLabel')}
             value={language ?? LANGUAGE_ALL}
             // The menu carries a count per language; the closed box names one.
@@ -262,7 +282,7 @@ export function TranslationsPage() {
                   <span>
                     {locale.label} ({locale.code})
                   </span>
-                  {!loading && (
+                  {!loading && untranslatedByLanguage[locale.code] !== undefined && (
                     <Typography variant="caption" color="text.secondary">
                       {t('admin.translationsPage.untranslatedShort', {
                         count: untranslatedByLanguage[locale.code] ?? 0,
