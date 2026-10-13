@@ -67,10 +67,13 @@ export function registerListHandler(fastify: FastifyInstance) {
 
       if (status) {
         whereClause += whereClause ? ' AND ' : ' WHERE '
-        // Map user-friendly status names to database values
-        const statusValue = status === 'Airing' ? 'Continuing' : status
-        whereClause += `status = $${paramIndex++}`
-        params.push(statusValue)
+        // Map user-friendly status names to database values. Several may be
+        // selected (Airing and Ended), so it is a list.
+        const statusValues = (Array.isArray(status) ? status : [status]).map((value) =>
+          value === 'Airing' ? 'Continuing' : value
+        )
+        whereClause += `status = ANY($${paramIndex++}::text[])`
+        params.push(statusValues)
       }
 
       if (minRtScore) {

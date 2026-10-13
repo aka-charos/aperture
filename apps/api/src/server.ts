@@ -16,6 +16,7 @@ import routes from './routes/index.js'
 import { getSwaggerConfig, swaggerUIConfig } from './config/openapi.js'
 import { useSecureCookies, apiDocsMode, helmetOptions, robotsTagHook } from './config/security.js'
 import { buildTrustProxyOption, refreshProxyTrust } from './config/proxyTrust.js'
+import { AJV_OPTIONS } from './config/ajv.js'
 import { warnOnWeakSecurityPosture, noteRequest } from './config/deploymentPosture.js'
 
 export interface ServerOptions {
@@ -45,12 +46,7 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
     // which is what lets Settings > Deployment change trusted proxies without a
     // restart. See config/proxyTrust.ts.
     trustProxy: buildTrustProxyOption(),
-    ajv: {
-      customOptions: {
-        // Allow OpenAPI 'example' keyword in schemas for documentation
-        keywords: ['example'],
-      },
-    },
+    ajv: AJV_OPTIONS,
   })
 
   // Load the stored trusted-proxy list into the matcher the trustProxy function

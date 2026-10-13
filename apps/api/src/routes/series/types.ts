@@ -90,7 +90,7 @@ export interface SeriesListQuerystring {
   search?: string
   genre?: string
   network?: string
-  status?: string
+  status?: string | string[]
   minRtScore?: string
   showAll?: string
   hasAwards?: string
