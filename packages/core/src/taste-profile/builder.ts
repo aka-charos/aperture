@@ -13,6 +13,11 @@
 import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../recommender/watchedExclusion.js'
+import {
+  libraryEpisodeCountSql,
+  REGULAR_EPISODE_SQL,
+  seriesCompletionRate,
+} from '../recommender/series/libraryEpisodes.js'
 import { embeddingColumnFor, type EmbeddingSpace } from '../recommender/centering.js'
 import { isDislikedRating, USER_RATING_SCALE_MAX } from '../recommender/ratingBands.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
@@ -503,6 +508,7 @@ async function getSeriesWatchHistory(userId: string): Promise<WatchedItem[]> {
     id: string
     title: string
     episodes_watched: number
+    regular_watched: number
     total_episodes: number | null
     has_favorites: boolean
     last_played_at: Date | null
@@ -513,7 +519,8 @@ async function getSeriesWatchHistory(userId: string): Promise<WatchedItem[]> {
        s.id,
        s.title,
        COUNT(DISTINCT wh.episode_id) as episodes_watched,
-       s.total_episodes,
+       COUNT(DISTINCT wh.episode_id) FILTER (WHERE ${REGULAR_EPISODE_SQL}) as regular_watched,
+       ${libraryEpisodeCountSql('s.id')} as total_episodes,
        BOOL_OR(wh.is_favorite) as has_favorites,
        MAX(wh.last_played_at) as last_played_at,
        MAX(ur.rating) as user_rating,
@@ -524,7 +531,7 @@ async function getSeriesWatchHistory(userId: string): Promise<WatchedItem[]> {
      LEFT JOIN user_ratings ur ON ur.series_id = s.id AND ur.user_id = wh.user_id
      WHERE wh.user_id = $1 AND wh.media_type = 'episode'
        AND ${WATCH_HISTORY_TASTE_SQL}
-     GROUP BY s.id, s.title, s.total_episodes, s.genres
+     GROUP BY s.id, s.title, s.genres
      ${libraryExclusionClause}
      ORDER BY MAX(wh.last_played_at) DESC NULLS LAST`,
     [userId, ...excludedLibraryIds]
@@ -532,14 +539,17 @@ async function getSeriesWatchHistory(userId: string): Promise<WatchedItem[]> {
 
   const watched: WatchedItem[] = result.rows.map((row) => {
     const episodesWatched = parseInt(String(row.episodes_watched), 10)
-    const totalEpisodes = row.total_episodes || undefined
+    // The library's regular episodes, never series.total_episodes: Emby leaves
+    // that column NULL, which silently switched the completion bands off
+    // (recommender/series/libraryEpisodes.ts).
+    const totalEpisodes = row.total_episodes ?? undefined
 
     return {
       id: row.id,
       title: row.title,
       episodeCount: episodesWatched,
       totalEpisodes,
-      completionRate: totalEpisodes ? episodesWatched / totalEpisodes : undefined,
+      completionRate: seriesCompletionRate(row.regular_watched, row.total_episodes),
       playCount: episodesWatched,
       hasFavorites: row.has_favorites,
       lastPlayedAt: row.last_played_at,

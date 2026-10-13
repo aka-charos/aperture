@@ -96,6 +96,7 @@ import { getWatchedGenreCounts } from '../genreFamiliarity.js'
 import { getWatchedYears, summarizeEraFit } from '../eraDiagnostics.js'
 import { getEffectiveAiExplanationSetting } from '../../lib/userSettings.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
+import { libraryEpisodeCountSql, REGULAR_EPISODE_SQL, seriesCompletionRate } from './libraryEpisodes.js'
 import { loadConfigForUser } from '../config.js'
 import {
   binderFor,
@@ -169,6 +170,7 @@ async function getSeriesWatchHistory(userId: string, limit: number): Promise<Wat
   const result = await query<{
     series_id: string
     episodes_watched: number
+    regular_watched: number
     total_episodes: number | null
     has_favorites: boolean
     last_played_at: Date | null
@@ -176,14 +178,15 @@ async function getSeriesWatchHistory(userId: string, limit: number): Promise<Wat
     `SELECT 
        e.series_id,
        COUNT(DISTINCT wh.episode_id) as episodes_watched,
-       s.total_episodes,
+       COUNT(DISTINCT wh.episode_id) FILTER (WHERE ${REGULAR_EPISODE_SQL}) as regular_watched,
+       ${libraryEpisodeCountSql('e.series_id')} as total_episodes,
        BOOL_OR(wh.is_favorite) as has_favorites,
        MAX(wh.last_played_at) as last_played_at
      FROM watch_history wh
      JOIN episodes e ON e.id = wh.episode_id
      JOIN series s ON s.id = e.series_id
      WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND (${WATCH_HISTORY_TASTE_SQL})
-     GROUP BY e.series_id, s.total_episodes
+     GROUP BY e.series_id
      ORDER BY MAX(wh.last_played_at) DESC NULLS LAST
      LIMIT $2`,
     [userId, limit]
@@ -200,9 +203,7 @@ async function getSeriesWatchHistory(userId: string, limit: number): Promise<Wat
 
     // Shared with the builder so both paths agree on what completion is worth,
     // including the penalty for a show that was dropped early.
-    if (row.total_episodes && row.total_episodes > 0) {
-      weight *= completionMultiplier(row.episodes_watched / row.total_episodes)
-    }
+    weight *= completionMultiplier(seriesCompletionRate(row.regular_watched, row.total_episodes))
 
     // Favorites bonus (1.5x if they have any favorite episodes)
     if (row.has_favorites) {

@@ -16,6 +16,7 @@
  */
 
 import { query } from '../lib/db.js'
+import { libraryEpisodeCountSql, REGULAR_EPISODE_SQL } from '../recommender/series/libraryEpisodes.js'
 import { createChildLogger } from '../lib/logger.js'
 import {
   loadLibraryMatrix,
@@ -200,18 +201,22 @@ async function fetchHistory(
           progress: string | null
         }>(
           // One row per series, summarised from its episodes: progress is the
-          // fraction of episodes finished, which is the series equivalent of
-          // "did they sit through it" and the strongest signal in the schema.
+          // fraction of the library's regular episodes played, which is the
+          // series equivalent of "did they sit through it" and the strongest
+          // signal in the schema. Measured against the episodes table, never
+          // series.total_episodes, which Emby leaves NULL — that made progress
+          // NULL for every show. `played` is false on purpose: per row it is
+          // ONE episode's flag, and OR-ing it graded a show sampled once as
+          // finished; gradeRelevance reads progress instead.
           `SELECT e.series_id AS item_id,
                   MAX(wh.last_played_at) AS last_played_at,
                   MAX(wh.play_count) AS play_count,
                   BOOL_OR(wh.is_favorite) AS is_favorite,
-                  BOOL_OR(wh.played) AS played,
-                  COUNT(*) FILTER (WHERE wh.played)::numeric
-                    / NULLIF(MAX(s.total_episodes), 0)::numeric AS progress
+                  false AS played,
+                  COUNT(DISTINCT wh.episode_id) FILTER (WHERE wh.played AND ${REGULAR_EPISODE_SQL})::numeric
+                    / ${libraryEpisodeCountSql('e.series_id')}::numeric AS progress
              FROM watch_history wh
              JOIN episodes e ON e.id = wh.episode_id
-             JOIN series s ON s.id = e.series_id
             WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL
             GROUP BY e.series_id`,
           [userId]
@@ -224,8 +229,10 @@ async function fetchHistory(
     isFavorite: Boolean(row.is_favorite),
     played: Boolean(row.played),
     // NUMERIC arrives as a string; Number(null) is 0, which would read as
-    // "bailed out immediately" rather than "nothing recorded".
-    progress: row.progress == null ? null : Number(row.progress),
+    // "bailed out immediately" rather than "nothing recorded". Clamped here and
+    // not with SQL LEAST, which skips NULLs: LEAST(NULL, 1) is 1, and a show
+    // with no library total would have graded as finished.
+    progress: row.progress == null ? null : Math.min(Number(row.progress), 1),
   }))
 }
 
