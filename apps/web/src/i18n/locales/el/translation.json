@@ -2233,78 +2233,78 @@
     "traktErrDisconnect": "Η αποσύνδεση από το Trakt απέτυχε",
     "traktErrSync": "Ο συγχρονισμός βαθμολογιών απέτυχε",
     "homeScreen": {
-      "useDefault": "Default: {{placement}}",
-      "chooseOwn": "My own placement",
-      "apply": "Apply",
-      "applied": "Done — your home screen has been updated.",
-      "savedLater": "Saved. It will be applied at the next sync.",
-      "saveFailed": "Could not save this placement",
-      "intro": "{{appName}} can add rows to your Emby home screen. Switch any of them off, see what is in them, and choose where they go. Changes reach Emby straight away.",
-      "loadFailed": "Could not load your home screen settings.",
+      "useDefault": "Προεπιλογή: {{placement}}",
+      "chooseOwn": "Δική μου θέση",
+      "apply": "Εφαρμογή",
+      "applied": "Έγινε — η αρχική οθόνη σας ενημερώθηκε.",
+      "savedLater": "Αποθηκεύτηκε. Θα εφαρμοστεί στον επόμενο συγχρονισμό.",
+      "saveFailed": "Δεν ήταν δυνατή η αποθήκευση αυτής της θέσης",
+      "intro": "Το {{appName}} μπορεί να προσθέσει σειρές στην αρχική οθόνη σας στο Emby. Απενεργοποιήστε όποια θέλετε, δείτε τι περιέχει η καθεμία και επιλέξτε πού θα εμφανίζεται. Οι αλλαγές περνούν στο Emby αμέσως.",
+      "loadFailed": "Δεν ήταν δυνατή η φόρτωση των ρυθμίσεων της αρχικής οθόνης σας.",
       "pageUnavailable": {
-        "feature-off": "Your admin has not switched on {{appName}} rows for Emby home screens.",
-        "unsupported": "{{appName}} can only add rows to an Emby home screen, and this server is not Emby.",
-        "no-account": "Your account is not on the media server, so there is no home screen to add rows to."
+        "feature-off": "Ο διαχειριστής δεν έχει ενεργοποιήσει τις σειρές του {{appName}} στις αρχικές οθόνες του Emby.",
+        "unsupported": "Το {{appName}} μπορεί να προσθέσει σειρές μόνο σε αρχική οθόνη του Emby, και αυτός ο διακομιστής δεν είναι Emby.",
+        "no-account": "Ο λογαριασμός σας δεν υπάρχει στον διακομιστή πολυμέσων, οπότε δεν υπάρχει αρχική οθόνη στην οποία να προστεθούν σειρές."
       },
-      "toggleRow": "Show {{row}} on my home screen",
-      "switchLocked": "This row cannot reach your home screen right now — the note below says why.",
+      "toggleRow": "Εμφάνιση της σειράς «{{row}}» στην αρχική μου οθόνη",
+      "switchLocked": "Αυτή η σειρά δεν μπορεί να εμφανιστεί στην αρχική οθόνη σας αυτή τη στιγμή — η σημείωση από κάτω εξηγεί γιατί.",
       "describe": {
-        "top-picks-movies": "The most popular movies on this server right now. The same list for everyone.",
-        "top-picks-series": "The most popular series on this server right now. The same list for everyone.",
-        "recs-movies": "Your own movie recommendations, from your latest recommendation run.",
-        "recs-series": "Your own series recommendations, from your latest recommendation run.",
-        "friends": "Titles your connections recommended to you on Watch This. A title leaves the row when you finish or dismiss it.",
-        "playlists": "Playlists and collections you generated, and playlists made from assistant suggestions. Each one you switch on becomes a row of its own."
+        "top-picks-movies": "Οι πιο δημοφιλείς ταινίες σε αυτόν τον διακομιστή αυτή τη στιγμή. Η ίδια λίστα για όλους.",
+        "top-picks-series": "Οι πιο δημοφιλείς σειρές σε αυτόν τον διακομιστή αυτή τη στιγμή. Η ίδια λίστα για όλους.",
+        "recs-movies": "Οι δικές σας προτάσεις ταινιών, από την πιο πρόσφατη δημιουργία προτάσεων.",
+        "recs-series": "Οι δικές σας προτάσεις σειρών, από την πιο πρόσφατη δημιουργία προτάσεων.",
+        "friends": "Τίτλοι που σας πρότειναν οι συνδέσεις σας στο «Δείτε το». Ένας τίτλος φεύγει από τη σειρά όταν τον ολοκληρώσετε ή τον απορρίψετε.",
+        "playlists": "Λίστες αναπαραγωγής και συλλογές που δημιουργήσατε, καθώς και λίστες από προτάσεις του βοηθού. Καθεμία που ενεργοποιείτε γίνεται ξεχωριστή σειρά."
       },
       "unavailable": {
-        "feature-off": "Home screen rows are switched off for this server.",
-        "no-access": "Your account cannot receive this row.",
-        "admin-off": "Your admin has switched this row off for everyone.",
-        "top-picks-off": "Top Picks is switched off on this server.",
-        "recommendations-off": "Recommendations are switched off for your account.",
-        "no-library": "You have no library of this kind, so there is nothing to recommend."
+        "feature-off": "Οι σειρές της αρχικής οθόνης είναι απενεργοποιημένες σε αυτόν τον διακομιστή.",
+        "no-access": "Ο λογαριασμός σας δεν μπορεί να λάβει αυτή τη σειρά.",
+        "admin-off": "Ο διαχειριστής έχει απενεργοποιήσει αυτή τη σειρά για όλους.",
+        "top-picks-off": "Οι Κορυφαίες επιλογές είναι απενεργοποιημένες σε αυτόν τον διακομιστή.",
+        "recommendations-off": "Οι προτάσεις είναι απενεργοποιημένες για τον λογαριασμό σας.",
+        "no-library": "Δεν έχετε βιβλιοθήκη αυτού του είδους, οπότε δεν υπάρχει τίποτα να προταθεί."
       },
       "status": {
-        "off": "Switched off — it is not on your home screen.",
-        "unknown": "Could not read what is in “{{name}}” just now.",
-        "unknownShowing": "On your home screen as “{{name}}”. Could not read what is in it just now.",
-        "showing_one": "On your home screen as “{{name}}” · {{count}} title",
-        "showing_other": "On your home screen as “{{name}}” · {{count}} titles",
-        "arriving_one": "Will appear on your home screen as “{{name}}” · {{count}} title",
-        "arriving_other": "Will appear on your home screen as “{{name}}” · {{count}} titles"
+        "off": "Απενεργοποιημένη — δεν εμφανίζεται στην αρχική οθόνη σας.",
+        "unknown": "Δεν ήταν δυνατό να διαβαστεί τι περιέχει η σειρά «{{name}}» αυτή τη στιγμή.",
+        "unknownShowing": "Στην αρχική οθόνη σας ως «{{name}}». Δεν ήταν δυνατό να διαβαστεί τι περιέχει αυτή τη στιγμή.",
+        "showing_one": "Στην αρχική οθόνη σας ως «{{name}}» · {{count}} τίτλος",
+        "showing_other": "Στην αρχική οθόνη σας ως «{{name}}» · {{count}} τίτλοι",
+        "arriving_one": "Θα εμφανιστεί στην αρχική οθόνη σας ως «{{name}}» · {{count}} τίτλος",
+        "arriving_other": "Θα εμφανιστεί στην αρχική οθόνη σας ως «{{name}}» · {{count}} τίτλοι"
       },
       "empty": {
-        "top-picks-movies": "The Top Picks list has nothing in it right now, so Emby shows no row.",
-        "top-picks-series": "The Top Picks list has nothing in it right now, so Emby shows no row.",
-        "recs-movies": "No movie recommendations yet. The row appears after your next recommendation run.",
-        "recs-series": "No series recommendations yet. The row appears after your next recommendation run.",
-        "friends": "Nothing from your connections right now. When one of them recommends you a title, it appears here.",
-        "playlists": "Nothing in this playlist yet, so Emby shows no row."
+        "top-picks-movies": "Η λίστα Κορυφαίων επιλογών είναι κενή αυτή τη στιγμή, οπότε το Emby δεν εμφανίζει σειρά.",
+        "top-picks-series": "Η λίστα Κορυφαίων επιλογών είναι κενή αυτή τη στιγμή, οπότε το Emby δεν εμφανίζει σειρά.",
+        "recs-movies": "Δεν υπάρχουν ακόμη προτάσεις ταινιών. Η σειρά θα εμφανιστεί μετά την επόμενη δημιουργία προτάσεων.",
+        "recs-series": "Δεν υπάρχουν ακόμη προτάσεις σειρών. Η σειρά θα εμφανιστεί μετά την επόμενη δημιουργία προτάσεων.",
+        "friends": "Τίποτα από τις συνδέσεις σας αυτή τη στιγμή. Όταν κάποια σας προτείνει έναν τίτλο, θα εμφανιστεί εδώ.",
+        "playlists": "Αυτή η λίστα αναπαραγωγής είναι ακόμη κενή, οπότε το Emby δεν εμφανίζει σειρά."
       },
-      "placement": "Placement",
-      "placementDefault": "Placement: {{placement}} (default)",
-      "placementOwn": "Placement: {{placement}} (your choice)",
-      "savedNotApplied": "Saved, but Emby could not be updated just now. It will be at the next sync.",
-      "savedNothingToShow": "Saved. The row appears once there is something in it.",
-      "moreTitles_one": "+{{count}} more",
-      "moreTitles_other": "+{{count}} more",
-      "noPlaylists": "You have no playlists that can go on your home screen yet.",
-      "openPlaylists": "Go to Playlists",
+      "placement": "Θέση",
+      "placementDefault": "Θέση: {{placement}} (προεπιλογή)",
+      "placementOwn": "Θέση: {{placement}} (δική σας επιλογή)",
+      "savedNotApplied": "Αποθηκεύτηκε, αλλά δεν ήταν δυνατή η ενημέρωση του Emby αυτή τη στιγμή. Θα γίνει στον επόμενο συγχρονισμό.",
+      "savedNothingToShow": "Αποθηκεύτηκε. Η σειρά θα εμφανιστεί μόλις έχει κάτι μέσα.",
+      "moreTitles_one": "+{{count}} ακόμη",
+      "moreTitles_other": "+{{count}} ακόμη",
+      "noPlaylists": "Δεν έχετε ακόμη λίστες αναπαραγωγής που μπορούν να μπουν στην αρχική οθόνη σας.",
+      "openPlaylists": "Μετάβαση στις Λίστες",
       "playlistKind": {
-        "playlist": "Playlist",
-        "collection": "Collection",
-        "chat": "From the assistant"
+        "playlist": "Λίστα αναπαραγωγής",
+        "collection": "Συλλογή",
+        "chat": "Από τον βοηθό"
       },
-      "playlistNotGenerated": "Not generated yet — generate it on the Playlists page first.",
-      "playlistOff_one": "Not on your home screen · {{count}} title",
-      "playlistOff_other": "Not on your home screen · {{count}} titles",
-      "playlistOffUnknown": "Not on your home screen",
-      "previewTitle": "Your Emby home screen",
-      "previewHelp": "Top to bottom, as it looks once your choices are applied. Rows from {{appName}} are highlighted; the rest are your own Emby rows.",
-      "previewUnavailable": "Emby did not answer, so your home screen cannot be shown right now.",
-      "previewEmpty": "Your home screen has no rows.",
-      "previewNew": "New",
-      "previewSort": "Titles within each row: {{sort}}."
+      "playlistNotGenerated": "Δεν έχει δημιουργηθεί ακόμη — δημιουργήστε την πρώτα στη σελίδα Λίστες.",
+      "playlistOff_one": "Δεν είναι στην αρχική οθόνη σας · {{count}} τίτλος",
+      "playlistOff_other": "Δεν είναι στην αρχική οθόνη σας · {{count}} τίτλοι",
+      "playlistOffUnknown": "Δεν είναι στην αρχική οθόνη σας",
+      "previewTitle": "Η αρχική οθόνη σας στο Emby",
+      "previewHelp": "Από πάνω προς τα κάτω, όπως θα φαίνεται μόλις εφαρμοστούν οι επιλογές σας. Οι σειρές του {{appName}} είναι επισημασμένες· οι υπόλοιπες είναι οι δικές σας σειρές του Emby.",
+      "previewUnavailable": "Το Emby δεν απάντησε, οπότε η αρχική οθόνη σας δεν μπορεί να εμφανιστεί αυτή τη στιγμή.",
+      "previewEmpty": "Η αρχική οθόνη σας δεν έχει σειρές.",
+      "previewNew": "Νέα",
+      "previewSort": "Τίτλοι σε κάθε σειρά: {{sort}}."
     },
     "tabs": {
       "recommendations": "Recommendations",
@@ -5591,46 +5591,46 @@
     "friendsName": "Recommended by friends row"
   },
   "homeScreenPlacement": {
-    "mode": "Placement",
+    "mode": "Θέση",
     "modes": {
-      "top": "Top",
-      "bottom": "Bottom",
-      "position": "Position number",
-      "after": "After a row",
-      "before": "Before a row"
+      "top": "Πάνω",
+      "bottom": "Κάτω",
+      "position": "Αριθμός θέσης",
+      "after": "Μετά από μια σειρά",
+      "before": "Πριν από μια σειρά"
     },
-    "position": "Position",
-    "positionHelp": "Rows above it (0 = top)",
-    "anchor": "Row",
-    "anchorMissing": "{{name}} (not found now)",
-    "rowWithAccounts": "{{name}} · {{accounts}} accounts",
-    "rowsLoading": "Reading rows…",
-    "noRows": "No rows to choose from",
+    "position": "Θέση",
+    "positionHelp": "Σειρές από πάνω της (0 = στην κορυφή)",
+    "anchor": "Σειρά",
+    "anchorMissing": "{{name}} (δεν βρέθηκε τώρα)",
+    "rowWithAccounts": "{{name}} · {{accounts}} λογαριασμοί",
+    "rowsLoading": "Ανάγνωση σειρών…",
+    "noRows": "Δεν υπάρχουν σειρές για επιλογή",
     "describe": {
-      "top": "Top",
-      "bottom": "Bottom",
-      "position": "Position {{position}}",
-      "after": "After {{name}}",
-      "before": "Before {{name}}"
+      "top": "Πάνω",
+      "bottom": "Κάτω",
+      "position": "Θέση {{position}}",
+      "after": "Μετά από «{{name}}»",
+      "before": "Πριν από «{{name}}»"
     },
     "features": {
-      "top-picks-movies": "Top Picks: Movies",
-      "top-picks-series": "Top Picks: Series",
-      "recs-movies": "Movie recommendations",
-      "recs-series": "Series recommendations",
-      "playlists": "Generated playlists",
-      "friends": "Recommended by friends"
+      "top-picks-movies": "Κορυφαίες επιλογές: Ταινίες",
+      "top-picks-series": "Κορυφαίες επιλογές: Σειρές",
+      "recs-movies": "Προτάσεις ταινιών",
+      "recs-series": "Προτάσεις σειρών",
+      "playlists": "Δημιουργημένες λίστες αναπαραγωγής",
+      "friends": "Προτάσεις από φίλους"
     },
     "groups": {
-      "latestmedia": "Latest Media"
+      "latestmedia": "Πρόσφατα πολυμέσα"
     },
     "sort": {
-      "Random": "Random",
-      "SortName": "Title (A–Z)",
-      "DateCreated": "Recently added",
-      "ProductionYear": "Newest release year",
-      "PremiereDate": "Newest release date",
-      "CommunityRating": "Highest rated"
+      "Random": "Τυχαία",
+      "SortName": "Τίτλος (Α–Ω)",
+      "DateCreated": "Πρόσφατα προστέθηκαν",
+      "ProductionYear": "Νεότερο έτος κυκλοφορίας",
+      "PremiereDate": "Νεότερη ημερομηνία κυκλοφορίας",
+      "CommunityRating": "Υψηλότερη βαθμολογία"
     }
   },
   "sharedWithMe": {
