@@ -1598,7 +1598,8 @@
     "maxWatchers": "Макс наблюдателей",
     "watchersHelper": "Отдельные пользователи на этом сервере",
     "seriesAiring": "Проветривание",
-    "seriesEnded": "Закончено"
+    "seriesEnded": "Закончено",
+    "watchersHelperNamed": "Distinct users on {{serverName}}"
   },
   "filterPresets": {
     "tooltip": "Предустановки фильтров",

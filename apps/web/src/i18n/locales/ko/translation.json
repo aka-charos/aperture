@@ -1657,7 +1657,8 @@
     "maxWatchers": "최대 시청자",
     "watchersHelper": "이 서버의 서로 다른 사용자 수",
     "seriesAiring": "방영 중",
-    "seriesEnded": "종영"
+    "seriesEnded": "종영",
+    "watchersHelperNamed": "Distinct users on {{serverName}}"
   },
   "filterPresets": {
     "tooltip": "필터 프리셋",

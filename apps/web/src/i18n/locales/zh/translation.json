@@ -1657,7 +1657,8 @@
     "maxWatchers": "最多观看者",
     "watchersHelper": "此服务器上的不同用户数",
     "seriesAiring": "播出中",
-    "seriesEnded": "已完结"
+    "seriesEnded": "已完结",
+    "watchersHelperNamed": "Distinct users on {{serverName}}"
   },
   "filterPresets": {
     "tooltip": "筛选预设",

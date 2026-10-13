@@ -193,9 +193,6 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
             ranges={series.seriesRanges}
           />
 
-          {/* What to show on the left, how to order and save it on the right. */}
-          <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'block' } }} />
-
           <SortPopper
             type="series"
             sortBy={series.seriesSortBy}

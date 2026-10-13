@@ -23,6 +23,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import { RangeSlider } from './RangeSlider'
 import { ChipToggleGroup } from './ChipToggleGroup'
+import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
 
 export type WatchStatusFilter = 'any' | 'watched' | 'unwatched'
 
@@ -142,6 +143,7 @@ export function FilterPopper({
 }: FilterPopperProps) {
   const { t } = useTranslation()
   const theme = useTheme()
+  const serverName = useServerDisplayName()
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)
   const [contentOpen, setContentOpen] = useState(false)
 
@@ -443,7 +445,9 @@ export function FilterPopper({
                   />
                 </Box>
                 <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
-                  {t('filterPopper.watchersHelper')}
+                  {serverName
+                    ? t('filterPopper.watchersHelperNamed', { serverName })
+                    : t('filterPopper.watchersHelper')}
                 </Typography>
               </Section>
 

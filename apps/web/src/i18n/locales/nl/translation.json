@@ -1590,7 +1590,8 @@
     "maxWatchers": "Maximale kijkers",
     "watchersHelper": "Verschillende gebruikers op deze server",
     "seriesAiring": "Luchten",
-    "seriesEnded": "Beëindigd"
+    "seriesEnded": "Beëindigd",
+    "watchersHelperNamed": "Distinct users on {{serverName}}"
   },
   "filterPresets": {
     "tooltip": "Filtervoorinstellingen",

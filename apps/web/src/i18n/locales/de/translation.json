@@ -1657,7 +1657,8 @@
     "maxWatchers": "Max. Zuschauer",
     "watchersHelper": "Unterschiedliche Nutzer auf diesem Server",
     "seriesAiring": "Läuft",
-    "seriesEnded": "Beendet"
+    "seriesEnded": "Beendet",
+    "watchersHelperNamed": "Distinct users on {{serverName}}"
   },
   "filterPresets": {
     "tooltip": "Filter-Voreinstellungen",

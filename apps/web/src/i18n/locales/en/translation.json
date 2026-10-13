@@ -1801,6 +1801,7 @@
     "minWatchers": "Min watchers",
     "maxWatchers": "Max watchers",
     "watchersHelper": "Distinct users on this server",
+    "watchersHelperNamed": "Distinct users on {{serverName}}",
     "seriesAiring": "Airing",
     "seriesEnded": "Ended"
   },

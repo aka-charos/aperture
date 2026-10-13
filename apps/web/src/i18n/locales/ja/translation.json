@@ -1657,7 +1657,8 @@
     "maxWatchers": "最大視聴者数",
     "watchersHelper": "このサーバー上の別ユーザー数",
     "seriesAiring": "放送中",
-    "seriesEnded": "終了"
+    "seriesEnded": "終了",
+    "watchersHelperNamed": "Distinct users on {{serverName}}"
   },
   "filterPresets": {
     "tooltip": "フィルタープリセット",

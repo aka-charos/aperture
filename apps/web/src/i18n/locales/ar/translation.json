@@ -1673,7 +1673,8 @@
     "maxWatchers": "الحد الأقصى للمشاهدين",
     "watchersHelper": "مستخدمون مميزون على هذا الخادم",
     "seriesAiring": "يُعرض حاليًا",
-    "seriesEnded": "انتهى العرض"
+    "seriesEnded": "انتهى العرض",
+    "watchersHelperNamed": "Distinct users on {{serverName}}"
   },
   "filterPresets": {
     "tooltip": "إعدادات تصفية محفوظة",

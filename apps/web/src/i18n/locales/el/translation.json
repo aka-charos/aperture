@@ -3611,7 +3611,8 @@
     "maxWatchers": "Μέγιστοι θεατές",
     "watchersHelper": "Διαφορετικοί χρήστες σε αυτόν τον διακομιστή",
     "seriesAiring": "Σε εξέλιξη",
-    "seriesEnded": "Ολοκληρωμένη"
+    "seriesEnded": "Ολοκληρωμένη",
+    "watchersHelperNamed": "Διαφορετικοί χρήστες στο {{serverName}}"
   },
   "settingsLibraryTitles": {
     "loadFailed": "Αποτυχία φόρτωσης ρύθμισης τίτλων βιβλιοθήκης",
