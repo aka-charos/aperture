@@ -213,6 +213,10 @@ export function LanguageMenuButton() {
           onClick={(e) => {
             setError(null)
             setAnchorEl(e.currentTarget)
+            // Re-read on every open: the language can change in another tab or
+            // device, and a menu answering from page-load state shows the old
+            // app language as the toggle's first option.
+            void load()
           }}
           size="small"
           aria-label={tooltip}
@@ -289,7 +293,7 @@ export function LanguageMenuButton() {
 
         {showContent && otherLang && (
           <Box sx={{ px: 2, pb: 2 }}>
-            <SectionHeading inset={false}>{t('languageMenu.contentHeading')}</SectionHeading>
+            <SectionHeading inset={false} secondary>{t('languageMenu.contentHeading')}</SectionHeading>
             <ToggleButtonGroup
               exclusive
               fullWidth
@@ -324,13 +328,28 @@ export function LanguageMenuButton() {
   )
 }
 
-function SectionHeading({ children, inset = true }: { children: string; inset?: boolean }) {
+/** `secondary` is the smaller heading for the recommendations toggle, which sits under the main choice. */
+function SectionHeading({
+  children,
+  inset = true,
+  secondary = false,
+}: {
+  children: string
+  inset?: boolean
+  secondary?: boolean
+}) {
   return (
     <Typography
       variant="overline"
       color="text.secondary"
       component="p"
-      sx={{ lineHeight: 1.6, pt: 1.5, pb: 0.75, px: inset ? 2 : 0 }}
+      sx={{
+        lineHeight: 1.6,
+        pt: 1.5,
+        pb: 0.75,
+        px: inset ? 2 : 0,
+        ...(secondary && { fontSize: '0.65rem', letterSpacing: '0.07em' }),
+      }}
     >
       {children}
     </Typography>
