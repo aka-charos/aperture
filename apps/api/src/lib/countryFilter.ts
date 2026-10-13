@@ -46,7 +46,11 @@ export function parseCountryQuery(country: string | string[] | undefined): strin
 
 /**
  * The WHERE fragment for the selected countries, or null when none are
- * selected. `bind` registers a value and returns its placeholder.
+ * selected. The country list is appended to `params` and its placeholder
+ * written HERE, from `params.length` — not by the caller — so the tests cover
+ * the exact text a route sends. (A caller-supplied placeholder once lost its
+ * `$` and every country selection failed in Postgres while these tests passed.)
+ * The caller resyncs any running index from `params.length` afterwards.
  *
  * Primary + AND reads "from one of these and associated with all of them": a
  * title is usually from one country, so requiring its origin to contain every
@@ -56,10 +60,11 @@ export function countryFilterSql(
   countries: readonly string[],
   match: CountryMatch | undefined,
   scope: CountryScope | undefined,
-  bind: (value: unknown) => string
+  params: unknown[]
 ): string | null {
   if (countries.length === 0) return null
-  const list = `${bind([...countries])}::text[]`
+  params.push([...countries])
+  const list = `$${params.length}::text[]`
   const all = match !== 'any'
 
   if (scope === 'primary') {

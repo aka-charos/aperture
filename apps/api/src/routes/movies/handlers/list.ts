@@ -147,10 +147,9 @@ export function registerListHandler(fastify: FastifyInstance) {
       const countries = parseCountryQuery(country)
       // Primary (first-listed) or any position, and OR or AND across several:
       // lib/countryFilter.ts, shared with the other list route.
-      const countrySql = countryFilterSql(countries, request.query.countryMatch, request.query.countryScope, (value) => {
-        params.push(value)
-        return `${paramIndex++}`
-      })
+      // The module binds the list and writes its placeholder; resync the index.
+      const countrySql = countryFilterSql(countries, request.query.countryMatch, request.query.countryScope, params)
+      paramIndex = params.length + 1
       if (countrySql) {
         whereClause += whereClause ? ' AND ' : ' WHERE '
         whereClause += countrySql

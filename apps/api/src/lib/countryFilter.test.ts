@@ -14,12 +14,17 @@ import {
 
 function build(countries: string[], match?: 'all' | 'any', scope?: 'primary' | 'any') {
   const params: unknown[] = []
-  const sql = countryFilterSql(countries, match, scope, (value) => {
-    params.push(value)
-    return `$${params.length}`
-  })
+  const sql = countryFilterSql(countries, match, scope, params)
   return { sql, params }
 }
+
+test('the placeholder follows the parameters already bound, with its $', () => {
+  const params: unknown[] = ['scope-a', 'scope-b', 'search']
+  const sql = countryFilterSql(['Italy'], 'any', 'primary', params)
+  assert.equal(sql, `(${PRIMARY_COUNTRIES_SQL}) && $4::text[]`)
+  assert.deepEqual(params[3], ['Italy'])
+  assert.equal(params.length, 4)
+})
 
 const PRIMARY = `(${PRIMARY_COUNTRIES_SQL}) && $1::text[]`
 
