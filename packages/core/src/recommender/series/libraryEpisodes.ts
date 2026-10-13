@@ -30,11 +30,19 @@ export function libraryEpisodeCountSql(seriesId: string): string {
 export const REGULAR_EPISODE_SQL = 'e.season_number > 0'
 
 /**
- * Watched share of the library's episodes, or undefined when there is no
- * library total to divide by. Both inputs may arrive as the strings pg returns
- * for counts. The callers count watched episodes through a join to
- * `episodes`, so the rate cannot pass 1; the clamp is a guard for a caller
- * that does not.
+ * Played share of the library's episodes, or undefined when it cannot say.
+ * Both inputs may arrive as the strings pg returns for counts.
+ *
+ * Undefined in two cases, and `completionMultiplier(undefined)` is 1.0 for
+ * both: no library total to divide by, and NOTHING PLAYED. A show reaches the
+ * taste builder with no played regular episode only through favourited
+ * episodes (a bookmark) or specials alone, and neither is evidence of quitting
+ * it. Reading that as a rate of 0 handed a bookmark the 0.25x "bounced off it"
+ * band, while the same show favourited at series level (which has no episode
+ * rows and no rate) kept 1.0x: one intent weighted four times apart.
+ *
+ * The callers count episodes through a join to `episodes`, so the rate cannot
+ * pass 1; the clamp is a guard for a caller that does not.
  */
 export function seriesCompletionRate(
   regularWatched: number | string | null | undefined,
@@ -44,6 +52,6 @@ export function seriesCompletionRate(
   const total = Number(libraryEpisodes)
   if (!Number.isFinite(total) || total <= 0) return undefined
   const watched = regularWatched == null ? 0 : Number(regularWatched)
-  if (!Number.isFinite(watched) || watched <= 0) return 0
+  if (!Number.isFinite(watched) || watched <= 0) return undefined
   return Math.min(watched / total, 1)
 }

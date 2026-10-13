@@ -1,4 +1,4 @@
-import { canonicalCountry, canonicalCountryNames } from '../countries/canonical.js'
+import { canonicalCountry } from '../countries/canonical.js'
 
 /**
  * Codes TMDb uses that the canonicaliser deliberately does not resolve.
@@ -11,6 +11,9 @@ import { canonicalCountry, canonicalCountryNames } from '../countries/canonical.
  * else, so here each one means exactly one country. Every target is pinned by
  * a test to be a canonical name, or the mapping would write a spelling that
  * matches nothing.
+ *
+ * This is the ONE copy. Migration 0201 does not repeat it: it sends bad rows
+ * back to be asked again, so they are written through this table.
  */
 export const TMDB_ORIGIN_CODE_NAMES: Readonly<Record<string, string>> = {
   SU: 'Soviet Union',
@@ -22,35 +25,50 @@ export const TMDB_ORIGIN_CODE_NAMES: Readonly<Record<string, string>> = {
   BU: 'Myanmar',
 }
 
-const CANONICAL = new Set(canonicalCountryNames())
-
 /**
- * TMDb's `origin_country` as canonical country names.
+ * What TMDb's `origin_country` says, in three cases a writer must treat
+ * differently:
  *
- * TMDb sends ISO 3166-1 alpha-2 codes ("GR", "FR"); `production_countries`
- * holds names ("Greece", "France"), so each code resolves to the canonical
- * spelling and compares directly. Codes are upper-cased first, since the
- * canonicaliser resolves a two-letter code only in upper case.
+ * - `missing`: the response had no such field. Says nothing about the title.
+ * - `unresolved`: TMDb named codes and NONE resolves to a canonical name. Not
+ *   an answer either: storing it as "names none" would retire the title for
+ *   good, and a mapping added later could never reach it. The backfill records
+ *   the attempt and asks again after its retry window.
+ * - `names`: the resolvable countries, in TMDb's order. `[]` only when TMDb's
+ *   own list was empty, which IS an answer.
  *
- * A code that resolves to NO canonical name is DROPPED, unlike every other use
- * of the canonicaliser, which passes unknown values through. Here a raw code
- * cannot match any country the picker offers, and because the Browse filter
- * prefers a non-empty origin over the first production country, one stored
- * "ZR" would silently replace a correct fallback. Dropping it leaves `[]`, and
- * `[]` falls back.
- *
- * Order is kept. A response with NO field returns null, not `[]`: `[]` is
- * stored as "TMDb answered" and a missing field does not say that.
+ * A partially resolvable list keeps what resolves: the unknown code could only
+ * have been one more origin, and the known one already matches.
  */
-export function originCountryNames(details: { origin_country?: readonly string[] | null }): string[] | null {
-  if (!Array.isArray(details.origin_country)) return null
+export type OriginAnswer =
+  | { kind: 'missing' }
+  | { kind: 'unresolved' }
+  | { kind: 'names'; names: string[] }
+
+export function readOriginCountries(details: { origin_country?: readonly string[] | null }): OriginAnswer {
+  if (!Array.isArray(details.origin_country)) return { kind: 'missing' }
   const names: string[] = []
+  let codes = 0
   for (const raw of details.origin_country) {
     if (typeof raw !== 'string') continue
+    // The canonicaliser resolves a two-letter code only in upper case.
     const code = raw.trim().toUpperCase()
     if (!code) continue
+    codes++
     const name = TMDB_ORIGIN_CODE_NAMES[code] ?? canonicalCountry(code)
-    if (name && CANONICAL.has(name) && !names.includes(name)) names.push(name)
+    if (name && !names.includes(name)) names.push(name)
   }
-  return names
+  if (codes > 0 && names.length === 0) return { kind: 'unresolved' }
+  return { kind: 'names', names }
+}
+
+/**
+ * TMDb's `origin_country` as canonical country names (the spelling
+ * `production_countries` uses, so the two compare directly), or null when the
+ * response is not an answer (`missing` or `unresolved` above). Null makes the
+ * enrichment writers leave the row pending; the backfill then decides.
+ */
+export function originCountryNames(details: { origin_country?: readonly string[] | null }): string[] | null {
+  const answer = readOriginCountries(details)
+  return answer.kind === 'names' ? answer.names : null
 }

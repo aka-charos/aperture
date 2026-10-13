@@ -45,7 +45,7 @@ import {
 import { getSeriesEnrichmentData, getTVDetails, creatorNames } from '../tmdb/series.js'
 import { findMovieByImdbId, findTVByImdbId, findTVByTvdbId } from '../tmdb/client.js'
 import { getMovieDetails } from '../tmdb/movies.js'
-import { originCountryNames } from '../tmdb/originCountries.js'
+import { readOriginCountries } from '../tmdb/originCountries.js'
 import { getRatingsData } from '../omdb/ratings.js'
 import { OmdbRequestError, isGlobalOmdbFailure } from '../omdb/failures.js'
 import type { RatingsData } from '../omdb/types.js'
@@ -948,11 +948,14 @@ async function fillMissingOriginCountries(
             details = await getTVDetails(tmdbId, { onLog })
           }
           if (!details) return await noAnswer()
-          const origin = originCountryNames(details)
-          if (origin === null) return 'missing'
+          const answer = readOriginCountries(details)
+          if (answer.kind === 'missing') return 'missing'
+          // Codes none of which resolve: not an answer, so it rides the retry
+          // window and a mapping added later can still reach the title.
+          if (answer.kind === 'unresolved') return await noAnswer()
           await query(
             `UPDATE ${table} SET origin_countries = $2::text[], origin_countries_fetched_at = NOW() WHERE id = $1`,
-            [row.id, origin]
+            [row.id, answer.names]
           )
           return 'filled'
         } catch (err) {

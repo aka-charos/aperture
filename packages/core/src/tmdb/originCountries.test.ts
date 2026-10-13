@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { canonicalCountryNames } from '../countries/canonical.js'
-import { TMDB_ORIGIN_CODE_NAMES, originCountryNames } from './originCountries.js'
+import { TMDB_ORIGIN_CODE_NAMES, originCountryNames, readOriginCountries } from './originCountries.js'
 
 test("TMDb's codes become the names production_countries uses", () => {
   assert.deepEqual(originCountryNames({ origin_country: ['GR'] }), ['Greece'])
@@ -27,15 +27,20 @@ test('every special-cased code maps to a canonical name, or it would match nothi
   }
 })
 
-test('an unresolvable code is dropped, so it cannot replace the first-production-country fallback', () => {
-  assert.deepEqual(originCountryNames({ origin_country: ['ZZ'] }), [])
-  assert.deepEqual(originCountryNames({ origin_country: ['ZZ', 'GR'] }), ['Greece'])
+test('codes that resolve to nothing are NOT an answer, so a later mapping can still reach the title', () => {
+  assert.deepEqual(readOriginCountries({ origin_country: ['ZZ'] }), { kind: 'unresolved' })
+  assert.equal(originCountryNames({ origin_country: ['ZZ'] }), null)
 })
 
-test('an empty list is an answer; a missing field is not, so the title stays pending', () => {
-  assert.deepEqual(originCountryNames({ origin_country: [] }), [])
+test('a partly resolvable list keeps what resolves', () => {
+  assert.deepEqual(readOriginCountries({ origin_country: ['ZZ', 'GR'] }), { kind: 'names', names: ['Greece'] })
+})
+
+test("an empty list is TMDb's answer; a missing field is not", () => {
+  assert.deepEqual(readOriginCountries({ origin_country: [] }), { kind: 'names', names: [] })
+  assert.deepEqual(readOriginCountries({}), { kind: 'missing' })
+  assert.deepEqual(readOriginCountries({ origin_country: null }), { kind: 'missing' })
   assert.equal(originCountryNames({}), null)
-  assert.equal(originCountryNames({ origin_country: null }), null)
 })
 
 test('duplicates fold', () => {

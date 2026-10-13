@@ -24,9 +24,16 @@ test('a watched count above the library total is clamped at 1', () => {
   assert.equal(seriesCompletionRate(30, 24), 1)
 })
 
-test('nothing regular watched (only specials, or a bookmark) is a rate of 0, not unknown', () => {
-  assert.equal(seriesCompletionRate(0, 24), 0)
-  assert.equal(seriesCompletionRate(null, 24), 0)
+test('nothing played (a bookmark, or specials alone) is unknown, not "bounced"', () => {
+  assert.equal(seriesCompletionRate(0, 24), undefined)
+  assert.equal(seriesCompletionRate(null, 24), undefined)
+  assert.equal(seriesCompletionRate('0', '24'), undefined)
+  // ...which weighs a bookmarked show like one favourited at series level.
+  assert.equal(completionMultiplier(seriesCompletionRate(0, 24)), 1.0)
+})
+
+test('one episode played of many is still the bottom band', () => {
+  assert.equal(completionMultiplier(seriesCompletionRate(1, 60)), 0.25)
 })
 
 test('the denominator leaves out specials and correlates on the expression given', () => {
