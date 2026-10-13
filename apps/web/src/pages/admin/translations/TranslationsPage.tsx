@@ -5,6 +5,7 @@ import {
   Button,
   Checkbox,
   Chip,
+  LinearProgress,
   CircularProgress,
   FormControl,
   FormControlLabel,
@@ -34,7 +35,7 @@ import { useTranslationCatalog } from './useTranslationCatalog'
 import { EditKeyDialog } from './EditKeyDialog'
 import { CsvImportDialog } from './CsvImportDialog'
 import { buildOverridesCsv, downloadCsv } from './csvExport'
-import { keyMatchesFilter } from './catalogFilter'
+import { countUntranslated, keyMatchesFilter } from './catalogFilter'
 import { InlineTranslationCell } from './InlineTranslationCell'
 
 const NAMESPACE_ALL = '__all__'
@@ -121,6 +122,33 @@ export function TranslationsPage() {
     () => (audience === AUDIENCE_ALL ? namespaces : namespaces.filter((ns) => namespaceAudience(ns) === audience)),
     [namespaces, audience]
   )
+
+  // The keys the untranslated counts are taken over: the audience and the
+  // namespace, which say WHICH strings someone is working on, but not the
+  // search or the checkboxes, which only say how they are looking at them.
+  const scopeKeys = useMemo(
+    () =>
+      keys.filter(
+        (key) =>
+          (audience === AUDIENCE_ALL || keyAudience(key) === audience) &&
+          (namespace === NAMESPACE_ALL || key.startsWith(`${namespace}.`))
+      ),
+    [keys, audience, namespace]
+  )
+
+  // Live, unlike the list: each save lowers the count straight away.
+  const untranslatedByLanguage = useMemo(() => {
+    const english = defaults.en ?? {}
+    const counts: Record<string, number> = {}
+    for (const locale of languageOptions) {
+      counts[locale.code] = countUntranslated(scopeKeys, locale.code, english, effective)
+    }
+    return counts
+  }, [scopeKeys, languageOptions, defaults, effective])
+
+  const untranslatedCount = language ? untranslatedByLanguage[language] ?? 0 : 0
+  const translatedShare =
+    scopeKeys.length > 0 ? Math.floor(((scopeKeys.length - untranslatedCount) / scopeKeys.length) * 100) : 100
 
   const pageKeys = useMemo(
     () => filteredKeys.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
@@ -213,6 +241,12 @@ export function TranslationsPage() {
             labelId="translations-language-label"
             label={t('admin.translationsPage.languageLabel')}
             value={language ?? LANGUAGE_ALL}
+            // The menu carries a count per language; the closed box names one.
+            renderValue={(value) =>
+              value === LANGUAGE_ALL
+                ? t('admin.translationsPage.languageAll')
+                : `${languageLocale?.label ?? value} (${value})`
+            }
             onChange={(e) => {
               const code = e.target.value
               setStoredLanguage(code)
@@ -224,7 +258,18 @@ export function TranslationsPage() {
             <MenuItem value={LANGUAGE_ALL}>{t('admin.translationsPage.languageAll')}</MenuItem>
             {languageOptions.map((locale) => (
               <MenuItem key={locale.code} value={locale.code}>
-                {locale.label} ({locale.code})
+                <Box sx={{ display: 'flex', width: '100%', gap: 2, justifyContent: 'space-between' }}>
+                  <span>
+                    {locale.label} ({locale.code})
+                  </span>
+                  {!loading && (
+                    <Typography variant="caption" color="text.secondary">
+                      {t('admin.translationsPage.untranslatedShort', {
+                        count: untranslatedByLanguage[locale.code] ?? 0,
+                      })}
+                    </Typography>
+                  )}
+                </Box>
               </MenuItem>
             ))}
           </Select>
@@ -267,6 +312,45 @@ export function TranslationsPage() {
           </Button>
         </Box>
       </Box>
+
+      {languageLocale && !loading && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Box sx={{ flex: '1 1 260px', minWidth: 200, maxWidth: 480 }}>
+            <Typography variant="body2" sx={{ mb: 0.5 }}>
+              {untranslatedCount === 0
+                ? t('admin.translationsPage.untranslatedNone', { language: languageLocale.label })
+                : t('admin.translationsPage.untranslatedSummary', {
+                    count: untranslatedCount,
+                    total: scopeKeys.length,
+                    language: languageLocale.label,
+                    percent: translatedShare,
+                  })}
+            </Typography>
+            <LinearProgress
+              variant="determinate"
+              value={translatedShare}
+              color={untranslatedCount === 0 ? 'success' : 'primary'}
+              sx={{ height: 6, borderRadius: 3 }}
+            />
+          </Box>
+          {untranslatedCount > 0 && (
+            <Chip
+              clickable
+              color={onlyUntranslated ? 'primary' : 'default'}
+              variant={onlyUntranslated ? 'filled' : 'outlined'}
+              label={
+                onlyUntranslated
+                  ? t('admin.translationsPage.showAllStrings')
+                  : t('admin.translationsPage.showUntranslated', { count: untranslatedCount })
+              }
+              onClick={() => {
+                setOnlyUntranslated((on) => !on)
+                setPage(0)
+              }}
+            />
+          )}
+        </Box>
+      )}
 
       {loading ? (
         <Box display="flex" justifyContent="center" py={6}>

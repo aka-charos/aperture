@@ -1,6 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { decideInlineSave, isUntranslated, keyMatchesFilter, type CatalogFilter } from './catalogFilter'
+import {
+  countUntranslated,
+  decideInlineSave,
+  isUntranslated,
+  keyMatchesFilter,
+  type CatalogFilter,
+} from './catalogFilter'
 
 const data = {
   english: {
@@ -50,6 +56,18 @@ test('same-as-English lists what a translator still has to do', () => {
 test('namespace is a whole segment, not a prefix of one', () => {
   assert.deepEqual(run({ namespace: 'home' }), ['home.title', 'home.greeting'])
   assert.deepEqual(run({ namespace: 'hom' }), [])
+})
+
+test('the untranslated count agrees with the filter', () => {
+  for (const locale of ['el', 'ja']) {
+    assert.equal(
+      countUntranslated(keys, locale, data.english, data.effective),
+      run({ onlyUntranslated: true, locale }).length
+    )
+  }
+  // A language with no strings at all is wholly untranslated.
+  assert.equal(countUntranslated(keys, 'fr', data.english, data.effective), keys.length)
+  assert.equal(countUntranslated([], 'el', data.english, data.effective), 0)
 })
 
 test('an empty or missing value counts as untranslated', () => {

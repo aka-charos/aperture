@@ -710,8 +710,16 @@
       "languageLabel": "Language",
       "languageAll": "All languages",
       "searchPlaceholderLanguage": "Search keys, English or {{language}} text…",
-      "onlyUntranslated": "Only same as English",
-      "onlyUntranslatedHint": "Strings in this language that are empty or still read exactly as the English. Some are meant to (a name, a unit), so read before translating."
+      "onlyUntranslated": "Only untranslated",
+      "onlyUntranslatedHint": "Strings in this language that are empty or still read exactly as the English. A few are meant to (a name, a unit), so read before translating.",
+      "untranslatedShort_one": "{{count}} untranslated",
+      "untranslatedShort_other": "{{count}} untranslated",
+      "untranslatedSummary_one": "{{count}} of {{total}} strings is not translated into {{language}} yet · {{percent}}% done",
+      "untranslatedSummary_other": "{{count}} of {{total}} strings are not translated into {{language}} yet · {{percent}}% done",
+      "untranslatedNone": "Everything here is translated into {{language}}.",
+      "showUntranslated_one": "Show only the {{count}} untranslated",
+      "showUntranslated_other": "Show only the {{count}} untranslated",
+      "showAllStrings": "Show all strings"
     },
     "connectionsDialog": {
       "title": "{{name}} के कनेक्शन",

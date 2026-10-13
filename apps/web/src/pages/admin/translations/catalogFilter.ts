@@ -61,6 +61,26 @@ export function keyMatchesFilter(key: string, filter: CatalogFilter, data: Catal
   return true
 }
 
+/**
+ * How many of `keys` still read as the English in `locale`. Counted over the
+ * keys passed (the page passes the current audience and namespace, never the
+ * search), and from the LIVE text, so it falls as strings are translated even
+ * though the list itself is held still while editing.
+ */
+export function countUntranslated(
+  keys: string[],
+  locale: string,
+  english: Record<string, string>,
+  effective: Record<string, Record<string, string>>
+): number {
+  const byKey = effective[locale] ?? {}
+  let count = 0
+  for (const key of keys) {
+    if (isUntranslated(english[key] ?? '', byKey[key])) count++
+  }
+  return count
+}
+
 export type InlineSave =
   /** Nothing to send: the text did not change, or it changed back to the
    *  bundled default with no override standing. */
