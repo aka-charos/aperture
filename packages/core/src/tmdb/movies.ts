@@ -2,6 +2,7 @@
  * TMDb Movie API Functions
  */
 
+import { originCountryNames } from './originCountries.js'
 import { createChildLogger } from '../lib/logger.js'
 import { tmdbRequest, findMovieByImdbId, type ApiLogCallback } from './client.js'
 import type {
@@ -133,6 +134,9 @@ export async function getMovieEnrichmentData(
     // an absence rather than a score of zero.
     voteAverage: details.vote_average > 0 ? details.vote_average : null,
     voteCount: details.vote_count > 0 ? details.vote_count : null,
+    // Also already on `details`: the country a title is FROM, which Browse uses
+    // as its primary country (0200).
+    originCountries: originCountryNames(details),
   }
 }
 

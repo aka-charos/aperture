@@ -61,6 +61,7 @@
     "test:cross-media": "node --import tsx --test src/similarity/crossMedia.test.ts",
     "test:era": "node --import tsx --test src/recommender/eraDiagnostics.test.ts",
     "test:exclusion": "node --import tsx --test src/recommender/watchedExclusion.test.ts src/recommender/watchHistoryCallSites.test.ts",
+    "test:countries": "node --import tsx --test src/countries/canonical.test.ts src/tmdb/originCountries.test.ts",
     "test:engagement": "node --import tsx --test src/taste-profile/engagement.test.ts src/taste-profile/ratingWeight.test.ts src/recommender/series/libraryEpisodes.test.ts",
     "test:activity-gate": "node --import tsx --test src/recommender/activityGate.test.ts",
     "test:storage": "node --import tsx --test src/recommender/storage.test.ts",

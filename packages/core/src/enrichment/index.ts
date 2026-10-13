@@ -43,7 +43,9 @@ import {
   type ApiLogCallback,
 } from '../tmdb/index.js'
 import { getSeriesEnrichmentData, getTVDetails, creatorNames } from '../tmdb/series.js'
-import { findTVByImdbId, findTVByTvdbId } from '../tmdb/client.js'
+import { findMovieByImdbId, findTVByImdbId, findTVByTvdbId } from '../tmdb/client.js'
+import { getMovieDetails } from '../tmdb/movies.js'
+import { originCountryNames } from '../tmdb/originCountries.js'
 import { getRatingsData } from '../omdb/ratings.js'
 import { OmdbRequestError, isGlobalOmdbFailure } from '../omdb/failures.js'
 import type { RatingsData } from '../omdb/types.js'
@@ -546,7 +548,13 @@ async function enrichMovie(
          enrichment_version = COALESCE((SELECT value::int FROM system_settings WHERE key = 'enrichment_version'), 1),
          -- Only advance when OMDb was actually asked; CASE rather than COALESCE
          -- so a pass that skipped OMDb leaves an earlier timestamp intact.
-         omdb_enriched_at = CASE WHEN $14 THEN NOW() ELSE omdb_enriched_at END
+         omdb_enriched_at = CASE WHEN $14 THEN NOW() ELSE omdb_enriched_at END,
+         -- TMDb's country of origin (0200), the Browse filter's primary country.
+         -- Its own column, since the sync rewrites production_countries every
+         -- pass. NULL means TMDb did not answer and leaves both columns for the
+         -- backfill to retry; '{}' is an answer (TMDb names no origin).
+         origin_countries = CASE WHEN $20::text[] IS NOT NULL THEN $20::text[] ELSE origin_countries END,
+         origin_countries_fetched_at = CASE WHEN $20::text[] IS NOT NULL THEN NOW() ELSE origin_countries_fetched_at END
        WHERE id = $1`,
       [
         movie.id,
@@ -568,6 +576,7 @@ async function enrichMovie(
         tmdbData?.voteCount ?? null,
         omdbData?.imdbRating ?? null,
         omdbData?.imdbVotes ?? null,
+        tmdbData?.originCountries ?? null,
       ]
     )
     return true
@@ -715,7 +724,10 @@ async function enrichSeries(
          -- flip the text back and forth. NULL creators means the details did
          -- not load, and leaves both columns alone so the next pass retries.
          tmdb_creators = CASE WHEN $15::text[] IS NOT NULL THEN $15::text[] ELSE tmdb_creators END,
-         tmdb_creators_fetched_at = CASE WHEN $15::text[] IS NOT NULL THEN NOW() ELSE tmdb_creators_fetched_at END
+         tmdb_creators_fetched_at = CASE WHEN $15::text[] IS NOT NULL THEN NOW() ELSE tmdb_creators_fetched_at END,
+         -- Country of origin (0200); same NULL-means-retry rule as the movie side.
+         origin_countries = CASE WHEN $16::text[] IS NOT NULL THEN $16::text[] ELSE origin_countries END,
+         origin_countries_fetched_at = CASE WHEN $16::text[] IS NOT NULL THEN NOW() ELSE origin_countries_fetched_at END
        WHERE id = $1`,
       [
         series.id,
@@ -733,6 +745,7 @@ async function enrichSeries(
         omdbData?.imdbRating ?? null,
         omdbData?.imdbVotes ?? null,
         tmdbData?.creators ?? null,
+        tmdbData?.originCountries ?? null,
       ]
     )
     return true
@@ -827,6 +840,125 @@ async function fillMissingSeriesCreators(jobId: string): Promise<{ filled: numbe
     jobId,
     'info',
     `👤 Series creators: ${outcome.filled} filled, ${outcome.failed} not found or failed (retried next run)`
+  )
+  return outcome
+}
+
+// ============================================================================
+// Origin countries backfill
+// ============================================================================
+
+/** How many answered requests WITHOUT the field end a run's backfill early. */
+const ORIGIN_FIELD_MISSING_LIMIT = 20
+
+/**
+ * Fill origin_countries for titles enriched before the column existed (0200).
+ *
+ * Same shape as fillMissingSeriesCreators: ONE TMDb details request per title
+ * (plus an id lookup when it has no TMDb id), never OMDb, each title asked at
+ * most once per run, and a failure stays pending for the next run. An empty
+ * origin list is stamped, since it is TMDb's answer.
+ *
+ * One guard the creators backfill does not need: if TMDb answers without the
+ * field at all, nothing can be filled, so after ORIGIN_FIELD_MISSING_LIMIT such
+ * answers with nothing filled the run stops asking rather than spending a
+ * request on every title in the library to learn the same thing.
+ */
+async function fillMissingOriginCountries(
+  jobId: string,
+  table: 'movies' | 'series',
+  step: number
+): Promise<{ filled: number; failed: number }> {
+  const outcome = { filled: 0, failed: 0 }
+  let fieldMissing = 0
+  const attempted = new Set<string>()
+  const idColumns = table === 'movies' ? 'tmdb_id, imdb_id, NULL::text AS tvdb_id' : 'tmdb_id, imdb_id, tvdb_id'
+  const hasId =
+    table === 'movies'
+      ? '(tmdb_id IS NOT NULL OR imdb_id IS NOT NULL)'
+      : '(tmdb_id IS NOT NULL OR imdb_id IS NOT NULL OR tvdb_id IS NOT NULL)'
+  const label = table === 'movies' ? 'movies' : 'series'
+
+  const pending = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) AS count FROM ${table} WHERE origin_countries_fetched_at IS NULL AND ${hasId}`
+  )
+  const total = parseInt(pending?.count || '0', 10)
+  if (total === 0) return outcome
+
+  setJobStep(jobId, step, `Fetching ${label} origin countries`, total)
+  addLog(jobId, 'info', `🌍 Fetching origin countries for ${total} ${label} from TMDb (TMDb only, no OMDb)`)
+
+  while (!isJobCancelled(jobId)) {
+    const batch = await query<{ id: string; title: string; tmdb_id: string | null; imdb_id: string | null; tvdb_id: string | null }>(
+      `SELECT id, title, ${idColumns} FROM ${table}
+       WHERE origin_countries_fetched_at IS NULL AND ${hasId}
+       ORDER BY id
+       LIMIT $1`,
+      [BATCH_SIZE + attempted.size]
+    )
+    const todo = batch.rows.filter((row) => !attempted.has(row.id)).slice(0, BATCH_SIZE)
+    if (todo.length === 0) break
+    for (const row of todo) attempted.add(row.id)
+
+    const results = await processWithConcurrency(
+      todo,
+      CONCURRENCY,
+      async (row): Promise<'filled' | 'failed' | 'missing'> => {
+        // A throw would reject the whole batch through the pool, so every
+        // failure is caught and counted; the title stays pending for next run.
+        try {
+          const onLog = createApiLogger(jobId, row.title)
+          let tmdbId = row.tmdb_id ? parseInt(row.tmdb_id, 10) : null
+          let details: { origin_country?: string[] } | null = null
+          if (table === 'movies') {
+            if (!tmdbId && row.imdb_id) tmdbId = await findMovieByImdbId(row.imdb_id, { onLog })
+            if (!tmdbId) return 'failed'
+            details = await getMovieDetails(tmdbId, { onLog })
+          } else {
+            if (!tmdbId && row.imdb_id) tmdbId = await findTVByImdbId(row.imdb_id, { onLog })
+            if (!tmdbId && row.tvdb_id) tmdbId = await findTVByTvdbId(row.tvdb_id, { onLog })
+            if (!tmdbId) return 'failed'
+            details = await getTVDetails(tmdbId, { onLog })
+          }
+          if (!details) return 'failed'
+          const origin = originCountryNames(details)
+          if (origin === null) return 'missing'
+          await query(
+            `UPDATE ${table} SET origin_countries = $2::text[], origin_countries_fetched_at = NOW() WHERE id = $1`,
+            [row.id, origin]
+          )
+          return 'filled'
+        } catch (err) {
+          logger.warn({ err, id: row.id, table }, 'Failed to fetch origin countries')
+          return 'failed'
+        }
+      },
+      () => isJobCancelled(jobId)
+    )
+    // A cancelled pool leaves the unreached slots empty; those were not asked.
+    for (const result of results) {
+      if (result === 'filled') outcome.filled++
+      else if (result === 'missing') {
+        outcome.failed++
+        fieldMissing++
+      } else if (result === 'failed') outcome.failed++
+    }
+    updateJobProgress(jobId, outcome.filled + outcome.failed, total)
+
+    if (outcome.filled === 0 && fieldMissing >= ORIGIN_FIELD_MISSING_LIMIT) {
+      addLog(
+        jobId,
+        'warn',
+        `🌍 TMDb answered ${fieldMissing} ${label} without an origin_country field; stopping the backfill for this run. The Browse filter falls back to the first production country.`
+      )
+      break
+    }
+  }
+
+  addLog(
+    jobId,
+    'info',
+    `🌍 ${label[0].toUpperCase()}${label.slice(1)} origin countries: ${outcome.filled} filled, ${outcome.failed} not found or failed (retried next run)`
   )
   return outcome
 }
@@ -948,7 +1080,9 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
   // A resumed job reuses its id, and the announcement is once per *run*.
   omdbFailureAnnounced.delete(jobId)
 
-  createJobProgress(jobId, 'enrich-metadata', 4) // 4 steps: movies, series, collections, series creators
+  // 6 steps: movies, series, collections, series creators, then the origin
+  // countries backlog for movies and for series (0200).
+  createJobProgress(jobId, 'enrich-metadata', 6)
 
   // Check for interrupted runs first
   const incompleteStatus = await getIncompleteEnrichmentRun()
@@ -1192,6 +1326,15 @@ export async function enrichMetadata(jobId: string): Promise<EnrichmentProgress>
     // in this run already have them, so this only reaches the backlog.
     if (tmdbEnabled && !isJobCancelled(jobId)) {
       await fillMissingSeriesCreators(jobId)
+    }
+
+    // Origin countries for titles enriched before 0200; titles enriched in this
+    // run already have theirs, so this only reaches the backlog.
+    if (tmdbEnabled && !isJobCancelled(jobId)) {
+      await fillMissingOriginCountries(jobId, 'movies', 4)
+    }
+    if (tmdbEnabled && !isJobCancelled(jobId)) {
+      await fillMissingOriginCountries(jobId, 'series', 5)
     }
 
     // Complete job

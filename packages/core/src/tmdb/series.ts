@@ -2,6 +2,7 @@
  * TMDb TV Series API Functions
  */
 
+import { originCountryNames } from './originCountries.js'
 import { createChildLogger } from '../lib/logger.js'
 import { tmdbRequest, findTVByImdbId, findTVByTvdbId, type ApiLogCallback } from './client.js'
 import type {
@@ -138,6 +139,7 @@ export async function getSeriesEnrichmentData(
     // The media server supplies no creators for nearly every show (measured:
     // 978 of 986 empty), and this response has carried them all along.
     creators: details ? creatorNames(details) : null,
+    originCountries: details ? originCountryNames(details) : null,
   }
 }
 

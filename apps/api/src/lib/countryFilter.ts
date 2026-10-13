@@ -3,24 +3,40 @@
  *
  * `production_countries` lists every co-producer, so "Greek" by bare membership
  * includes a French film where Greece is the third of four countries. The
- * filter therefore has a SCOPE: `primary` matches only the country listed
- * first, which is the closest thing the metadata has to the country a title
- * belongs to; `any` is membership anywhere in the list, the old behaviour.
- * "First" is the order the media server stores, which mirrors its metadata
- * source; nothing here re-orders it.
+ * filter therefore has a SCOPE:
+ *
+ * - `primary` matches the country a title is FROM. That is TMDb's
+ *   `origin_country` (`origin_countries`, 0200) when enrichment has fetched it,
+ *   and the first-listed production country otherwise. The fallback is only
+ *   that: measured on a live library, roughly one multi-country title in four
+ *   or five has its production countries in A-Z order, where "first" is just
+ *   the alphabetically earliest.
+ * - `any` matches any production country or origin country, so it is always a
+ *   superset of `primary` and ticking it can never hide a title.
  *
  * And a MATCH for several countries: `any` (OR) or `all` (AND).
  *
- * Absent parameters keep the pre-existing behaviour (`any` scope, `all` match),
- * so an API caller that never heard of either gets the answers it always got;
- * the Browse page sends both explicitly, and its own defaults are primary + OR.
+ * Absent parameters keep the pre-existing behaviour (`any` scope, `all` match)
+ * for API callers that never heard of either; the Browse page sends both
+ * explicitly, and its own defaults are primary + OR.
  *
- * Pure so the four combinations are pinned by a test. Column names are bare,
- * as the list queries read the unaliased table.
+ * Pure so the combinations are pinned by a test. Column names are bare, as the
+ * list queries read the unaliased table.
  */
 
 export type CountryScope = 'primary' | 'any'
 export type CountryMatch = 'all' | 'any'
+
+/**
+ * The countries a title is FROM: its TMDb origin when known, else its first
+ * production country. `cardinality(NULL)` is NULL, so a never-fetched row takes
+ * the ELSE branch exactly as a fetched-but-empty one does.
+ */
+export const PRIMARY_COUNTRIES_SQL =
+  'CASE WHEN cardinality(origin_countries) > 0 THEN origin_countries ELSE production_countries[1:1] END'
+
+/** Every country a title is associated with: co-producers plus origin. */
+export const ALL_COUNTRIES_SQL = "(production_countries || COALESCE(origin_countries, '{}'::text[]))"
 
 export function parseCountryQuery(country: string | string[] | undefined): string[] {
   if (!country) return []
@@ -32,9 +48,9 @@ export function parseCountryQuery(country: string | string[] | undefined): strin
  * The WHERE fragment for the selected countries, or null when none are
  * selected. `bind` registers a value and returns its placeholder.
  *
- * Primary + AND reads "led by one of these and co-produced by all of them":
- * a title has one primary country, so requiring it to equal every selection
- * could never match more than one country.
+ * Primary + AND reads "from one of these and associated with all of them": a
+ * title is usually from one country, so requiring its origin to contain every
+ * selection would match almost nothing.
  */
 export function countryFilterSql(
   countries: readonly string[],
@@ -47,8 +63,8 @@ export function countryFilterSql(
   const all = match !== 'any'
 
   if (scope === 'primary') {
-    const primary = `production_countries[1] = ANY(${list})`
-    return all && countries.length > 1 ? `(${primary} AND production_countries @> ${list})` : primary
+    const primary = `(${PRIMARY_COUNTRIES_SQL}) && ${list}`
+    return all && countries.length > 1 ? `((${primary}) AND ${ALL_COUNTRIES_SQL} @> ${list})` : primary
   }
-  return `production_countries ${all ? '@>' : '&&'} ${list}`
+  return `${ALL_COUNTRIES_SQL} ${all ? '@>' : '&&'} ${list}`
 }

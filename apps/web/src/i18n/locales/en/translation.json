@@ -1821,7 +1821,7 @@
     "matchAll": "All (AND)",
     "matchAny": "Any (OR)",
     "includeSecondary": "Include secondary countries",
-    "includeSecondaryHelp": "Off: a title counts for a country only when that country is listed first among its production countries, its main producer. On: every co-producing country counts, so a film where the country is the third of four co-producers shows up too."
+    "includeSecondaryHelp": "Off: a title counts only for the country it comes from (TMDb's country of origin, or the first listed production country when that isn't known yet). On: every co-producing country counts too, so a film where the country is the third of four co-producers shows up as well."
   },
   "networkFilter": {
     "label": "Network",

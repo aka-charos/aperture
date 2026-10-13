@@ -14,6 +14,7 @@ import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
+import { ALL_COUNTRIES_SQL, PRIMARY_COUNTRIES_SQL } from '../../../lib/countryFilter.js'
 import {
   genresSchema,
   keywordsSchema,
@@ -218,15 +219,20 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       // media server keeps them out of.
       const params: unknown[] = []
       const inScope = scopeClause(await viewerScope(request), 'movies', params)
-      // `count` is every title listing the country anywhere; `primaryCount` only
-      // those listing it FIRST, which is what the filter matches by default
-      // (lib/countryFilter.ts). Both ship so the picker can show the number the
-      // selected scope will actually return.
+      // `count` is every title associated with the country (co-producer or
+      // origin); `primaryCount` only those it is FROM, which is what the filter
+      // matches by default. Both come from the filter's own two sets
+      // (lib/countryFilter.ts), so the number beside a country is the number
+      // the selected scope returns.
       const result = await query<{ country: string; count: string; primary_count: string }>(
-        `SELECT c AS country, COUNT(*)::text AS count,
-                COUNT(*) FILTER (WHERE ord = 1)::text AS primary_count
-         FROM movies, unnest(production_countries) WITH ORDINALITY AS u(c, ord)
-         WHERE ${inScope}
+        `WITH t AS (
+           SELECT ${ALL_COUNTRIES_SQL} AS all_set, ${PRIMARY_COUNTRIES_SQL} AS primary_set
+           FROM movies
+           WHERE ${inScope}
+         )
+         SELECT c AS country, COUNT(*)::text AS count,
+                COUNT(*) FILTER (WHERE c = ANY(t.primary_set))::text AS primary_count
+         FROM t CROSS JOIN LATERAL (SELECT DISTINCT x FROM unnest(t.all_set) AS x) AS u(c)
          GROUP BY c
          ORDER BY c`,
         params

@@ -1737,3 +1737,30 @@ Verified on the page that scored 0.67: its visible text is 21,246 characters, so
 **Rejected.** Fixing the sync to populate the columns: Emby does not send the counts, and the column would be one more copy to keep in step with the episodes table. Not built: `MAX(play_count) > 1` still grades a series as rewatched when any one episode was played twice, which is the same per-episode-flag mistake in the evaluation's rewatch branch, left for its own change.
 
 **Reaches nobody until rebuilt** ([F-042](#f-042)): `rebuild-taste-profiles`, then a series regenerate. Every series profile that moves also rewrites its Watcher Identity ([F-111](#f-111)), which means paid model calls.
+
+## F-155
+
+**"Primary country" is TMDb's country of origin, not the first production country.** The Browse country filter used to match a country anywhere in `production_countries`, so a film where Greece is the third of four co-producers listed as Greek. The first fix read `production_countries[1]` as the country a title belongs to. That rests on the stored order meaning something, so it was measured first.
+
+**Measured on a live library** (movies with more than one production country, share already in A-Z order against what chance gives):
+
+| Countries | Titles | A-Z | Chance | Implied sorted share |
+|---|---|---|---|---|
+| 2 | 2,394 | 63% | 50% | ~26% |
+| 3 | 846 | 36% | 17% | ~23% |
+| 4 | 306 | 26% | 4% | ~23% |
+| 5 | 108 | 20% | 1% | ~20% |
+| 6 | 41 | 10% | 0.1% | ~10% |
+
+A near-constant excess at every size is the signature of a sorted MINORITY: roughly one multi-country title in four or five has its countries in alphabetical order, the rest in source order. A real ordering effect would not produce it. US-led co-productions list the United States first, which runs against A-Z and would pull the two-country figure BELOW chance. So "first" is a fact about the title for most rows and the alphabetically earliest country for the rest, and the error favours early letters. For Greek cinema that means a Greek-Cypriot co-production filed as Cypriot.
+
+**TMDb answers the question in its own field.** `origin_country` sits on `/movie/{id}` and `/tv/{id}`, the responses enrichment already fetched and discarded it from (the same discard as [F-144](#f-144)'s creators). Six rules.
+
+1. **Own column** (`origin_countries`, `0200`, both tables), never `production_countries`, which the library sync rewrites every pass.
+2. **Stored as canonical NAMES** through `normalizeCountries` (`tmdb/originCountries.ts`, pinned), because `production_countries` holds names and the two must compare directly; TMDb's codes are upper-cased first, since the canonicaliser resolves a two-letter code only in upper case.
+3. **NULL means not answered, `{}` means TMDb names none.** A response WITHOUT the field returns null, not `[]`, so it stays pending rather than being stamped as answered.
+4. **The backfill is TMDb only** (steps 5 and 6 of `enrich-metadata`, after the creators backfill): one details request per title, never OMDb, each title asked once per run, failures retried next run. It stops early when TMDb answers twenty titles without the field and fills none, rather than spending a request per title to learn the same thing.
+5. **Primary is the origin set, else the first production country** (`PRIMARY_COUNTRIES_SQL`); `any` scope is co-producers PLUS origin (`ALL_COUNTRIES_SQL`), so ticking "Include secondary countries" can never hide a title. The countries endpoints count from the same two expressions, so the number beside a country is the number the filter returns.
+6. **Absent API parameters keep the old behaviour** (any position, AND); only the Browse page sends primary + OR. Presets saved before the scope existed load with secondary included.
+
+**Not changed:** the assistant's country filter ([F-011](#f-011)) still matches `production_countries` anywhere, and nothing else displays a "country of origin" yet.

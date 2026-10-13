@@ -85,6 +85,11 @@ export interface TMDbMovieDetails {
   genres: TMDbGenre[]
   belongs_to_collection: TMDbCollection | null
   production_companies: TMDbProductionCompany[]
+  /**
+   * TMDb's country of origin, ISO 3166-1 alpha-2. Optional in the type: older
+   * TMDb payloads and cached responses may lack it.
+   */
+  origin_country?: string[]
 }
 
 export interface TMDbVideo {
@@ -140,6 +145,11 @@ export interface TMDbTVDetails {
   created_by: TMDbTVCreator[]
   networks: TMDbNetwork[]
   production_companies: TMDbProductionCompany[]
+  /**
+   * TMDb's country of origin, ISO 3166-1 alpha-2. Optional in the type: older
+   * TMDb payloads and cached responses may lack it.
+   */
+  origin_country?: string[]
 }
 
 export interface TMDbTVKeywordsResponse {
@@ -235,6 +245,11 @@ export interface MovieEnrichmentData {
    */
   voteAverage: number | null
   voteCount: number | null
+  /**
+   * TMDb `origin_country` as canonical names (tmdb/originCountries.ts). NULL
+   * when the details did not load, `[]` when TMDb names no origin.
+   */
+  originCountries: string[] | null
 }
 
 export interface SeriesEnrichmentData {
@@ -250,6 +265,11 @@ export interface SeriesEnrichmentData {
    * as "nobody created this".
    */
   creators: string[] | null
+  /**
+   * TMDb `origin_country` as canonical names (tmdb/originCountries.ts). NULL
+   * when the details did not load, `[]` when TMDb names no origin.
+   */
+  originCountries: string[] | null
 }
 
 export interface CollectionData {
