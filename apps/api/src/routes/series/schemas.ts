@@ -47,6 +47,7 @@ export const listSeriesSchema = {
       minMetacritic: { type: 'string' as const, description: 'Minimum Metacritic score (0-100)', example: '75' },
       country: { type: 'string' as const, description: 'Filter by production country. Comma-separated or repeated.', example: 'United States' },
       countryMatch: { type: 'string' as const, enum: ['all', 'any'], description: "How to combine multiple countries: 'all' requires every selected country (default), 'any' matches when at least one overlaps.", default: 'all' },
+      countryScope: { type: 'string' as const, enum: ['primary', 'any'], description: "Which listed production country counts: 'primary' only the first-listed one, 'any' (default) any co-producer.", default: 'any' },
       watchStatus: { type: 'string' as const, enum: ['any', 'watched', 'unwatched'], description: 'Personal watch state (any episode) for the current user', default: 'any' },
       minWatchers: { type: 'string' as const, description: 'Minimum distinct users with episode watch history for this series', example: '2' },
       maxWatchers: { type: 'string' as const, description: 'Maximum distinct users with episode watch history', example: '10' },

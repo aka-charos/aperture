@@ -46,6 +46,7 @@ export interface FilterPreset {
     status?: string[]
     countries?: string[]
     countryMatch?: CountryMatchMode
+    includeSecondaryCountries?: boolean
     watchStatus?: WatchStatusFilter
     minWatchers?: number | null
     maxWatchers?: number | null

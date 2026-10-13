@@ -172,9 +172,14 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
       // media server keeps them out of.
       const params: unknown[] = []
       const inScope = scopeClause(await viewerScope(request), 'series', params)
-      const result = await query<{ country: string; count: string }>(
-        `SELECT c AS country, COUNT(*)::text AS count
-         FROM series, unnest(production_countries) AS c
+      // `count` is every title listing the country anywhere; `primaryCount` only
+      // those listing it FIRST, which is what the filter matches by default
+      // (lib/countryFilter.ts). Both ship so the picker can show the number the
+      // selected scope will actually return.
+      const result = await query<{ country: string; count: string; primary_count: string }>(
+        `SELECT c AS country, COUNT(*)::text AS count,
+                COUNT(*) FILTER (WHERE ord = 1)::text AS primary_count
+         FROM series, unnest(production_countries) WITH ORDINALITY AS u(c, ord)
          WHERE ${inScope}
          GROUP BY c
          ORDER BY c`,
@@ -185,6 +190,7 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
         countries: result.rows.map((r) => ({
           country: r.country,
           count: parseInt(r.count, 10),
+          primaryCount: parseInt(r.primary_count, 10),
         })),
       })
     }

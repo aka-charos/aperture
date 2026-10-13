@@ -8,14 +8,9 @@ import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
+import { countryFilterSql, parseCountryQuery } from '../../../lib/countryFilter.js'
 import { listMoviesSchema } from '../schemas.js'
 import type { MovieRow, MoviesListResponse, MoviesListQuerystring } from '../types.js'
-
-function parseCountryQuery(country: string | string[] | undefined): string[] {
-  if (!country) return []
-  const raw = Array.isArray(country) ? country : country.split(',')
-  return [...new Set(raw.map((c) => c.trim()).filter(Boolean))]
-}
 
 export function registerListHandler(fastify: FastifyInstance) {
   fastify.get<{
@@ -150,13 +145,15 @@ export function registerListHandler(fastify: FastifyInstance) {
       }
 
       const countries = parseCountryQuery(country)
-      if (countries.length > 0) {
-        // 'all' (default) requires every selected country to be present (@> contains);
-        // 'any' matches when at least one overlaps (&&).
-        const countryOperator = request.query.countryMatch === 'any' ? '&&' : '@>'
+      // Primary (first-listed) or any position, and OR or AND across several:
+      // lib/countryFilter.ts, shared with the other list route.
+      const countrySql = countryFilterSql(countries, request.query.countryMatch, request.query.countryScope, (value) => {
+        params.push(value)
+        return `${paramIndex++}`
+      })
+      if (countrySql) {
         whereClause += whereClause ? ' AND ' : ' WHERE '
-        whereClause += `production_countries ${countryOperator} $${paramIndex++}::text[]`
-        params.push(countries)
+        whereClause += countrySql
       }
 
       // Watched means played. A favorited-but-unwatched film has a

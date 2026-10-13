@@ -48,6 +48,7 @@ export const listMoviesSchema = {
       resolution: { type: 'string' as const, description: 'Filter by resolution. Can pass multiple comma-separated values.', example: '4K,1080p' },
       country: { type: 'string' as const, description: 'Filter by production country (ISO or label as stored). Comma-separated or repeated.', example: 'United States,Japan' },
       countryMatch: { type: 'string' as const, enum: ['all', 'any'], description: "How to combine multiple countries: 'all' requires every selected country (default), 'any' matches when at least one overlaps.", default: 'all' },
+      countryScope: { type: 'string' as const, enum: ['primary', 'any'], description: "Which listed production country counts: 'primary' only the first-listed one, 'any' (default) any co-producer.", default: 'any' },
       watchStatus: { type: 'string' as const, enum: ['any', 'watched', 'unwatched'], description: 'Personal watch state for the current user', default: 'any' },
       minWatchers: { type: 'string' as const, description: 'Minimum distinct users with watch history for this title (instance-wide)', example: '2' },
       maxWatchers: { type: 'string' as const, description: 'Maximum distinct users with watch history for this title', example: '10' },

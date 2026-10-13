@@ -183,6 +183,10 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
             onChange={(countries) => series.setSeriesFilters((prev) => ({ ...prev, countries }))}
             match={series.seriesFilters.countryMatch}
             onMatchChange={(countryMatch) => series.setSeriesFilters((prev) => ({ ...prev, countryMatch }))}
+            includeSecondary={series.seriesFilters.includeSecondaryCountries}
+            onIncludeSecondaryChange={(includeSecondaryCountries) =>
+              series.setSeriesFilters((prev) => ({ ...prev, includeSecondaryCountries }))
+            }
           />
 
           <FilterPopper

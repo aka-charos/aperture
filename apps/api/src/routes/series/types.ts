@@ -103,6 +103,7 @@ export interface SeriesListQuerystring {
   minMetacritic?: string
   country?: string | string[]
   countryMatch?: 'all' | 'any'
+  countryScope?: 'primary' | 'any'
   watchStatus?: 'any' | 'watched' | 'unwatched'
   minWatchers?: string
   maxWatchers?: string

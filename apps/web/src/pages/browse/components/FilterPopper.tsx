@@ -41,6 +41,8 @@ export interface MovieFilters {
   resolutions: string[]
   countries: string[]
   countryMatch: CountryMatchMode
+  /** Count co-producing countries too, not only the first-listed one. */
+  includeSecondaryCountries: boolean
   watchStatus: WatchStatusFilter
   minWatchers: number | null
   maxWatchers: number | null
@@ -56,6 +58,8 @@ export interface SeriesFilters {
   status: string[]
   countries: string[]
   countryMatch: CountryMatchMode
+  /** Count co-producing countries too, not only the first-listed one. */
+  includeSecondaryCountries: boolean
   watchStatus: WatchStatusFilter
   minWatchers: number | null
   maxWatchers: number | null
@@ -84,7 +88,8 @@ const defaultMovieFilters: MovieFilters = {
   contentRatings: [],
   resolutions: [],
   countries: [],
-  countryMatch: 'all',
+  countryMatch: 'any',
+  includeSecondaryCountries: false,
   watchStatus: 'any',
   minWatchers: null,
   maxWatchers: null,
@@ -99,7 +104,8 @@ const defaultSeriesFilters: SeriesFilters = {
   contentRatings: [],
   status: [],
   countries: [],
-  countryMatch: 'all',
+  countryMatch: 'any',
+  includeSecondaryCountries: false,
   watchStatus: 'any',
   minWatchers: null,
   maxWatchers: null,
@@ -156,6 +162,7 @@ export function FilterPopper({
         ...defaultMovieFilters,
         countries: filters.countries,
         countryMatch: filters.countryMatch,
+        includeSecondaryCountries: filters.includeSecondaryCountries,
         yearRange: [ranges.year.min, ranges.year.max],
         runtimeRange: ranges.runtime ? [ranges.runtime.min, ranges.runtime.max] : [0, 300],
       })
@@ -164,6 +171,7 @@ export function FilterPopper({
         ...defaultSeriesFilters,
         countries: filters.countries,
         countryMatch: filters.countryMatch,
+        includeSecondaryCountries: filters.includeSecondaryCountries,
         yearRange: [ranges.year.min, ranges.year.max],
         seasonsRange: ranges.seasons ? [ranges.seasons.min, ranges.seasons.max] : [1, 30],
       })

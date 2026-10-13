@@ -104,6 +104,7 @@ export interface MoviesListQuerystring {
   resolution?: string | string[]
   country?: string | string[]
   countryMatch?: 'all' | 'any'
+  countryScope?: 'primary' | 'any'
   watchStatus?: 'any' | 'watched' | 'unwatched'
   minWatchers?: string
   maxWatchers?: string

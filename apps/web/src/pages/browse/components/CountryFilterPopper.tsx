@@ -6,6 +6,7 @@ import {
   Checkbox,
   Chip,
   ClickAwayListener,
+  FormControlLabel,
   IconButton,
   InputAdornment,
   List,
@@ -16,6 +17,7 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
   alpha,
   useTheme,
@@ -24,6 +26,7 @@ import PublicIcon from '@mui/icons-material/Public'
 import SearchIcon from '@mui/icons-material/Search'
 import CloseIcon from '@mui/icons-material/Close'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import type { CountryOption } from '../types'
 import type { CountryMatchMode } from './FilterPopper'
 
@@ -35,14 +38,35 @@ interface CountryFilterPopperProps {
   onChange: (selected: string[]) => void
   match: CountryMatchMode
   onMatchChange: (match: CountryMatchMode) => void
+  /** Count co-producing countries, not only the first-listed one. */
+  includeSecondary: boolean
+  onIncludeSecondaryChange: (include: boolean) => void
 }
 
-export function CountryFilterPopper({ countries, selected, onChange, match, onMatchChange }: CountryFilterPopperProps) {
+export function CountryFilterPopper({
+  countries,
+  selected,
+  onChange,
+  match,
+  onMatchChange,
+  includeSecondary,
+  onIncludeSecondaryChange,
+}: CountryFilterPopperProps) {
   const { t } = useTranslation()
   const theme = useTheme()
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null)
   const [search, setSearch] = useState('')
   const [sortMode, setSortMode] = useState<CountrySortMode>('count')
+
+  // The number beside a country is the number the filter will return in the
+  // current scope. Primary counts are absent from an older API: read as count.
+  const scoped = useMemo(
+    () =>
+      countries
+        .map((c) => ({ country: c.country, count: includeSecondary ? c.count : (c.primaryCount ?? c.count) }))
+        .filter((c) => c.count > 0),
+    [countries, includeSecondary]
+  )
 
   const open = Boolean(anchorEl)
 
@@ -62,9 +86,9 @@ export function CountryFilterPopper({ countries, selected, onChange, match, onMa
   // Selected values can outlive the options list (e.g. loaded from a preset
   // after a library re-sync); keep them visible so they can be deselected.
   const selectedOptions = useMemo(() => {
-    const known = new Map(countries.map((c) => [c.country, c]))
+    const known = new Map(scoped.map((c) => [c.country, c]))
     return selected.map((value) => known.get(value) ?? { country: value, count: 0 })
-  }, [countries, selected])
+  }, [scoped, selected])
 
   const query = search.trim().toLowerCase()
 
@@ -74,7 +98,7 @@ export function CountryFilterPopper({ countries, selected, onChange, match, onMa
   )
 
   const visibleUnselected = useMemo(() => {
-    const rest = countries.filter(
+    const rest = scoped.filter(
       (c) => !selected.includes(c.country) && (!query || c.country.toLowerCase().includes(query))
     )
     return rest.sort((a, b) =>
@@ -82,7 +106,7 @@ export function CountryFilterPopper({ countries, selected, onChange, match, onMa
         ? b.count - a.count || a.country.localeCompare(b.country)
         : a.country.localeCompare(b.country)
     )
-  }, [countries, selected, query, sortMode])
+  }, [scoped, selected, query, sortMode])
 
   const visibleCount = visibleSelected.length + visibleUnselected.length
 
@@ -263,6 +287,29 @@ export function CountryFilterPopper({ countries, selected, onChange, match, onMa
                 </ToggleButtonGroup>
               </Box>
 
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <FormControlLabel
+                  sx={{ mr: 0, '& .MuiFormControlLabel-label': { fontSize: '0.8125rem' } }}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={includeSecondary}
+                      onChange={(e) => onIncludeSecondaryChange(e.target.checked)}
+                      sx={{ p: 0.5, marginInlineEnd: 0.5 }}
+                    />
+                  }
+                  label={t('countryFilter.includeSecondary')}
+                />
+                <Tooltip title={t('countryFilter.includeSecondaryHelp')} arrow placement="top">
+                  <InfoOutlinedIcon
+                    fontSize="small"
+                    tabIndex={0}
+                    aria-label={t('countryFilter.includeSecondaryHelp')}
+                    sx={{ color: 'text.secondary', fontSize: 16, cursor: 'help' }}
+                  />
+                </Tooltip>
+              </Box>
+
               {selected.length > 0 && (
                 <Box display="flex" flexWrap="wrap" gap={0.5} sx={{ maxHeight: 88, overflow: 'auto' }}>
                   {selected.map((country) => (
@@ -292,8 +339,8 @@ export function CountryFilterPopper({ countries, selected, onChange, match, onMa
                     }}
                     sx={{ '& .MuiToggleButton-root': { py: 0.25, px: 1, textTransform: 'none' } }}
                   >
-                    <ToggleButton value="all">{t('countryFilter.matchAll')}</ToggleButton>
                     <ToggleButton value="any">{t('countryFilter.matchAny')}</ToggleButton>
+                    <ToggleButton value="all">{t('countryFilter.matchAll')}</ToggleButton>
                   </ToggleButtonGroup>
                 </Box>
               )}

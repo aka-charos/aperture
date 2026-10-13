@@ -4713,7 +4713,9 @@
     "shownCount_other": "{{count}} countries",
     "matchLabel": "Match",
     "matchAll": "All",
-    "matchAny": "Any"
+    "matchAny": "Any",
+    "includeSecondary": "Include secondary countries",
+    "includeSecondaryHelp": "Off: a title counts for a country only when that country is listed first among its production countries, its main producer. On: every co-producing country counts, so a film where the country is the third of four co-producers shows up too."
   },
   "settingsPosterDisplay": {
     "title": "ポスター表示",

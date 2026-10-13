@@ -38,7 +38,10 @@ export interface Resolution {
 
 export interface CountryOption {
   country: string
+  /** Titles listing the country anywhere among their production countries. */
   count: number
+  /** Titles listing it FIRST. Absent from an older API, which reads as `count`. */
+  primaryCount?: number
 }
 
 export interface NetworkOption {

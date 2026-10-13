@@ -195,7 +195,16 @@ export function useBrowseFilterPresets({
       if (preset.filters.metacritic) setMovieFilters((filters) => ({ ...filters, metacritic: preset.filters.metacritic! }))
       if (preset.filters.contentRatings) setMovieFilters((filters) => ({ ...filters, contentRatings: preset.filters.contentRatings! }))
       if (preset.filters.resolutions) setMovieFilters((filters) => ({ ...filters, resolutions: preset.filters.resolutions! }))
-      if (preset.filters.countries) setMovieFilters((filters) => ({ ...filters, countries: preset.filters.countries! }))
+      if (preset.filters.countries) {
+        const countries = preset.filters.countries
+        setMovieFilters((filters) => ({
+          ...filters,
+          countries,
+          // Saved before primary-only matching existed, a preset matched any
+          // position; absent keeps that rather than quietly narrowing it.
+          includeSecondaryCountries: preset.filters.includeSecondaryCountries ?? countries.length > 0,
+        }))
+      }
       if (preset.filters.countryMatch) setMovieFilters((filters) => ({ ...filters, countryMatch: preset.filters.countryMatch! }))
       if (preset.filters.watchStatus) setMovieFilters((filters) => ({ ...filters, watchStatus: preset.filters.watchStatus! }))
       if (preset.filters.minWatchers !== undefined) setMovieFilters((filters) => ({ ...filters, minWatchers: preset.filters.minWatchers ?? null }))
@@ -220,7 +229,16 @@ export function useBrowseFilterPresets({
       if (preset.filters.metacritic) setSeriesFilters((filters) => ({ ...filters, metacritic: preset.filters.metacritic! }))
       if (preset.filters.contentRatings) setSeriesFilters((filters) => ({ ...filters, contentRatings: preset.filters.contentRatings! }))
       if (preset.filters.status) setSeriesFilters((filters) => ({ ...filters, status: preset.filters.status! }))
-      if (preset.filters.countries) setSeriesFilters((filters) => ({ ...filters, countries: preset.filters.countries! }))
+      if (preset.filters.countries) {
+        const countries = preset.filters.countries
+        setSeriesFilters((filters) => ({
+          ...filters,
+          countries,
+          // Saved before primary-only matching existed, a preset matched any
+          // position; absent keeps that rather than quietly narrowing it.
+          includeSecondaryCountries: preset.filters.includeSecondaryCountries ?? countries.length > 0,
+        }))
+      }
       if (preset.filters.countryMatch) setSeriesFilters((filters) => ({ ...filters, countryMatch: preset.filters.countryMatch! }))
       if (preset.filters.watchStatus) setSeriesFilters((filters) => ({ ...filters, watchStatus: preset.filters.watchStatus! }))
       if (preset.filters.minWatchers !== undefined) setSeriesFilters((filters) => ({ ...filters, minWatchers: preset.filters.minWatchers ?? null }))

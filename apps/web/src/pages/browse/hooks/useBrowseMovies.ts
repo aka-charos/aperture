@@ -132,6 +132,9 @@ export function useBrowseMovies({ tabIndex, persistSortPreferences }: UseBrowseM
         movieFilters.resolutions.forEach((resolution) => params.append('resolution', resolution))
         movieFilters.countries.forEach((country) => params.append('country', country))
         if (movieFilters.countries.length > 1) params.set('countryMatch', movieFilters.countryMatch)
+        if (movieFilters.countries.length > 0) {
+          params.set('countryScope', movieFilters.includeSecondaryCountries ? 'any' : 'primary')
+        }
         if (movieFilters.watchStatus !== 'any') params.set('watchStatus', movieFilters.watchStatus)
         if (movieFilters.minWatchers !== null && movieFilters.minWatchers > 0) params.set('minWatchers', String(movieFilters.minWatchers))
         if (movieFilters.maxWatchers !== null && movieFilters.maxWatchers >= 0) params.set('maxWatchers', String(movieFilters.maxWatchers))
