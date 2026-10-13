@@ -1,15 +1,21 @@
 import Papa from 'papaparse'
 import type { LocaleOption } from './useTranslationCatalog'
 
-/** One wide CSV: row = key, columns = key + every locale code (en first). */
+/**
+ * One wide CSV: row = key, columns = key + every locale code (en first). With
+ * `onlyLocale`, the columns are key, en and that locale — what one translator
+ * needs. The import reads any set of locale columns, so either file goes back
+ * in unchanged.
+ */
 export function buildOverridesCsv(
   locales: LocaleOption[],
   keys: string[],
-  effective: Record<string, Record<string, string>>
+  effective: Record<string, Record<string, string>>,
+  onlyLocale: string | null = null
 ): string {
   const en = locales.find((l) => l.code === 'en')
-  const rest = locales.filter((l) => l.code !== 'en')
-  const orderedLocales = en ? [en, ...rest] : locales
+  const rest = locales.filter((l) => l.code !== 'en' && (onlyLocale === null || l.code === onlyLocale))
+  const orderedLocales = en ? [en, ...rest] : rest
 
   const fields = ['key', ...orderedLocales.map((l) => l.code)]
   const data = keys.map((key) => {

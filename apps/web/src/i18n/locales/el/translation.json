@@ -4729,7 +4729,12 @@
       "audienceLabel": "Κοινό",
       "audienceAll": "Όλα τα κείμενα",
       "audienceUser": "Των χρηστών",
-      "audienceAdmin": "Της διαχείρισης"
+      "audienceAdmin": "Της διαχείρισης",
+      "languageLabel": "Γλώσσα",
+      "languageAll": "Όλες οι γλώσσες",
+      "searchPlaceholderLanguage": "Αναζήτηση σε κλειδιά, αγγλικό ή κείμενο ({{language}})…",
+      "onlyUntranslated": "Μόνο ίδια με τα αγγλικά",
+      "onlyUntranslatedHint": "Κείμενα αυτής της γλώσσας που είναι κενά ή ίδια ακριβώς με τα αγγλικά. Κάποια είναι σωστά έτσι (ένα όνομα, μια μονάδα), οπότε διαβάστε πριν μεταφράσετε."
     },
     "connectionsDialog": {
       "title": "Συνδέσεις: {{name}}",

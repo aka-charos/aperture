@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Box,
@@ -34,11 +34,34 @@ import { useTranslationCatalog } from './useTranslationCatalog'
 import { EditKeyDialog } from './EditKeyDialog'
 import { CsvImportDialog } from './CsvImportDialog'
 import { buildOverridesCsv, downloadCsv } from './csvExport'
+import { keyMatchesFilter } from './catalogFilter'
+import { InlineTranslationCell } from './InlineTranslationCell'
 
 const NAMESPACE_ALL = '__all__'
 const AUDIENCE_ALL = 'all'
+const LANGUAGE_ALL = '__all__'
+// Per-viewer convenience: a translator working through one language should
+// come back to it. Never relied on, so every access is guarded.
+const LANGUAGE_STORAGE_KEY = 'aperture-translations-language'
 
 type AudienceFilter = StringAudience | typeof AUDIENCE_ALL
+
+function readStoredLanguage(): string {
+  try {
+    return localStorage.getItem(LANGUAGE_STORAGE_KEY) || LANGUAGE_ALL
+  } catch {
+    return LANGUAGE_ALL
+  }
+}
+
+function storeLanguage(code: string): void {
+  try {
+    if (code === LANGUAGE_ALL) localStorage.removeItem(LANGUAGE_STORAGE_KEY)
+    else localStorage.setItem(LANGUAGE_STORAGE_KEY, code)
+  } catch {
+    // Storage blocked: the choice simply is not remembered.
+  }
+}
 
 export function TranslationsPage() {
   const { t } = useTranslation()
@@ -48,24 +71,47 @@ export function TranslationsPage() {
   const [search, setSearch] = useState('')
   const [namespace, setNamespace] = useState(NAMESPACE_ALL)
   const [audience, setAudience] = useState<AudienceFilter>(AUDIENCE_ALL)
+  const [storedLanguage, setStoredLanguage] = useState(readStoredLanguage)
   const [onlyOverridden, setOnlyOverridden] = useState(false)
+  const [onlyUntranslated, setOnlyUntranslated] = useState(false)
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(50)
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [listVersion, setListVersion] = useState(0)
+
+  // English is the default column already, so it is not a language to pick.
+  const languageOptions = useMemo(() => locales.filter((l) => l.code !== 'en'), [locales])
+  // A remembered language this instance no longer offers reads as "all",
+  // rather than a Select whose value is absent from its options (blank).
+  const languageLocale = languageOptions.find((l) => l.code === storedLanguage) ?? null
+  const language = languageLocale?.code ?? null
+
+  // The text is read through a ref, so the list re-forms when a FILTER
+  // changes and not when a string is saved: with "same as English" on, a
+  // string translated inline would otherwise vanish from under the cursor
+  // the moment it saves, and the next row would jump into its place.
+  const textRef = useRef({ effective, overrides })
+  textRef.current = { effective, overrides }
 
   const filteredKeys = useMemo(() => {
-    const query = search.trim().toLowerCase()
+    const filter = {
+      query: search.trim().toLowerCase(),
+      namespace: namespace === NAMESPACE_ALL ? null : namespace,
+      locale: language,
+      onlyOverridden,
+      onlyUntranslated,
+    }
+    const data = { english: defaults.en ?? {}, ...textRef.current }
     return keys.filter((key) => {
       if (audience !== AUDIENCE_ALL && keyAudience(key) !== audience) return false
-      if (namespace !== NAMESPACE_ALL && !key.startsWith(`${namespace}.`)) return false
-      if (onlyOverridden && !Object.values(overrides).some((locale) => key in locale)) return false
-      if (query && !key.toLowerCase().includes(query) && !(defaults.en?.[key] || '').toLowerCase().includes(query)) {
-        return false
-      }
-      return true
+      return keyMatchesFilter(key, filter, data)
     })
-  }, [keys, audience, namespace, onlyOverridden, overrides, search, defaults])
+    // `loading` and `listVersion` are dependencies so the list is formed
+    // again once the overrides arrive and after an import; the text itself
+    // deliberately is not (see above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keys, audience, namespace, language, onlyOverridden, onlyUntranslated, search, defaults, loading, listVersion])
 
   // Narrowed so the namespace list answers the audience already chosen. The
   // selection resets with it rather than being carried across: a MUI Select
@@ -88,9 +134,12 @@ export function TranslationsPage() {
   // of the audience filter is being able to hand a translator the strings a
   // viewer can actually see. The audience rides in the filename because a
   // partial export is otherwise indistinguishable from a full one.
+  // With a language chosen the file is key, en and that language — what one
+  // translator works on — and the language rides in the filename too.
   const handleExport = () => {
-    const csv = buildOverridesCsv(locales, filteredKeys, effective)
-    downloadCsv(csv, `aperture-translations-${audience}-${new Date().toISOString().slice(0, 10)}.csv`)
+    const csv = buildOverridesCsv(locales, filteredKeys, effective, language)
+    const scope = language ? `${audience}-${language}` : audience
+    downloadCsv(csv, `aperture-translations-${scope}-${new Date().toISOString().slice(0, 10)}.csv`)
   }
 
   return (
@@ -110,7 +159,11 @@ export function TranslationsPage() {
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
         <TextField
           size="small"
-          placeholder={t('admin.translationsPage.searchPlaceholder')}
+          placeholder={
+            languageLocale
+              ? t('admin.translationsPage.searchPlaceholderLanguage', { language: languageLocale.label })
+              : t('admin.translationsPage.searchPlaceholder')
+          }
           value={search}
           onChange={(e) => {
             setSearch(e.target.value)
@@ -154,6 +207,28 @@ export function TranslationsPage() {
             ))}
           </Select>
         </FormControl>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel id="translations-language-label">{t('admin.translationsPage.languageLabel')}</InputLabel>
+          <Select
+            labelId="translations-language-label"
+            label={t('admin.translationsPage.languageLabel')}
+            value={language ?? LANGUAGE_ALL}
+            onChange={(e) => {
+              const code = e.target.value
+              setStoredLanguage(code)
+              storeLanguage(code)
+              if (code === LANGUAGE_ALL) setOnlyUntranslated(false)
+              setPage(0)
+            }}
+          >
+            <MenuItem value={LANGUAGE_ALL}>{t('admin.translationsPage.languageAll')}</MenuItem>
+            {languageOptions.map((locale) => (
+              <MenuItem key={locale.code} value={locale.code}>
+                {locale.label} ({locale.code})
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <FormControlLabel
           control={
             <Checkbox
@@ -166,6 +241,22 @@ export function TranslationsPage() {
           }
           label={t('admin.translationsPage.onlyOverridden')}
         />
+        {languageLocale && (
+          <Tooltip title={t('admin.translationsPage.onlyUntranslatedHint')}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={onlyUntranslated}
+                  onChange={(e) => {
+                    setOnlyUntranslated(e.target.checked)
+                    setPage(0)
+                  }}
+                />
+              }
+              label={t('admin.translationsPage.onlyUntranslated')}
+            />
+          </Tooltip>
+        )}
 
         <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
           <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleExport} disabled={loading}>
@@ -187,9 +278,19 @@ export function TranslationsPage() {
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell>{t('admin.translationsPage.colKey')}</TableCell>
-                  <TableCell>{t('admin.translationsPage.colDefault')}</TableCell>
-                  <TableCell align="center">{t('admin.translationsPage.colOverrides')}</TableCell>
+                  <TableCell sx={languageLocale ? { width: '22%' } : undefined}>
+                    {t('admin.translationsPage.colKey')}
+                  </TableCell>
+                  <TableCell sx={languageLocale ? { width: '33%' } : undefined}>
+                    {t('admin.translationsPage.colDefault')}
+                  </TableCell>
+                  {languageLocale ? (
+                    <TableCell>
+                      {languageLocale.label} ({languageLocale.code})
+                    </TableCell>
+                  ) : (
+                    <TableCell align="center">{t('admin.translationsPage.colOverrides')}</TableCell>
+                  )}
                   <TableCell align="right">{t('admin.translationsPage.colActions')}</TableCell>
                 </TableRow>
               </TableHead>
@@ -198,31 +299,46 @@ export function TranslationsPage() {
                   const count = overrideCountFor(key)
                   return (
                     <TableRow key={key} hover onClick={() => setEditingKey(key)} sx={{ cursor: 'pointer' }}>
-                      <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{key}</TableCell>
-                      <TableCell>
-                        <Tooltip title={defaults.en?.[key] || ''}>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              maxWidth: 480,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {defaults.en?.[key]}
-                          </Typography>
-                        </Tooltip>
+                      <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem', wordBreak: 'break-all' }}>
+                        {key}
                       </TableCell>
-                      <TableCell align="center">
-                        {count > 0 ? (
-                          <Chip size="small" color="primary" label={`${count}/${locales.length}`} />
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">
-                            —
+                      <TableCell>
+                        {languageLocale ? (
+                          // Translating needs the whole sentence, so it wraps here.
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                            {effective.en?.[key]}
                           </Typography>
+                        ) : (
+                          <Tooltip title={defaults.en?.[key] || ''}>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                maxWidth: 480,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {defaults.en?.[key]}
+                            </Typography>
+                          </Tooltip>
                         )}
                       </TableCell>
+                      {languageLocale ? (
+                        <TableCell>
+                          <InlineTranslationCell keyPath={key} locale={languageLocale.code} catalog={catalog} />
+                        </TableCell>
+                      ) : (
+                        <TableCell align="center">
+                          {count > 0 ? (
+                            <Chip size="small" color="primary" label={`${count}/${locales.length}`} />
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">
+                              —
+                            </Typography>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell align="right">
                         <IconButton
                           size="small"
@@ -273,7 +389,11 @@ export function TranslationsPage() {
 
       <CsvImportDialog
         open={importOpen}
-        onClose={() => setImportOpen(false)}
+        onClose={() => {
+          setImportOpen(false)
+          // An import changes text the list is filtered on; form it again.
+          setListVersion((v) => v + 1)
+        }}
         catalog={catalog}
       />
     </Box>

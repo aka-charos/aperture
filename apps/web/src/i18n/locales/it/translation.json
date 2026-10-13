@@ -707,7 +707,12 @@
       "audienceLabel": "Audience",
       "audienceAll": "All strings",
       "audienceUser": "User-facing",
-      "audienceAdmin": "Admin console"
+      "audienceAdmin": "Admin console",
+      "languageLabel": "Language",
+      "languageAll": "All languages",
+      "searchPlaceholderLanguage": "Search keys, English or {{language}} text…",
+      "onlyUntranslated": "Only same as English",
+      "onlyUntranslatedHint": "Strings in this language that are empty or still read exactly as the English. Some are meant to (a name, a unit), so read before translating."
     },
     "connectionsDialog": {
       "title": "Connessioni di {{name}}",
