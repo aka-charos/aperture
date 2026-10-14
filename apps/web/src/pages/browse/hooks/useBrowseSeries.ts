@@ -5,10 +5,13 @@ import { PAGE_SIZE, defaultSeriesFilters } from '../constants'
 import type { ActiveFilterChip, ContentRating, CountryOption, FilterRanges, NetworkOption, Series } from '../types'
 import type { SeriesFilters, SortField, SortOrder } from '../components'
 import { buildSeriesActiveFilterChips } from '../utils/activeFilterChips'
+import { withLoadedRange, type SeriesUrlState } from '../urlState'
 
 interface UseBrowseSeriesOptions {
   tabIndex: number
   persistSortPreferences: (sortBy: SortField, sortOrder: SortOrder) => void
+  /** The selection the URL carried when Browse opened (urlState.ts). */
+  initial?: SeriesUrlState
 }
 
 interface SeriesResponse {
@@ -45,7 +48,7 @@ interface BrowseSeriesResult {
   handleSeriesSortChange: (sortBy: SortField, sortOrder: SortOrder) => void
 }
 
-export function useBrowseSeries({ tabIndex, persistSortPreferences }: UseBrowseSeriesOptions): BrowseSeriesResult {
+export function useBrowseSeries({ tabIndex, persistSortPreferences, initial }: UseBrowseSeriesOptions): BrowseSeriesResult {
   const { t } = useTranslation()
   const [series, setSeries] = useState<Series[]>([])
   const [seriesGenres, setSeriesGenres] = useState<string[]>([])
@@ -60,12 +63,14 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences }: UseBrowseS
   const [seriesLoading, setSeriesLoading] = useState(true)
   const [seriesLoadingMore, setSeriesLoadingMore] = useState(false)
   const [seriesError, setSeriesError] = useState<string | null>(null)
-  const [seriesSearch, setSeriesSearch] = useState('')
-  const [seriesGenre, setSeriesGenre] = useState('')
-  const [network, setNetwork] = useState('')
-  const [seriesFilters, setSeriesFilters] = useState<SeriesFilters>(defaultSeriesFilters)
-  const [seriesSortBy, setSeriesSortBy] = useState<SortField>('title')
-  const [seriesSortOrder, setSeriesSortOrder] = useState<SortOrder>('asc')
+  const [seriesSearch, setSeriesSearch] = useState(initial?.search ?? '')
+  const [seriesGenre, setSeriesGenre] = useState(initial?.genre ?? '')
+  const [network, setNetwork] = useState(initial?.group ?? '')
+  const [seriesFilters, setSeriesFilters] = useState<SeriesFilters>(initial?.filters ?? defaultSeriesFilters)
+  const [seriesSortBy, setSeriesSortBy] = useState<SortField>(initial?.sortBy ?? 'title')
+  const [seriesSortOrder, setSeriesSortOrder] = useState<SortOrder>(initial?.sortOrder ?? 'asc')
+  // Range ends the URL set: loading the library's real extents must keep them.
+  const pinnedRangesRef = useRef(initial?.pinned ?? {})
   const [seriesPage, setSeriesPage] = useState(1)
   const [seriesHasMore, setSeriesHasMore] = useState(true)
   const [seriesTotal, setSeriesTotal] = useState(0)
@@ -178,8 +183,12 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences }: UseBrowseS
         setSeriesRanges(data)
         setSeriesFilters((prev) => ({
           ...prev,
-          yearRange: [data.year.min, data.year.max],
-          seasonsRange: [data.seasons?.min || 1, data.seasons?.max || 30],
+          yearRange: withLoadedRange(prev.yearRange, [data.year.min, data.year.max], pinnedRangesRef.current.yearRange),
+          seasonsRange: withLoadedRange(
+            prev.seasonsRange,
+            [data.seasons?.min || 1, data.seasons?.max || 30],
+            pinnedRangesRef.current.seasonsRange
+          ),
         }))
       }
     } catch {

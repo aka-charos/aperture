@@ -3,12 +3,15 @@ import { useTranslation } from 'react-i18next'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { PAGE_SIZE } from '../constants'
 import type { BrowsePerson } from '../types'
+import type { PeopleUrlState } from '../urlState'
 
 type PeopleSortBy = 'name' | 'credits'
 
 interface UseBrowsePeopleOptions {
   tabIndex: number
   initialTabIsPeople: boolean
+  /** The search and sort the URL carried when Browse opened (urlState.ts). */
+  initial?: PeopleUrlState
 }
 
 interface PeopleResponse {
@@ -30,14 +33,14 @@ interface BrowsePeopleResult {
   peopleLoadMoreRef: RefObject<HTMLDivElement | null>
 }
 
-export function useBrowsePeople({ tabIndex, initialTabIsPeople }: UseBrowsePeopleOptions): BrowsePeopleResult {
+export function useBrowsePeople({ tabIndex, initialTabIsPeople, initial }: UseBrowsePeopleOptions): BrowsePeopleResult {
   const { t } = useTranslation()
   const [people, setPeople] = useState<BrowsePerson[]>([])
   const [peopleLoading, setPeopleLoading] = useState(() => initialTabIsPeople)
   const [peopleLoadingMore, setPeopleLoadingMore] = useState(false)
   const [peopleError, setPeopleError] = useState<string | null>(null)
-  const [peopleSearch, setPeopleSearch] = useState('')
-  const [peopleSortBy, setPeopleSortBy] = useState<PeopleSortBy>('credits')
+  const [peopleSearch, setPeopleSearch] = useState(initial?.search ?? '')
+  const [peopleSortBy, setPeopleSortBy] = useState<PeopleSortBy>(initial?.sortBy ?? 'credits')
   const [peoplePage, setPeoplePage] = useState(1)
   const [peopleHasMore, setPeopleHasMore] = useState(true)
   const [peopleTotal, setPeopleTotal] = useState(0)

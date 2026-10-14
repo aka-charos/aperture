@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent, SyntheticEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
@@ -18,6 +18,7 @@ import ViewListIcon from '@mui/icons-material/ViewList'
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
 import type { SortField, SortOrder } from './browse/components'
 import { browseTabFromSearchParam } from './browse/constants'
+import { readBrowseUrl, writeBrowseUrl, type BrowseTab } from './browse/urlState'
 import { BrowseMoviesTab } from './browse/BrowseMoviesTab'
 import { BrowsePeopleTab } from './browse/BrowsePeopleTab'
 import { BrowseSeriesTab } from './browse/BrowseSeriesTab'
@@ -32,25 +33,31 @@ export function BrowsePage() {
   const theme = useTheme()
   const serverName = useServerDisplayName()
   const [searchParams, setSearchParams] = useSearchParams()
+  // The selection lives in the URL (browse/urlState.ts), so going back to
+  // Browse from a title restores exactly what was on screen. Read once, on
+  // arrival: from then on the page's own state is the source and the URL
+  // follows it.
+  const [urlState] = useState(() => readBrowseUrl(searchParams))
   const initialTabIndex = browseTabFromSearchParam(searchParams.get('tab'))
   // Which kinds this viewer can see, decided by the server (F-136). A kind
   // they cannot see gets no tab, and a link to it opens the first one they can.
   const hasMovies = useCapability('movies')
   const hasSeries = useCapability('series')
   const firstVisibleTab = hasMovies ? 0 : hasSeries ? 1 : 2
-  const [tabIndex, setTabIndex] = useState(
-    (initialTabIndex === 0 && !hasMovies) || (initialTabIndex === 1 && !hasSeries)
-      ? firstVisibleTab
-      : initialTabIndex
+  const visibleTab = useCallback(
+    (index: number) =>
+      (index === 0 && !hasMovies) || (index === 1 && !hasSeries) ? firstVisibleTab : index,
+    [firstVisibleTab, hasMovies, hasSeries]
   )
+  const [tabIndex, setTabIndex] = useState(() => visibleTab(initialTabIndex))
   const tabQuery = searchParams.get('tab')
   const { viewMode, setViewMode } = useViewMode('browse')
   const { viewMode: peopleViewMode, setViewMode: setPeopleViewMode } = useViewMode('browsePeople')
   const presetsRef = useRef<ReturnType<typeof useBrowseFilterPresets> | null>(null)
 
   useEffect(() => {
-    setTabIndex(browseTabFromSearchParam(tabQuery))
-  }, [tabQuery])
+    setTabIndex(visibleTab(browseTabFromSearchParam(tabQuery)))
+  }, [tabQuery, visibleTab])
 
   const persistMovieSort = useCallback((sortBy: SortField, sortOrder: SortOrder) => {
     void presetsRef.current?.persistSortPreferences('movies', sortBy, sortOrder)
@@ -60,16 +67,89 @@ export function BrowsePage() {
     void presetsRef.current?.persistSortPreferences('series', sortBy, sortOrder)
   }, [])
 
-  const movies = useBrowseMovies({ tabIndex, persistSortPreferences: persistMovieSort })
-  const series = useBrowseSeries({ tabIndex, persistSortPreferences: persistSeriesSort })
-  const people = useBrowsePeople({ tabIndex, initialTabIsPeople: initialTabIndex === 2 })
-  const presets = useBrowseFilterPresets({
-    setMovieSortBy: movies.setMovieSortBy,
-    setMovieSortOrder: movies.setMovieSortOrder,
-    setSeriesSortBy: series.setSeriesSortBy,
-    setSeriesSortOrder: series.setSeriesSortOrder,
+  const movies = useBrowseMovies({ tabIndex, persistSortPreferences: persistMovieSort, initial: urlState.movies })
+  const series = useBrowseSeries({ tabIndex, persistSortPreferences: persistSeriesSort, initial: urlState.series })
+  const people = useBrowsePeople({
+    tabIndex,
+    initialTabIsPeople: initialTabIndex === 2,
+    initial: urlState.people,
   })
+  // The saved sort preference loads after the page does. A sort the URL
+  // carried is what was on screen, so it wins: the preference applies only to
+  // a visit whose URL named no sort.
+  const keepMovieSort = urlState.movies.sortBy !== undefined
+  const keepSeriesSort = urlState.series.sortBy !== undefined
+  const presetSortSetters = useMemo(() => {
+    const ignore = () => {}
+    return {
+      setMovieSortBy: keepMovieSort ? ignore : movies.setMovieSortBy,
+      setMovieSortOrder: keepMovieSort ? ignore : movies.setMovieSortOrder,
+      setSeriesSortBy: keepSeriesSort ? ignore : series.setSeriesSortBy,
+      setSeriesSortOrder: keepSeriesSort ? ignore : series.setSeriesSortOrder,
+    }
+  }, [
+    keepMovieSort,
+    keepSeriesSort,
+    movies.setMovieSortBy,
+    movies.setMovieSortOrder,
+    series.setSeriesSortBy,
+    series.setSeriesSortOrder,
+  ])
+  const presets = useBrowseFilterPresets(presetSortSetters)
   presetsRef.current = presets
+
+  // Write what is on screen back into the URL. In place (replace), so moving a
+  // slider does not add a history entry; the entry that Back returns to simply
+  // holds the latest selection. Switching tabs still adds one (handleTabChange).
+  const tabName: BrowseTab = tabIndex === 1 ? 'series' : tabIndex === 2 ? 'people' : 'movies'
+  const browseQuery = useMemo(
+    () =>
+      writeBrowseUrl(tabName, {
+        movies: {
+          search: movies.movieSearch,
+          genre: movies.movieGenre,
+          group: movies.collection,
+          filters: movies.movieFilters,
+          sortBy: movies.movieSortBy,
+          sortOrder: movies.movieSortOrder,
+          ranges: movies.movieRanges,
+        },
+        series: {
+          search: series.seriesSearch,
+          genre: series.seriesGenre,
+          group: series.network,
+          filters: series.seriesFilters,
+          sortBy: series.seriesSortBy,
+          sortOrder: series.seriesSortOrder,
+          ranges: series.seriesRanges,
+        },
+        people: { search: people.peopleSearch, sortBy: people.peopleSortBy },
+      }),
+    [
+      tabName,
+      movies.movieSearch,
+      movies.movieGenre,
+      movies.collection,
+      movies.movieFilters,
+      movies.movieSortBy,
+      movies.movieSortOrder,
+      movies.movieRanges,
+      series.seriesSearch,
+      series.seriesGenre,
+      series.network,
+      series.seriesFilters,
+      series.seriesSortBy,
+      series.seriesSortOrder,
+      series.seriesRanges,
+      people.peopleSearch,
+      people.peopleSortBy,
+    ]
+  )
+  useEffect(() => {
+    if (browseQuery !== searchParams.toString()) {
+      setSearchParams(new URLSearchParams(browseQuery), { replace: true })
+    }
+  }, [browseQuery, searchParams, setSearchParams])
 
   const currentViewMode = tabIndex === 2 ? peopleViewMode : viewMode
   const handleTabChange = useCallback(

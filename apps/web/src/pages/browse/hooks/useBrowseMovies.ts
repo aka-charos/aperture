@@ -13,10 +13,13 @@ import type {
 } from '../types'
 import type { MovieFilters, SortField, SortOrder } from '../components'
 import { buildMovieActiveFilterChips } from '../utils/activeFilterChips'
+import { withLoadedRange, type MovieUrlState } from '../urlState'
 
 interface UseBrowseMoviesOptions {
   tabIndex: number
   persistSortPreferences: (sortBy: SortField, sortOrder: SortOrder) => void
+  /** The selection the URL carried when Browse opened (urlState.ts). */
+  initial?: MovieUrlState
 }
 
 interface MoviesResponse {
@@ -66,7 +69,7 @@ interface BrowseMoviesResult {
   handleMovieSortChange: (sortBy: SortField, sortOrder: SortOrder) => void
 }
 
-export function useBrowseMovies({ tabIndex, persistSortPreferences }: UseBrowseMoviesOptions): BrowseMoviesResult {
+export function useBrowseMovies({ tabIndex, persistSortPreferences, initial }: UseBrowseMoviesOptions): BrowseMoviesResult {
   const { t } = useTranslation()
   const [movies, setMovies] = useState<Movie[]>([])
   const [movieGenres, setMovieGenres] = useState<string[]>([])
@@ -82,12 +85,14 @@ export function useBrowseMovies({ tabIndex, persistSortPreferences }: UseBrowseM
   const [moviesLoading, setMoviesLoading] = useState(true)
   const [moviesLoadingMore, setMoviesLoadingMore] = useState(false)
   const [moviesError, setMoviesError] = useState<string | null>(null)
-  const [movieSearch, setMovieSearch] = useState('')
-  const [movieGenre, setMovieGenre] = useState('')
-  const [collection, setCollection] = useState('')
-  const [movieFilters, setMovieFilters] = useState<MovieFilters>(defaultMovieFilters)
-  const [movieSortBy, setMovieSortBy] = useState<SortField>('title')
-  const [movieSortOrder, setMovieSortOrder] = useState<SortOrder>('asc')
+  const [movieSearch, setMovieSearch] = useState(initial?.search ?? '')
+  const [movieGenre, setMovieGenre] = useState(initial?.genre ?? '')
+  const [collection, setCollection] = useState(initial?.group ?? '')
+  const [movieFilters, setMovieFilters] = useState<MovieFilters>(initial?.filters ?? defaultMovieFilters)
+  const [movieSortBy, setMovieSortBy] = useState<SortField>(initial?.sortBy ?? 'title')
+  const [movieSortOrder, setMovieSortOrder] = useState<SortOrder>(initial?.sortOrder ?? 'asc')
+  // Range ends the URL set: loading the library's real extents must keep them.
+  const pinnedRangesRef = useRef(initial?.pinned ?? {})
   const [moviePage, setMoviePage] = useState(1)
   const [movieHasMore, setMovieHasMore] = useState(true)
   const [movieTotal, setMovieTotal] = useState(0)
@@ -199,8 +204,12 @@ export function useBrowseMovies({ tabIndex, persistSortPreferences }: UseBrowseM
         setMovieRanges(data)
         setMovieFilters((prev) => ({
           ...prev,
-          yearRange: [data.year.min, data.year.max],
-          runtimeRange: [data.runtime?.min || 0, data.runtime?.max || 300],
+          yearRange: withLoadedRange(prev.yearRange, [data.year.min, data.year.max], pinnedRangesRef.current.yearRange),
+          runtimeRange: withLoadedRange(
+            prev.runtimeRange,
+            [data.runtime?.min || 0, data.runtime?.max || 300],
+            pinnedRangesRef.current.runtimeRange
+          ),
         }))
       }
     } catch {
