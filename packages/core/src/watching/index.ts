@@ -8,14 +8,20 @@
 export {
   getUpcomingEpisodes,
   getUpcomingEpisodeForSeries,
+  getLatestAiredEpisodes,
   type UpcomingEpisode,
 } from './upcomingEpisodes.js'
 
 export {
   UPCOMING_EPISODE_HORIZON_MONTHS,
+  RECENTLY_AIRED_WINDOW_MONTHS,
   upcomingHorizonDate,
+  recentlyAiredSinceDate,
   isWithinUpcomingHorizon,
-} from './upcomingHorizon.js'
+  isRecentlyAired,
+  pickLatestAired,
+  type AiredEpisode,
+} from './episodeWindows.js'
 
 export { refreshStaleTmdbTotals } from './tmdbTotals.js'
 

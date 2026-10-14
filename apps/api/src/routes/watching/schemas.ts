@@ -75,6 +75,19 @@ export const watchingSchemas = {
       },
       lastPlayedAt: { type: 'string', format: 'date-time', nullable: true, description: 'Most recent episode play' },
       upcomingEpisode: { $ref: 'UpcomingEpisode#' },
+      recentlyAiredEpisode: {
+        type: 'object',
+        nullable: true,
+        description:
+          'The latest episode, when it aired in the last two months and nothing airs in the next two: a season just released or just finished. Null otherwise, and always null when upcomingEpisode is set.',
+        properties: {
+          seasonNumber: { type: 'integer' },
+          episodeNumber: { type: 'integer' },
+          title: { type: 'string' },
+          airDate: { type: 'string', format: 'date', description: 'Air date (YYYY-MM-DD)' },
+          source: { type: 'string', enum: ['emby', 'tmdb'], description: 'Where the episode came from' },
+        },
+      },
     },
   },
 

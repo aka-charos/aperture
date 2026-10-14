@@ -11,8 +11,12 @@ import { query, queryOne } from '../../lib/db.js'
 import { requireAuth } from '../../plugins/auth.js'
 import {
   getUpcomingEpisodes,
+  getLatestAiredEpisodes,
   isWithinUpcomingHorizon,
+  isRecentlyAired,
+  recentlyAiredSinceDate,
   upcomingHorizonDate,
+  type AiredEpisode,
   refreshStaleTmdbTotals,
   reconcileWatchingFavoritesForUser,
   favoriteWatchingSeriesOnMediaServer,
@@ -82,6 +86,11 @@ interface WatchingSeriesResponse {
     airDate: string
     source: 'emby' | 'tmdb'
   } | null
+  /**
+   * The latest episode, when it aired within the recent window AND nothing is
+   * shown as upcoming: a season just released or just finished.
+   */
+  recentlyAiredEpisode: AiredEpisode | null
 }
 
 /**
@@ -165,6 +174,15 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
     )
     const upcomingEpisodes = await getUpcomingEpisodes(seriesIds, { tmdbFallbackIds })
 
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    const horizon = upcomingHorizonDate(now)
+    const recentSince = recentlyAiredSinceDate(now)
+
+    // After the upcoming lookup, not beside it: its live TMDb fetches write
+    // tmdb_last_episode, which this reads.
+    const latestAired = await getLatestAiredEpisodes(seriesIds, today)
+
     // Which seasons exist on the server per series — compared against TMDB's
     // per-season data to flag aired seasons missing from the library entirely.
     const serverSeasons = new Map<string, Set<number>>()
@@ -182,10 +200,6 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
         set.add(r.season_number)
       }
     }
-
-    const now = new Date()
-    const today = now.toISOString().split('T')[0]
-    const horizon = upcomingHorizonDate(now)
 
     const series: WatchingSeriesResponse[] = result.rows.map((row) => {
       const upcoming = upcomingEpisodes.get(row.series_id)
@@ -223,6 +237,13 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
       // a premiere announced for next summer does not sit beside next week's.
       const shownUpcoming =
         upcoming && isWithinUpcomingHorizon(upcoming.airDate, horizon) ? upcoming : null
+      // With nothing shown as upcoming, a show whose latest episode came out
+      // recently still belongs beside the upcoming ones.
+      const latest = latestAired.get(row.series_id)
+      const recentlyAired =
+        !shownUpcoming && latest && isRecentlyAired(latest.airDate, recentSince, today)
+          ? latest
+          : null
       return {
         id: row.watching_id ?? row.series_id,
         seriesId: row.series_id,
@@ -255,6 +276,7 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
           airDate: shownUpcoming.airDate,
           source: shownUpcoming.source,
         } : null,
+        recentlyAiredEpisode: recentlyAired,
       }
     })
 

@@ -24,14 +24,24 @@ export function DashboardPage() {
   const { users: connectionUsers, loading: connectionsLoading } =
     useConnectionsRecentWatches(hasConnections)
 
-  // Filter watching series to only those with upcoming episodes, sorted by air date
+  // Upcoming episodes soonest first, then shows whose latest episode aired
+  // recently (nothing upcoming soon), newest first. Both windows are decided
+  // by the API; the two fields never both carry a value.
   const upcomingShows = watchingSeries
     .filter((s) => s.upcomingEpisode)
-    .sort((a, b) => {
-      const dateA = new Date(a.upcomingEpisode!.airDate).getTime()
-      const dateB = new Date(b.upcomingEpisode!.airDate).getTime()
-      return dateA - dateB
-    })
+    .sort(
+      (a, b) =>
+        new Date(a.upcomingEpisode!.airDate).getTime() -
+        new Date(b.upcomingEpisode!.airDate).getTime()
+    )
+  const recentlyAiredShows = watchingSeries
+    .filter((s) => !s.upcomingEpisode && s.recentlyAiredEpisode)
+    .sort(
+      (a, b) =>
+        new Date(b.recentlyAiredEpisode!.airDate).getTime() -
+        new Date(a.recentlyAiredEpisode!.airDate).getTime()
+    )
+  const episodeShows = [...upcomingShows, ...recentlyAiredShows]
 
   const greeting = getGreeting(t)
 
@@ -91,13 +101,13 @@ export function DashboardPage() {
         />
       </Box>
 
-      {/* Shows You Watch - Upcoming Episodes */}
-      {(watchingLoading || upcomingShows.length > 0) && (
+      {/* Shows You Watch - New & Upcoming Episodes */}
+      {(watchingLoading || episodeShows.length > 0) && (
         <Box sx={{ mb: 4 }}>
           <WatchingCarousel
-            title={t('dashboard.upcomingEpisodes')}
+            title={t('dashboard.newAndUpcomingEpisodes')}
             subtitle={t('dashboard.subtitleFromWatching')}
-            items={upcomingShows}
+            items={episodeShows}
             loading={watchingLoading}
           />
         </Box>

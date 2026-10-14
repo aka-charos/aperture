@@ -22,8 +22,9 @@ interface CachedData {
   version: number // For cache invalidation on schema changes
 }
 
-// v5: adds episodesAired/episodesMissing (v4 normalized status, v2 the union)
-const CACHE_VERSION = 5
+// v6: adds recentlyAiredEpisode (v5 episodesAired/episodesMissing, v4
+// normalized status, v2 the union)
+const CACHE_VERSION = 6
 
 /** Watchlist membership only — history-sourced rows must not count as "watching" */
 function watchlistIds(series: WatchingSeries[]): Set<string> {

@@ -40,6 +40,12 @@ export interface WatchingSeries {
   missingSeasons: number[]
   lastPlayedAt: string | null
   upcomingEpisode: UpcomingEpisode | null
+  /**
+   * The latest episode, when it aired in the last two months and nothing is
+   * upcoming within two months. Decided server-side; always null when
+   * upcomingEpisode is set.
+   */
+  recentlyAiredEpisode: UpcomingEpisode | null
 }
 
 /** Response from POST /api/watching/refresh (favorites reconcile) */

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Box, Typography, Chip } from '@mui/material'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
+import NewReleasesIcon from '@mui/icons-material/NewReleases'
 import { useNavigate } from 'react-router-dom'
 import { MoviePoster, BaseCarousel, CarouselItem } from '@aperture/ui'
 import { useUserRatings } from '../../../hooks/useUserRatings'
@@ -27,6 +28,8 @@ interface WatchingItem {
   communityRating: number | null
   status: string | null
   upcomingEpisode: UpcomingEpisode | null
+  /** Set by the API only when upcomingEpisode is not: the latest episode aired recently */
+  recentlyAiredEpisode: UpcomingEpisode | null
 }
 
 interface WatchingCarouselProps {
@@ -48,6 +51,15 @@ function formatAirDate(dateStr: string, t: TFunction, locale: string): string {
   return date.toLocaleDateString(locale, {
     month: 'short',
     day: 'numeric',
+  })
+}
+
+/** A past air date, as a short date. Date-only strings are read as UTC by `new Date`, so format in UTC too or a date shifts a day west of Greenwich. */
+function formatAiredDate(dateStr: string, locale: string): string {
+  return new Date(dateStr).toLocaleDateString(locale, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
   })
 }
 
@@ -155,6 +167,32 @@ export function WatchingCarousel({
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
                   {formatEpisodeNumber(item.upcomingEpisode)}
+                </Typography>
+              </Box>
+            </Box>
+          )}
+
+          {/* Latest episode, when it aired recently and nothing is upcoming */}
+          {!item.upcomingEpisode && item.recentlyAiredEpisode && (
+            <Box
+              sx={{
+                mt: 1,
+                p: 0.75,
+                borderRadius: 1,
+                backgroundColor: 'background.paper',
+                border: 1,
+                borderColor: 'divider',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <NewReleasesIcon sx={{ fontSize: 12, color: 'success.main' }} />
+                <Typography variant="caption" color="success.main" fontWeight={600}>
+                  {t('dashboard.airedOn', {
+                    date: formatAiredDate(item.recentlyAiredEpisode.airDate, i18n.language),
+                  })}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                  {formatEpisodeNumber(item.recentlyAiredEpisode)}
                 </Typography>
               </Box>
             </Box>

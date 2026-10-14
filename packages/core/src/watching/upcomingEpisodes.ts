@@ -9,6 +9,7 @@
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
 import { tmdbRequest } from '../tmdb/client.js'
+import { pickLatestAired, type AiredEpisode } from './episodeWindows.js'
 
 const logger = createChildLogger('upcoming-episodes')
 
@@ -56,10 +57,12 @@ interface TMDbTVDetailsWithNextEpisode {
  */
 export async function persistTmdbTotals(
   seriesId: string,
-  tmdbData: Pick<
-    TMDbTVDetailsWithNextEpisode,
-    'number_of_episodes' | 'number_of_seasons' | 'seasons' | 'status'
-  > | null
+  tmdbData:
+    | (Pick<
+        TMDbTVDetailsWithNextEpisode,
+        'number_of_episodes' | 'number_of_seasons' | 'seasons' | 'status'
+      > & { last_episode_to_air?: TMDbNextEpisode | null })
+    | null
 ): Promise<void> {
   try {
     if (tmdbData && typeof tmdbData.number_of_episodes === 'number' && tmdbData.number_of_episodes > 0) {
@@ -70,10 +73,22 @@ export async function persistTmdbTotals(
             air_date: s.air_date ?? null,
           }))
         : null
+      // '{}' rather than NULL when TMDb lists no aired episode: NULL means
+      // "never asked" and sends the row back to the totals refresh.
+      const last = tmdbData.last_episode_to_air
+      const lastEpisode =
+        last && last.air_date
+          ? {
+              season_number: last.season_number,
+              episode_number: last.episode_number,
+              name: last.name,
+              air_date: last.air_date,
+            }
+          : {}
       await query(
         `UPDATE series
          SET tmdb_total_episodes = $2, tmdb_total_seasons = $3, tmdb_seasons = $4,
-             tmdb_status = $5, tmdb_totals_synced_at = NOW()
+             tmdb_status = $5, tmdb_last_episode = $6, tmdb_totals_synced_at = NOW()
          WHERE id = $1`,
         [
           seriesId,
@@ -81,6 +96,7 @@ export async function persistTmdbTotals(
           tmdbData.number_of_seasons,
           seasons ? JSON.stringify(seasons) : null,
           tmdbData.status ?? null,
+          JSON.stringify(lastEpisode),
         ]
       )
     } else {
@@ -244,6 +260,84 @@ export async function getUpcomingEpisodes(
         logger.debug({ err, tmdbId: row.tmdb_id, seriesId: row.id }, 'Failed to fetch TMDB data')
       }
     }
+  }
+
+  return result
+}
+
+/**
+ * Latest aired episode per series: the later of the newest episode on the
+ * media server dated on or before today, and TMDb's last_episode_to_air as
+ * cached on the series row by the totals refresh. Specials (season 0) are left
+ * out on both sides, since a Christmas special is not "a new season". One
+ * query, no TMDb calls.
+ */
+export async function getLatestAiredEpisodes(
+  seriesIds: string[],
+  today: string
+): Promise<Map<string, AiredEpisode>> {
+  const result = new Map<string, AiredEpisode>()
+  if (seriesIds.length === 0) return result
+
+  const rows = await query<{
+    series_id: string
+    season_number: number | null
+    episode_number: number | null
+    title: string | null
+    air_date: string | null
+    tmdb_last_episode: {
+      season_number?: number
+      episode_number?: number
+      name?: string
+      air_date?: string
+    } | null
+  }>(
+    // to_char, not the bare DATE: node-pg turns a DATE into a Date at the
+    // server's local midnight, which reads as the day before on hosts east of UTC.
+    `SELECT s.id AS series_id, e.season_number, e.episode_number, e.title,
+            to_char(e.premiere_date, 'YYYY-MM-DD') AS air_date, s.tmdb_last_episode
+     FROM series s
+     LEFT JOIN LATERAL (
+       SELECT season_number, episode_number, title, premiere_date
+       FROM episodes
+       WHERE series_id = s.id AND season_number >= 1
+         AND premiere_date IS NOT NULL AND premiere_date <= $2
+       ORDER BY premiere_date DESC, season_number DESC, episode_number DESC
+       LIMIT 1
+     ) e ON true
+     WHERE s.id = ANY($1)`,
+    [seriesIds, today]
+  )
+
+  for (const row of rows.rows) {
+    const emby: AiredEpisode | null =
+      row.air_date && row.season_number != null && row.episode_number != null
+        ? {
+            seasonNumber: row.season_number,
+            episodeNumber: row.episode_number,
+            title: row.title ?? '',
+            airDate: row.air_date,
+            source: 'emby',
+          }
+        : null
+    const last = row.tmdb_last_episode
+    const tmdb: AiredEpisode | null =
+      last &&
+      typeof last.air_date === 'string' &&
+      last.air_date <= today &&
+      typeof last.season_number === 'number' &&
+      last.season_number >= 1 &&
+      typeof last.episode_number === 'number'
+        ? {
+            seasonNumber: last.season_number,
+            episodeNumber: last.episode_number,
+            title: last.name ?? '',
+            airDate: last.air_date,
+            source: 'tmdb',
+          }
+        : null
+    const latest = pickLatestAired(emby, tmdb)
+    if (latest) result.set(row.series_id, latest)
   }
 
   return result

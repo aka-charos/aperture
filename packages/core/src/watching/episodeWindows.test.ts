@@ -1,0 +1,79 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import {
+  isRecentlyAired,
+  isWithinUpcomingHorizon,
+  pickLatestAired,
+  recentlyAiredSinceDate,
+  upcomingHorizonDate,
+  type AiredEpisode,
+} from './episodeWindows.js'
+
+const now = new Date('2026-10-14T09:00:00Z')
+const today = '2026-10-14'
+const horizon = upcomingHorizonDate(now)
+const since = recentlyAiredSinceDate(now)
+
+test('the horizon is two calendar months out, the recent window two months back', () => {
+  assert.equal(horizon, '2026-12-14')
+  assert.equal(since, '2026-08-14')
+})
+
+test('month-end clamps instead of rolling into the following month', () => {
+  assert.equal(upcomingHorizonDate(new Date('2026-12-31T12:00:00Z')), '2027-02-28')
+  assert.equal(upcomingHorizonDate(new Date('2027-12-31T12:00:00Z')), '2028-02-29')
+  assert.equal(recentlyAiredSinceDate(new Date('2026-04-30T12:00:00Z')), '2026-02-28')
+  assert.equal(recentlyAiredSinceDate(new Date('2026-01-15T12:00:00Z')), '2025-11-15')
+})
+
+test('episodes inside the horizon are shown, the horizon day included', () => {
+  assert.equal(isWithinUpcomingHorizon('2026-10-20', horizon), true)
+  assert.equal(isWithinUpcomingHorizon('2026-12-14', horizon), true)
+  assert.equal(isWithinUpcomingHorizon(new Date('2026-11-01T00:00:00Z'), horizon), true)
+})
+
+test('a premiere months away is not', () => {
+  assert.equal(isWithinUpcomingHorizon('2026-12-15', horizon), false)
+  assert.equal(isWithinUpcomingHorizon('2027-07-10', horizon), false)
+})
+
+test('an unreadable upcoming date is kept, not hidden', () => {
+  assert.equal(isWithinUpcomingHorizon('not a date', horizon), true)
+})
+
+test('recently aired covers the window back to today, both ends included', () => {
+  assert.equal(isRecentlyAired('2026-08-14', since, today), true)
+  assert.equal(isRecentlyAired('2026-10-14', since, today), true)
+  assert.equal(isRecentlyAired('2026-08-13', since, today), false)
+  assert.equal(isRecentlyAired('2026-10-15', since, today), false)
+})
+
+test('an unreadable aired date adds nothing', () => {
+  assert.equal(isRecentlyAired('not a date', since, today), false)
+})
+
+const ep = (over: Partial<AiredEpisode>): AiredEpisode => ({
+  seasonNumber: 3,
+  episodeNumber: 10,
+  title: 'Finale',
+  airDate: '2026-09-01',
+  source: 'emby',
+  ...over,
+})
+
+test('pickLatestAired takes the later date from either side', () => {
+  const emby = ep({ airDate: '2026-05-01' })
+  const tmdb = ep({ seasonNumber: 4, episodeNumber: 8, airDate: '2026-09-20', source: 'tmdb' })
+  assert.equal(pickLatestAired(emby, tmdb), tmdb)
+  assert.equal(pickLatestAired(tmdb, null), tmdb)
+  assert.equal(pickLatestAired(null, emby), emby)
+  assert.equal(pickLatestAired(null, null), null)
+})
+
+test('on the same day the later episode wins, and a full tie keeps the server copy', () => {
+  const emby = ep({ episodeNumber: 1 })
+  const tmdb = ep({ episodeNumber: 8, source: 'tmdb' })
+  assert.equal(pickLatestAired(emby, tmdb), tmdb)
+  const same = ep({ source: 'tmdb' })
+  assert.equal(pickLatestAired(ep({}), same)?.source, 'emby')
+})
