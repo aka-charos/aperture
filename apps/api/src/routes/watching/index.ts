@@ -11,6 +11,7 @@ import { query, queryOne } from '../../lib/db.js'
 import { requireAuth } from '../../plugins/auth.js'
 import {
   getUpcomingEpisodes,
+  isWithinUpcomingHorizon,
   refreshStaleTmdbTotals,
   reconcileWatchingFavoritesForUser,
   favoriteWatchingSeriesOnMediaServer,
@@ -181,7 +182,8 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
 
-    const today = new Date().toISOString().split('T')[0]
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
 
     const series: WatchingSeriesResponse[] = result.rows.map((row) => {
       const upcoming = upcomingEpisodes.get(row.series_id)
@@ -214,6 +216,11 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
       const episodesOnServer = parseInt(row.episodes_on_server, 10) || 0
       const episodesMissing =
         episodesAired !== null ? Math.max(0, episodesAired - episodesOnServer) : 0
+      // The count above needs the real next episode however far off it is;
+      // what the page SHOWS as upcoming stops at the horizon (two months), so
+      // a premiere announced for next summer does not sit beside next week's.
+      const shownUpcoming =
+        upcoming && isWithinUpcomingHorizon(upcoming.airDate, now) ? upcoming : null
       return {
         id: row.watching_id ?? row.series_id,
         seriesId: row.series_id,
@@ -239,12 +246,12 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
         tmdbTotalSeasons: row.tmdb_total_seasons,
         missingSeasons,
         lastPlayedAt: row.last_played_at,
-        upcomingEpisode: upcoming ? {
-          seasonNumber: upcoming.seasonNumber,
-          episodeNumber: upcoming.episodeNumber,
-          title: upcoming.title,
-          airDate: upcoming.airDate,
-          source: upcoming.source,
+        upcomingEpisode: shownUpcoming ? {
+          seasonNumber: shownUpcoming.seasonNumber,
+          episodeNumber: shownUpcoming.episodeNumber,
+          title: shownUpcoming.title,
+          airDate: shownUpcoming.airDate,
+          source: shownUpcoming.source,
         } : null,
       }
     })

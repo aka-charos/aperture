@@ -11,6 +11,12 @@ export {
   type UpcomingEpisode,
 } from './upcomingEpisodes.js'
 
+export {
+  UPCOMING_EPISODE_HORIZON_MONTHS,
+  upcomingHorizonDate,
+  isWithinUpcomingHorizon,
+} from './upcomingHorizon.js'
+
 export { refreshStaleTmdbTotals } from './tmdbTotals.js'
 
 export {
