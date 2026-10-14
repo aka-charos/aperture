@@ -74,6 +74,15 @@ const LIST_KEYS: Record<string, string> = {
   status: 'status',
 }
 
+/**
+ * Lists whose values the API checks against a fixed set. An unknown value there
+ * is refused with a 400 and the whole list fails to load, so the reader drops
+ * it instead (the other lists match free text and simply match nothing).
+ */
+const LIST_VOCABULARY: Record<string, readonly string[]> = {
+  status: ['Continuing', 'Ended'],
+}
+
 const MOVIE_SORTS: readonly SortField[] = ['title', 'year', 'releaseDate', 'rating', 'rtScore', 'metacritic', 'runtime', 'added']
 const SERIES_SORTS: readonly SortField[] = ['title', 'year', 'rating', 'rtScore', 'metacritic', 'seasons', 'added']
 const PEOPLE_SORTS: readonly PeopleSort[] = ['name', 'credits']
@@ -111,7 +120,10 @@ function readFilters<F extends MovieFilters | SeriesFilters>(
 
   for (const [field, key] of Object.entries(LIST_KEYS)) {
     if (!(field in defaults)) continue
-    const values = [...new Set(params.getAll(key).map((v) => v.trim()).filter(Boolean))]
+    const allowed = LIST_VOCABULARY[field]
+    const values = [...new Set(params.getAll(key).map((v) => v.trim()).filter(Boolean))].filter(
+      (v) => !allowed || allowed.includes(v)
+    )
     if (values.length > 0) filters[field] = values
   }
 

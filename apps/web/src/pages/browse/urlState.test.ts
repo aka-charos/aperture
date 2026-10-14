@@ -182,6 +182,13 @@ describe('readBrowseUrl', () => {
   })
 })
 
+describe('readBrowseUrl status vocabulary', () => {
+  it('drops a status the API would refuse, keeping the ones it accepts', () => {
+    const state = readBrowseUrl(new URLSearchParams('tab=series&status=Airing&status=Ended'))
+    assert.deepEqual(state.series.filters.status, ['Ended'])
+  })
+})
+
 describe('withLoadedRange', () => {
   it('keeps the ends the URL set and takes the rest from the library', () => {
     assert.deepEqual(withLoadedRange([1990, 2026], [1920, 2025], { min: true, max: false }), [1990, 2025])
