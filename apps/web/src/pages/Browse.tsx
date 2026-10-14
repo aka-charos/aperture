@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent, SyntheticEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigationType, useSearchParams } from 'react-router-dom'
 import {
   Box,
   Tab,
@@ -38,6 +38,10 @@ export function BrowsePage() {
   // arrival: from then on the page's own state is the source and the URL
   // follows it.
   const [urlState] = useState(() => readBrowseUrl(searchParams))
+  // Back/Forward puts the list back where it was (browse/listMemory.ts); a
+  // fresh visit, from the sidebar or a link, starts at the top. Read once.
+  const navigationType = useNavigationType()
+  const [restoreList] = useState(() => navigationType === 'POP')
   const initialTabIndex = browseTabFromSearchParam(searchParams.get('tab'))
   // Which kinds this viewer can see, decided by the server (F-136). A kind
   // they cannot see gets no tab, and a link to it opens the first one they can.
@@ -67,8 +71,18 @@ export function BrowsePage() {
     void presetsRef.current?.persistSortPreferences('series', sortBy, sortOrder)
   }, [])
 
-  const movies = useBrowseMovies({ tabIndex, persistSortPreferences: persistMovieSort, initial: urlState.movies })
-  const series = useBrowseSeries({ tabIndex, persistSortPreferences: persistSeriesSort, initial: urlState.series })
+  const movies = useBrowseMovies({
+    tabIndex,
+    persistSortPreferences: persistMovieSort,
+    initial: urlState.movies,
+    restore: restoreList,
+  })
+  const series = useBrowseSeries({
+    tabIndex,
+    persistSortPreferences: persistSeriesSort,
+    initial: urlState.series,
+    restore: restoreList,
+  })
   const people = useBrowsePeople({
     tabIndex,
     initialTabIsPeople: initialTabIndex === 2,

@@ -6,12 +6,15 @@ import type { ActiveFilterChip, ContentRating, CountryOption, FilterRanges, Netw
 import type { SeriesFilters, SortField, SortOrder } from '../components'
 import { buildSeriesActiveFilterChips } from '../utils/activeFilterChips'
 import { withLoadedRange, type SeriesUrlState } from '../urlState'
+import { useListMemory } from './useListMemory'
 
 interface UseBrowseSeriesOptions {
   tabIndex: number
   persistSortPreferences: (sortBy: SortField, sortOrder: SortOrder) => void
   /** The selection the URL carried when Browse opened (urlState.ts). */
   initial?: SeriesUrlState
+  /** Browse was reached by Back/Forward: put the list back where it was. */
+  restore?: boolean
 }
 
 interface SeriesResponse {
@@ -48,7 +51,12 @@ interface BrowseSeriesResult {
   handleSeriesSortChange: (sortBy: SortField, sortOrder: SortOrder) => void
 }
 
-export function useBrowseSeries({ tabIndex, persistSortPreferences, initial }: UseBrowseSeriesOptions): BrowseSeriesResult {
+export function useBrowseSeries({
+  tabIndex,
+  persistSortPreferences,
+  initial,
+  restore = false,
+}: UseBrowseSeriesOptions): BrowseSeriesResult {
   const { t } = useTranslation()
   const [series, setSeries] = useState<Series[]>([])
   const [seriesGenres, setSeriesGenres] = useState<string[]>([])
@@ -88,6 +96,48 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences, initial }: U
     seriesCountRef.current = 0
   }, [])
 
+  // The list's API query, without the page number: what the list IS. It keys
+  // the fetch effect (so a re-run that would send the same request does not
+  // refetch, e.g. the range load leaving every parameter as it was) and the
+  // remembered list Back restores (listMemory.ts).
+  const listQuery = useMemo(() => {
+    const params = new URLSearchParams({
+      pageSize: String(PAGE_SIZE),
+      sortBy: seriesSortBy,
+      sortOrder: seriesSortOrder,
+    })
+    if (seriesSearch) params.set('search', seriesSearch)
+    if (seriesGenre) params.set('genre', seriesGenre)
+    if (network) params.set('network', network)
+
+    if (seriesFilters.yearRange[0] > seriesRanges.year.min) params.set('minYear', String(seriesFilters.yearRange[0]))
+    if (seriesFilters.yearRange[1] < seriesRanges.year.max) params.set('maxYear', String(seriesFilters.yearRange[1]))
+    if (seriesFilters.seasonsRange[0] > (seriesRanges.seasons?.min || 1)) params.set('minSeasons', String(seriesFilters.seasonsRange[0]))
+    if (seriesFilters.seasonsRange[1] < (seriesRanges.seasons?.max || 30)) params.set('maxSeasons', String(seriesFilters.seasonsRange[1]))
+    if (seriesFilters.communityRating[0] > 0) params.set('minCommunityRating', String(seriesFilters.communityRating[0]))
+    if (seriesFilters.rtScore[0] > 0) params.set('minRtScore', String(seriesFilters.rtScore[0]))
+    if (seriesFilters.metacritic[0] > 0) params.set('minMetacritic', String(seriesFilters.metacritic[0]))
+    seriesFilters.contentRatings.forEach((rating) => params.append('contentRating', rating))
+    seriesFilters.status.forEach((status) => params.append('status', status))
+    seriesFilters.countries.forEach((country) => params.append('country', country))
+    if (seriesFilters.countries.length > 1) params.set('countryMatch', seriesFilters.countryMatch)
+    if (seriesFilters.countries.length > 0) {
+      params.set('countryScope', seriesFilters.includeSecondaryCountries ? 'any' : 'primary')
+    }
+    if (seriesFilters.watchStatus !== 'any') params.set('watchStatus', seriesFilters.watchStatus)
+    if (seriesFilters.minWatchers !== null && seriesFilters.minWatchers > 0) params.set('minWatchers', String(seriesFilters.minWatchers))
+    if (seriesFilters.maxWatchers !== null && seriesFilters.maxWatchers >= 0) params.set('maxWatchers', String(seriesFilters.maxWatchers))
+    return params.toString()
+  }, [network, seriesFilters, seriesGenre, seriesRanges, seriesSearch, seriesSortBy, seriesSortOrder])
+
+  const memory = useListMemory<Series>({
+    tab: 'series',
+    active: tabIndex === 1,
+    restore,
+    current: { key: listQuery, items: series, page: seriesPage, total: seriesTotal, hasMore: seriesHasMore },
+  })
+  const markShowing = memory.markShowing
+
   const fetchSeries = useCallback(
     async (page: number, append = false) => {
       if (append) {
@@ -97,35 +147,7 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences, initial }: U
       }
 
       try {
-        const params = new URLSearchParams({
-          page: String(page),
-          pageSize: String(PAGE_SIZE),
-          sortBy: seriesSortBy,
-          sortOrder: seriesSortOrder,
-        })
-        if (seriesSearch) params.set('search', seriesSearch)
-        if (seriesGenre) params.set('genre', seriesGenre)
-        if (network) params.set('network', network)
-
-        if (seriesFilters.yearRange[0] > seriesRanges.year.min) params.set('minYear', String(seriesFilters.yearRange[0]))
-        if (seriesFilters.yearRange[1] < seriesRanges.year.max) params.set('maxYear', String(seriesFilters.yearRange[1]))
-        if (seriesFilters.seasonsRange[0] > (seriesRanges.seasons?.min || 1)) params.set('minSeasons', String(seriesFilters.seasonsRange[0]))
-        if (seriesFilters.seasonsRange[1] < (seriesRanges.seasons?.max || 30)) params.set('maxSeasons', String(seriesFilters.seasonsRange[1]))
-        if (seriesFilters.communityRating[0] > 0) params.set('minCommunityRating', String(seriesFilters.communityRating[0]))
-        if (seriesFilters.rtScore[0] > 0) params.set('minRtScore', String(seriesFilters.rtScore[0]))
-        if (seriesFilters.metacritic[0] > 0) params.set('minMetacritic', String(seriesFilters.metacritic[0]))
-        seriesFilters.contentRatings.forEach((rating) => params.append('contentRating', rating))
-        seriesFilters.status.forEach((status) => params.append('status', status))
-        seriesFilters.countries.forEach((country) => params.append('country', country))
-        if (seriesFilters.countries.length > 1) params.set('countryMatch', seriesFilters.countryMatch)
-        if (seriesFilters.countries.length > 0) {
-          params.set('countryScope', seriesFilters.includeSecondaryCountries ? 'any' : 'primary')
-        }
-        if (seriesFilters.watchStatus !== 'any') params.set('watchStatus', seriesFilters.watchStatus)
-        if (seriesFilters.minWatchers !== null && seriesFilters.minWatchers > 0) params.set('minWatchers', String(seriesFilters.minWatchers))
-        if (seriesFilters.maxWatchers !== null && seriesFilters.maxWatchers >= 0) params.set('maxWatchers', String(seriesFilters.maxWatchers))
-
-        const response = await fetch(`/api/series?${params}`, { credentials: 'include' })
+        const response = await fetch(`/api/series?${listQuery}&page=${page}`, { credentials: 'include' })
         if (!response.ok) {
           setSeriesError(t('browse.errors.loadSeries'))
           return
@@ -142,6 +164,7 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences, initial }: U
         setSeriesTotal(data.total)
         setSeriesHasMore(data.series.length === PAGE_SIZE && loadedCount < data.total)
         setSeriesError(null)
+        if (!append) markShowing(listQuery)
       } catch {
         setSeriesError(t('browse.errors.connect'))
       } finally {
@@ -149,7 +172,7 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences, initial }: U
         setSeriesLoadingMore(false)
       }
     },
-    [network, seriesFilters, seriesGenre, seriesRanges, seriesSearch, seriesSortBy, seriesSortOrder, t]
+    [listQuery, markShowing, t]
   )
 
   const fetchSeriesMetadata = useCallback(async () => {
@@ -200,13 +223,28 @@ export function useBrowseSeries({ tabIndex, persistSortPreferences, initial }: U
     void fetchSeriesMetadata()
   }, [fetchSeriesMetadata])
 
+  const { takeRemembered, isShowing } = memory
   useEffect(() => {
+    // Already showing this query (restored, or a re-run that changed nothing).
+    if (isShowing(listQuery)) return
+    const remembered = takeRemembered(listQuery)
+    if (remembered) {
+      setSeries(remembered.items)
+      setSeriesPage(remembered.page)
+      setSeriesTotal(remembered.total)
+      setSeriesHasMore(remembered.hasMore)
+      seriesCountRef.current = remembered.items.length
+      setSeriesError(null)
+      setSeriesLoading(false)
+      return
+    }
     resetSeries()
+    markShowing(null)
     const debounce = setTimeout(() => {
       void fetchSeries(1, false)
     }, seriesSearch ? 300 : 0)
     return () => clearTimeout(debounce)
-  }, [fetchSeries, network, resetSeries, seriesFilters, seriesGenre, seriesSearch, seriesSortBy, seriesSortOrder])
+  }, [fetchSeries, isShowing, listQuery, markShowing, resetSeries, seriesSearch, takeRemembered])
 
   useEffect(() => {
     if (seriesObserverRef.current) {
