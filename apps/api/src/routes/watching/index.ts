@@ -12,6 +12,7 @@ import { requireAuth } from '../../plugins/auth.js'
 import {
   getUpcomingEpisodes,
   isWithinUpcomingHorizon,
+  upcomingHorizonDate,
   refreshStaleTmdbTotals,
   reconcileWatchingFavoritesForUser,
   favoriteWatchingSeriesOnMediaServer,
@@ -184,6 +185,7 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
 
     const now = new Date()
     const today = now.toISOString().split('T')[0]
+    const horizon = upcomingHorizonDate(now)
 
     const series: WatchingSeriesResponse[] = result.rows.map((row) => {
       const upcoming = upcomingEpisodes.get(row.series_id)
@@ -220,7 +222,7 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
       // what the page SHOWS as upcoming stops at the horizon (two months), so
       // a premiere announced for next summer does not sit beside next week's.
       const shownUpcoming =
-        upcoming && isWithinUpcomingHorizon(upcoming.airDate, now) ? upcoming : null
+        upcoming && isWithinUpcomingHorizon(upcoming.airDate, horizon) ? upcoming : null
       return {
         id: row.watching_id ?? row.series_id,
         seriesId: row.series_id,

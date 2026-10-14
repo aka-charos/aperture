@@ -8,7 +8,8 @@ export const watchingSchemas = {
   // Upcoming episode
   UpcomingEpisode: {
     type: 'object',
-    description: 'Information about the next upcoming episode',
+    description:
+      'The next episode, when it airs within two months. Absent (null on the series) both when nothing is scheduled and when the next episode is further out, such as a season premiere announced for next year.',
     properties: {
       seasonNumber: { type: 'integer', description: 'Season number' },
       episodeNumber: { type: 'integer', description: 'Episode number' },

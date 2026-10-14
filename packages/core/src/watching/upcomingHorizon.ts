@@ -25,15 +25,13 @@ export function upcomingHorizonDate(now: Date = new Date()): string {
 }
 
 /**
- * Whether an air date falls inside the horizon. An unparseable date is kept
- * rather than hidden: dropping an episode over a format we failed to read is
- * the worse mistake.
+ * Whether an air date falls on or before `horizon` (from `upcomingHorizonDate`,
+ * computed once per request rather than per series). An unparseable date is
+ * kept rather than hidden: dropping an episode over a format we failed to read
+ * is the worse mistake.
  */
-export function isWithinUpcomingHorizon(
-  airDate: string | Date,
-  now: Date = new Date()
-): boolean {
+export function isWithinUpcomingHorizon(airDate: string | Date, horizon: string): boolean {
   const parsed = airDate instanceof Date ? airDate : new Date(airDate)
   if (Number.isNaN(parsed.getTime())) return true
-  return parsed.toISOString().slice(0, 10) <= upcomingHorizonDate(now)
+  return parsed.toISOString().slice(0, 10) <= horizon
 }
