@@ -50,8 +50,8 @@ export async function refreshStaleTmdbTotals(
 
   // A row is stale when never synced, past the TTL, or synced before newer
   // fields existed (totals present but tmdb_seasons/tmdb_status/
-  // tmdb_last_episode null — the last is written as '{}' when TMDb has none,
-  // so NULL there always means "not asked yet"). Rows with null totals AND a
+  // tmdb_last_episode null — the last is written as '{}' when TMDb has none or
+  // the lookup failed, so NULL there always means "not asked yet"). Rows with null totals AND a
   // sync stamp are failed lookups and stay TTL-gated.
   const stale = await query<{ id: string; tmdb_id: string }>(
     `SELECT id, tmdb_id FROM series

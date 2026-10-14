@@ -70,6 +70,43 @@ export function isRecentlyAired(airDate: string | Date, since: string, today: st
   return day !== null && day >= since && day <= today
 }
 
+/** One season of one show, as the server holds it and as far as this viewer played it. */
+export interface SeasonProgress {
+  /** Highest episode number of the season on the server */
+  serverLastEpisode: number | null
+  /** Highest episode number of the season this viewer played, null when none */
+  playedLastEpisode: number | null
+}
+
+/**
+ * Whether a show's recently aired episode is news to THIS viewer: they were
+ * caught up when it came out. A show someone sampled once years ago must not
+ * come back on the strength of a new season they are three seasons behind.
+ *
+ * - They played anything in the latest episode's season or later: they are in
+ *   it, so a just-finished season or a season dropped all at once counts.
+ * - The latest episode is in season 1 and they played nothing: nothing came
+ *   before it, so only the watchlist can have put the show here, and a show
+ *   added to wait for its premiere is exactly the one to show.
+ * - Otherwise they must have played the last episode the SERVER holds of the
+ *   previous season: finished S3, S4 just aired → yes; stopped in S1 → no.
+ *   A previous season missing from the server cannot have been finished here.
+ */
+export function wasCaughtUp(
+  latestSeason: number,
+  seasons: ReadonlyMap<number, SeasonProgress> | undefined
+): boolean {
+  if (seasons) {
+    for (const [season, progress] of seasons) {
+      if (season >= latestSeason && progress.playedLastEpisode != null) return true
+    }
+  }
+  if (latestSeason <= 1) return true
+  const previous = seasons?.get(latestSeason - 1)
+  if (!previous || previous.playedLastEpisode == null) return false
+  return previous.serverLastEpisode == null || previous.playedLastEpisode >= previous.serverLastEpisode
+}
+
 export interface AiredEpisode {
   seasonNumber: number
   episodeNumber: number

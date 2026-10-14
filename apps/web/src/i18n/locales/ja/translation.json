@@ -3315,7 +3315,7 @@
     "subtitlePersonalized": "あなたの好みに基づいたパーソナライズされたピック",
     "emptyMovieRecs": "映画のおすすめはまだありません。 映画を観て、パーソナライズされた映画を手に入れましょう!",
     "emptySeriesRecs": "シリーズの推奨事項はまだありません。 いくつかのシリーズを視聴して、パーソナライズされた選択肢を手に入れましょう!",
-    "newAndUpcomingEpisodes": "新着・今後のエピソード",
+    "upcomingEpisodes": "新着・今後のエピソード",
     "airedOn": "{{date}}に放送",
     "subtitleFromWatching": "視聴している番組から",
     "emptyUpcoming": "今後のエピソードはありません",

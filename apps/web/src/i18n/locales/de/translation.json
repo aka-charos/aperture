@@ -3315,7 +3315,7 @@
     "subtitlePersonalized": "Personalisierte Vorschläge basierend auf deinem Geschmack",
     "emptyMovieRecs": "Noch keine Filmemfehlungen. Schau ein paar Filme, um personalisierte Vorschläge zu erhalten!",
     "emptySeriesRecs": "Noch keine Serienempfehlungen. Schau ein paar Serien, um personalisierte Vorschläge zu erhalten!",
-    "newAndUpcomingEpisodes": "Neue & kommende Episoden",
+    "upcomingEpisodes": "Neue & kommende Episoden",
     "airedOn": "Ausgestrahlt am {{date}}",
     "subtitleFromWatching": "Von Serien, die du schaust",
     "emptyUpcoming": "Keine kommenden Episoden",

@@ -9,6 +9,7 @@ export {
   getUpcomingEpisodes,
   getUpcomingEpisodeForSeries,
   getLatestAiredEpisodes,
+  getSeasonProgress,
   type UpcomingEpisode,
 } from './upcomingEpisodes.js'
 
@@ -20,7 +21,9 @@ export {
   isWithinUpcomingHorizon,
   isRecentlyAired,
   pickLatestAired,
+  wasCaughtUp,
   type AiredEpisode,
+  type SeasonProgress,
 } from './episodeWindows.js'
 
 export { refreshStaleTmdbTotals } from './tmdbTotals.js'

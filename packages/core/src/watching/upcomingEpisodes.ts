@@ -9,7 +9,8 @@
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
 import { tmdbRequest } from '../tmdb/client.js'
-import { pickLatestAired, type AiredEpisode } from './episodeWindows.js'
+import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
+import { pickLatestAired, type AiredEpisode, type SeasonProgress } from './episodeWindows.js'
 
 const logger = createChildLogger('upcoming-episodes')
 
@@ -101,8 +102,18 @@ export async function persistTmdbTotals(
       )
     } else {
       // Stamp the sync time even without usable totals so dead/renamed TMDB
-      // ids aren't re-fetched on every request.
-      await query(`UPDATE series SET tmdb_totals_synced_at = NOW() WHERE id = $1`, [seriesId])
+      // ids aren't re-fetched on every request. A NULL tmdb_last_episode is
+      // marked asked ('{}') for the same reason: the staleness check treats
+      // NULL there as "never asked" whatever the stamp says, so a show whose
+      // lookup started failing after it had totals would otherwise be fetched
+      // on every load. A value already stored is kept.
+      await query(
+        `UPDATE series
+         SET tmdb_totals_synced_at = NOW(),
+             tmdb_last_episode = COALESCE(tmdb_last_episode, '{}'::jsonb)
+         WHERE id = $1`,
+        [seriesId]
+      )
     }
   } catch (err) {
     logger.debug({ err, seriesId }, 'Failed to persist TMDB totals')
@@ -340,6 +351,50 @@ export async function getLatestAiredEpisodes(
     if (latest) result.set(row.series_id, latest)
   }
 
+  return result
+}
+
+/**
+ * Per series, per season on the server: the highest episode number held and
+ * the highest this viewer PLAYED (a favorited episode writes a watch_history
+ * row too, and is not a watch). Feeds `wasCaughtUp`, and its keys are also the
+ * seasons the server holds. Season 0 is included; callers decide about it.
+ */
+export async function getSeasonProgress(
+  userId: string,
+  seriesIds: string[]
+): Promise<Map<string, Map<number, SeasonProgress>>> {
+  const result = new Map<string, Map<number, SeasonProgress>>()
+  if (seriesIds.length === 0) return result
+
+  const rows = await query<{
+    series_id: string
+    season_number: number
+    server_last: number | null
+    played_last: number | null
+  }>(
+    `SELECT e.series_id, e.season_number,
+            MAX(e.episode_number) AS server_last,
+            MAX(e.episode_number) FILTER (WHERE wh.id IS NOT NULL) AS played_last
+     FROM episodes e
+     LEFT JOIN watch_history wh
+       ON wh.episode_id = e.id AND wh.user_id = $2 AND ${WATCH_HISTORY_PLAYED_SQL}
+     WHERE e.series_id = ANY($1) AND e.season_number IS NOT NULL
+     GROUP BY e.series_id, e.season_number`,
+    [seriesIds, userId]
+  )
+
+  for (const row of rows.rows) {
+    let seasons = result.get(row.series_id)
+    if (!seasons) {
+      seasons = new Map()
+      result.set(row.series_id, seasons)
+    }
+    seasons.set(row.season_number, {
+      serverLastEpisode: row.server_last,
+      playedLastEpisode: row.played_last,
+    })
+  }
   return result
 }
 

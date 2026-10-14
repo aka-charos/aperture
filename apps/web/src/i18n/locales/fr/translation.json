@@ -3319,7 +3319,7 @@
     "subtitlePersonalized": "Choix personnalisés en fonction de vos goûts",
     "emptyMovieRecs": "Aucune recommandation de film pour l'instant. Regardez quelques films pour obtenir des choix personnalisés !",
     "emptySeriesRecs": "Aucune recommandation de série pour l'instant. Regardez quelques séries pour obtenir des choix personnalisés !",
-    "newAndUpcomingEpisodes": "Épisodes récents et à venir",
+    "upcomingEpisodes": "Épisodes récents et à venir",
     "airedOn": "Diffusé le {{date}}",
     "subtitleFromWatching": "Des émissions que vous regardez",
     "emptyUpcoming": "Aucun épisode à venir",

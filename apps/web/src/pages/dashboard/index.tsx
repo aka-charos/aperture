@@ -105,7 +105,11 @@ export function DashboardPage() {
       {(watchingLoading || episodeShows.length > 0) && (
         <Box sx={{ mb: 4 }}>
           <WatchingCarousel
-            title={t('dashboard.newAndUpcomingEpisodes')}
+            // The key keeps its old name although the row now also holds
+            // recently aired shows: an admin's override of the title
+            // (Translations, or /config/i18n) is keyed on it and would be
+            // stranded by a rename. All 14 locales carry the new wording.
+            title={t('dashboard.upcomingEpisodes')}
             subtitle={t('dashboard.subtitleFromWatching')}
             items={episodeShows}
             loading={watchingLoading}

@@ -4408,7 +4408,7 @@
     "subtitlePersonalized": "Personalized picks based on your taste",
     "emptyMovieRecs": "No movie recommendations yet. Watch some movies to get personalized picks!",
     "emptySeriesRecs": "No series recommendations yet. Watch some series to get personalized picks!",
-    "newAndUpcomingEpisodes": "New & Upcoming Episodes",
+    "upcomingEpisodes": "New & Upcoming Episodes",
     "airedOn": "Aired {{date}}",
     "subtitleFromWatching": "From shows you watch",
     "emptyUpcoming": "No upcoming episodes",

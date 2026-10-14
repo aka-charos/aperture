@@ -6,8 +6,48 @@ import {
   pickLatestAired,
   recentlyAiredSinceDate,
   upcomingHorizonDate,
+  wasCaughtUp,
   type AiredEpisode,
+  type SeasonProgress,
 } from './episodeWindows.js'
+
+const seasons = (entries: [number, number | null, number | null][]) =>
+  new Map<number, SeasonProgress>(
+    entries.map(([season, serverLastEpisode, playedLastEpisode]) => [
+      season,
+      { serverLastEpisode, playedLastEpisode },
+    ])
+  )
+
+test('finished the previous season, the new one just aired: caught up', () => {
+  assert.equal(wasCaughtUp(4, seasons([[1, 8, 8], [2, 8, 8], [3, 10, 10]])), true)
+})
+
+test('stopped in season 1, season 4 just aired: not caught up', () => {
+  assert.equal(wasCaughtUp(4, seasons([[1, 8, 3], [2, 8, null], [3, 10, null]])), false)
+})
+
+test('part-way through the previous season is not finished', () => {
+  assert.equal(wasCaughtUp(4, seasons([[3, 10, 9]])), false)
+})
+
+test('already watching the latest season counts, however far in', () => {
+  assert.equal(wasCaughtUp(4, seasons([[3, 10, 10], [4, 8, 1]])), true)
+})
+
+test('a previous season the server lacks cannot have been finished', () => {
+  assert.equal(wasCaughtUp(4, seasons([[2, 8, 8]])), false)
+  assert.equal(wasCaughtUp(4, undefined), false)
+})
+
+test('a new show premiering needs nothing before it', () => {
+  assert.equal(wasCaughtUp(1, undefined), true)
+  assert.equal(wasCaughtUp(1, seasons([[1, 8, null]])), true)
+})
+
+test('specials played do not count as being in the latest season', () => {
+  assert.equal(wasCaughtUp(4, seasons([[0, 3, 3], [3, 10, 5]])), false)
+})
 
 const now = new Date('2026-10-14T09:00:00Z')
 const today = '2026-10-14'

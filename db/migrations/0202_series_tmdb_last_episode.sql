@@ -8,10 +8,10 @@
 -- arrives on the same /tv/{id} response that already refreshes
 -- tmdb_total_episodes and tmdb_seasons, so it costs no extra request.
 --
--- NULL means never asked (the totals refresh fills it), '{}' means TMDb lists
--- no aired episode.
+-- NULL means never asked (the totals refresh fills it), '{}' means asked and
+-- TMDb gave no aired episode: it lists none, or the lookup failed.
 
 ALTER TABLE series
   ADD COLUMN IF NOT EXISTS tmdb_last_episode JSONB;
 
-COMMENT ON COLUMN series.tmdb_last_episode IS 'TMDb last_episode_to_air: {season_number, episode_number, name, air_date}, or {} when TMDb lists none. Refreshed with tmdb_total_episodes.';
+COMMENT ON COLUMN series.tmdb_last_episode IS 'TMDb last_episode_to_air: {season_number, episode_number, name, air_date}, or {} when asked and TMDb gave none. Refreshed with tmdb_total_episodes.';

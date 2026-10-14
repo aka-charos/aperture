@@ -67,6 +67,42 @@ function formatEpisodeNumber(ep: UpcomingEpisode): string {
   return `S${String(ep.seasonNumber).padStart(2, '0')}E${String(ep.episodeNumber).padStart(2, '0')}`
 }
 
+/** The line under a poster: when (upcoming or aired) on the left, SxxEyy on the right. */
+function EpisodeLine({
+  icon: Icon,
+  color,
+  label,
+  episode,
+}: {
+  icon: typeof CalendarTodayIcon
+  color: string
+  label: string
+  episode: UpcomingEpisode
+}) {
+  return (
+    <Box
+      sx={{
+        mt: 1,
+        p: 0.75,
+        borderRadius: 1,
+        backgroundColor: 'background.paper',
+        border: 1,
+        borderColor: 'divider',
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Icon sx={{ fontSize: 12, color }} />
+        <Typography variant="caption" color={color} fontWeight={600}>
+          {label}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+          {formatEpisodeNumber(episode)}
+        </Typography>
+      </Box>
+    </Box>
+  )
+}
+
 export function WatchingCarousel({
   title,
   subtitle,
@@ -148,55 +184,24 @@ export function WatchingCarousel({
             )}
           </MoviePoster>
 
-          {/* Upcoming episode info */}
-          {item.upcomingEpisode && (
-            <Box
-              sx={{
-                mt: 1,
-                p: 0.75,
-                borderRadius: 1,
-                backgroundColor: 'background.paper',
-                border: 1,
-                borderColor: 'divider',
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <CalendarTodayIcon sx={{ fontSize: 12, color: 'primary.main' }} />
-                <Typography variant="caption" color="primary.main" fontWeight={600}>
-                  {formatAirDate(item.upcomingEpisode.airDate, t, i18n.language)}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-                  {formatEpisodeNumber(item.upcomingEpisode)}
-                </Typography>
-              </Box>
-            </Box>
-          )}
-
-          {/* Latest episode, when it aired recently and nothing is upcoming */}
-          {!item.upcomingEpisode && item.recentlyAiredEpisode && (
-            <Box
-              sx={{
-                mt: 1,
-                p: 0.75,
-                borderRadius: 1,
-                backgroundColor: 'background.paper',
-                border: 1,
-                borderColor: 'divider',
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <NewReleasesIcon sx={{ fontSize: 12, color: 'success.main' }} />
-                <Typography variant="caption" color="success.main" fontWeight={600}>
-                  {t('dashboard.airedOn', {
-                    date: formatAiredDate(item.recentlyAiredEpisode.airDate, i18n.language),
-                  })}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-                  {formatEpisodeNumber(item.recentlyAiredEpisode)}
-                </Typography>
-              </Box>
-            </Box>
-          )}
+          {item.upcomingEpisode ? (
+            <EpisodeLine
+              icon={CalendarTodayIcon}
+              color="primary.main"
+              label={formatAirDate(item.upcomingEpisode.airDate, t, i18n.language)}
+              episode={item.upcomingEpisode}
+            />
+          ) : item.recentlyAiredEpisode ? (
+            // Latest episode, when it aired recently and nothing is upcoming
+            <EpisodeLine
+              icon={NewReleasesIcon}
+              color="success.main"
+              label={t('dashboard.airedOn', {
+                date: formatAiredDate(item.recentlyAiredEpisode.airDate, i18n.language),
+              })}
+              episode={item.recentlyAiredEpisode}
+            />
+          ) : null}
         </CarouselItem>
       ))}
     </BaseCarousel>

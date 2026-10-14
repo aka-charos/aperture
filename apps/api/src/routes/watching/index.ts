@@ -12,6 +12,8 @@ import { requireAuth } from '../../plugins/auth.js'
 import {
   getUpcomingEpisodes,
   getLatestAiredEpisodes,
+  getSeasonProgress,
+  wasCaughtUp,
   isWithinUpcomingHorizon,
   isRecentlyAired,
   recentlyAiredSinceDate,
@@ -172,7 +174,14 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
         )
         .map((r) => r.series_id)
     )
-    const upcomingEpisodes = await getUpcomingEpisodes(seriesIds, { tmdbFallbackIds })
+    // Season progress reads only episodes and watch history, so it runs beside
+    // the upcoming lookup. Its keys are also the seasons the server holds,
+    // compared against TMDB's per-season data to flag aired seasons missing
+    // from the library entirely.
+    const [upcomingEpisodes, seasonProgress] = await Promise.all([
+      getUpcomingEpisodes(seriesIds, { tmdbFallbackIds }),
+      getSeasonProgress(userId, seriesIds),
+    ])
 
     const now = new Date()
     const today = now.toISOString().split('T')[0]
@@ -183,27 +192,9 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
     // tmdb_last_episode, which this reads.
     const latestAired = await getLatestAiredEpisodes(seriesIds, today)
 
-    // Which seasons exist on the server per series — compared against TMDB's
-    // per-season data to flag aired seasons missing from the library entirely.
-    const serverSeasons = new Map<string, Set<number>>()
-    if (seriesIds.length > 0) {
-      const seasonRows = await query<{ series_id: string; season_number: number }>(
-        `SELECT DISTINCT series_id, season_number FROM episodes WHERE series_id = ANY($1)`,
-        [seriesIds]
-      )
-      for (const r of seasonRows.rows) {
-        let set = serverSeasons.get(r.series_id)
-        if (!set) {
-          set = new Set()
-          serverSeasons.set(r.series_id, set)
-        }
-        set.add(r.season_number)
-      }
-    }
-
     const series: WatchingSeriesResponse[] = result.rows.map((row) => {
       const upcoming = upcomingEpisodes.get(row.series_id)
-      const onServer = serverSeasons.get(row.series_id)
+      const progress = seasonProgress.get(row.series_id)
       // Regular seasons (per TMDB) that started airing. Specials (season 0)
       // and unaired/announced seasons are ignored.
       const airedSeasons = (row.tmdb_seasons ?? []).filter(
@@ -214,7 +205,7 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
           s.air_date <= today
       )
       const missingSeasons = airedSeasons
-        .filter((s) => !onServer?.has(s.season_number))
+        .filter((s) => !progress?.has(s.season_number))
         .map((s) => s.season_number)
         .sort((a, b) => a - b)
       // Aired episode count: full episode_count per started season, except
@@ -238,10 +229,15 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
       const shownUpcoming =
         upcoming && isWithinUpcomingHorizon(upcoming.airDate, horizon) ? upcoming : null
       // With nothing shown as upcoming, a show whose latest episode came out
-      // recently still belongs beside the upcoming ones.
+      // recently still belongs beside the upcoming ones — but only for a
+      // viewer who was caught up when it did (finished S3, S4 just aired), not
+      // one who sampled the show years ago and stopped in season 1.
       const latest = latestAired.get(row.series_id)
       const recentlyAired =
-        !shownUpcoming && latest && isRecentlyAired(latest.airDate, recentSince, today)
+        !shownUpcoming &&
+        latest &&
+        isRecentlyAired(latest.airDate, recentSince, today) &&
+        wasCaughtUp(latest.seasonNumber, progress)
           ? latest
           : null
       return {
