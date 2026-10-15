@@ -27,12 +27,12 @@ The primary instrument: for each seed, the **actual nearest neighbours** raw vs 
 
 ## Archived Results
 
-Every run is stored (the job log trims its middle, so the archive is the record): run date, **embedding set/model**, pool size, viewers qualified, seed list used — with per-run **CSV exports**:
+Every run is stored (the job log trims its middle, so the archive is the record): run date, **embedding set/model**, pool size, viewers qualified, seed list used. Two **CSV exports**, each available for every archived run at once (the buttons above the table) or for one run (the icons on its row):
 
 - **Download figures (CSV)** — percentiles, NDCG/recall at all cutoffs, per variant, with provenance columns
 - **Download neighbours (CSV)** — the full dump, per seed and variant
 
-"Download everything" is the primary action because the real use is **pivoting across runs** — model vs model, seed list vs seed list. Mind the pool-size comparability warning above the table.
+The all-runs download is the main one because the real use is **pivoting across runs** — model vs model, seed list vs seed list. Mind the pool-size comparability warning above the table.
 
 ---
 

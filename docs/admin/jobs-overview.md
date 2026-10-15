@@ -1,23 +1,22 @@
 # Jobs Overview
 
-Background jobs power everything periodic in Aperture — syncing, embeddings, recommendations, backups. This is the operations surface for all 34 of them.
-
-![Admin Jobs](../images/admin/admin-jobs.png)
+Background jobs power everything periodic in Aperture — syncing, embeddings, recommendations, backups. This is the operations surface for all 39 of them.
 
 ## Where It Lives
 
-Admin console → **Operations** → **Jobs** (`/admin/ops/jobs`). Tabs: **Movies / TV Series / Global** job cards, plus a **Schedule** tab listing every job (including a few that have no card) with enable toggles.
+Admin console → **Operations** → **Jobs** (`/admin/ops/jobs`). Tabs: **Movies / TV Series / Global** job cards (34 jobs), plus a **Schedule** tab listing every job, including the five that have no card (`sync-users`, `refresh-assistant-suggestions`, `backup-database`, `cleanup-auth-state`, `refresh-library-gaps`), with enable toggles.
 
-A **Running Jobs** widget in the app bar shows what's active from anywhere.
+A **Running Jobs** widget in the app bar shows what's active from anywhere; each row in it opens that job's card with its log. The admin search (⌘⇧K / Ctrl+Shift+K) finds every job by name.
 
 ## How Execution Works
 
-- **One slot per job** — starting a job that's already running is rejected ("Job is already running"). *Different* jobs run concurrently; there is no queue and no sequencing
+- **One slot per job** — starting a job that's already running is rejected ("Job is already running"). A cancelled job keeps its slot until it has actually stopped, and the refusal says so. *Different* jobs run concurrently; there is no queue and no sequencing
 - **Cancel is cooperative** — "Stop Job" asks for confirmation, then the job checks the cancel flag between units of work (important for paid-model jobs: a cancelled explanation job keeps what it already paid for)
 - **No auto-retry, no priority system** — a failed job waits for its next schedule or a manual run
 - **Per-job history** — the history dialog shows past runs with their logs; job cards also offer an inline "Show Logs (n)" toggle
 - Scheduled recommendation runs consult an **activity gate** (a user with no new activity may be skipped) — manual runs always execute
-- AI work done inside jobs is attributed per job in the [AI spend](ai-providers.md) dashboard
+- AI work done inside jobs is attributed per job in the [AI spend](ai-spend.md) dashboard
+- **Legacy library jobs** (`sync-movie-libraries`, `sync-series-libraries`, `refresh-top-picks`) do nothing while legacy library output is switched off on [Output format](output-format.md): their cards are greyed with the reason, and a scheduled run records itself as skipped
 
 ## Job States
 

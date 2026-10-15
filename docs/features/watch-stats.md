@@ -2,8 +2,6 @@
 
 The Watch Stats page turns your watch history into analytics: what you watch, when you watch it, and how it compares with the rest of the household.
 
-![Watch Stats Page](../images/features/watch-stats.png)
-
 ## Accessing Watch Stats
 
 Navigate to **Watch Stats** in the sidebar (insights icon).
@@ -100,7 +98,7 @@ Your most-watched production studios (movies) and TV networks (series), with log
 
 ## Your Taste in Words
 
-Alongside the charts, your [Watcher Identity](user-settings/watcher-identity.md) appears as taste cards for movies and series — plain-language sentences describing what kind of viewer the numbers say you are.
+Alongside the charts, your [Watcher Identity](user-settings/watcher-identity.md) appears as taste cards for movies and series — a short written account of what kind of viewer your history says you are, naming the titles and patterns behind it. It is rewritten automatically when your taste profile changes (at a recommendation run); the card's button writes it again on demand if it doesn't sound like you. This page is the only place it's shown.
 
 ---
 

@@ -2,8 +2,6 @@
 
 Configure the connection between Aperture and your Emby or Jellyfin server. One media server at a time.
 
-![Admin Settings - Media Server](../images/admin/admin-settings-setup-media.png)
-
 ## Accessing Settings
 
 Admin console → **Library** → **Media server** (`/admin/library/server`).
@@ -18,11 +16,11 @@ Admin console → **Library** → **Media server** (`/admin/library/server`).
 | **Public URL (optional)** | The address users' **browsers** should open for "Open in Emby/Jellyfin" buttons, when it differs from the server URL (reverse proxy, split DNS, container networking) |
 | **Server Display Name (optional)** | Overrides the server's own name everywhere in the UI |
 
-**Test** verifies the key and shows the resolved **server name** with a "Connected" state. (There is deliberately no version display — the connection test reports what the app uses.)
+**Test Connection** verifies the key and shows the resolved **server name** with a "Connected" state. It uses the fields as they stand; the saved API key is only sent to the server URL it was saved for, so testing a different URL needs the key typed in again. (There is deliberately no version display — the connection test reports what the app uses.)
 
 ## Security Settings
 
-**Allow passwordless login** — for media servers that permit passwordless accounts. When on, the login page's password field becomes optional and anyone who can reach Aperture can start a session for any known username; the toggle carries an exposure warning accordingly. Off by default.
+**Allow passwordless login** — for media servers that permit passwordless accounts. When on, the login page's password field becomes optional and anyone who can reach Aperture can start a session for any known username; the toggle carries an exposure warning accordingly. Off by default. **In a production build the toggle does nothing unless the container also sets `ALLOW_PASSWORDLESS_LOGIN=true`**, a second step out of reach of anyone who only gets into the admin console; the [Deployment](deployment.md) page reports whether it is permitted.
 
 ## Environment Fallback
 

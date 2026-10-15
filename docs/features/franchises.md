@@ -2,8 +2,6 @@
 
 The Franchise Tracker shows the **movie collections** in your library — Marvel, Middle-earth, James Bond — and your progress through each one.
 
-![Browse with Franchise Filter](../images/features/browse-movies-grid.png)
-
 ## What Counts as a Franchise
 
 A franchise is a **movie collection** — the TMDb collection metadata attached to your files (populated by the metadata enrichment job). Trilogies, universes, and box sets all show up as long as your titles carry collection data. This page is movies-only; series don't form franchises.
@@ -42,6 +40,19 @@ The page header totals your collection habit: **Franchises**, **Completed**, **T
 ### Expanding a Franchise
 
 Open a card to see its movies as a poster grid — each with its watched tick and your star rating, so you can see exactly which entry you're missing. The grid is the answer to "what's next in this collection?".
+
+---
+
+## A Franchise Page
+
+Click a franchise's **name** (or **Part of Collection** on any movie's detail page) to open its own page, which lists the **whole** collection, including the films you don't have:
+
+- A summary: how many films, how many are in your library, and how many you've watched
+- **In your library** — the films you have, each with its watched tick
+- **Not in your library** — released films the server doesn't have, with a **Request** button when Seerr is set up and your account may request (otherwise it says why not). A film already requested shows its request status instead
+- **Upcoming** — announced films with their release date (or "Release date not announced"); these can't be requested yet
+
+If TMDb can't be reached, only the films already in your library are listed, and the page says so. Requests made here appear under [My Requests](my-requests.md).
 
 ---
 

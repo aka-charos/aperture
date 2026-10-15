@@ -8,6 +8,10 @@ const UserDetailPage = lazy(async () => ({
   default: (await import('@/pages/UserDetail')).UserDetailPage,
 }))
 
+const AdminGuidePage = lazy(async () => ({
+  default: (await import('@/pages/admin/help/AdminGuidePage')).AdminGuidePage,
+}))
+
 /**
  * The admin route table, generated from the registry rather than written out
  * beside it.
@@ -39,6 +43,10 @@ export function adminChildRoutes(): ReactElement[] {
     // tree — so it is a route without an entry rather than a leaf nobody wants
     // listed.
     <Route key="user-detail" path="access/users/:id" element={<UserDetailPage />} />,
+
+    // One admin guide page. The index is the `guide` entry; each page under it
+    // is a record of that entry, like a user under Users, not a leaf of its own.
+    <Route key="guide-page" path="help/:slug" element={<AdminGuidePage />} />,
 
     // Everything the console answered to before it was one route per section.
     <Route key="legacy-settings" path="settings" element={<LegacyAdminRedirect />} />,

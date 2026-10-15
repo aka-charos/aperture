@@ -2,8 +2,6 @@
 
 Configure which AI model writes recommendation explanations, taste profiles, and playlist text.
 
-![Admin Settings - AI/LLM](../images/admin/admin-settings-ai-llm.png)
-
 ## Where It Lives
 
 Admin console → **AI models** → **Providers & roles** → the **Text Generation** card (`/admin/ai/roles`).

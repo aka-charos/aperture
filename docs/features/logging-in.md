@@ -2,8 +2,6 @@
 
 Aperture uses your existing Emby or Jellyfin credentials — no separate account needed.
 
-![Login Screen](../images/features/login.png)
-
 ## How to Log In
 
 1. Open Aperture in your browser
@@ -22,7 +20,9 @@ If your admin has enabled passwordless login (for media servers that don't requi
 
 ## First-Time Login
 
-Your user account is **imported automatically** the first time you sign in — there's no account creation step. Watch-history sync and your first recommendation run are admin-side jobs, so if your dashboard looks empty at first, they may still need to run (the empty states tell you).
+There's no account to create: Aperture knows you from the media server. It still needs an administrator to **give your account access** before you can sign in. Until then, signing in says your access is turned off; your account is recorded on that first attempt, so the admin will find you on their Users page.
+
+Watch-history sync and your first recommendation run are admin-side jobs, so if your dashboard looks empty at first, they may still need to run (the empty states tell you). Which libraries you see in Aperture follows what the media server lets your account open.
 
 ---
 
@@ -32,8 +32,8 @@ Your user account is **imported automatically** the first time you sign in — t
 |---------|---------------|
 | **"Invalid username or password"** | The credentials don't work — try them in Emby/Jellyfin directly |
 | **"Too many failed attempts for this account."** | Brute-force lockout; wait a bit and try again |
-| **"This account has been disabled."** | An admin has disabled your Aperture account, even though your media-server credentials are valid — contact your admin |
-| **"Could not reach the media server."** | Aperture can't see Emby/Jellyfin right now; try again shortly |
+| **"Your access is turned off. Contact your … administrator."** | Your media-server credentials are fine, but an admin has not given your account access to Aperture, or has turned it off. Your settings are kept; contact your admin |
+| **"Could not reach the media server. Please try again shortly."** | Aperture can't see Emby/Jellyfin right now; try again shortly |
 
 Note that a wrong username and a wrong password say the same thing — deliberately, so usernames can't be probed.
 
@@ -44,7 +44,7 @@ You stay signed in until:
 - **30 days** pass since you logged in (absolute expiry), or
 - **7 days** pass without using Aperture (idle expiry) — whichever comes first
 
-Sign out any time from the avatar menu.
+Sign out any time from the avatar menu. If an admin turns off your access, or your account is disabled on the media server, you are signed out at once.
 
 ---
 

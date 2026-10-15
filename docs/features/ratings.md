@@ -2,8 +2,6 @@
 
 Aperture uses a **1–10 star rating**. Ratings are the strongest taste signal the recommender has, and they sync to Trakt if you've connected it.
 
-![Browse Movies with Ratings](../images/features/browse-movies-list.png)
-
 ## Rating a Title
 
 ### From a poster

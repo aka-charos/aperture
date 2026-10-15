@@ -2,11 +2,11 @@
 
 The Watch History page is your complete viewing log — everything your media server says you've played, with search, filters, and the tools to correct it.
 
-![Watch History Page](../images/features/watch-history.png)
-
 ## Accessing Watch History
 
 Navigate to **Watch History** in the sidebar (clock icon). The page has two tabs, **Movies** and **Series**, each with its own view mode ([grid or list](grid-list-views.md)).
+
+If an admin has connected you with other people (see [Watch This](watch-this.md)), a **whose history** picker at the top switches to a connection's history. Theirs is read-only, and shows only titles from libraries you can open yourself.
 
 Your history comes from your media server, synced automatically — movies roughly every 2 hours, series hourly, and always right before a recommendation run. Roughly-dated watches (from the rating prompt) appear here too, marked as approximate.
 

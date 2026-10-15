@@ -2,11 +2,9 @@
 
 The **Preferences** tab collects the settings that shape your day-to-day view of Aperture — and your account's connection to the outside world.
 
-![User Settings - Preferences](../../images/user-settings/user-settings-preferences.png)
-
 ## Accessing Preferences
 
-Click your **avatar** in the top bar and pick **Preferences** (the menu links all three settings tabs directly).
+Click your **avatar** in the top bar and pick **Preferences** (the menu links the settings tabs directly). On Emby there's a fourth tab, [Emby home screen](home-screen.md), for the rows Aperture adds to your Emby home screen.
 
 ---
 
@@ -18,11 +16,11 @@ Click your **avatar** in the top bar and pick **Preferences** (the menu links al
 
 ## AI Library Names
 
-The names of your two AI Picks libraries in Emby/Jellyfin — "*YourName*'s AI Picks - Movies" and "- TV Series" by default. Changes are used at the next library update. Keep names short (they show in TV menus) and avoid characters your media server dislikes in folder names. See [Virtual Libraries](../virtual-libraries.md).
+The names of your two AI Picks libraries in Emby/Jellyfin — "*YourName*'s AI Picks - Movies" and "- TV Series" by default. These libraries are a legacy feature, off on new installs; while your server doesn't write them, this card is greyed. Changes are used at the next library update, and a name another library already uses is refused. Keep names short (they show in TV menus). See [Virtual Libraries](../virtual-libraries.md).
 
 ## AI Explanation Preference
 
-Whether each recommendation carries a **"Why *Aperture* picked this for you"** note — in the detail page's insights panel and on your media server. Your account may have this locked by an admin, in which case the card shows the effective setting with a **Reset to Default** option instead of the toggle. Changes apply when recommendations are next regenerated — turning it on doesn't backfill old runs.
+Whether each recommendation carries a **"Why *Aperture* picked this for you"** note in the detail page's insights panel (and, where the AI Picks libraries are still written, in their descriptions on your media server). Your account may have this locked by an admin, in which case the card shows the effective setting with a **Reset to Default** option instead of the toggle. Changes apply when recommendations are next regenerated — turning it on doesn't backfill old runs.
 
 ## Similarity Graph
 
@@ -43,7 +41,7 @@ Connect, sync, or disconnect your Trakt account. This card only appears when you
 
 ## Email & Notifications
 
-A toggle for receiving email notifications about your recommendations, and your email address. This card appears only when your **admin grants email notifications** for your account.
+A toggle for receiving email notifications about your recommendations, and your email address. This card appears only when your **admin grants email notifications** for your account. Aperture doesn't send any email yet; this only records your address and your choice for when it does. The address must be one plain email address.
 
 The email address starts synced from your media server account; setting a custom one **locks it** against future overwrites from Emby/Jellyfin (the helper text tells you which state you're in). Changes save as you leave the field.
 

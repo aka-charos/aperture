@@ -2,17 +2,15 @@
 
 The Movie Detail page shows everything about a specific movie — its ratings, its people, how it fits your taste, and what you can do with it. Series share the same page layout; the series-specific parts are described in [Series Details](series-detail.md).
 
-![Movie Detail Page](../images/features/movie-detail.png)
-
 ## Page Sections
 
 ### Hero
 
-The top of the page: full-width fanart backdrop, poster, title, year, and the key facts in one line.
+The top of the page: full-width fanart backdrop, poster, title, year, and the key facts in one line. The poster carries a **watched tick** once you've finished it, and the director and writers (for series, the creators) are listed under the title, linked to their pages.
 
 - **Ratings** — the community rating from your media server ("7.6 / 10"), followed by external score badges where available: Rotten Tomatoes (Tomatometer and Audience), Metacritic, IMDb, TMDB, and Letterboxd. For movies with a critic consensus, the quote appears under the badges, and an awards line where one exists.
 - **Genre chips** — clickable, and annotated by the recommender where it has something to say: "a genre you already watch a lot of" versus "new to you".
-- **Synopsis** — with a **Read full synopsis** expander for the longer plot text.
+- **Synopsis** — with a **Read full synopsis** expander for the longer plot text. If your admin has [synopsis translation](../admin/synopsis-translation.md) on, the plot appears in the language you're reading Aperture in, marked **Machine-translated**, with **Show original** one click away.
 
 ### Actions
 
@@ -23,6 +21,7 @@ The hero's action row:
 | **Open in Jellyfin / Open in Emby** | Opens the movie in your media server's app or web client |
 | **Favorite / Favorited** | Sets or clears the favorite flag **on your media server**. Favorites matter: they feed your taste profile and what the recommender excludes |
 | **Mark Watched / Mark Unwatched** | Marks the movie watched (or clears it) in your media server and Aperture's history. Unwatching asks for confirmation — it cannot be undone. Availability depends on a per-user permission |
+| **Recommend to…** | Sends the title to people you're connected to; they find it under [Watch This](watch-this.md). Only shown if an admin has connected you with someone |
 | **Trailer** | Opens the YouTube trailer in a modal |
 | **Report a problem** | Report video, audio, subtitle, or other playback issues — see below |
 
@@ -42,7 +41,7 @@ Directly under the actions, a **Community Activity** strip shows how the househo
 - **Average Viewer Progress** — how far into it viewers typically get
 - **User Reach** — what percentage of the server's users have touched it
 
-Where your admin allows it, these counts expand into a list of **who** watched and favorited it; otherwise they stay anonymous.
+The counts expand into a list of **who** watched and favorited it only for people you're allowed to see: admins see everyone, and anyone connected to others (see [Watch This](watch-this.md)) sees themselves and their connections. Everyone else sees the counts alone.
 
 ---
 
@@ -53,7 +52,7 @@ If the recommender scored this title for you, the page shows a personal insights
 - **How We Calculated Your Match** — the three factors with their weight shares: **Taste Match** (similarity to your history), **Discovery** (how different it is from what you usually watch), and **Quality** (community and critic ratings), blended, then adjusted by your franchise and genre preferences.
 - **Evidence** — "Based on your history with similar movies:" the specific titles from your history that pulled it in, linked.
 - **Variety In Your List** — how much this pick differs from the others chosen with it; this shapes the *order* of your list, not the match.
-- **Taste twin** — sometimes the reason is a person here whose taste closely overlaps yours; the panel says so and shows the rare titles you've both watched, but never names them.
+- **Taste twin** — sometimes the reason is a person here whose taste closely overlaps yours; the panel says so and shows the rare titles you've both watched. It names them only if they are one of your connections (see [Watch This](watch-this.md)); otherwise they stay anonymous.
 - **AI explanation** — "Why *Aperture* picked this for you", a natural-language paragraph, if your admin enabled it.
 
 ---
@@ -81,15 +80,13 @@ The lower-left card collects the rest, most of it clickable:
 
 | Field | Notes |
 |-------|-------|
-| **Cast / Director / Writers** | Names link to their [person pages](person-pages.md) |
-| **Created By** | For series |
+| **Cast** | Names link to their [person pages](person-pages.md) (director, writers and series creators are in the hero) |
 | **Studios** | Links to the [studio page](studio-pages.md) |
 | **Available On** | Streaming providers, where known |
 | **Keywords, Languages, Countries** | Production metadata |
 | **Cinematography / Music / Editing** | Key crew |
-| **Awards** | Notable wins and nominations |
 | **External Links** | IMDb, TMDb, TVDb |
-| **Part of Collection** | The franchise this belongs to (see the [Franchise Tracker](franchises.md)) |
+| **Part of Collection** | The franchise this belongs to; opens its [franchise page](franchises.md#a-franchise-page) |
 
 ---
 

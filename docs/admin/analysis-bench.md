@@ -25,18 +25,39 @@ The bench runs the **real generation path** (retries, pacing, contract checks) b
 - The **full prompt** is included at the end, so you can see exactly what every model answered
 - **Copy** to clipboard or **download** as `.txt`
 - **Earlier comparisons** are listed (stored in their own tables) with the prompt version each answered, and are deletable
-- A **signals table** above the answers, and a signals line under each one, count habits the prompt asks the model to avoid: paragraphs and the longest paragraph in sentences, pointing at "the sources", views with no holder ("is described as"), "rather than", announcing a question stays open, paragraphs that open by restating their question, and **told twice** — phrases that appear under two different questions, printed so you can check them (names and genre words are ignored, since a person or a genre mentioned twice is not a repeated fact), and **spill** — how often a critic, scholar, reviewer or viewer is mentioned outside the Critical Reception section, where the prompt keeps them, **semi** — semicolons, which the prompt forbids — and **rec/work** — words in Critical Reception against words in Form and Style, marked "!" when reception runs longer, which the prompt also forbids. Told twice, spill and rec/work read the model's own section labels, so an answer whose labels could not be read shows a dash there rather than a zero, and says why under its stat line: **map: none written**, or **map not read:** followed by what the model wrote. They are counts to compare, not a pass mark — each pattern also matches innocent prose. And zero is not clean: an opinion stated as a plain fact, with no critic named and no hedge, matches nothing here and has to be read
+- A **signals table** above the answers, and a signals line under each one, count habits the prompt asks the model to avoid (see [The Signals](#the-signals))
+- When the [decision model's source filter](decision-model.md#weeding-title-analysis-sources) is on, the report prints its score for every retrieved page, worst first, and which pages it dropped, with their addresses
 - Retrieval now **drops bot-check and access-wall pages** (Cloudflare challenges, "Access restricted") before they reach the prompt, so they no longer appear in the sources list or take a share of the budget. A page with the same specific title as one already kept (one book chapter fetched from two sites) is dropped too; a title that is little more than the film's name never counts as a match
+
+### The Signals
+
+| Column | Counts |
+|--------|--------|
+| **words**, **paras** | Length, marked "!" when over what that prompt version allows (a word count a little over is tolerated where the prompt says so) |
+| **longest**, **longest-w** | The longest paragraph, in sentences and in words |
+| **sources** | Pointing at the documents ("the sources say") instead of stating a fact |
+| **named** | Critics and publications named, read from this run's own documents and printed beside the count |
+| **labels** | A section label such as `[tradition]` left in the prose |
+| **split** | One question's answer scattered over paragraphs that are not next to each other |
+| **unattrib** | A view with no holder ("is described as", "is said to") |
+| **rather**, **open**, **echoes** | "Rather than"; announcing that a question stays open; a paragraph opening by restating its question |
+| **twice** | A phrase told under two different questions, printed so you can check it |
+| **spill**, **praise** | Critics and viewers, and quality words, outside the Critical Reception section |
+| **awards**, **semi** | Awards named; semicolons |
+| **rec/work** | Words in Critical Reception against words in Form and Style, "!" when reception runs longer |
+| **t/w/c/r** | Paragraphs given to Context, Form and Style, Making and Critical Reception, "!" when one is over its share |
+
+The columns that read the model's own section labels show a dash rather than a zero when those labels could not be read, and the answer says why under its stat line: **map: none written**, or **map not read:** followed by what the model wrote. An answer the contract checks rejected is marked **[UNUSABLE]** even when it has prose. These are counts to compare, not a pass mark: each pattern also matches innocent prose, and zero is not clean — an opinion stated as a plain fact, with no critic named and no hedge, matches nothing and has to be read.
 
 ## Comparing Prompt Versions
 
-Under the model list, **Prompt versions** lists every version this build carries (currently v7 to v15, where v15 is current and v10 was a draft that never went live), with the current one ticked. Tick more than one and every ticked model answers every ticked version.
+Under the model list, **Prompt versions** lists every version this build carries (currently v7 to v18, where v18 is current and v10 was a draft that never went live), with the current one ticked. Tick more than one and every ticked model answers every ticked version.
 
-**Variants** are listed under them. A variant is a different set of questions and rules for the **same** version — same title header, same documents, same output contract — written for a model that cannot hold that version's own rules. Tick one and it runs beside the versions, on the same retrieval, and its answers are labelled `v15 compact` so they cannot be mistaken for the version's own. A variant is **never** written to the library: it is a bench prompt only, and it is not a draft of the next version.
+**Variants** would be listed under them: a different set of questions and rules for the **same** version, for a model that cannot hold that version's own rules. This build carries none (the `compact` variant was folded into version 16), so the list is empty. Bench rows stored with one still read as, for example, `v15 compact`.
 
-`compact` is the one this build carries. It is about 60% of version 15's instruction length, gives each question a paragraph budget instead of asking the model to judge proportion, and is aimed at small local models — on Fear and Loathing in Las Vegas, `ornith-1.5-9b` under v15 gave the film one paragraph and its reception two, which is the proportion v15 states as a hard cap.
+When a **draft** of the next version exists it is listed as **draft — bench only**. Only the bench can run it: the library keeps writing with the current version until the draft is promoted in a later release. This build has no draft.
 
-A version marked **draft — bench only** is the next prompt being tested. Only the bench can run it: the library keeps writing with the current version, and no stored analysis is retired until the draft is promoted in a later release. Bench the draft against the current version on several titles and models first — that is what it is for.
+A new prompt version does not by itself rewrite the library. Stored analyses are rewritten only when they are older than the oldest version still considered usable (currently v17), so a v17 analysis stays as it is under v18.
 
 - The sources are **retrieved once** and every version's prompt is built from them, so the prompts are identical down to the TASK line and differ only in their questions and rules. A difference between two answers from one model is therefore the prompt
 - The report groups each model's answers together, labels each one with its version (`deepseek-v4.1-flash · v8`, `· v9`), and puts them on adjacent rows of the signals table

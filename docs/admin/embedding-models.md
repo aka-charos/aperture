@@ -2,8 +2,6 @@
 
 Configure which AI model generates the vectors behind similarity, recommendations, search, and the Media Graph — and manage the vector storage that results.
 
-![Admin Settings - AI/LLM](../images/admin/admin-settings-ai-llm.png)
-
 ## Where It Lives
 
 - The **Embeddings** role card: Admin console → **AI models** → **Providers & roles** (`/admin/ai/roles`)
@@ -21,11 +19,11 @@ After switching models, run (in order, via [Jobs](jobs-overview.md)):
 
 1. `generate-movie-embeddings`
 2. `generate-series-embeddings` (embeds **series and episodes**)
-3. `refresh-embedding-centering`
-4. `rebuild-taste-profiles` — profiles are points in the *old* vector space until rebuilt
+3. `refresh-embedding-centering`: both embedding jobs already re-centre the set when they finish, so this is only needed if their logs report that centring failed. The Embeddings page lists it as a step, and running it is harmless.
+4. `rebuild-taste-profiles` — profiles are points in the *old* vector space until rebuilt, and nothing else moves them for up to 30 days
 5. `generate-movie-recommendations` / `generate-series-recommendations`
 
-The Embeddings page states the same sequence.
+The same applies to changing the **retrieval mode** on the Embeddings role card: each mode is its own vector set.
 
 ## Episode Embeddings
 

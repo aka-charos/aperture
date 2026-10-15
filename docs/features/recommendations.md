@@ -2,8 +2,6 @@
 
 The My Recommendations page shows AI-generated picks personalized to your taste, based on your watch history, ratings, and profile.
 
-![Recommendations Page](../images/features/recommendations.png)
-
 ## Accessing Recommendations
 
 Navigate to **Recommendations** in the sidebar (sparkle icon).
@@ -38,14 +36,14 @@ The **Regenerate** button re-runs recommendations for you, right now — no need
 
 ## Reading a Pick
 
-- **Rank badge** — a numbered badge (#1, #2, …), the same badge that's burned into the poster overlays of your AI Picks library in your media server
+- **Rank badge** — a numbered badge (#1, #2, …), your list's order
 - **Match score** — "Match Score: 87%" against your taste
 - **Score bars** (list view) — **Similarity**, **Novelty**, and **Rating** shown separately
 - **Reason line** — a short "why this made your list" note
 - **Watch trailer / View on TMDb** — quick actions on each pick
 - **Watched badge** — anything you've already seen, so it can't surprise you (picked titles exclude it; anything showing here was watched after the run)
 
-A few picks aren't driven by the scores at all: some come from **someone here with taste like yours** (a taste twin — never named), some from **interests you've stated** in your profile, and some are **critically acclaimed** titles the run reserves a slot for. The reason line says which.
+A few picks aren't driven by the scores at all: some come from **someone here with taste like yours** (a taste twin — named only if they're one of your [connections](watch-this.md)), some from **interests you've stated** in your profile, and some are **critically acclaimed** titles the run reserves a slot for, when your admin has switched that on. The reason line says which.
 
 ---
 
@@ -86,7 +84,7 @@ You can customize these (or switch to your own weights entirely) in [AI Algorith
 Content is excluded if:
 
 - You've already watched it — played, or progressed at least 5% into it
-- It's in a library your admin excluded
+- It's in a library your admin excluded, or one the media server doesn't let your account open (whether you get movie picks, series picks or both follows from the libraries you can open)
 - You've favorited it — it's still scored for transparency, but never picked (you've already found it)
 
 How **disliked** titles are treated — excluded entirely, or penalized but allowed — is your choice in [AI Algorithm Settings](user-settings/ai-algorithm.md).
@@ -95,13 +93,9 @@ How **disliked** titles are treated — excluded entirely, or penalized but allo
 
 ## Recommendations in Your Media Server
 
-Your picks also appear as libraries in Emby/Jellyfin:
+On Emby, your picks can also appear as **rows on your Emby home screen** — one for movies, one for series — when your admin has switched home rows on. You can switch them off or move them on the **Emby home screen** tab of your settings; see [Emby Home Screen](user-settings/home-screen.md).
 
-- Default names: "*YourName*'s AI Picks - Movies" and "- TV Series"
-- Sorted by recommendation rank; poster overlays carry the rank badge
-- You can rename them per user under [Preferences](user-settings/preferences.md) → AI Library Names
-
-See [Virtual Libraries](virtual-libraries.md) for how these are built.
+Some servers still use the older **AI Picks libraries** ("*YourName*'s AI Picks - Movies" / "- TV Series"), sorted by rank with the rank burned into the posters. That output is being phased out and is off on new installs; see [Virtual Libraries](virtual-libraries.md).
 
 ---
 

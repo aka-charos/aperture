@@ -2,6 +2,8 @@
 
 This guide covers installing and configuring Aperture using Docker Desktop on Windows when your media server (Emby or Jellyfin) is running directly on Windows (not in a container).
 
+> **The output folder is only for legacy library output.** New installs start with the STRM / symlink libraries switched off: recommendations are read in the app and, on Emby, shown as [home rows](home-rows.md), which need no output folder, no shared path and no extra Emby library. Everything below about `C:\ApertureLibraries`, STRM mode and adding libraries to Emby applies only if you switch that output on afterwards in [Output format](output-format.md).
+
 ## Overview
 
 ```
@@ -276,7 +278,11 @@ Or use `http://localhost:3456` from the same machine.
 
 > **Important:** Use `host.docker.internal` instead of `localhost`. This special hostname allows Docker containers to reach services running on the Windows host.
 
-### File Locations
+### File Locations and Output Format (only for legacy libraries)
+
+The setup wizard no longer asks for these. If you want the legacy libraries, finish the wizard, switch on **Write STRM / symlink libraries** in Admin console → Recommendations → Output format, and set the two pages as below.
+
+#### File Locations
 
 | Setting | Value |
 |---------|-------|
@@ -286,7 +292,7 @@ Examples:
 - Local: `C:\ApertureLibraries\`
 - Network: `M:\Media\ApertureLibraries\` (use drive letter, not UNC)
 
-### Output Format — CRITICAL!
+#### Output Format — CRITICAL!
 
 | Setting | Value |
 |---------|-------|
@@ -297,7 +303,7 @@ Examples:
 
 ---
 
-## Step 7: Add Libraries to Emby
+## Step 7: Add Libraries to Emby (legacy output only)
 
 After Aperture generates recommendations:
 

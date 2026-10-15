@@ -2,10 +2,6 @@
 
 The sidebar collapses to a slim icon rail when you want the content to take over the screen.
 
-![Sidebar Expanded](../images/features/sidebar-expanded.png)
-
-![Sidebar Collapsed](../images/features/sidebar-collapsed.png)
-
 ## Collapsing and Expanding
 
 Two ways to toggle:

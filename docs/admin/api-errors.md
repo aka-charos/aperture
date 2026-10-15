@@ -2,8 +2,6 @@
 
 How integration failures surface to admins, and how to clear them.
 
-![Admin Settings - Integrations](../images/admin/admin-settings-setup-integrations.png)
-
 ## Where It Appears
 
 An **error alert** mounts inside the admin shell and shows only on **Integrations** pages, listing the most recent failures (up to 5) with a detected-at timestamp and an indicator chip elsewhere in the shell. It's UI-only — no email or webhook notification.

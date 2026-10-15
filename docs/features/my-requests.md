@@ -4,6 +4,8 @@
 
 Requests are fulfilled through your server's *Seerr integration (Jellyseerr/Overseerr)*, which your administrator configures. The page needs it; without Seerr there is nothing to request with. See [Seerr Integration](../admin/seerr.md) on the admin side.
 
+Aperture makes requests **as you**, on your own Seerr account, so Seerr's own rules for you apply: a request may wait for approval rather than go straight through, and a quota or missing permission is shown in Seerr's own words.
+
 ---
 
 ## The Requests tab
@@ -28,6 +30,7 @@ You can request content from several places; all of it lands here:
 - **Search & request by name** — on the My Requests page, search your Seerr catalog for anything at all — including titles Aperture's Discovery never surfaced — and request it. These are recorded as *direct requests*.
 - **Person pages** — the *Not in your library* section of an actor's or director's page can request any of their missing titles (for series, you pick the seasons). See [Person Pages](person-pages.md).
 - **Series detail pages** — the *missing episodes* card can request the seasons your server doesn't have. See [Series Details](series-detail.md).
+- **Franchise pages** — the *Not in your library* films of a movie collection. See [Franchise Tracker](franchises.md#a-franchise-page).
 
 ---
 
@@ -39,4 +42,6 @@ If a title misbehaves — wrong audio track, missing subtitles, a broken file �
 2. For a series, optionally scope it to a season and episode.
 3. Add a message if it helps, and send.
 
-The report is passed to Seerr, where your administrator triages it. The **Issues** tab lists the problems you've reported and their current status; administrators see reports from all users.
+The report is filed in Seerr under your own Seerr account, where your administrator triages it. The **Issues** tab lists the problems you've reported and their current status, with the replies on each one, and you can **reply** from here; administrators see reports from all users.
+
+Reporting needs your Aperture account to be linked to a Seerr account. If it isn't, the tab says so — ask an admin to link it — rather than filing the report under someone else's name.

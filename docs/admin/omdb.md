@@ -2,8 +2,6 @@
 
 Connect to the Open Movie Database (OMDb) for Rotten Tomatoes (Tomatometer, audience score, consensus), Metacritic, IMDb ratings/votes, awards, languages/countries, and longer plot text.
 
-![Admin Settings - Integrations](../images/admin/admin-settings-setup-integrations.png)
-
 ## Accessing Settings
 
 Admin console → **Integrations** → **OMDb** (`/admin/integrations/omdb`).

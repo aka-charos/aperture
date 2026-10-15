@@ -2,8 +2,6 @@
 
 The admin side of the [Shows You Watch](../features/shows-you-watch.md) feature — one switch.
 
-![Admin Settings - Shows You Watch](../images/admin/admin-settings-shows-you-watch.png)
-
 ## Where It Lives
 
 Admin console → **Recommendations** → **Shows You Watch** (`/admin/recommendations/watching`).

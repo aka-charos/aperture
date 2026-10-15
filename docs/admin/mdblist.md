@@ -2,8 +2,6 @@
 
 Connect to MDBList for curated scores (Letterboxd, MDBList ratings), streaming providers, keywords, and as a [Top Picks](top-picks.md) popularity source.
 
-![Admin Settings - Integrations](../images/admin/admin-settings-setup-integrations.png)
-
 ## Accessing Settings
 
 Admin console → **Integrations** → **MDBList** (`/admin/integrations/mdblist`).

@@ -2,8 +2,6 @@
 
 Protect your data with automatic and manual backups, and restore from the admin panel.
 
-![Admin Settings - System](../images/admin/admin-settings-system.png)
-
 ## Where It Lives
 
 Admin console → **Operations** → **Backup & restore** (`/admin/ops/backup`). The setup wizard's first step can also restore a backup into a fresh instance.

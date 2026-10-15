@@ -17,7 +17,7 @@ Admin console → **Integrations** → **Outgoing email** (`/admin/integrations/
 | **Accept a self-signed certificate** | Keeps encryption but skips checking the server's identity. Only for a mail server you run yourself. |
 | **Username / Password** | Leave the username blank for a relay that takes mail without a login. With a username set, the login is always attempted, even if the server does not advertise it, so a wrong password fails the test instead of slipping through. The password is masked once saved. It is only ever sent to the server it was saved for, over a connection at least as secure as the one it was saved with: change the server, switch to **None**, or accept a self-signed certificate, and you must enter it again. |
 | **From address** | Most providers only accept an address that belongs to the account you log in with |
-| **From name** | Blank uses the instance name (Settings → System), so a rename follows |
+| **From name** | Blank uses the instance name ([Instance name & logo](branding.md)), so a rename follows |
 | **Public address** | The address people open the app at, used for links in emails. Leave blank to use `APP_BASE_URL`. A local address like `localhost` is refused. While neither is set, or `APP_BASE_URL` is a local address, emails carry no links rather than links that go nowhere. |
 | **EHLO name** | The name Aperture introduces itself with. Leave it blank unless the mail server refuses the default: inside Docker that default is `[127.0.0.1]`, which strict servers reject or score as spam. |
 

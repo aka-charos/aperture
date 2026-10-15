@@ -2,8 +2,6 @@
 
 Configure every AI capability in one place. AI is organized by **role** — each role has its own provider, model, and keys, on one page of cards.
 
-![Admin Settings - AI/LLM](../images/admin/admin-settings-ai-llm.png)
-
 ## Where It Lives
 
 Admin console → **AI models** → **Providers & roles** (`/admin/ai/roles`).
@@ -23,20 +21,24 @@ The setup wizard requires the first four to be configured before it will finish;
 
 ## Per-Role Cards
 
-Each card holds: **provider → model → API key** (per-role keys; a provider's key isn't shared between roles), plus:
+Each card holds **provider → model → API key**, plus whatever that role and model support:
 
-- **Spare/fallback API keys** — extra keys per provider that rotate in when the primary hits a quota or auth error (web-search grounding depends on this: Gemini's free tier is what usually breaks)
-- **Custom models** — "Add Custom Model…" registers a model keyed to *(provider, role)*, so custom entries don't leak across roles
-- **Reasoning effort** (where the model supports it) and **retrieval mode** (input type) on the embeddings card
-- **Temperature** and **Top P** on the Title analysis card, and only when the chosen model's catalogue entry declares them — 87 of OpenRouter's 439 models do not accept temperature at all, so the fields appear per model rather than per provider. Empty means the provider default, which is what every role used before these existed. The number in a grey field is a suggestion, not a stored value; move one of the two at a time, or a change cannot be attributed.
-- **Test** — sends a real (billable) request tagged as a settings test; for embeddings it reports the **measured vector width** and whether a matching storage table exists
+- **API keys** are entered per card, and a role without a key of its own borrows the key of another role on the same provider. The Web Search and Title Analysis keys are never lent out, because they can spend Google grounding quota you may want kept on a separate project.
+- **Spare API keys** (Web Search and Title Analysis) rotate in, in order, when the key above runs out of quota. For Google each must come from a different Google project, since keys in one project share one limit.
+- **Custom models**: **Add Custom Model…** registers a model keyed to *(provider, role)*, so custom entries do not carry across roles. For LM Studio it lists the models installed on the server; for an embeddings model it measures the vector width and picks the matching table. A model cannot be added until it tests successfully.
+- **Reasoning effort** on the Text Generation and Title Analysis cards, when the chosen model offers it. The levels listed are the ones that model accepts; **Provider default** sends nothing. A reasoning model bills its scratchpad from the same output budget as the answer, so lowering this can stop answers being cut short.
+- **Service tier** on the language roles (Chat, Text Generation, Exploration, Title Analysis) when the provider is OpenRouter: **Flex** is cheaper and slower and is never moved to standard capacity, so when the provider is busy a flex call fails rather than costing more. The card says whether the model has a flex endpoint.
+- **Temperature** and **Top P** on the Title Analysis card, and only when the chosen model's catalogue entry declares them — many OpenRouter models do not accept temperature at all, so the fields appear per model rather than per provider. Empty means the provider default. The number in a grey field is a suggestion, not a stored value; move one of the two at a time, or a change cannot be attributed.
+- **Fallback models** and **call spacing** on the Title Analysis card: models tried in order when the first fails, and a pause between calls for a rate-limited free plan (hidden for LM Studio and Ollama, which have no rate limit).
+- **Retrieval mode** (and, for a mode on OpenRouter, a pinned **upstream**) on the Embeddings card, for models that support one. Each mode is a separate set of vectors; see [Embedding models](embedding-models.md).
+- **Test** sends a real (billable) request tagged as a settings test. For embeddings it reports the **measured vector width** and whether a matching storage table exists; on OpenRouter it also reports the model's reasoning levels and flex availability, and on flex sends one request to check which tier served it.
 
-Model catalogs ship with the app — OpenAI, Anthropic, Google, Groq, Deepseek, OpenRouter, Z.AI, HuggingFace, Ollama, LM Studio (auto-discovers installed models), and generic OpenAI-compatible endpoints.
+Model catalogs ship with the app: OpenAI, Anthropic, Google, Groq, Deepseek, OpenRouter, Z.AI, Hugging Face, Ollama, LM Studio (reads the installed models off the server), and generic OpenAI-compatible endpoints.
 
 ## Quotas and Free Tiers
 
-- The web-search role shows a **free-tier usage panel** with a quota that resets at **midnight US/Pacific**; limits and per-key cooldowns are handled automatically
-- A **free-tier toggle** on cards enables per-call pacing for rate-limited free plans
+- The Web Search card shows a **usage panel** with a quota that resets at **midnight US/Pacific**. **These keys are on the free tier** only decides which ceilings that panel draws; nothing is throttled either way, and keys rotate on real quota errors.
+- Rate limits the provider actually reports override the built-in free-tier figures.
 
 ## Where the Money Goes
 

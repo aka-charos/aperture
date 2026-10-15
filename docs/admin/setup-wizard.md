@@ -2,8 +2,6 @@
 
 The Setup Wizard guides initial Aperture configuration in 8 steps. It appears automatically on first access (from local-network addresses only) and can be re-run at any time via the **Re-run Setup Wizard** button pinned to the bottom of the admin nav column.
 
-![Admin Overview](../images/admin/admin-overview.png)
-
 ## Before You Start
 
 Have ready: your media server's URL and **API key** (Emby: Dashboard → Advanced → API Keys; Jellyfin: Dashboard → API Keys) and an **AI provider API key** (the wizard requires one — OpenAI is the default suggestion, but every provider catalog is offered).
@@ -29,11 +27,11 @@ Media server **type** (Emby/Jellyfin), **URL**, and **API key**, plus:
 
 Per-library **enable switches** fetched from your server, grouped **Movies / TV**. Bulk controls — **Refresh**, **Enable All**, **Disable All** — live right here in the wizard. Everything disabled is invisible to Aperture (see [Libraries](libraries.md)).
 
-> **No paths, output format or mount checks.** Earlier versions asked here where to write STRM/symlink libraries, which format to use, and then validated the `/aperture-libraries` and `/media` mounts. That output is legacy and a **new install starts with it switched off** — recommendations are read in the app and, on Emby, shown as home rows (Admin → Recommendations → Emby Home Rows). An operator who still wants the libraries switches them on in [Output format](output-format.md) and sets [File locations](file-locations.md) there.
+> **No paths, output format or mount checks.** Earlier versions asked here where to write STRM/symlink libraries, which format to use, and then validated the `/aperture-libraries` and `/media` mounts. That output is legacy and a **new install starts with it switched off** — recommendations are read in the app and, on Emby, shown as [home rows](home-rows.md). An operator who still wants the libraries switches them on in [Output format](output-format.md) and sets [File locations](file-locations.md) there.
 
 ### 4. Users
 
-Import and enable users, toggling **Movies / Series** per user. The wizard **refuses to disable the last enabled admin**. Users can also be managed later (see [User management](user-management.md)).
+Import users and switch **Recommendations** on for the ones who should get them. Whether that means movies, series or both follows from the libraries each account can see on the media server. Here access follows the switch: a user left off cannot sign in until you give them access later. Admins start switched on, and the wizard **refuses to switch off the last enabled admin**. Afterwards, access and every feature are separate switches on the [Users](user-management.md) page.
 
 ### 5. Top Picks
 
@@ -49,7 +47,7 @@ The wizard queues the kickoff pipeline — **8 jobs**: library syncs (movies, se
 
 ### 8. Done
 
-What to do next — sign in to see recommendations, and on Emby put them on home screens (Admin → Recommendations → Emby Home Rows) — the schedules that were set, and which features just unlocked. From here, the [Post-setup checklist](post-setup-checklist.md) takes over.
+What to do next — sign in to see recommendations, and on Emby put them on home screens ([Emby home rows](home-rows.md)) — the schedules that were set, and which features just unlocked. From here, the [Post-setup checklist](post-setup-checklist.md) takes over.
 
 ---
 

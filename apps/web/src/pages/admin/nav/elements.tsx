@@ -23,6 +23,7 @@ import ImageIcon from '@mui/icons-material/Image'
 import LiveTvIcon from '@mui/icons-material/LiveTv'
 import LocalMoviesIcon from '@mui/icons-material/LocalMovies'
 import ManageSearchIcon from '@mui/icons-material/ManageSearch'
+import MenuBookIcon from '@mui/icons-material/MenuBook'
 import MemoryIcon from '@mui/icons-material/Memory'
 import MovieIcon from '@mui/icons-material/Movie'
 import OutputIcon from '@mui/icons-material/Output'
@@ -382,5 +383,11 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
   database: {
     icon: <DnsIcon />,
     Component: lazy(() => import('@/pages/admin/routes/DatabaseRoute')),
+  },
+
+  // -------------------------------------------------------------------- help
+  guide: {
+    icon: <MenuBookIcon />,
+    Component: section(() => import('@/pages/admin/help/AdminGuidePage'), 'AdminGuidePage'),
   },
 }

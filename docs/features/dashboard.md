@@ -2,8 +2,6 @@
 
 The Dashboard is your home screen: a time-boxed snapshot of your viewing, your AI picks, what's airing next, and what's popular on the server.
 
-![Dashboard](../images/features/dashboard.png)
-
 ## Greeting & Quick Stats
 
 A time-of-day greeting heads the page, above a stats bar covering the **last 30 days** (it says so, and links **More details** to [Watch Stats](watch-stats.md) for the all-time view):
@@ -21,11 +19,15 @@ A time-of-day greeting heads the page, above a stats bar covering the **last 30 
 
 Two carousels — **Your AI Movie Recommendations** and **Your AI Series Recommendations** ("Personalized picks based on your taste"):
 
-- **Rank badges** — numbered, matching your [AI Picks libraries](recommendations.md)
+- **Rank badges** — numbered, matching the order on [My Recommendations](recommendations.md)
 - **Rate from the poster** — hover and pick stars (1–10)
 - **Click any poster** for the detail page and its insights panel
 
 Empty until your first recommendation run; the empty state says so.
+
+## Recently Watched by Your Connections
+
+If an admin has connected your account with someone else's (see [Watch This](watch-this.md)), each connection gets a carousel — **Recently watched by {name}**, "From your connections" — showing what they played lately. A Movie/Series chip marks each title, and only titles from libraries you can open are shown.
 
 ## Upcoming Episodes
 

@@ -1,8 +1,6 @@
 # Browse Movies & Series
 
-The Browse page is your library explorer: every title you have, with deep filtering, sorting, presets, and a People tab.
-
-![Browse Movies Grid View](../images/features/browse-movies-grid.png)
+The Browse page is your library explorer: every title in the libraries your account can open, with deep filtering, sorting, presets, and a People tab.
 
 ## Page Layout
 
@@ -30,7 +28,7 @@ The **Filters** button (it shows a count when anything is active) opens the full
 |---------|---------|
 | **Scores** | Community rating, Rotten Tomatoes critic score, Metacritic |
 | **Year** | Release-year range |
-| **Library & Audience** | **Watch status** (Any / Watched / Unwatched — unwatched means never played or under 5% progress), **min/max watchers** (how many distinct users on your server have watched it) |
+| **Library & Audience** | **Watch status** (Any / Watched / Unwatched — watched means you finished playing it; a title you only favourited, or stopped partway through, counts as unwatched), **min/max watchers** (how many distinct users on your server have played it) |
 | **Runtime** | Length range (movies) |
 | **Video quality** | Resolution / formats present in your files |
 | **Seasons** | Season-count range (series) |

@@ -25,13 +25,13 @@ Admin console → **Recommendations** → **Discovery tuning** (`/admin/recommen
 
 ## Shared Candidate Pool
 
-- **Pool ceiling** (default 3,000, up to 20,000) and **drop titles unseen for N days** (default 30, 1–365) — the shared pool is pruned per run before personalized fetching merges in
+- **Pool ceiling** (default 3,000, 100–20,000) and **drop titles unseen for N days** (default 30, 1–365) — the shared pool is pruned per run before personalized fetching merges in. The ceiling is a memory bound on one person's run, not a quality judgement: past it, the titles a source returned most recently are kept
 
 ## Ranking Weights — and the Honesty Table
 
 Three sliders (**Taste match** 0.5, **Popularity** 0.3, **Recency** 0.2) with live % shares. Beneath them, **"What the weights actually do"** shows the *measured* share per term from real runs — because the configured split is not what lands: a fixed **source-quality term (10%)** has no slider, so the defaults actually blend to ≈45.5 / 27.3 / 18.2 / 9.1. Cells drift-flagged at ≥5 points. This is reported, not corrected — a measured correction was simulated and rejected.
 
-Changes apply on the next run; **Refresh** on the Discover page shows them sooner.
+Changes apply on the next run (`generate-discovery-suggestions`, daily at 06:00); **Refresh** on the Discover page shows them sooner. Discover runs only for users with the **Discover** permission whose media-server account is active, and its taste match uses each user's taste profile, which `rebuild-taste-profiles` keeps current for them too.
 
 ## What's Not Configurable
 

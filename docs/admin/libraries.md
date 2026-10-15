@@ -2,8 +2,6 @@
 
 Choose which media-server libraries Aperture analyzes — everything else stays out of sync, recommendations, and stats.
 
-![Admin Settings - Media Server](../images/admin/admin-settings-setup-media.png)
-
 ## Accessing Settings
 
 Admin console → **Library** → **Libraries** (`/admin/library/libraries`). The setup wizard's Libraries step configures the same thing initially, with the same bulk controls.

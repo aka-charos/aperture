@@ -2,8 +2,6 @@
 
 Playlists are **AI-generated recommendation lists** — you describe the vibe, Aperture picks the titles, and the finished playlist lands in your Emby/Jellyfin server, visible **only to you**. For a list everyone sees, build a [Collection](collections.md) instead.
 
-![Playlists Page](../images/features/playlists.png)
-
 ## Accessing Playlists
 
 Navigate to **Playlists** in the sidebar (playlist icon).
@@ -47,6 +45,7 @@ Refreshing re-runs the same preview, so the server copy never changes without yo
 - **Remove** — per item from the view dialog
 - **Edit settings** — genres, seeds, preferences
 - **Delete** — removes the playlist from Aperture *and* from your media server
+- **Show on my Emby home screen** — on Emby, tick **Also show it on my Emby home screen** and the playlist becomes a row on your home screen after the next home-screen sync (only you see it, and the row isn't kept in playlist order). Your admin has to have playlist rows switched on; see [Emby Home Screen](user-settings/home-screen.md)
 
 ---
 
@@ -57,7 +56,7 @@ Created from elsewhere and view-only:
 - **From the Media Graph** — explore, then **Create playlist** to bundle the current items ("Create Playlist from Graph")
 - **From chat** — assistant answer carousels offer **Create Playlist from Suggestions**, pre-selecting the titles it recommended
 
-Either way the dialog lists the items (adjustable at creation), and can generate a name and description with AI. The playlist is created on your media server too.
+Either way the dialog lists the items (adjustable at creation), and can generate a name and description with AI. The playlist is created on your media server too. A playlist made from chat suggestions can also go on your Emby home screen; one made from the Media Graph can't.
 
 ---
 

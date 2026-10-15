@@ -1,18 +1,21 @@
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Box,
+  Button,
   CircularProgress,
   Drawer,
   GlobalStyles,
   IconButton,
   Link,
   Paper,
+  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
 } from '@mui/material'
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import MenuIcon from '@mui/icons-material/Menu'
 import NavigateNextIcon from '@mui/icons-material/NavigateNext'
 import { AdminErrorBoundary } from './AdminErrorBoundary'
@@ -26,6 +29,14 @@ import {
   adminEntryPath,
   adminEntriesInGroup,
 } from '@/pages/admin/nav/registry'
+
+/**
+ * Lazy, and mounted only once asked for: it carries the whole admin guide
+ * (~170 KB of markdown), which an admin who never opens it never downloads.
+ */
+const AdminHelpDrawer = lazy(async () => ({
+  default: (await import('@/pages/admin/help/AdminHelpDrawer')).AdminHelpDrawer,
+}))
 
 const NAV_WIDTH = 250
 
@@ -49,8 +60,11 @@ export function AdminShell() {
   const { open: openSearch } = useAdminSearch()
   const isNarrow = useMediaQuery(theme.breakpoints.down('md'))
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [helpRequested, setHelpRequested] = useState(false)
 
   const entry = adminEntryForPath(location.pathname)
+  const helpDocs = entry?.docs
   const group = ADMIN_GROUPS.find((g) => g.id === entry?.group)
 
   /**
@@ -69,6 +83,7 @@ export function AdminShell() {
 
   useEffect(() => {
     setDrawerOpen(false)
+    setHelpOpen(false)
   }, [location.pathname])
 
   /**
@@ -231,7 +246,36 @@ export function AdminShell() {
                 </Typography>
               </Box>
             )}
+            {/* On the breadcrumb row so every section offers it in the same
+                place, including the five that draw their own heading. */}
+            {helpDocs && helpDocs.length > 0 && (
+              <Tooltip title={t('adminDocs.help.tooltip')}>
+                <Button
+                  size="small"
+                  startIcon={<HelpOutlineIcon fontSize="small" />}
+                  onClick={() => {
+                    setHelpRequested(true)
+                    setHelpOpen(true)
+                  }}
+                  sx={{ ml: 'auto', flexShrink: 0, textTransform: 'none', color: 'text.secondary' }}
+                >
+                  {t('adminDocs.help.button')}
+                </Button>
+              </Tooltip>
+            )}
           </Box>
+
+          {helpRequested && helpDocs && helpDocs.length > 0 && entry && (
+            <Suspense fallback={null}>
+              <AdminHelpDrawer
+                // A new section starts on its own first page with no history.
+                key={entry.id}
+                open={helpOpen}
+                docs={helpDocs}
+                onClose={() => setHelpOpen(false)}
+              />
+            </Suspense>
+          )}
 
           {/* The app bar carries the title at md+; below it there is no room,
               so the page states its own name. Skipped for the five that draw

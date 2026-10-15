@@ -2,8 +2,6 @@
 
 The Series Detail page shows everything about a TV series — its episodes and your progress through them, what's missing from your server, and how it fits your taste. It shares its layout with [Movie Details](movie-detail.md).
 
-![Series Detail Page](../images/features/series-detail.png)
-
 ## Page Sections
 
 ### Hero
@@ -13,6 +11,7 @@ Full-width fanart backdrop, poster, title, year, and the key facts in one line.
 - **Status chip** — **Continuing** (green) while new episodes are still coming; otherwise **Ended**
 - **Ratings** — community rating ("8.4 / 10"), critic score where available, and the external badges (Rotten Tomatoes, Metacritic, IMDb, TMDB, Letterboxd) with the critic consensus quote
 - **Created By** — the show's creator, linked to their person page
+- **Synopsis** — translated into your language, with **Show original**, when your admin has synopsis translation on
 - **Seasons / Episodes / avg per episode** chips
 - **Genre chips** — annotated by the recommender ("a genre you already watch a lot of" vs "new to you")
 
@@ -24,6 +23,7 @@ Full-width fanart backdrop, poster, title, year, and the key facts in one line.
 | **Favorite / Favorited** | Sets the favorite flag on your media server — for a series, this is also how it lands on [Shows You Watch](shows-you-watch.md) |
 | **Add to Watching / Watching** | Toggles the series on your Shows You Watch list directly |
 | **Trailer** | Opens the YouTube trailer in a modal |
+| **Recommend to…** | Sends the series to people you're connected to; they find it under [Watch This](watch-this.md) |
 | **Report a problem** | Report video/audio/subtitle issues, scoped to a season or episode if you like |
 
 The 1–10 star rating sits on the poster and in the hero. Unlike movies, rating a series never asks when you watched it.
@@ -59,13 +59,13 @@ A **"Not on your server"** card appears when aired episodes aren't available to 
 
 ## Community Activity
 
-A strip under the actions shows how the household engages with the series — watched/favorited counts, **Completed**, **episode plays**, and **Average Viewer Progress** across all episodes. Where your admin allows it, the counts expand to named watchers.
+A strip under the actions shows how the household engages with the series — watched/favorited counts, **Completed**, **episode plays**, and **Average Viewer Progress** across all episodes. Admins, and anyone connected to others, can expand the counts to the names of the watchers they're allowed to see (see [Movie Details](movie-detail.md#community-activity)).
 
 ---
 
 ## Recommended For You
 
-If the recommender scored this series for you, the insights panel explains the pick — **Recommended For You** or **How This Fits Your Taste**, the **Taste Match / Discovery / Quality** breakdown with weight shares, evidence from your history, the **taste-twin** note (without naming anyone), and the AI explanation if enabled. See [Movie Details](movie-detail.md) for the full tour.
+If the recommender scored this series for you, the insights panel explains the pick — **Recommended For You** or **How This Fits Your Taste**, the **Taste Match / Discovery / Quality** breakdown with weight shares, evidence from your history, the **taste-twin** note (naming them only if they are one of your connections), and the AI explanation if enabled. See [Movie Details](movie-detail.md) for the full tour.
 
 A **Series Analysis** may also be available — see [Title Analysis](title-analysis.md).
 

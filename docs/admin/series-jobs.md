@@ -2,8 +2,6 @@
 
 The TV Series tab (`/admin/ops/jobs`) — the series-side pipeline, including episodes.
 
-![Admin Jobs](../images/admin/admin-jobs.png)
-
 ## The Pipeline
 
 | Job | Default schedule | What it does |
@@ -12,7 +10,7 @@ The TV Series tab (`/admin/ops/jobs`) — the series-side pipeline, including ep
 | `sync-series-watch-history` | **every hour** | Episode-level play states and progress for all users — hourly because episode data changes faster than movies |
 | `generate-series-embeddings` | every 6 h at :20 | Embeds **series and episodes** — episode vectors power the assistant's episode search |
 | `generate-series-recommendations` | **weekly, Sunday 04:00** | Score and select per-user series picks (activity gate applies to scheduled runs) |
-| `sync-series-libraries` | every 3 h at :30 | Rebuild the "AI Picks - TV Series" libraries from the newest completed run |
+| `sync-series-libraries` | every 3 h at :30 | Rebuild the legacy "AI Picks - TV Series" libraries from the newest completed run. Writes nothing while legacy library output is off ([Output format](output-format.md)) |
 | `enrich-metadata` | every 6 h | TMDb+OMDb enrichment (Global tab — shared with movies) |
 
 Jobs are **not chained** — the staggering is for load-spreading, not sequencing. The one ordering rule that matters: **watch history before recommendations** (runs exclude watched episodes; the job syncs history itself as a safety net, but after a big import, run history manually first).
@@ -37,7 +35,7 @@ The largest embedding tables in a real library are the **episode** tables — a 
 
 ## Season 00 (Specials) Handling
 
-The library writer keeps specials from jumping the queue on Emby shelves:
+In the legacy libraries, the writer keeps specials from jumping the queue on Emby shelves:
 
 - Season 00 is written as a **hidden placeholder** entry with a future `dateadded`, so it sorts last rather than first
 - Its NFO plot carries an explanatory note, so it's identifiable if it's ever seen
@@ -45,7 +43,8 @@ The library writer keeps specials from jumping the queue on Emby shelves:
 
 ## Reading the Results
 
-- `selected_rank` from the newest completed run drives the AI Picks library ordering and burned-in poster badges
+- `selected_rank` from the newest completed run is the order on My Recommendations, and in the legacy AI Picks libraries and their poster badges; [Emby home rows](home-rows.md) read the same run
+- A viewer with no series library they can open gets no series run
 - A failed run leaves the previous picks in place — check the run history and logs before assuming "no recommendations"
 - Series watched-state exclusions treat **5%+ episode progress** as "watched" for recommendation purposes
 

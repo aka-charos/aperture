@@ -32,7 +32,7 @@ Summary tiles: **Initial setup**, **Weekly**, and **Monthly** (weekly × 4.33). 
 
 ## Pricing Catalog
 
-Prices come from the **Helicone LLM-costs API**, cached for 24 hours; a status/refresh control exists for the cache. Internal provider/model ids are mapped to catalog entries — models that don't map are the "unknown" rows above.
+Prices come from the **Helicone LLM-costs API**, cached for 24 hours and refreshed weekly by the `refresh-ai-pricing` job. Internal provider/model ids are mapped to catalog entries — models that don't map are the "unknown" rows above. **OpenRouter models are priced from OpenRouter's own catalogue instead**, by exact model id (a `:free` variant is priced differently from the paid one). Custom models carry no price, so they show as unknown.
 
 ---
 

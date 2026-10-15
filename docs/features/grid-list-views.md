@@ -2,10 +2,6 @@
 
 Most catalog pages offer two display modes — **Grid View** (posters) and **List View** (detailed rows). Your choice is remembered per page, per account.
 
-![Browse Grid View](../images/features/browse-movies-grid.png)
-
-![Browse List View](../images/features/browse-movies-list.png)
-
 ## Where Views Are Available
 
 | Page | Grid | List | List default? |

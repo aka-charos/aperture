@@ -2,15 +2,13 @@
 
 After the Setup Wizard, work through this to get Aperture fully operational.
 
-![Admin Jobs](../images/admin/admin-jobs.png)
-
 ## 1. Users
 
 **Access → Users** (`/admin/access/users`):
 
 - Users sync automatically every 30 minutes; **Sync Users** forces it. Provider users not yet imported can be imported from the list
-- Enable **Movies / Series** per user (a user with neither gets nothing)
-- Give permissions where warranted — **Discovery, content requests, collections access** (see [User permissions](user-permissions.md))
+- Give **access** to the accounts that should sign in, and switch **Recommendations** on for them; whether they get movies, series or both follows from the libraries the media server lets them see
+- Give permissions where warranted — **Discover, Request, Collections, Assistant** (see [User permissions](user-permissions.md))
 
 ## 2. Integrations
 
@@ -23,7 +21,7 @@ After the Setup Wizard, work through this to get Aperture fully operational.
 
 ## 3. AI Roles
 
-**AI models → Providers & roles**: all four core roles configured (the wizard required this — verify the keys are the ones you want long-term). Check the **Embeddings** page shows coverage after the first embedding jobs run.
+**AI models → Providers & roles**: all four core roles configured (the wizard required this — verify the keys are the ones you want long-term). Check the **Embeddings** page shows coverage after the first embedding jobs run. Optional extras live in the same group: Web Search and Title Analysis roles, the [Decision model](decision-model.md) and [Synopsis translation](synopsis-translation.md).
 
 ## 4. Verify the Pipeline Ran
 
@@ -39,7 +37,7 @@ The wizard's last step runs all of these; if any show red, open its logs before 
 ## 5. Output Sanity
 
 - Sign in as a viewer: **My Recommendations** should list picks with explanations
-- On Emby, set up home rows (Admin → Recommendations → Emby Home Rows) and check a viewer's home screen
+- On Emby, set up [home rows](home-rows.md) and check a viewer's home screen
 - Only if you switched on legacy library output ([Output format](output-format.md)): libraries appear on the media server with **rank badges burned into posters**, and the [File locations](file-locations.md) mapping is right
 
 ## 6. Schedules

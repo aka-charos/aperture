@@ -2,8 +2,6 @@
 
 Connect to Seerr (Jellyseerr/Overseerr) to enable content **requests** and **issue reporting** for your users.
 
-![Admin Settings - Integrations](../images/admin/admin-settings-setup-integrations.png)
-
 ## Accessing Settings
 
 Admin console → **Integrations** → **Seerr** (`/admin/integrations/seerr`).
@@ -29,7 +27,13 @@ The daily `reconcile-discovery-requests` job (04:30, ahead of the suggestions ru
 
 ## User Mapping
 
-Aperture matches its users to Seerr users **automatically, in tiers**: media-server **GUID** → **email** → **username** → **display name**, with ambiguity guards. Importing your users into Seerr is what seeds the top tiers. There's no manual mapping UI on this page — each user's resolved Seerr identity is visible and overridable on their [user detail page](user-management.md); a failed mapping refuses bulk requests with "Seerr account not linked" when mapping is required.
+Every call Aperture makes to Seerr on a user's behalf is made **as that user**, so a request or an issue appears in Seerr under their name, Seerr's own notifications name them, and Seerr's own permissions and quotas apply to them. That includes auto-approval: a user without auto-approve in Seerr gets a **pending** request, and an admin can approve or decline it in Aperture from the all-users view of [My Requests](../features/my-requests.md), as well as in Seerr. When Seerr refuses a request (a quota, a missing permission), the user sees Seerr's own reason.
+
+Aperture matches its users to Seerr users **automatically, in tiers**: media-server **account id** → **email** → **username** → **display name**. The first tier with exactly one match wins; a tier matching several Seerr users stops the search rather than guessing. Importing your media-server users into Seerr is what makes the first tier work. A user's match can be overridden with a Seerr user id on their [user detail page](user-permissions.md) (Settings tab → **Seerr mapping**).
+
+A user who cannot be matched still gets requests through, made as the owner of the API key (as before). Issue reporting is refused for them instead, with an explanation, because Seerr would file their comments under the admin's name.
+
+Non-admins never see root folders or quality profiles: the request options dialog is offered to admins only, and everyone else's requests use their Seerr defaults.
 
 ## Status Model
 

@@ -2,13 +2,13 @@
 
 **Encore** is Aperture's built-in AI assistant. Ask in plain language and it searches your library, your history, your stats, and — for discovery requests — the web, answering with poster cards you can act on.
 
-![Dashboard showing AI features](../images/features/dashboard.png)
-
 ## Opening the Assistant
 
 - The **sparkle button** (bottom-right, on every page) opens the assistant as a **side panel** you can drag to resize (400–720px wide)
 - It's also a full **page** in the sidebar (**Assistant**), where your conversations live
 - Conversations are **saved server-side** — close the panel or reload the page and they're still there, fully rendered; old conversations can be deleted from the sidebar page
+- Every message costs model calls, so an admin can switch the assistant off for particular accounts; if you don't see the sparkle button or the **Assistant** page, it's off for yours
+- It only ever shows titles from the libraries your account can open
 
 ---
 
@@ -51,6 +51,12 @@ For "find me something new" requests, the assistant searches **web sources** (Go
 3. **From your taste profile** — scored library matches for your exact words
 
 Missing titles can be **requested** straight from the cards (via Seerr). While it works, a **status line** narrates the phase — "Searching your library…", "Scouting for candidates…", "Writing up why each fits…" — so you're never staring at a spinner.
+
+### Talk about a film's analysis
+
+> "What do critics say about how Suspiria was made?"
+
+If a title has a stored [Film Analysis](title-analysis.md), the assistant can read it to you or answer from it. It never writes a new one in chat; where none exists it says so. Parts of an analysis that may give away how a film ends are held behind a disclosure.
 
 ### Build playlists from answers
 

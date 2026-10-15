@@ -2,8 +2,6 @@
 
 The Movies tab (`/admin/ops/jobs`) — the movie-side pipeline from sync to shelves.
 
-![Admin Jobs](../images/admin/admin-jobs.png)
-
 ## The Pipeline
 
 | Job | Default schedule | What it does |
@@ -12,7 +10,7 @@ The Movies tab (`/admin/ops/jobs`) — the movie-side pipeline from sync to shel
 | `sync-movie-watch-history` | every 2 h | Pull play states and progress for all users (runs before embeddings by design) |
 | `generate-movie-embeddings` | every 6 h at :10 | Embed new/changed movies with the current [embedding model](embedding-models.md) |
 | `generate-movie-recommendations` | **weekly, Sunday 04:00** | Score and select per-user picks (activity gate applies to scheduled runs) |
-| `sync-movie-libraries` | every 3 h at :20 | Rebuild the "AI Picks - Movies" libraries from the newest completed run |
+| `sync-movie-libraries` | every 3 h at :20 | Rebuild the legacy "AI Picks - Movies" libraries from the newest completed run. Writes nothing while legacy library output is off ([Output format](output-format.md)) |
 | `enrich-metadata` | every 6 h | TMDb+OMDb enrichment (Global tab — shared with series) |
 
 Jobs are **not chained** — schedules overlap deliberately and each job claims its own slot (a second start of the *same* job is refused with 409). The one ordering-sensitive case: **watch history before recommendations**, because runs exclude what you've watched. The recommendation job syncs history itself as a safety net, but after a big import, run history manually first.
@@ -29,8 +27,9 @@ Jobs are **not chained** — schedules overlap deliberately and each job claims 
 
 ## Reading the Results
 
-- The run stores `selected_rank` — what the AI Picks library ordering and the burned-in poster badges display
-- Library builds pick up the **newest completed** run; a failed recommendation run leaves the previous picks in place
+- The run stores `selected_rank` — the order on My Recommendations, and in the legacy AI Picks libraries and their poster badges
+- [Emby home rows](home-rows.md) and library builds pick up the **newest completed** run; a failed recommendation run leaves the previous picks in place
+- Each viewer's recommendations are limited to the libraries they can open ([User permissions](user-permissions.md#which-titles-a-user-sees)); a viewer with no movie library gets no movie run
 - Explanations generate within the run (see [AI explanations](ai-explanations.md)); the separate `refresh-recommendation-explanations` job rewrites them without re-scoring
 
 ---

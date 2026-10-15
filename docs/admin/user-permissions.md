@@ -1,37 +1,53 @@
 # User Permissions
 
-What each user may do, where it's granted, and what the user still controls themselves.
+What each user may do, where it is granted, what decides which titles they see, and what users control themselves.
 
-![Admin Users](../images/admin/admin-users.png)
+## Where Permissions Are Granted
 
-## The Per-User Permission Set
+Most switches sit on each row of the [Users page](user-management.md) (`/admin/access/users`); the rest are on the **user detail page → Settings** tab (`/admin/access/users/:id`), which also keeps a **Permission history** of every change.
 
-Granted on the **user detail page → Settings** tab (`/admin/access/users/:id`):
+| Permission | Where | Grants |
+|------------|-------|--------|
+| **Aperture access** | Users list | Signing in at all. Off ends sessions and stops all background work for the account while keeping every other switch as it is; see [Access](user-management.md#access). |
+| **Recommendations** | Users list | Personal recommendations, Emby home rows and (legacy) generated libraries. One switch for both media types: which of movies and series the account gets follows from its [library scope](#which-titles-a-user-sees). |
+| **Discover** | Users list, detail page | The [Discover](../features/discovery.md) page of suggestions for titles not in the library |
+| **Request** | Users list, detail page | Request buttons that send titles to Seerr. Needs Discover: switching Discover off switches this off too, and it cannot be switched on without it. |
+| **Collections** | Users list, detail page | Creating [collections](../features/collections.md), which are written to the media server as Box Sets everyone can see |
+| **Assistant** | Users list | The AI assistant. Every message costs model calls. On for everyone by default. |
+| **Email** | Users list, detail page | Shows the Email & Notifications card in their settings, where they can enter an address and opt in. No email is sent yet. |
+| **AI Override** | Users list, detail page | Lets the user choose their own AI-explanation preference; only meaningful while **Allow Per-User Overrides** is on (see [AI explanations](ai-explanations.md)) |
+| **Watch history management** | Detail page | Marking titles watched or unwatched from their watch history and detail pages |
+| **Seerr mapping** | Detail page | Overrides which Seerr account their requests and issues are made as. Leave empty to match automatically by email or username. |
 
-| Permission | Grants |
-|------------|--------|
-| **Movies / Series enabled** | The user gets that media type at all (recommendations, stats, history) |
-| **Discovery suggestions** | Access to the [Discover](../features/discovery.md) page |
-| **Content requests** | Request buttons anywhere (requires Discovery; disabling Discovery force-disables this) |
-| **Allow creating collections** | Their [collections](../features/collections.md) write to the media server for everyone |
-| **Email notifications** | The Email & Notifications card in their Preferences |
-| **Manage watch history** | Mark watched/unwatched (with the watch-date prompt); admins always can |
-| **AI explanation override** | Let the user choose their own explanation preference |
-| **Seerr user mapping** | Override the auto-matched Seerr identity |
+**Admins** always have Collections, the Assistant and watch history management. **Discover is the exception**: an admin with Discover switched off is refused there like anyone else.
 
-Admins see and can reach everything regardless of toggles.
+Every change, including one that followed automatically from another switch (Request going off with Discover), is recorded in the account's **Permission history** with who made it.
+
+## Which Titles a User Sees
+
+What a user is shown is their **library scope**: the libraries the media server lets their account open, among the libraries enabled on the [Libraries](libraries.md) page, plus their **parental rating** limit from the media server. Aperture reads the account's library access at each user sync and at sign-in, so a change made in Emby or Jellyfin takes effect within 30 minutes.
+
+The scope applies to recommendations, Browse, search, similar titles, the Explore graph, the assistant, detail pages, Top Picks and home rows. A title outside it is treated as not existing. It also decides recommendation kinds: an account that can open no series library gets no series recommendations, whatever its Recommendations switch says. A user's own records (watch history, ratings, stats) are never filtered.
+
+Until an account's library access has been read for the first time, every enabled library counts.
 
 ## What Users Control Themselves (No Admin Gate)
 
-- **Algorithm weights** — the master toggle and four sliders in their [AI Algorithm](../features/user-settings/ai-algorithm.md) tab (admin defaults apply until they flip it on)
-- **Taste profile tuning** — genre/franchise weights, interests, library exclusion (their [Watcher Identity](../features/user-settings/watcher-identity.md))
-- **AI library names** — renaming their own AI Picks libraries
-- **Poster display, language, similarity prefs** — their [Preferences](../features/user-settings/preferences.md)
+In their own settings:
+
+- **Watcher Identity**: taste profile tuning, genre and franchise weights, interests, and which libraries shape their taste ([Watcher Identity](../features/user-settings/watcher-identity.md))
+- **AI Algorithm**: their own recommendation weights; your defaults apply until they switch it on ([AI Algorithm](../features/user-settings/ai-algorithm.md))
+- **Preferences**: poster display, language, similarity options, their email address and opt-in (when granted), and their AI library names (legacy output only) ([Preferences](../features/user-settings/preferences.md))
+- **Emby home screen** (Emby accounts): which [home rows](home-rows.md) they get and where
+
+## API Keys
+
+An API key acts as the account that made it, but only with the rights its scopes allow: a **read** key cannot change anything, and only an **admin** scope on an admin's key carries admin rights. See [API keys](api-keys.md).
 
 ## The One Global Gate That Interacts
 
-**Recommendations → Explanations → "Allow Per-User Overrides"** is the global switch that makes the per-user AI-explanation permission meaningful; the effective value chains global default → your grant → their choice (see [AI Explanations](ai-explanations.md)).
+**Recommendations → Explanations → Allow Per-User Overrides** is the global switch that makes the per-user AI-explanation permission meaningful. The effective value chains global default → your grant → their choice (see [AI explanations](ai-explanations.md)).
 
 ---
 
-**Related:** [User management](user-management.md) · [AI explanations](ai-explanations.md) · [Libraries](libraries.md)
+**Related:** [User management](user-management.md) · [AI explanations](ai-explanations.md) · [Libraries](libraries.md) · [API keys](api-keys.md)

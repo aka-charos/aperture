@@ -2,8 +2,6 @@
 
 The old "Maintenance" settings tab is gone — its two real features moved to dedicated pages:
 
-![Admin Settings - Maintenance](../images/admin/admin-settings-maintenance.png)
-
 ## Poster Repair
 
 **Operations → Poster repair** (`/admin/ops/poster-repair`).

@@ -2,8 +2,6 @@
 
 Studio pages collect what your library holds from a **production studio** (movies) or **TV network** (series).
 
-![Series Detail with Network](../images/features/series-detail.png)
-
 ## Accessing Studio Pages
 
 1. **Click a studio name** — from a movie detail page's info card

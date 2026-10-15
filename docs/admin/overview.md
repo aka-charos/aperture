@@ -10,11 +10,11 @@ Admin console → **Overview** (`/admin`).
 
 **System Status** — polls `/health` every 30 seconds. "All systems operational" or "System issues detected", with server time, **version**, and **database connected/disconnected** as detail rows.
 
-**Quick Stats** — total users, **AI Enabled Users** (how many accounts have media access), and **Movies in Library**.
+**Quick Stats** — total users, **AI Enabled Users** (accounts with Aperture access, the switch on the [Users](user-management.md#access) page), and **Movies in Library**.
 
-**Setup Status** — a four-point checklist: Media server connected · Database connected · Movies synced · Users enabled — with a **Complete** chip when all four pass.
+**Setup Status** — a four-point checklist: Media server connected · Database connected · Movies synced · Users enabled (at least one account has access) — with a **Complete** chip when all four pass.
 
-**Getting Started** *(only while the checklist is incomplete)* — the six steps in order: configure the media server → select libraries → run Sync Movies → enable users → run Generate Embeddings → run Generate Recommendations — with a **Go to Jobs** button straight to the jobs console.
+**Getting Started** *(only while the checklist is incomplete)* — the six steps in order: configure the media server → select libraries → run Sync Movies → enable users → generate embeddings → generate recommendations — with a **Go to Jobs** button straight to the jobs console. The card's wording predates the console: the media server is under **Library → Media server**, libraries under **Library → Libraries**, and the jobs are `generate-movie-embeddings` and `generate-movie-recommendations` (and their series counterparts).
 
 ## When Something Looks Wrong Here
 

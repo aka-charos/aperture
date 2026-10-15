@@ -2,8 +2,6 @@
 
 **Watcher Identity** is your taste profile: what Aperture has learned from your watch history, made inspectable and adjustable. It's the model behind genre boost/avoid, franchise affinities, stated interests, and the taste sentences you can read about yourself.
 
-![User Settings - Watcher Identity](../../images/user-settings/user-settings-watcher-identity.png)
-
 ## Accessing
 
 Click your **avatar** in the top bar and pick **Watcher Identity**.
@@ -50,7 +48,7 @@ One card, **shared between movies and TV series**:
 
 ## Library Sources
 
-Per media type, choose **which of your server's libraries** contribute to the taste profile. Your AI Picks and system libraries are automatically excluded, so the profile never reads its own output.
+Per media type, choose **which of your libraries** contribute to the taste profile (only the ones your account can open are listed). Generated AI Picks libraries and system libraries are automatically excluded, so the profile never reads its own output.
 
 ---
 

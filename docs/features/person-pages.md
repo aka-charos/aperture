@@ -2,8 +2,6 @@
 
 Person pages cover anyone in your library's credits — actors, directors, writers, creators — with their work from your library, plus everything else they've done that you can request.
 
-![Movie Detail with Cast](../images/features/movie-detail.png)
-
 ## Accessing Person Pages
 
 1. **Click a name** — anywhere on a movie or series detail page: cast lists, director, writers, creator, cinematography, music, editing

@@ -2,8 +2,6 @@
 
 Aperture connects to external services for metadata, ratings, requests, and AI grounding. Each integration is its own page in the admin console.
 
-![Admin Settings - Integrations](../images/admin/admin-settings-setup-integrations.png)
-
 ## Where Integrations Live
 
 Admin console → **Integrations** — one page per service:
@@ -21,7 +19,7 @@ Admin console → **Integrations** — one page per service:
 | **Tavily** | `/admin/integrations/tavily` | Web search for the assistant's discovery turns |
 | **fastCRW** | `/admin/integrations/crw` | Self-hosted search/scrape for Title Analysis |
 | **Streaming (JustWatch)** | `/admin/integrations/streaming` | Streaming-chart discovery tab |
-| **Ratings Refresh** | `/admin/integrations/ratings-refresh` | Ongoing IMDb rating freshness |
+| **Ratings Refresh** | `/admin/integrations/ratings` | Ongoing IMDb rating freshness |
 
 Each card shows a green **Configured** chip once saved; most have an **enable switch**, so an integration is turned off by toggling — the key stays saved.
 

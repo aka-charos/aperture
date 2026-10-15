@@ -2,8 +2,6 @@
 
 Connect to The Movie Database (TMDb) — the metadata backbone of Aperture: enrichment, posters, genre strips, gap analysis, and the external side of discovery all read from it.
 
-![Admin Settings - Integrations](../images/admin/admin-settings-setup-integrations.png)
-
 ## Accessing Settings
 
 Admin console → **Integrations** → **TMDB** (`/admin/integrations/tmdb`).
@@ -31,7 +29,7 @@ Free tier, no per-key quota that Aperture's usage would approach.
 |----------|--------------|
 | **Metadata enrichment** (`enrich-metadata`, every 6 h) | Keywords, **collections** (franchises), crew, runtimes — for movies *and* series |
 | **Posters & artwork** | Poster proxying, studio logos (separate `enrich-studio-logos` job), person profiles |
-| **Genre strips & Discovery tuning** | Both admin pages are **gated**: they're hidden/redirected until TMDb is configured |
+| **Genre strips & Discovery tuning** | Both admin pages are **gated**: until TMDb is configured they are dimmed in the console's nav, with "Needs TMDB configured before this can do anything" on hover |
 | **Gap analysis** | TMDb collection membership vs your library (`/admin/library/gaps`) |
 | **Discovery & streaming rows** | External candidates, poster paths for JustWatch rows |
 
@@ -43,7 +41,7 @@ Ratings change; metadata doesn't. Ongoing rating freshness is the separate **[Ra
 
 ## Troubleshooting
 
-- **"Not configured" gates everywhere** — genre strips, discovery tuning, and gap analysis are *hidden* until a working key is saved; fix the key and they reappear (the gate re-probes, it isn't cached)
+- **Genre strips and Discovery tuning are dimmed in the nav** — they need a working key; save one and they light up (a failed check is not cached, so it is asked again). Gap analysis states the same requirement at the top of its page
 - **Enrichment running but nothing enriched** — the pending selection only picks rows with an `imdb_id`/`tmdb_id`; run a library sync first and check that your titles carry ids
 - **Posters missing after enrichment** — check the `enrich-metadata` run logs and the [API errors](api-errors.md) panel for TMDb failures
 

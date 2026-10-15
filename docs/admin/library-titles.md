@@ -1,8 +1,6 @@
 # Library Title Templates
 
-Configure the default names of the two AI Picks libraries Aperture creates per user — the names your household sees on the Emby/Jellyfin home screen.
-
-![Admin Settings - AI Recommendations](../images/admin/admin-settings-ai-recommendations.png)
+Configure the default names of the two AI Picks libraries Aperture creates per user — the names your household sees on the Emby/Jellyfin home screen. These libraries are **legacy output**, being replaced by [Emby home rows](home-rows.md); while legacy output is switched off on [Output format](output-format.md), this page is greyed and its settings are kept.
 
 ## Accessing Settings
 
@@ -25,16 +23,19 @@ The page also manages the **library cover art** for the two AI libraries — bun
 
 ## Users Can Override
 
-A user may rename *their own* libraries in User Settings → Preferences → AI Library Names; their choice wins over these defaults. See [Virtual libraries](../features/virtual-libraries.md).
+A user may rename *their own* libraries in User Settings → Preferences → AI Library Names (greyed there too while legacy output is off); their choice wins over these defaults. See [Virtual libraries](../features/virtual-libraries.md).
 
 ## Applying Changes
 
-Names apply when the **`sync-movie-libraries` / `sync-series-libraries`** jobs next run (every 3 hours, staggered). Renaming creates the new library on the server — **the old-named library is not found and removed** (lookup is by name), so delete a lingering old library on the media server by hand.
+Names apply when the **`sync-movie-libraries` / `sync-series-libraries`** jobs next run (every 3 hours, staggered). Renaming creates the library under its new name and deletes the old-named one, as long as that library provably reads only that viewer's own folder; anything else is left alone.
+
+A name already used by a library that is not the viewer's own (your "Movies" library, or another viewer's) is refused: that viewer's library is skipped, and the job log says to choose another name. Nothing is taken over or granted.
 
 ## Troubleshooting
 
 - **New name didn't appear** — the library jobs haven't run since the change; check their history
-- **Two AI Picks libraries on the server** — a rename left the old one; remove the stale one in Emby/Jellyfin
+- **Two AI Picks libraries on the server** — a rename from before old libraries were removed automatically left one behind; remove the stale one in Emby/Jellyfin (when phasing legacy output out altogether, **Remove generated libraries** on [Output format](output-format.md) finds such leftovers too)
+- **"The library name … already belongs to a library…" in the job log** — the template or the viewer's own name matches an existing library; pick another
 - **Users say "my library reverted"** — they're looking at the default name because their per-user override was cleared
 
 ---

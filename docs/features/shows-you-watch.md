@@ -2,8 +2,6 @@
 
 Shows You Watch is your list of TV series you're following, with upcoming-episode countdowns and an honest picture of how much of each show your server actually has.
 
-![Shows You Watch Page](../images/features/shows-you-watch.png)
-
 ## Accessing Shows You Watch
 
 Navigate to **Shows You Watch** in the sidebar (queue icon). Your admin can switch the feature off for the whole server, in which case it's hidden.

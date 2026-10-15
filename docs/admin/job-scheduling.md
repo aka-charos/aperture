@@ -2,14 +2,12 @@
 
 Configure when background jobs run — per job, from the jobs console.
 
-![Admin Jobs](../images/admin/admin-jobs.png)
-
 ## Where It Lives
 
 Admin console → **Operations** → **Jobs** (`/admin/ops/jobs`):
 
 - **Gear / "Configure schedule"** on any job card opens its schedule dialog
-- The **Schedule tab** lists all 34 jobs — including the card-less ones (`sync-users`, `backup-database`, `cleanup-auth-state`, `refresh-library-gaps`) — with an **Enabled toggle**, next run, last run, duration, and status
+- The **Schedule tab** lists all 39 jobs — including the card-less ones (`sync-users`, `refresh-assistant-suggestions`, `backup-database`, `cleanup-auth-state`, `refresh-library-gaps`) — with an **Enabled toggle**, next run, last run, duration, and status
 
 ## Schedule Types
 
@@ -27,15 +25,29 @@ Disabled jobs can also be flipped off directly from the Schedule tab.
 
 Some jobs work through a list and stop after a set number of items, then pick up where they left off on the next run. Their schedule dialog has an extra field for that cap, and the card shows it beside the schedule ("Up to 200 titles per run"). It applies to manual runs as well as scheduled ones; leave it blank for the job's default.
 
-Currently this is `generate-title-analysis` (**Titles per run**, default 200, 1–5,000). A run that is still going when its next firing is due makes that firing skip, so on a short interval pick a smaller number.
+| Job | Unit | Default | Range |
+|-----|------|---------|-------|
+| `generate-title-analysis` | titles | 200 | 1–5,000 |
+| `translate-title-synopses` | translations (title × language) | 300 | 1–20,000 |
+| `translate-title-analyses` | translations (analysis × language) | 100 | 1–5,000 |
 
-## Defaults Worth Knowing
+A run that is still going when its next firing is due makes that firing skip, so on a short interval pick a smaller number.
 
-- Syncs: library syncs every 3 h (staggered), movie watch history every 2 h, **series watch history hourly**, users every 30 min
-- Embeddings: every 6 h (staggered :10/:20)
-- Recommendations: **weekly, Sunday 04:00**; Top Picks daily 05:00; backup 02:00; `refresh-ai-pricing` weekly Sunday 00:00
-- Several jobs are **manual by default**: metadata enrichment in some setups (`enrich-metadata` seeds every-6h via job config), taste-profile rebuilds, explanation refreshes, title analysis, evaluation, gap analysis
-- Effective schedules come from the `job_config` table seeded with defaults — the definitions' cron fields are documentation, the table is truth
+## Default Schedules
+
+| Cadence | Jobs |
+|---------|------|
+| Every 30 min | `sync-users` |
+| Hourly | `sync-series-watch-history` (:00), `sync-watching-favorites` (:30) |
+| Every 2 h | `sync-movie-watch-history` |
+| Every 3 h | `sync-movies` (:00), `sync-series` (:10), `sync-movie-libraries` (:20), `sync-series-libraries` (:30) |
+| Every 6 h | `enrich-metadata` (:00), `generate-movie-embeddings` (:10), `generate-series-embeddings` (:20), `sync-trakt-ratings` (:30) |
+| Daily | `backup-database` 02:00, `refresh-ratings` 02:30, `sync-lldap-emails` 03:15, `cleanup-auth-state` 03:30, `reconcile-discovery-requests` 04:30, `refresh-top-picks` 05:00, `enrich-studio-logos` 05:30, `sync-home-sections` 05:45, `generate-discovery-suggestions` 06:00, `enrich-mdblist` 07:00 |
+| Weekly, Sunday | `refresh-assistant-suggestions`, `refresh-ai-pricing` and `auto-request-top-picks` 00:00; `generate-movie-recommendations` and `generate-series-recommendations` 04:00 |
+| Manual only | `full-reset-movie-recommendations`, `full-reset-series-recommendations`, `refresh-library-gaps`, `rebuild-taste-profiles`, `refresh-embedding-centering`, `refresh-recommendation-explanations`, `check-recommendation-explanations`, `evaluate-recommender`, `remove-legacy-libraries` |
+| Manual by default, schedulable | `generate-title-analysis`, `translate-title-synopses`, `translate-title-analyses` (each one costs model calls, so a cadence is opted into) |
+
+The order within a night is deliberate: ratings refresh before the recommendation run, reconciling Seerr before the discovery run, and home rows after Top Picks. Effective schedules come from the `job_config` table, seeded with these defaults — once you change one, the table is what runs.
 
 ## Timezone and Missed Runs
 

@@ -11,8 +11,9 @@ Admin console → **Appearance** → **Instance name & logo** (`/admin/appearanc
 One field, up to **40 characters**, blank = back to the default ("Aperture"). **Reset to Aperture** restores it. The name flows into:
 
 - The **browser tab title** and the **sidebar wordmark**, and the **login card**
-- **Every translated string** containing `{{appName}}`, in all 15 locales — including *"Why {{appName}} picked this for you"* on recommendation panels and the AI-explanation preference copy
-- The **NFO credit lines** written into your media server ("🎯 Why {name} picked this for you:" in the `<plot>` of AI Picks library items) — the renamed instance brands the metadata in Emby/Jellyfin too
+- **Every translated string** containing `{{appName}}`, in all 14 locales — including *"Why {{appName}} picked this for you"* on recommendation panels and the AI-explanation preference copy
+- The **NFO credit lines** written into your media server ("🎯 Why {name} picked this for you:" in the `<plot>` of AI Picks library items), while legacy library output is on — the renamed instance brands the metadata in Emby/Jellyfin too
+- The **From name** of outgoing email, unless [Outgoing email](smtp.md) sets its own
 
 ## Logo & Favicon
 

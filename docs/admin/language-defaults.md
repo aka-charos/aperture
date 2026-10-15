@@ -21,6 +21,10 @@ The locale list endpoint is public (the login page needs it pre-session).
 
 The **AI Summaries language** is the language AI-written text is generated in: taste synopses, recommendation explanations, playlist/collection names and descriptions, and assistant replies — independent of the UI language, useful when a household browses in one language and reads summaries in another.
 
+## What the UI Languages Also Drive
+
+[Synopsis translation](synopsis-translation.md), when it is on, translates plots and film analyses into the enabled UI languages, so enabling a language here adds it as a translation target too (unless that card has a fixed list).
+
 ## Per-User Overrides
 
 Users pick both languages in [Preferences](../features/user-settings/preferences.md) — offered **only the locales you enabled**, cleared field = server default, and the card shows the effective values. A saved user override that you later remove from the allowlist falls back to the server default automatically. Right-to-left locales flip the whole interface direction, not just the text.

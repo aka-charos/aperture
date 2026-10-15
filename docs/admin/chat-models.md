@@ -2,8 +2,6 @@
 
 Configure which AI model powers the AI assistant (the chat in the corner of every page).
 
-![Admin Settings - AI/LLM](../images/admin/admin-settings-ai-llm.png)
-
 ## Where It Lives
 
 Admin console → **AI models** → **Providers & roles** → the **Chat Assistant** card (`/admin/ai/roles`). Card text: *"Needs tool calling to search your library and make recommendations."*
@@ -14,9 +12,9 @@ The hard requirement is **reliable tool calling** — the assistant answers by c
 
 Everything else is preference:
 
-- **Cloud models** — any of the OpenAI, Anthropic, Google, Deepseek, OpenRouter, Z.AI, Groq catalogs; reasoning effort is configurable per card
+- **Cloud models** — any of the OpenAI, Anthropic, Google, Deepseek, OpenRouter, Z.AI, Groq catalogs. There is deliberately no reasoning-effort control on this card (the assistant is interactive, and thinking is often the point); on OpenRouter the **Flex** service tier is offered, but a chat turn that fails on a busy flex endpoint fails for the user
 - **Local models** — Ollama and LM Studio (auto-discovery of installed models) work for privacy-conscious deployments; quality depends on the model's tool-calling
-- Each role (chat included) holds its **own API key** plus spare/fallback keys
+- The card takes its own API key, or borrows the key of another role on the same provider
 
 ## What Chat Costs
 
@@ -24,8 +22,8 @@ Every turn is **metered** — token counts and cost land in `llm_inference_calls
 
 ## Disabling Chat
 
-Leave the chat role unconfigured — the sparkle button disappears and the assistant page reports the assistant is unavailable. The system prompt itself is code-defined; there is no admin prompt editor.
+Leave the chat role unconfigured — the sparkle button disappears and the assistant page reports the assistant is unavailable. To withhold it from particular users instead, switch off their **Assistant** permission on the [Users](user-permissions.md) page (admins always have it). The system prompt itself is code-defined; there is no admin prompt editor.
 
 ---
 
-**Related:** [AI providers](ai-providers.md) · [AI assistant (user doc)](../features/ai-assistant.md) · [AI spend](ai-providers.md)
+**Related:** [AI providers](ai-providers.md) · [AI assistant (user doc)](../features/ai-assistant.md) · [AI spend](ai-spend.md)

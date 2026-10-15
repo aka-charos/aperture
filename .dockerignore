@@ -8,5 +8,9 @@ node_modules
 .env
 .env.*
 *.md
+# The admin guide is compiled into the web bundle (apps/web/src/pages/admin/help/docs.ts).
+# `*.md` above matches the context root only, but say so rather than rely on it:
+# without these pages the build still succeeds and ships an empty guide.
+!docs/**/*.md
 LICENSE
 data

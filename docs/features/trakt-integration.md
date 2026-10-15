@@ -2,8 +2,6 @@
 
 Connect your Trakt.tv account to keep your ratings in sync and add Trakt-powered sources to [Discover](discovery.md).
 
-![User Settings - Profile](../images/user-settings/user-settings-profile.png)
-
 ## What Syncs
 
 **Ratings only — in both directions:**

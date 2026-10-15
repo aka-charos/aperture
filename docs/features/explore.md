@@ -2,8 +2,6 @@
 
 Media Graph (sidebar: **Media Graph**, hub icon) is a semantic exploration tool: describe what you're in the mood for, or pick one of your lists, and your library is drawn as a poster graph you can wander through.
 
-![Explore Page](../images/features/explore.png)
-
 ## Accessing Media Graph
 
 Navigate to **Media Graph** in the sidebar. It requires AI embeddings to be generated — your admin must have completed the AI setup.

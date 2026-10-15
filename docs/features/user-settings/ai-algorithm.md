@@ -2,8 +2,6 @@
 
 The **AI Algorithm** tab lets you retune how recommendations are scored for your account — the four weights, how watched content is treated, and what happens to titles you disliked.
 
-![User Settings - AI Algorithm](../../images/user-settings/user-settings-ai-algorithm.png)
-
 ## Accessing
 
 Click your **avatar** in the top bar and pick **AI Algorithm**.
@@ -47,7 +45,7 @@ One weight at a time: regenerate, look at the list, then decide.
 
 ## Recent Watch History Limit
 
-A slider (10–200 items) controlling how much recent history feeds the *"because you watched…"* note on each pick. Your taste profile always reads your full history — this does **not** change what gets recommended.
+A slider (10–200 items) that only matters if your taste profile can't be built the usual way: a stand-in is then made from this many of your titles. Your taste profile normally reads your full history, and the *"because you watched…"* note searches your history on its own, so this does **not** change what gets recommended.
 
 ## Include Watched Content
 

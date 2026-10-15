@@ -1,12 +1,12 @@
 # File Locations Configuration
 
-Configure path mappings between Aperture and your media server for symlinks and STRM files to work correctly.
-
-![Admin Settings - Media Server](../images/admin/admin-settings-setup-media.png)
+Configure path mappings between Aperture and your media server for symlinks and STRM files to work correctly. These settings only matter for the **legacy library output** (the STRM / symlink libraries), which is being replaced by [Emby home rows](home-rows.md).
 
 ## Accessing Settings
 
 Admin console → **Library** → **File locations** (`/admin/library/paths`).
+
+While legacy library output is switched off (on [Output format](output-format.md); new installs start with it off), this section is greyed with a notice: nothing is written, and the settings are kept in case it is switched back on.
 
 ---
 
@@ -173,7 +173,7 @@ STRM files contain the path to the actual media:
 Symbolic links point directly to the original file:
 
 ```
-ln -s /mnt/Movies/Inception.mkv /mnt/ApertureLibraries/ai-movies/Inception.strm
+ln -s /mnt/Movies/Inception.mkv "/mnt/ApertureLibraries/aperture/<Name>_<user id>/Inception (2010)/Inception (2010).mkv"
 ```
 
 **Requirements:**
@@ -223,15 +223,17 @@ ln -s /mnt/Movies/Inception.mkv /mnt/ApertureLibraries/ai-movies/Inception.strm
 
 ### Test Your Configuration
 
-1. Run `sync-movie-libraries` job
+1. Run the `sync-movie-libraries` job (legacy output must be switched on)
 2. Check the output directory for created files
 3. Try playing a recommendation in your media server
 
 ### Check STRM Contents
 
 ```bash
-cat /path/to/aperture-libraries/ai-movies/SomeMovie.strm
+cat "/path/to/aperture-libraries/aperture/<Name>_<user id>/Some Movie (2010)/Some Movie (2010).strm"
 ```
+
+Each viewer's movie library is a folder under `aperture/`, named after them and their media-server user id, their series library under `aperture-tv/`, and Top Picks under `top-picks-movies/` and `top-picks-series/`.
 
 The path inside should be valid from your media server's perspective.
 

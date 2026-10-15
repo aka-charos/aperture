@@ -2,13 +2,11 @@
 
 Discover surfaces movies and TV series that **aren't in your library yet** — AI-scored suggestions you can request into your library in one click when your admin has configured Seerr.
 
-![Discovery Page](../images/features/discovery.png)
-
 ## Accessing Discover
 
 Navigate to **Discover** in the sidebar (compass icon).
 
-**Note:** Your admin must enable Discover for your account; otherwise the page tells you it's not enabled.
+**Note:** Your admin must enable Discover for your account; until then it isn't in your sidebar.
 
 ---
 
@@ -102,7 +100,7 @@ If your admin has configured Seerr and enabled requests for your account:
 | **Approved** | Approved and on its way |
 | **Declined** | Declined |
 
-Later stages — **Processing**, **Partially available**, **Available** — show on the [My Requests](my-requests.md) page, which tracks everything you've asked for. If you don't see the Request button, requests aren't enabled for your account.
+Later stages — **Processing**, **Partially available**, **Available** — show on the [My Requests](my-requests.md) page, which tracks everything you've asked for. Requests are made on your own Seerr account, so one may wait for approval depending on your Seerr permissions. If you don't see the Request button, requests aren't enabled for your account.
 
 ---
 

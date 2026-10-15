@@ -2,8 +2,6 @@
 
 Top Picks ranks the most popular titles across all users of your server, over a recent window — what the household has been watching, not what fits you personally.
 
-![Top Picks Page](../images/features/top-picks.png)
-
 ## Accessing Top Picks
 
 Navigate to **Top Picks** in the sidebar (flame icon). The page has two tabs: **Movies** and **Series** ("Top Pick Movies" / "Top Pick Series").
@@ -12,7 +10,7 @@ Navigate to **Top Picks** in the sidebar (flame icon). The page has two tabs: **
 
 ## The Ranking
 
-The header states exactly what's being ranked: **"Ranked by popularity based on watch activity from all users over the last N days"** — the window is admin-configured (default 30 days). A **Last refreshed** caption shows when the ranking was last computed.
+The header states exactly what's being ranked: **"Ranked by popularity based on watch activity from all users over the last N days"** — the window is admin-configured (default 30 days). The list is worked out when you open the page. On servers that still write the older Top Picks libraries, a **Last refreshed** caption shows when those were last written.
 
 This is deliberately **not personalized**: it's the same list for everyone. For picks that fit you specifically, see [My Recommendations](recommendations.md).
 
@@ -29,7 +27,7 @@ This is deliberately **not personalized**: it's the same list for everyone. For 
 
 ### Rank Badges
 
-Each title carries a numbered rank badge (#1, #2, …) — the same badge that's burned into the poster overlays when Top Picks are written into your media server.
+Each title carries a numbered rank badge (#1, #2, …). Titles from libraries your account can't open are left out, so the list may skip numbers others see.
 
 ---
 
@@ -75,13 +73,9 @@ Use both: Top Picks to see what everyone's talking about, Recommendations for wh
 
 ## Top Picks in Your Media Server
 
-If your admin configured it, Top Picks are also written into Emby/Jellyfin:
+On Emby, Top Picks can appear as two **rows on your home screen** (movies and series) when your admin has switched home rows on; you can hide or move them on the **Emby home screen** tab of your settings ([Emby Home Screen](user-settings/home-screen.md)).
 
-- As libraries named **"Top Picks - Movies"** and **"Top Picks - Series"**, or as a **Box Set collection** or **playlist** — depending on the output your admin chose
-- Rank badges burned into the poster overlays
-- Refreshed automatically on the admin's schedule
-
-See [Virtual Libraries](virtual-libraries.md).
+Older setups may also write Top Picks into Emby/Jellyfin as libraries named **"Top Picks - Movies"** / **"Top Picks - Series"**, a Box Set collection or a playlist, with rank badges burned into the posters. That output is being phased out; see [Virtual Libraries](virtual-libraries.md).
 
 ---
 

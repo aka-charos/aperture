@@ -2,8 +2,6 @@
 
 View database statistics and purge stored data — the destructive controls.
 
-![Admin Settings - System](../images/admin/admin-settings-system.png)
-
 ## Where It Lives
 
 Admin console → **Operations** → **Database** (`/admin/ops/database`).

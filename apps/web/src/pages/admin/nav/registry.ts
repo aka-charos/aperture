@@ -30,6 +30,7 @@ export const ADMIN_GROUP_IDS = [
   'appearance',
   'access',
   'ops',
+  'help',
 ] as const
 
 export type AdminGroupId = (typeof ADMIN_GROUP_IDS)[number]
@@ -54,6 +55,9 @@ export const ADMIN_GROUPS: readonly AdminGroup[] = [
   { id: 'appearance', segment: 'appearance', labelKey: 'adminNav.groups.appearance' },
   { id: 'access', segment: 'access', labelKey: 'adminNav.groups.access' },
   { id: 'ops', segment: 'ops', labelKey: 'adminNav.groups.ops' },
+  // No segment, like overview: its one entry is `/admin/help`, and a group
+  // segment would make that `/admin/help/help` for no reader's benefit.
+  { id: 'help', segment: '', labelKey: 'adminDocs.navGroup' },
 ]
 
 /**
@@ -114,6 +118,16 @@ export interface AdminEntry {
    * than by anything a reader of either file could see.
    */
   ownsHeading?: boolean
+  /**
+   * The admin guide pages that describe this section, as file names in
+   * `docs/admin/` without the `.md`. The first is the one the section's help
+   * button opens on; the rest are offered beside it.
+   *
+   * Kept here, as data, so the shell can decide whether to offer help without
+   * loading a single page of it, and so `pages/admin/help/help.test.ts` can check
+   * every name against the folder.
+   */
+  docs?: readonly string[]
 }
 
 export const ADMIN_ENTRIES: readonly AdminEntry[] = [
@@ -124,6 +138,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: '',
     titleKey: 'adminNav.overview.title',
     blurbKey: 'adminNav.overview.blurb',
+    docs: ['overview'],
     aliases: ['dashboard', 'home', 'status', 'health'],
     ownsHeading: true,
   },
@@ -135,6 +150,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'server',
     titleKey: 'adminNav.mediaServer.title',
     blurbKey: 'adminNav.mediaServer.blurb',
+    docs: ['media-server'],
     aliases: ['emby', 'jellyfin', 'media server', 'url', 'connection', 'api key'],
   },
   {
@@ -143,6 +159,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'libraries',
     titleKey: 'adminNav.libraries.title',
     blurbKey: 'adminNav.libraries.blurb',
+    docs: ['libraries'],
     aliases: ['libraries', 'collections', 'sync', 'enabled', 'excluded'],
   },
   {
@@ -151,6 +168,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'paths',
     titleKey: 'adminNav.fileLocations.title',
     blurbKey: 'adminNav.fileLocations.blurb',
+    docs: ['file-locations'],
     aliases: ['paths', 'strm', 'output', 'directory', 'folder', 'mount', 'symlink', 'legacy'],
     gate: 'legacyLibraryOutput',
   },
@@ -160,6 +178,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'gaps',
     titleKey: 'adminNav.gapAnalysis.title',
     blurbKey: 'adminNav.gapAnalysis.blurb',
+    docs: ['gap-analysis'],
     aliases: ['gaps', 'missing', 'collections', 'franchise', 'tmdb collection'],
     ownsHeading: true,
   },
@@ -171,6 +190,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'tmdb',
     titleKey: 'adminNav.tmdb.title',
     blurbKey: 'adminNav.tmdb.blurb',
+    docs: ['tmdb'],
     aliases: ['tmdb', 'themoviedb', 'api key', 'metadata', 'posters'],
     fields: [
       { anchor: 'tmdb-api-key', labelKey: 'settingsTmdb.apiKey', aliases: ['tmdb key'] },
@@ -183,6 +203,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'omdb',
     titleKey: 'adminNav.omdb.title',
     blurbKey: 'adminNav.omdb.blurb',
+    docs: ['omdb'],
     aliases: ['omdb', 'imdb', 'api key', 'plot', 'awards', 'rotten tomatoes'],
     fields: [
       { anchor: 'omdb-api-key', labelKey: 'settingsOmdb.apiKey', aliases: ['omdb key'] },
@@ -196,6 +217,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'mdblist',
     titleKey: 'adminNav.mdblist.title',
     blurbKey: 'adminNav.mdblist.blurb',
+    docs: ['mdblist'],
     aliases: ['mdblist', 'lists', 'api key', 'ratings'],
     fields: [
       { anchor: 'mdblist-api-key', labelKey: 'settingsMdblist.apiKey' },
@@ -209,6 +231,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'trakt',
     titleKey: 'adminNav.trakt.title',
     blurbKey: 'adminNav.trakt.blurb',
+    docs: ['trakt'],
     aliases: ['trakt', 'scrobble', 'ratings sync', 'oauth', 'client id'],
     fields: [
       { anchor: 'trakt-client-id', labelKey: 'settingsTrakt.clientId' },
@@ -222,6 +245,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'seerr',
     titleKey: 'adminNav.seerr.title',
     blurbKey: 'adminNav.seerr.blurb',
+    docs: ['seerr'],
     aliases: ['seerr', 'jellyseerr', 'overseerr', 'requests', 'api key'],
     fields: [
       { anchor: 'seerr-url', labelKey: 'settingsSeerr.seerrUrl', aliases: ['url', 'host'] },
@@ -234,6 +258,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'lldap',
     titleKey: 'adminNav.lldap.title',
     blurbKey: 'adminNav.lldap.blurb',
+    docs: ['lldap'],
     aliases: ['lldap', 'ldap', 'email', 'import', 'directory'],
   },
   {
@@ -242,6 +267,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'smtp',
     titleKey: 'adminNav.smtp.title',
     blurbKey: 'adminNav.smtp.blurb',
+    docs: ['smtp'],
     aliases: ['smtp', 'email', 'mail', 'outgoing', 'notifications', 'starttls', 'gmail', 'postfix'],
     fields: [
       {
@@ -257,6 +283,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'n8n',
     titleKey: 'adminNav.n8n.title',
     blurbKey: 'adminNav.n8n.blurb',
+    docs: ['n8n'],
     aliases: ['n8n', 'webhook', 'automation', 'workflow'],
   },
   {
@@ -265,6 +292,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'tavily',
     titleKey: 'adminNav.tavily.title',
     blurbKey: 'adminNav.tavily.blurb',
+    docs: ['tavily'],
     aliases: ['tavily', 'web search', 'grounding', 'api key'],
     fields: [
       { anchor: 'tavily-api-key', labelKey: 'settingsTavily.apiKey' },
@@ -279,6 +307,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'crw',
     titleKey: 'adminNav.crw.title',
     blurbKey: 'adminNav.crw.blurb',
+    docs: ['crw'],
     aliases: ['crw', 'fastcrw', 'scrape', 'retrieval', 'search engines', 'title analysis'],
     fields: [
       { anchor: 'crw-enabled', labelKey: 'settingsCrw.enabledLabel' },
@@ -294,6 +323,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'streaming',
     titleKey: 'adminNav.streaming.title',
     blurbKey: 'adminNav.streaming.blurb',
+    docs: ['streaming'],
     aliases: ['justwatch', 'streaming', 'providers', 'region', 'charts'],
   },
   {
@@ -302,6 +332,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'ratings',
     titleKey: 'adminNav.ratingsRefresh.title',
     blurbKey: 'adminNav.ratingsRefresh.blurb',
+    docs: ['ratings-refresh'],
     aliases: ['ratings', 'imdb dataset', 'refresh', 'vote count', 'tsv'],
   },
 
@@ -312,6 +343,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'roles',
     titleKey: 'adminNav.aiRoles.title',
     blurbKey: 'adminNav.aiRoles.blurb',
+    docs: ['ai-providers', 'text-models', 'chat-models', 'embedding-models'],
     aliases: [
       'openrouter',
       'gemini',
@@ -342,6 +374,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'spend',
     titleKey: 'adminNav.aiSpend.title',
     blurbKey: 'adminNav.aiSpend.blurb',
+    docs: ['ai-spend'],
     aliases: ['spend', 'cost', 'usage', 'tokens', 'openrouter', 'inference'],
   },
   {
@@ -350,6 +383,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'estimate',
     titleKey: 'adminNav.aiEstimate.title',
     blurbKey: 'adminNav.aiEstimate.blurb',
+    docs: ['cost-estimate'],
     aliases: ['estimate', 'projection', 'pricing', 'budget'],
   },
   {
@@ -358,6 +392,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'embeddings',
     titleKey: 'adminNav.embeddings.title',
     blurbKey: 'adminNav.embeddings.blurb',
+    docs: ['embedding-models', 'maintenance'],
     aliases: ['embeddings', 'pgvector', 'dimensions', 'vectors', 'centering', 'sets'],
   },
   {
@@ -368,6 +403,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'decision-model',
     titleKey: 'adminNav.decisionModel.title',
     blurbKey: 'adminNav.decisionModel.blurb',
+    docs: ['decision-model'],
     aliases: [
       'decision model',
       'system one',
@@ -398,6 +434,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'synopsis-translation',
     titleKey: 'adminNav.synopsisTranslation.title',
     blurbKey: 'adminNav.synopsisTranslation.blurb',
+    docs: ['synopsis-translation'],
     aliases: [
       'translate',
       'translation',
@@ -425,6 +462,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'algorithm',
     titleKey: 'adminNav.algorithm.title',
     blurbKey: 'adminNav.algorithm.blurb',
+    docs: ['algorithm-tuning'],
     aliases: [
       'weights',
       'similarity',
@@ -461,6 +499,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'analysis-bench',
     titleKey: 'adminNav.analysisBench.title',
     blurbKey: 'adminNav.analysisBench.blurb',
+    docs: ['analysis-bench'],
     aliases: [
       'compare',
       'comparison',
@@ -479,6 +518,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'evaluation',
     titleKey: 'adminNav.evaluation.title',
     blurbKey: 'adminNav.evaluation.blurb',
+    docs: ['evaluation'],
     aliases: ['evaluation', 'evaluate', 'benchmark', 'seeds', 'neighbours', 'neighbors', 'ndcg', 'holdout', 'ab test'],
     fields: [
       {
@@ -494,6 +534,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'explanations',
     titleKey: 'adminNav.explanations.title',
     blurbKey: 'adminNav.explanations.blurb',
+    docs: ['ai-explanations'],
     aliases: ['explanation', 'why', 'ai text', 'reasons'],
   },
   {
@@ -502,6 +543,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'output',
     titleKey: 'adminNav.outputFormat.title',
     blurbKey: 'adminNav.outputFormat.blurb',
+    docs: ['output-format'],
     aliases: [
       'strm',
       'nfo',
@@ -529,6 +571,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'naming',
     titleKey: 'adminNav.libraryNaming.title',
     blurbKey: 'adminNav.libraryNaming.blurb',
+    docs: ['library-titles'],
     aliases: ['naming', 'prefix', 'library name', 'ai picks', 'legacy'],
     gate: 'legacyLibraryOutput',
   },
@@ -538,6 +581,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'top-picks',
     titleKey: 'adminNav.topPicks.title',
     blurbKey: 'adminNav.topPicks.blurb',
+    docs: ['top-picks'],
     aliases: ['top picks', 'trending', 'auto request', 'mdblist'],
   },
   {
@@ -546,6 +590,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'home-sections',
     titleKey: 'adminNav.homeSections.title',
     blurbKey: 'adminNav.homeSections.blurb',
+    docs: ['home-rows'],
     aliases: ['emby', 'home screen', 'home rows', 'sections', 'tags', 'top picks row'],
     fields: [
       { anchor: 'home-sections-enabled', labelKey: 'settingsHomeSections.enabled' },
@@ -558,6 +603,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'watching',
     titleKey: 'adminNav.watching.title',
     blurbKey: 'adminNav.watching.blurb',
+    docs: ['shows-you-watch'],
     aliases: ['watching', 'shows you watch', 'upcoming episodes', 'continue'],
   },
   {
@@ -566,6 +612,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'discovery',
     titleKey: 'adminNav.discoveryTuning.title',
     blurbKey: 'adminNav.discoveryTuning.blurb',
+    docs: ['discovery-tuning'],
     aliases: ['discovery', 'discover', 'seerr', 'candidates', 'pool', 'trakt', 'tmdb', 'tuning'],
     gate: 'tmdbConfigured',
     fields: [
@@ -612,6 +659,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'genre-strips',
     titleKey: 'adminNav.genreStrips.title',
     blurbKey: 'adminNav.genreStrips.blurb',
+    docs: ['genre-strips'],
     aliases: ['genre', 'strips', 'discover', 'rows', 'tmdb'],
     gate: 'tmdbConfigured',
   },
@@ -621,6 +669,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'channels',
     titleKey: 'adminNav.channelsWebExpand.title',
     blurbKey: 'adminNav.channelsWebExpand.blurb',
+    docs: ['channels-web-expand'],
     aliases: ['channels', 'playlists', 'web expansion', 'collections'],
   },
 
@@ -631,6 +680,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'branding',
     titleKey: 'adminNav.branding.title',
     blurbKey: 'adminNav.branding.blurb',
+    docs: ['branding'],
     aliases: ['name', 'logo', 'brand', 'instance name', 'title', 'rename'],
     fields: [
       { anchor: 'branding-name', labelKey: 'settingsBranding.label', aliases: ['app name', 'rename'] },
@@ -642,6 +692,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'colors',
     titleKey: 'adminNav.themeColors.title',
     blurbKey: 'adminNav.themeColors.blurb',
+    docs: ['theme-colors'],
     aliases: ['colour', 'color', 'theme', 'primary', 'secondary', 'accent'],
   },
   {
@@ -650,6 +701,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'posters',
     titleKey: 'adminNav.posterDisplay.title',
     blurbKey: 'adminNav.posterDisplay.blurb',
+    docs: ['poster-display'],
     aliases: ['poster', 'badge', 'rating badge', 'artwork'],
   },
   {
@@ -658,6 +710,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'language',
     titleKey: 'adminNav.languageDefaults.title',
     blurbKey: 'adminNav.languageDefaults.blurb',
+    docs: ['language-defaults'],
     aliases: ['language', 'locale', 'ui language', 'default'],
   },
   {
@@ -666,6 +719,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'translations',
     titleKey: 'adminNav.translations.title',
     blurbKey: 'adminNav.translations.blurb',
+    docs: ['translations'],
     aliases: ['translation', 'i18n', 'strings', 'override', 'locale'],
     ownsHeading: true,
   },
@@ -677,6 +731,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'users',
     titleKey: 'adminNav.users.title',
     blurbKey: 'adminNav.users.blurb',
+    docs: ['user-management', 'user-permissions'],
     aliases: ['users', 'accounts', 'admin', 'enable', 'disable', 'permissions', 'connections', 'social'],
     ownsHeading: true,
   },
@@ -686,6 +741,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'api-keys',
     titleKey: 'adminNav.apiKeys.title',
     blurbKey: 'adminNav.apiKeys.blurb',
+    docs: ['api-keys'],
     aliases: ['api key', 'token', 'x-api-key', 'integration key'],
   },
   {
@@ -694,6 +750,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'deployment',
     titleKey: 'adminNav.deployment.title',
     blurbKey: 'adminNav.deployment.blurb',
+    docs: ['deployment', 'external-database'],
     aliases: [
       'proxy',
       'trusted proxies',
@@ -714,6 +771,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'jobs',
     titleKey: 'adminNav.jobs.title',
     blurbKey: 'adminNav.jobs.blurb',
+    docs: ['jobs-overview', 'job-scheduling', 'global-jobs', 'movie-jobs', 'series-jobs'],
     aliases: ['jobs', 'schedule', 'cron', 'sync', 'run', 'enrichment', 'background'],
     ownsHeading: true,
   },
@@ -723,6 +781,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'backup',
     titleKey: 'adminNav.backup.title',
     blurbKey: 'adminNav.backup.blurb',
+    docs: ['backup-restore'],
     aliases: ['backup', 'restore', 'dump', 'pg_dump', 'snapshot'],
   },
   {
@@ -731,6 +790,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'poster-repair',
     titleKey: 'adminNav.posterRepair.title',
     blurbKey: 'adminNav.posterRepair.blurb',
+    docs: ['maintenance'],
     aliases: ['poster', 'repair', 'broken images', 'artwork', 'maintenance'],
   },
   {
@@ -739,6 +799,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'logs',
     titleKey: 'adminNav.logs.title',
     blurbKey: 'adminNav.logs.blurb',
+    docs: ['logs'],
     aliases: ['logs', 'logging', 'verbosity', 'debug', 'level'],
   },
   {
@@ -747,7 +808,20 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     segment: 'database',
     titleKey: 'adminNav.database.title',
     blurbKey: 'adminNav.database.blurb',
+    docs: ['database-management'],
     aliases: ['database', 'purge', 'wipe', 'danger', 'reset', 'postgres'],
+  },
+
+  // -------------------------------------------------------------------- help
+  {
+    id: 'guide',
+    group: 'help',
+    segment: 'help',
+    titleKey: 'adminDocs.guide.title',
+    blurbKey: 'adminDocs.guide.blurb',
+    aliases: ['help', 'docs', 'documentation', 'guide', 'manual', 'how to', 'readme'],
+    // One title per page it shows, so the page publishes its own.
+    ownsHeading: true,
   },
 ]
 

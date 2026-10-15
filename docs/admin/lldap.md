@@ -15,13 +15,13 @@ Admin console → **Integrations** → **LLDAP** (`/admin/integrations/lldap`). 
 | **Admin Password** | Masked once saved ("Password is saved. Enter a new one to replace it."); whitespace is stripped before submit |
 | **Enable LLDAP email import** | Master switch — disabled until the three fields above are present. Caption: "Users without a manually-set email will get theirs from LLDAP" |
 
-**Save** and **Test Connection** buttons; the test reports how many users it found ("Connection successful! Found N user(s) in LLDAP.").
+**Save** and **Test Connection** buttons; the test reports how many users it found ("Connection successful! Found N user(s) in LLDAP."). The test uses the fields as they stand, saved or not, but the saved password is only sent to the server URL it was saved for: to test a different URL, type the password in again.
 
 ## How Sync Works
 
 The daily `sync-lldap-emails` job (03:15) authenticates to LLDAP, fetches all users, and matches **Aperture username → LLDAP user id, case-insensitively**:
 
-- **Matched** — email copied across, unless the user's email is **locked** (manually set emails are never overwritten)
+- **Matched** — email copied across, unless the user's email is **locked** (manually set emails are never overwritten). A value that is not one plain address (a list, a display-name form) is skipped
 - **Unmatched** — skipped silently; not an error
 - The summary (`{matched, updated, skipped, total}`) lands in the job run history
 

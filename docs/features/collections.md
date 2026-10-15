@@ -28,5 +28,6 @@ Access to the Collections page is granted by your administrator (it's available 
 - **Editing the description** only updates the collection's overview text on the server; it never rewrites the item list.
 - **Renaming** a collection builds the new box set but does not find and remove the one under the old name — delete the old one from your media server if it lingers.
 - **Deleting** the collection in Aperture also removes the server-side collection.
+- **Your home screen** — on Emby, a collection you made can also be shown as a row on **your own** home screen (**Also show it on my Emby home screen**), when your admin has playlist rows switched on. See [Emby Home Screen](user-settings/home-screen.md).
 
 Both features are powered by the same pipeline (Aperture's *channels*); the only difference is the output type and its visibility.

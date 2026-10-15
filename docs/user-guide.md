@@ -34,7 +34,7 @@ Explore and navigate your media collection.
 7. [Title Analysis](features/title-analysis.md) - A grounded critical essay on how a title was made and received
 8. [Watch History](features/watch-history.md) - Your viewing log, with search, filters, and management
 9. [Watch Stats](features/watch-stats.md) - Analytics and viewing insights, with drill-down everywhere
-10. [Franchise Tracker](features/franchises.md) - Your progress through the movie collections on your server
+10. [Franchise Tracker](features/franchises.md) - Your progress through the movie collections on your server, and each collection's own page
 11. [Person Pages](features/person-pages.md) - Actor and director filmographies, including titles you don't have yet
 12. [Studio Pages](features/studio-pages.md) - Studio and network catalogs
 
@@ -71,36 +71,43 @@ Find content that isn't in your library yet, and get it in.
 20. [Shows You Watch](features/shows-you-watch.md) - Track ongoing series and upcoming episodes
 21. [Playlists](features/playlists.md) - AI-generated personal playlists, written back to your media server
 22. [Collections](features/collections.md) - AI-generated collections, shared with everyone on the server
-23. [Virtual Libraries](features/virtual-libraries.md) - The AI Picks and Top Picks libraries Aperture writes into your media server
+23. [Virtual Libraries](features/virtual-libraries.md) - The older AI Picks and Top Picks libraries (legacy, being phased out)
+
+---
+
+## Sharing With Connections
+
+24. [Watch This](features/watch-this.md) - Recommend titles to the people you're connected to, and see what they sent you
 
 ---
 
 ## AI Assistant
 
-24. [AI Assistant (Encore)](features/ai-assistant.md) - Ask for content in plain language; answers are grounded in your library and the web
+25. [AI Assistant (Encore)](features/ai-assistant.md) - Ask for content in plain language; answers are grounded in your library and the web
 
 ---
 
 ## Personalizing Aperture
 
-User settings live under your avatar menu, in three tabs.
+User settings live under your avatar menu, in three tabs (four on Emby).
 
-25. [Preferences](features/user-settings/preferences.md) - Language, AI library names, poster display, email notifications, Trakt
-26. [AI Algorithm Weights](features/user-settings/ai-algorithm.md) - Customize how your recommendations are scored
-27. [Watcher Identity](features/user-settings/watcher-identity.md) - Taste profiles: genre and franchise weights, interests
+26. [Preferences](features/user-settings/preferences.md) - Language, poster display, email notifications, Trakt, and the legacy AI library names
+27. [AI Algorithm Weights](features/user-settings/ai-algorithm.md) - Customize how your recommendations are scored
+28. [Watcher Identity](features/user-settings/watcher-identity.md) - Taste profiles: genre and franchise weights, interests
+29. [Emby Home Screen](features/user-settings/home-screen.md) - The rows Aperture adds to your Emby home screen, and where they go
 
 ---
 
 ## Integrations
 
-28. [Trakt Integration](features/trakt-integration.md) - Two-way rating sync and extra Discover sources
+30. [Trakt Integration](features/trakt-integration.md) - Two-way rating sync and extra Discover sources
 
 ---
 
 ## UI Features
 
-29. [Collapsible Sidebar](features/collapsible-sidebar.md) - Save screen space
-30. [Grid & List Views](features/grid-list-views.md) - Per-page display modes, remembered per account
+31. [Collapsible Sidebar](features/collapsible-sidebar.md) - Save screen space
+32. [Grid & List Views](features/grid-list-views.md) - Per-page display modes, remembered per account
 
 ---
 
@@ -120,3 +127,5 @@ User settings live under your avatar menu, in three tabs.
 | Explore similar content visually | [Media Graph](features/explore.md) |
 | See my viewing statistics | [Watch Stats](features/watch-stats.md) |
 | Customize my recommendations | [AI Algorithm](features/user-settings/ai-algorithm.md) |
+| Recommend something to someone | [Watch This](features/watch-this.md) |
+| Change my Emby home screen rows | [Emby Home Screen](features/user-settings/home-screen.md) |

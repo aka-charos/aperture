@@ -2,8 +2,6 @@
 
 Connect Aperture to Trakt.tv so **users** can sync their ratings and [Discover](../features/discovery.md) can use Trakt charts as sources.
 
-![Admin Settings - Integrations](../images/admin/admin-settings-setup-integrations.png)
-
 ## Accessing Settings
 
 Admin console → **Integrations** → **Trakt** (`/admin/integrations/trakt`).

@@ -2,8 +2,6 @@
 
 Every movie and series detail page shows **Related Movies / Related Series** — the same relationships drawn two ways: a **List** of posters and an interactive **Graph**.
 
-![Movie Detail Page](../images/features/movie-detail.png)
-
 ## List and Graph
 
 | Tab | Display |

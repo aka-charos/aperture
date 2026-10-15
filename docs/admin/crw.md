@@ -24,14 +24,17 @@ A readiness warning appears when the current mode can't run (Title Analysis mode
 | **Use the retrieval service** | off | Master switch |
 | **Service URL** | `http://host.docker.internal:3000` | **Never localhost** — Compose containers reach the host differently; the helper explains the addressing |
 | **API key** | optional | Clearing the field and saving removes the stored key |
-| **Search engine cascade** | three ordered selects | google / duckduckgo / bing + "None"; tried in order until one returns results |
-| **Results per title** | 6 (1–20) | |
-| **Timeout** | 90 s (5–300) | One page can take >80 s; check `ladder_min_ms` in the service's boot log |
-| **Source text per analysis** | 16,000 chars (2k–200k) | ~4 chars/token; size to the model's context window |
+| **Search engine cascade** | google, duckduckgo, bing | Three ordered selects, each with "None"; tried in order until one returns results. Each is a separate request, so drop an engine that is permanently blocked |
+| **Results per title** | 6 (1–20) | Pages searched and fetched by the general search |
+| **Extra criticism results** | 4 (0–20) | A second search limited to the **Criticism publications** below, **added to** the results above rather than taken from them. 0 switches it off |
+| **Criticism publications** | built-in list | The sites the extra search asks, as hosts (optionally with a path, e.g. `mubi.com/en/notebook`). Choose publications that print argued criticism; empty uses the built-in list |
+| **Time per page** | 45 s (5–60) | How long the service may spend fetching one result page. Pages behind a bot check need the time; the service itself gives a page 15 s if this is not sent |
+| **Timeout** | 180 s (5–300) | One search call: the search, then fetching every result. Must be at least 60 s above the time per page, and saving refuses a pair that does not fit |
+| **Source text per analysis** | 16,000 chars (2k–200k) | ~4 chars/token; size to the model's context window. More documents divide this budget, they do not grow it |
 | **Analysis output limit** | 8,000 tokens (0 = none) | Runaway backstop, not a length control |
-| **Max text per page** | 12,000 chars (1k–100k) | Safety valve |
+| **Maximum text per page** | 12,000 chars (1k–100k) | Safety valve |
 
-**Test** performs a real one-result search ("film criticism") and names which engine answered — deliberately not a health ping, which a half-started container can pass.
+**Test** performs a real one-result search ("film criticism") and names which engine answered — deliberately not a health ping, which a half-started container can pass. It uses the fields as they stand; the saved API key is only sent to the URL it was saved for.
 
 ## Engine Health
 
@@ -39,7 +42,7 @@ The cascade self-heals: **five consecutive empty answers park an engine at the b
 
 ## How Title Analysis Uses It
 
-The `generate-title-analysis` job (manual by default, schedulable, with a configurable titles-per-run limit) refuses to start when the mode isn't ready. Per title: engines are tried in health order, the first with results wins; the fetched text is budgeted to the configured character cap; both the retrieval mode and the sources count are recorded per analysis so results are comparable. A grounded call that returns **zero** grounding citations is thrown away — the model answered from memory, which is exactly what this feature exists to prevent.
+The `generate-title-analysis` job (manual by default, schedulable, with a configurable titles-per-run limit) refuses to start when the mode isn't ready. Per title: engines are tried in health order, the first with results wins, and the criticism search runs beside it. Before anything reaches the prompt, pages that are bot walls, empty fetches, listings with no prose, pages that never name the title, and repeats of a page already kept are dropped, at most one page per site is kept, and navigation menus and plot sections are stripped from what is left. Optionally, the [decision model](decision-model.md#weeding-title-analysis-sources) then drops pages that carry no writing about the title. The remaining text is budgeted to the configured character cap. The retrieval mode and the sources are recorded per analysis so results are comparable. A grounded call that returns **zero** grounding citations is thrown away — the model answered from memory, which is exactly what this feature exists to prevent.
 
 Failures land in the [API errors](api-errors.md) panel under the fastCRW provider.
 
