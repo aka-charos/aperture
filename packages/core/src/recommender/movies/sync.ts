@@ -1,5 +1,5 @@
 import { createChildLogger } from '../../lib/logger.js'
-import { mergeWatchHistorySyncRow } from '../watchHistorySyncRows.js'
+import { mergeWatchHistorySyncRow, watchHistorySyncUpdateSql } from '../watchHistorySyncRows.js'
 import { query, queryOne } from '../../lib/db.js'
 import { getEnabledLibraryIds } from '../../lib/libraryConfig.js'
 import { getMediaServerProvider } from '../../media/index.js'
@@ -831,9 +831,11 @@ export async function syncWatchHistoryForUser(
     return undefined
   }
 
-  // Get current watch history for this user
+  // Get current movie watch history for this user. Movie rows only: episode
+  // rows share the table with movie_id NULL, and a NULL in this set made the
+  // removal pass below try to delete it on every sync and report it removed.
   const existingHistory = await query<{ movie_id: string }>(
-    'SELECT movie_id FROM watch_history WHERE user_id = $1',
+    'SELECT movie_id FROM watch_history WHERE user_id = $1 AND movie_id IS NOT NULL',
     [userId]
   )
   const existingMovieIds = new Set(existingHistory.rows.map((r) => r.movie_id))
@@ -895,6 +897,7 @@ export async function syncWatchHistoryForUser(
 
   const syncedMovieIds = new Set<string>(toSync.map((t) => t.movieId))
   let synced = 0
+  let changed = 0
 
   // Bulk upsert watch history using unnest()
   if (toSync.length > 0) {
@@ -904,13 +907,7 @@ export async function syncWatchHistoryForUser(
        FROM unnest($2::uuid[], $3::int[], $4::timestamptz[], $5::boolean[], $6::boolean[], $7::bigint[], $8::bigint[])
          AS t(movie_id, play_count, last_played_at, is_favorite, played, playback_position_ticks, runtime_ticks)
        ON CONFLICT (user_id, movie_id) WHERE movie_id IS NOT NULL DO UPDATE SET
-         play_count = EXCLUDED.play_count,
-         last_played_at = EXCLUDED.last_played_at,
-         is_favorite = EXCLUDED.is_favorite,
-         played = EXCLUDED.played,
-         playback_position_ticks = EXCLUDED.playback_position_ticks,
-         runtime_ticks = EXCLUDED.runtime_ticks,
-         updated_at = NOW()`,
+         ${watchHistorySyncUpdateSql()}`,
       [
         userId,
         toSync.map((t) => t.movieId),
@@ -922,7 +919,11 @@ export async function syncWatchHistoryForUser(
         toSync.map((t) => t.runtimeTicks),
       ]
     )
-    synced = result.rowCount || toSync.length
+    synced = toSync.length
+    // Rows inserted or actually changed. An unchanged row is skipped by the
+    // WHERE above, so on a quiet history this is 0 — which is what lets the
+    // activity gate skip the viewer.
+    changed = result.rowCount ?? 0
   }
 
   // An approximate date stops being approximate once the title is really
@@ -961,7 +962,9 @@ export async function syncWatchHistoryForUser(
         `DELETE FROM watch_history WHERE user_id = $1 AND movie_id = ANY($2::uuid[])`,
         [userId, toRemove]
       )
-      removed = deleteResult.rowCount || toRemove.length
+      // What the delete actually removed, not what it was asked to: the two
+      // differ whenever a row went between the read above and this delete.
+      removed = deleteResult.rowCount ?? 0
       logger.debug({ userId, removed }, 'Removed stale watch history entries')
     }
   }
@@ -969,7 +972,7 @@ export async function syncWatchHistoryForUser(
   // Update user's last sync timestamp
   await query('UPDATE users SET watch_history_synced_at = NOW() WHERE id = $1', [userId])
 
-  logger.info({ userId, synced, removed, deltaSync: !fullSync }, 'Watch history sync completed')
+  logger.info({ userId, synced, changed, removed, deltaSync: !fullSync }, 'Watch history sync completed')
   return { synced, removed }
 }
 

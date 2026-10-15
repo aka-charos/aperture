@@ -222,7 +222,12 @@ export async function generateRecommendationsForUser(
       return { runId: null, recommendations: [], skipped: true }
     }
     logger.info(
-      { userId: user.id, reason: decision.reason, changedAt: decision.changedAt },
+      {
+        userId: user.id,
+        reason: decision.reason,
+        changedAt: decision.changedAt,
+        countChange: decision.countChange,
+      },
       `🔎 Regenerating: ${decision.reason}`
     )
   }

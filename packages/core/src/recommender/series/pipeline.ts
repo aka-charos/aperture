@@ -107,6 +107,8 @@ import {
   type LibraryScope,
 } from '../../lib/libraryScope.js'
 import { loadRecommendationRecipients } from '../recipients.js'
+import { inputCountsSql, outputCountsSql } from '../gateCounts.js'
+import { withRunCounts } from '../runCountsFallback.js'
 import type { PipelineConfig } from '../types.js'
 
 const logger = createChildLogger('series-recommender')
@@ -285,23 +287,6 @@ async function buildSeriesTasteProfile(
   }
 
   return averageEmbeddings(embeddings, weights)
-}
-
-/**
- * Store series taste profile
- */
-async function storeSeriesTasteProfile(userId: string, profile: number[]): Promise<void> {
-  const vectorStr = `[${profile.join(',')}]`
-
-  await query(
-    `INSERT INTO user_preferences (user_id, series_taste_embedding, series_taste_embedding_updated_at)
-     VALUES ($1, $2::halfvec, NOW())
-     ON CONFLICT (user_id) DO UPDATE SET
-       series_taste_embedding = $2::halfvec,
-       series_taste_embedding_updated_at = NOW(),
-       updated_at = NOW()`,
-    [userId, vectorStr]
-  )
 }
 
 interface SeriesCandidateQueryContext {
@@ -742,11 +727,14 @@ async function applySeriesDiversityAndSelect(
  * Create a series recommendation run record
  */
 async function createSeriesRecommendationRun(userId: string): Promise<string> {
-  const result = await queryOne<{ id: string }>(
-    `INSERT INTO recommendation_runs (user_id, media_type, status)
-     VALUES ($1, 'series', 'running')
-     RETURNING id`,
-    [userId]
+  // input_counts in the same statement that fixes created_at: see gateCounts.ts.
+  const result = await withRunCounts((withCounts) =>
+    queryOne<{ id: string }>(
+      `INSERT INTO recommendation_runs (user_id, media_type, status${withCounts ? ', input_counts' : ''})
+       VALUES ($1, 'series', 'running'${withCounts ? `, ${inputCountsSql('series', '$1')}` : ''})
+       RETURNING id`,
+      [userId]
+    )
   )
 
   return result!.id
@@ -877,10 +865,7 @@ async function storeSeriesCandidates(
   )
 }
 
-/**
- * Finalize a series recommendation run
- */
-/** Mirrors finalizeRun in the movie pipeline, including the stored weights. */
+/** Finalize a series run. Mirrors finalizeRun in the movie pipeline, including the stored weights. */
 async function finalizeSeriesRun(
   runId: string,
   candidateCount: number,
@@ -890,23 +875,26 @@ async function finalizeSeriesRun(
   error?: string,
   weights?: BlendWeights
 ): Promise<void> {
-  await query(
-    `UPDATE recommendation_runs
-     SET status = $2, candidate_count = $3, selected_count = $4,
-         duration_ms = $5, error_message = $6, completed_at = NOW(),
-         similarity_weight = $7, novelty_weight = $8, rating_weight = $9
-     WHERE id = $1`,
-    [
-      runId,
-      status,
-      candidateCount,
-      selectedCount,
-      durationMs,
-      error || null,
-      weights?.similarityWeight ?? null,
-      weights?.noveltyWeight ?? null,
-      weights?.ratingWeight ?? null,
-    ]
+  await withRunCounts((withCounts) =>
+    query(
+      `UPDATE recommendation_runs
+       SET status = $2, candidate_count = $3, selected_count = $4,
+           duration_ms = $5, error_message = $6, completed_at = NOW(),
+           similarity_weight = $7, novelty_weight = $8, rating_weight = $9
+           ${withCounts ? `, output_counts = ${outputCountsSql('$1')}` : ''}
+       WHERE id = $1`,
+      [
+        runId,
+        status,
+        candidateCount,
+        selectedCount,
+        durationMs,
+        error || null,
+        weights?.similarityWeight ?? null,
+        weights?.noveltyWeight ?? null,
+        weights?.ratingWeight ?? null,
+      ]
+    )
   )
 }
 
@@ -1000,7 +988,12 @@ export async function generateSeriesRecommendationsForUser(
       return { runId: null, recommendations: [], skipped: true }
     }
     logger.info(
-      { userId: user.id, reason: decision.reason, changedAt: decision.changedAt },
+      {
+        userId: user.id,
+        reason: decision.reason,
+        changedAt: decision.changedAt,
+        countChange: decision.countChange,
+      },
       `🔎 Regenerating: ${decision.reason}`
     )
   }
@@ -1081,9 +1074,11 @@ export async function generateSeriesRecommendationsForUser(
       return { runId, recommendations: [] }
     }
 
-    // Also store in legacy location for backwards compatibility
-    await storeSeriesTasteProfile(user.id, tasteProfile)
-    logger.info({ userId: user.id }, '💾 Stored series taste profile (legacy)')
+    // No legacy copy in user_preferences.series_taste_embedding any more:
+    // nothing has read it since F-106, and writing it on every run stamped
+    // user_preferences.updated_at after the run row was created, so the
+    // activity gate's preferences signal fired on the next run of BOTH media
+    // types for every viewer with series recommendations (F-156).
 
     // 2b. Rewrite the Watcher Identity if the profile above moved under it.
     // Mirrors the movie pipeline; see the note there for why it sits at this

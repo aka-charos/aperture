@@ -2,6 +2,8 @@ import { query, queryOne } from '../lib/db.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import type { Candidate, WatchedMovie } from './types.js'
 import type { BlendWeights } from './shared/scoring.js'
+import { inputCountsSql, outputCountsSql } from './gateCounts.js'
+import { withRunCounts } from './runCountsFallback.js'
 
 /**
  * Store recommendation candidates using bulk INSERT
@@ -380,31 +382,37 @@ export async function finalizeRun(
   errorMessage?: string,
   weights?: BlendWeights
 ): Promise<void> {
-  await query(
-    `UPDATE recommendation_runs
-     SET candidate_count = $2, selected_count = $3, duration_ms = $4, status = $5, error_message = $6,
-         similarity_weight = $7, novelty_weight = $8, rating_weight = $9
-     WHERE id = $1`,
-    [
-      runId,
-      candidateCount,
-      selectedCount,
-      durationMs,
-      status,
-      errorMessage || null,
-      weights?.similarityWeight ?? null,
-      weights?.noveltyWeight ?? null,
-      weights?.ratingWeight ?? null,
-    ]
+  await withRunCounts((withCounts) =>
+    query(
+      `UPDATE recommendation_runs
+       SET candidate_count = $2, selected_count = $3, duration_ms = $4, status = $5, error_message = $6,
+           similarity_weight = $7, novelty_weight = $8, rating_weight = $9
+           ${withCounts ? `, output_counts = ${outputCountsSql('$1')}` : ''}
+       WHERE id = $1`,
+      [
+        runId,
+        candidateCount,
+        selectedCount,
+        durationMs,
+        status,
+        errorMessage || null,
+        weights?.similarityWeight ?? null,
+        weights?.noveltyWeight ?? null,
+        weights?.ratingWeight ?? null,
+      ]
+    )
   )
 }
 
 export async function createRecommendationRun(userId: string): Promise<string> {
-  const run = await queryOne<{ id: string }>(
-    `INSERT INTO recommendation_runs (user_id, run_type, status)
-     VALUES ($1, 'scheduled', 'running')
-     RETURNING id`,
-    [userId]
+  // input_counts in the same statement that fixes created_at: see gateCounts.ts.
+  const run = await withRunCounts((withCounts) =>
+    queryOne<{ id: string }>(
+      `INSERT INTO recommendation_runs (user_id, run_type, status, media_type${withCounts ? ', input_counts' : ''})
+       VALUES ($1, 'scheduled', 'running', 'movie'${withCounts ? `, ${inputCountsSql('movie', '$1')}` : ''})
+       RETURNING id`,
+      [userId]
+    )
   )
 
   if (!run) {

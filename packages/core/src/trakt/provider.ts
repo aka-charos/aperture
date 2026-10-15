@@ -392,10 +392,17 @@ export async function syncTraktRatings(userId: string): Promise<TraktSyncResult>
        SELECT $1, movie_id, rating, 'trakt'
        FROM unnest($2::uuid[], $3::int[]) AS t(movie_id, rating)
        ON CONFLICT (user_id, movie_id) WHERE movie_id IS NOT NULL
-       DO UPDATE SET 
-         rating = EXCLUDED.rating, 
-         source = 'trakt', 
-         updated_at = CASE WHEN user_ratings.rating != EXCLUDED.rating THEN NOW() ELSE user_ratings.updated_at END
+       DO UPDATE SET
+         rating = EXCLUDED.rating,
+         source = 'trakt'
+       -- A WHERE, not a CASE on updated_at: trigger_user_ratings_updated_at
+       -- (0053, BEFORE UPDATE) overwrites updated_at on every update, so the
+       -- CASE this replaced was dead and every sync restamped every rating,
+       -- which kept the recommendation activity gate's ratings signal firing
+       -- for every Trakt-connected viewer (F-156). Skipping the UPDATE is the
+       -- only thing that stops the trigger. Unchanged rows are no longer
+       -- returned, so the "updated" count is now the ratings that changed.
+       WHERE (user_ratings.rating, user_ratings.source) IS DISTINCT FROM (EXCLUDED.rating, 'trakt')
        RETURNING (xmax = 0) as is_insert`,
       [
         userId,
@@ -445,10 +452,17 @@ export async function syncTraktRatings(userId: string): Promise<TraktSyncResult>
        SELECT $1, series_id, rating, 'trakt'
        FROM unnest($2::uuid[], $3::int[]) AS t(series_id, rating)
        ON CONFLICT (user_id, series_id) WHERE series_id IS NOT NULL
-       DO UPDATE SET 
-         rating = EXCLUDED.rating, 
-         source = 'trakt', 
-         updated_at = CASE WHEN user_ratings.rating != EXCLUDED.rating THEN NOW() ELSE user_ratings.updated_at END
+       DO UPDATE SET
+         rating = EXCLUDED.rating,
+         source = 'trakt'
+       -- A WHERE, not a CASE on updated_at: trigger_user_ratings_updated_at
+       -- (0053, BEFORE UPDATE) overwrites updated_at on every update, so the
+       -- CASE this replaced was dead and every sync restamped every rating,
+       -- which kept the recommendation activity gate's ratings signal firing
+       -- for every Trakt-connected viewer (F-156). Skipping the UPDATE is the
+       -- only thing that stops the trigger. Unchanged rows are no longer
+       -- returned, so the "updated" count is now the ratings that changed.
+       WHERE (user_ratings.rating, user_ratings.source) IS DISTINCT FROM (EXCLUDED.rating, 'trakt')
        RETURNING (xmax = 0) as is_insert`,
       [
         userId,

@@ -1,5 +1,5 @@
 import { createChildLogger } from '../../lib/logger.js'
-import { mergeWatchHistorySyncRow } from '../watchHistorySyncRows.js'
+import { mergeWatchHistorySyncRow, watchHistorySyncUpdateSql } from '../watchHistorySyncRows.js'
 import { query, queryOne } from '../../lib/db.js'
 import { getMediaServerProvider } from '../../media/index.js'
 import { getMediaServerApiKey, getMediaServerConfig } from '../../settings/systemSettings.js'
@@ -185,6 +185,7 @@ export async function syncSeriesWatchHistoryForUser(
 
   const syncedEpisodeIds = new Set<string>(toSync.map((t) => t.episodeId))
   let synced = 0
+  let changed = 0
 
   // Bulk upsert watch history using unnest()
   if (toSync.length > 0) {
@@ -194,13 +195,7 @@ export async function syncSeriesWatchHistoryForUser(
        FROM unnest($2::uuid[], $3::int[], $4::timestamptz[], $5::boolean[], $6::boolean[], $7::bigint[], $8::bigint[])
          AS t(episode_id, play_count, last_played_at, is_favorite, played, playback_position_ticks, runtime_ticks)
        ON CONFLICT (user_id, episode_id) WHERE episode_id IS NOT NULL DO UPDATE SET
-         play_count = EXCLUDED.play_count,
-         last_played_at = EXCLUDED.last_played_at,
-         is_favorite = EXCLUDED.is_favorite,
-         played = EXCLUDED.played,
-         playback_position_ticks = EXCLUDED.playback_position_ticks,
-         runtime_ticks = EXCLUDED.runtime_ticks,
-         updated_at = NOW()`,
+         ${watchHistorySyncUpdateSql()}`,
       [
         userId,
         toSync.map((t) => t.episodeId),
@@ -212,7 +207,11 @@ export async function syncSeriesWatchHistoryForUser(
         toSync.map((t) => t.runtimeTicks),
       ]
     )
-    synced = result.rowCount || toSync.length
+    synced = toSync.length
+    // Rows inserted or actually changed. An unchanged row is skipped by the
+    // WHERE above, so on a quiet history this is 0 — which is what lets the
+    // activity gate skip the viewer.
+    changed = result.rowCount ?? 0
   }
 
   // Remove watch history entries no longer present in Emby (played, resume, or favorites)
@@ -225,7 +224,9 @@ export async function syncSeriesWatchHistoryForUser(
         `DELETE FROM watch_history WHERE user_id = $1 AND episode_id = ANY($2::uuid[]) AND media_type = 'episode'`,
         [userId, toRemove]
       )
-      removed = deleteResult.rowCount || toRemove.length
+      // What the delete actually removed, not what it was asked to (mirrors
+      // the movie sync).
+      removed = deleteResult.rowCount ?? 0
       logger.debug({ userId, removed }, 'Removed stale episode watch history entries')
     }
   }
@@ -234,7 +235,7 @@ export async function syncSeriesWatchHistoryForUser(
   await query('UPDATE users SET series_watch_history_synced_at = NOW() WHERE id = $1', [userId])
 
   logger.info(
-    { userId, synced, removed, deltaSync: !fullSync },
+    { userId, synced, changed, removed, deltaSync: !fullSync },
     'Series watch history sync completed'
   )
   return { synced, removed }

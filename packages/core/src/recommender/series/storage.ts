@@ -176,25 +176,5 @@ export async function clearUserSeriesRecommendations(userId: string): Promise<vo
   logger.info({ userId, runsDeleted: runIds.length }, 'Cleared series recommendations for user')
 }
 
-/**
- * Finalize a series recommendation run
- */
-export async function finalizeSeriesRun(
-  runId: string,
-  candidateCount: number,
-  selectedCount: number,
-  durationMs: number,
-  status: 'completed' | 'failed',
-  errorMessage?: string
-): Promise<void> {
-  await query(
-    `UPDATE recommendation_runs
-     SET candidate_count = $2, selected_count = $3, duration_ms = $4, status = $5, 
-         error_message = $6, completed_at = NOW()
-     WHERE id = $1`,
-    [runId, candidateCount, selectedCount, durationMs, status, errorMessage || null]
-  )
-}
-
 
 

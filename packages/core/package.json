@@ -63,7 +63,7 @@
     "test:exclusion": "node --import tsx --test src/recommender/watchedExclusion.test.ts src/recommender/watchHistoryCallSites.test.ts",
     "test:countries": "node --import tsx --test src/countries/canonical.test.ts src/tmdb/originCountries.test.ts",
     "test:engagement": "node --import tsx --test src/taste-profile/engagement.test.ts src/taste-profile/ratingWeight.test.ts src/recommender/series/libraryEpisodes.test.ts",
-    "test:activity-gate": "node --import tsx --test src/recommender/activityGate.test.ts",
+    "test:activity-gate": "node --import tsx --test src/recommender/activityGate.test.ts src/recommender/gateCounts.test.ts src/recommender/watchHistorySyncRows.test.ts",
     "test:storage": "node --import tsx --test src/recommender/storage.test.ts",
     "test:canonical": "node --import tsx --test src/recommender/movies/canonicalText.test.ts",
     "test:twins": "node --import tsx --test src/recommender/shared/twinSlots.test.ts src/recommender/shared/acclaimedSlots.test.ts",

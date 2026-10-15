@@ -1766,3 +1766,50 @@ A near-constant excess at every size is the signature of a sorted MINORITY: roug
 6. **Absent API parameters mean any + AND**, the shape callers always had, except that "any" now also matches the origin, so a country query can return a title whose only link to it is TMDb's origin. Only the Browse page sends primary + OR. Presets saved before the scope existed load with secondary included.
 
 **Not changed:** the assistant's country filter ([F-011](#f-011)) still matches `production_countries` anywhere, and nothing else displays a "country of origin" yet.
+
+## F-156
+
+**The activity gate ([F-043](#f-043)) never skipped anyone, for three separate reasons, and fixing the first exposed that it could not see a deletion at all.**
+
+**1. The full watch-history sync rewrote every row on every pass.** Both upserts (`movies/sync.ts` `syncWatchHistoryForUser`, `series/watchHistorySync.ts`) ended `ON CONFLICT … DO UPDATE SET …, updated_at = NOW()` with no condition, and `trigger_watch_history_updated_at` (`0008`, BEFORE UPDATE) stamps `updated_at` on any update anyway. The sync runs in full mode everywhere: the two jobs pass `fullSync = true`, and step 0 of both recommendation pipelines runs a full sync per user **before** the gate. The gate's watch-history signal is `MAX(watch_history.updated_at)`, so it was always newer than the last run. The gate's own tests passed throughout: `decideRegeneration` was right, and its input was always "changed".
+
+**Delta sync was not the fix.** `0084` made the jobs full because a delta cannot see a title unplayed or unfavorited on the server, and that reason stands.
+
+**Fix:** `DO UPDATE … WHERE (stored) IS DISTINCT FROM (incoming)`, built by `watchHistorySyncUpdateSql()` (`recommender/watchHistorySyncRows.ts`) from one column list, so the SET and the comparison cannot drift; both upserts call it. A `WHERE` on `DO UPDATE` suppresses the UPDATE itself, which is the only thing that stops a BEFORE UPDATE trigger: writing the old `updated_at` back would not, since the trigger overwrites it. `IS DISTINCT FROM`, because the tick columns and `last_played_at` are NULL on many rows and `<>` reads a change to or from NULL as no change. `playback_position_ticks` counts as activity: it moves only when the viewer plays the title, and crossing 5% moves it into `WATCH_HISTORY_EXCLUDABLE_SQL`, which changes the candidate pool. The sync log now reports `synced` (rows seen) and `changed` (rows written); a quiet history logs `changed: 0`.
+
+**2. Every series run rewrote the viewer's `user_preferences` row.** `storeSeriesTasteProfile` wrote `series_taste_embedding` (no reader since [F-106](#f-106)) on every run, after the run row was created, so `user_preferences.updated_at` was always newer than the last run. The preferences signal is not per media type, so this fired the gate for **both** movies and series for every viewer with series recommendations. Deleted rather than guarded, since the column has no reader.
+
+**3. The Trakt ratings sync (every 6 hours) restamped every rating.** Its upsert set `updated_at = CASE WHEN rating changed THEN NOW() ELSE old END`, and `trigger_user_ratings_updated_at` (`0053`) overwrites that on every update, so the CASE was dead: the same mistake as (1), written by someone who saw the problem and solved it in a place the trigger overrides. Now `WHERE (rating, source) IS DISTINCT FROM (EXCLUDED.rating, 'trakt')`. Unchanged rows are no longer returned, so its "updated" count is now the ratings that changed. **General form: with a BEFORE UPDATE `updated_at` trigger, the only way to keep `updated_at` is not to UPDATE; anything in the SET list is overwritten.**
+
+**4. Deletions: the restamp was hiding that no timestamp sees one.** Every gate signal is "the newest timestamp in a table", and a deleted row leaves none. While (1) restamped everything, every removal was covered by accident. Once the gate skips people, removals come from many places: a title unplayed or unfavorited on the server, "mark unwatched", a rating removed, a custom interest or a franchise/genre weight deleted, and a title dropped from the library, which takes every viewer's watch rows, ratings **and picks** with it by `ON DELETE CASCADE`, with no code anywhere to notice.
+
+**Stamping each delete site was tried in this change and abandoned.** It covered the explicit deletes and missed every cascade and every delete site not written yet.
+
+**Fix: row counts.** `0203` adds two columns to `recommendation_runs`:
+- `input_counts`: the viewer's watch rows, ratings, taste profile, preferences, settings, franchise and genre weights, interests, and for series their series favourites. Written in the statement that creates the run, the moment `created_at` is fixed.
+- `output_counts`: the run's picks and their evidence. Written at finalize.
+
+The gate counts the same rows now and regenerates when any count differs (`compareCounts`, `recommender/gateCounts.ts`, pure). That is complete for deletions whatever caused them: a deletion lowers a count unless an insertion offsets it, and an insertion carries a timestamp newer than the run.
+
+Six rules.
+- (a) **One SQL definition for both halves.** `inputCountsSql`/`outputCountsSql` build the snapshot and the gate's current read, each count scoped exactly as its matching timestamp signal.
+- (b) **Inputs at creation, not at finalize.** Counted at the end, a deletion made while the run was working would be folded into the baseline.
+- (c) **Outputs exist because of picks.** A removed title deletes its candidate rows, leaving the viewer a pick short with nothing in their own history moved. Thinning and pruning never touch the selected rows of the newest completed run, so on that run these counts move only when a title is deleted.
+- (d) **Any difference regenerates, a rise included.** A rise with no newer timestamp should not happen, so if it does, something the timestamps cannot see moved.
+- (e) **A run with no counts reads as unknown and regenerates** (every run made before `0203`): one extra run per viewer after the deploy, then normal skipping. A key added to the snapshot later is skipped on older runs rather than read as a change.
+- (f) **`gateCounts.test.ts` scans core** and fails when a run creator or any UPDATE that sets a run's status does not record its counts, with comments stripped first (`testing/sourceTree.ts`) so a mention in prose cannot stand in for the call, and a literal status (`status = 'completed'`) counted as a finalize too. Verified by removing the counts from a finalize. A writer that skipped them would make its viewers regenerate on every run, the safe direction, which is why nothing else would ever notice. The dead second `finalizeSeriesRun` in `series/storage.ts` (exported, called by nothing) was deleted rather than kept in step.
+- (g) **The writers survive a schema without `0203`.** The counts ride in the statements that create and finalize a run, so an image newer than its schema (migrations run by hand, `RUN_MIGRATIONS_ON_START` off) would have failed every recommendation run, where the gate's own read fails open. `withRunCounts` (`recommender/runCountsFallback.ts`) retries the write without the counts on an undefined-column error naming one of the two columns (`isMissingRunCountsColumn`, pure and pinned), and warns once. Any other missing column still fails. A run written that way reads as `counts-unknown`, so the gate regenerates those viewers until the migration runs.
+
+**Expected and harmless:** a run that rebuilds a stale taste profile, rewrites the Watcher Identity or detects franchises writes those inputs after its own run row, so the next run regenerates once more. That is at most once per profile refresh (30 days), not every run.
+
+**Only reader checked.** `watch_history.updated_at` is read by the gate alone (grep over core and `apps/api`).
+
+**Not verified against a database** (none in the authoring environment). `scripts/check-activity-gate.sql` reports, for every viewer and media type, every reason their next scheduled run would regenerate, or nothing when the gate would skip. Its count expressions are generated from `gateCounts.ts` and pinned against it by a test. Run it twice after the deploy:
+- once before the first scheduled recommendation run, when every row should read `counts-unknown`;
+- once after it, when a viewer who watched nothing should show an empty reason.
+
+Any reason that shows up for everyone is another writer restamping a signal, the class of fault (2) and (3) were.
+
+**The duplicate-row merge is now order-independent.** `mergeWatchHistorySyncRow` took the first non-null `runtimeTicks`, so two copies of one title reporting different runtimes merged differently by arrival order, and with the upsert guard an order flip would read as a changed row on every sync. It takes the longer runtime now (compared as numbers, since a BIGINT arrives as a string); every field is a max, an OR or a latest, and a test pins that both orders give the same row.
+
+**Left to the check script:** a row set that oscillates on the server side (an in-progress list that rotates, a capped endpoint) would delete and re-add rows on alternate syncs, so the count moves and the gate never skips that viewer. That is no regression (everyone regenerated before), and the check script names such viewers with `input-counts (watch_history …)`.

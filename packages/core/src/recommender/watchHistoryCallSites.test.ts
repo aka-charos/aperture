@@ -1,8 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { sourceFiles } from '../testing/sourceTree.js'
 
 /**
  * Every query that READS watch_history must say what it means by "watched".
@@ -116,6 +117,9 @@ const ALLOWED_UNFILTERED: Record<string, string> = {
   'packages/core/src/recommender/movies/sync.ts':
     'Owns the rows. Reads existing ids to diff against the media server.',
   'packages/core/src/recommender/series/watchHistorySync.ts': 'Series counterpart of the above.',
+  'packages/core/src/recommender/gateCounts.ts':
+    'Counts rows so the activity gate can see a DELETION. Any row leaving is a change, ' +
+    'favourite or not, for the same reason the gate itself is allowlisted below.',
   'packages/core/src/recommender/activityGate.ts':
     'Asks whether anything CHANGED since the last run. A new favorite is real activity, ' +
     'and gating it on played would make the recommender ignore a signal it acts on.',
@@ -131,17 +135,6 @@ const ALLOWED_UNFILTERED: Record<string, string> = {
     'because the summary tiles they open from are counted without it (skipWatched).',
 }
 
-function* walk(dir: string): Generator<string> {
-  for (const entry of readdirSync(dir)) {
-    if (entry === 'node_modules' || entry === 'dist') continue
-    const full = join(dir, entry)
-    if (statSync(full).isDirectory()) {
-      yield* walk(full)
-    } else if (entry.endsWith('.ts')) {
-      yield full
-    }
-  }
-}
 
 interface Literal {
   text: string
@@ -232,7 +225,7 @@ function scan(): { offenders: string[]; reads: number; files: number } {
   let files = 0
 
   for (const root of SCANNED_ROOTS) {
-    for (const file of walk(root)) {
+    for (const file of sourceFiles(root)) {
       files++
       const rel = relative(REPO_ROOT, file).split(sep).join('/')
       if (rel.endsWith('.test.ts')) continue

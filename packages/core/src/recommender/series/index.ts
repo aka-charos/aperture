@@ -30,7 +30,6 @@ export {
   storeSeriesEvidence,
   getSeriesOverviews,
   clearUserSeriesRecommendations as clearSeriesRecommendations,
-  finalizeSeriesRun,
 } from './storage.js'
 
 export {

@@ -39,6 +39,7 @@ import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import { getRecommendationConfig } from '../lib/recommendationConfig.js'
+import { compareCounts, inputCountsSql, outputCountsSql, type GateCounts } from './gateCounts.js'
 
 const logger = createChildLogger('recommender-activity-gate')
 
@@ -97,11 +98,19 @@ export interface RegenerationDecision {
     | 'preferences'
     | 'new-candidates'
     | 'config'
+    /** An input row count moved since the run: a deletion the timestamps cannot see. */
+    | 'input-counts'
+    /** The run lost picks or evidence rows: a recommended title was deleted. */
+    | 'output-counts'
+    /** The run predates the count snapshots (0203), so a deletion cannot be ruled out. */
+    | 'counts-unknown'
     | 'check-failed'
     | 'unchanged'
   lastRunAt: Date | null
   /** The newest input timestamp we found, when that is what triggered the run */
   changedAt: Date | null
+  /** Which count moved, when a count is what triggered the run (for logs) */
+  countChange?: { key: string; stored: number; current: number }
 }
 
 const REGENERATE = (
@@ -118,6 +127,15 @@ interface SignalRow {
   config: Date | null
   /** Titles that became available to recommend since the last run */
   new_candidate_count: number
+  /**
+   * Row counts stored on the last run and the same counts now (gateCounts.ts).
+   * `undefined` means the caller did not ask, and the count check is skipped;
+   * `null` means asked and there is nothing to compare, which regenerates.
+   */
+  input_counts?: GateCounts | null
+  current_input_counts?: GateCounts | null
+  output_counts?: GateCounts | null
+  current_output_counts?: GateCounts | null
 }
 
 /**
@@ -159,6 +177,24 @@ export function decideRegeneration(
     }
   }
 
+  // Deletions. Every check above is "a timestamp newer than the run", and a
+  // deleted row leaves none, so the run's stored row counts are compared with
+  // the counts now (gateCounts.ts). Skipped only when the caller passed no
+  // counts at all; a run that has none to compare (made before 0203) cannot
+  // rule a deletion out, so it regenerates.
+  for (const [reason, stored, current] of [
+    ['input-counts', signals.input_counts, signals.current_input_counts],
+    ['output-counts', signals.output_counts, signals.current_output_counts],
+  ] as const) {
+    if (stored === undefined && current === undefined) continue
+    const comparison = compareCounts(stored, current)
+    if (comparison.kind === 'unknown') return REGENERATE('counts-unknown', lastRunAt)
+    if (comparison.kind === 'changed') {
+      const countChange = { key: comparison.key, stored: comparison.stored, current: comparison.current }
+      return { ...REGENERATE(reason, lastRunAt), countChange }
+    }
+  }
+
   // Counted, not compared: see GateThresholds.newCandidateThreshold.
   if ((signals.new_candidate_count ?? 0) >= thresholds.newCandidateThreshold) {
     return REGENERATE('new-candidates', lastRunAt)
@@ -176,7 +212,7 @@ async function readSignals(
   userId: string,
   mediaType: RecommendationMediaType,
   embeddingTable: string | null,
-  lastRunAt: Date,
+  lastRun: { id: string; created_at: Date },
   thresholds: GateThresholds
 ): Promise<SignalRow | null> {
   const isMovie = mediaType === 'movie'
@@ -184,6 +220,10 @@ async function readSignals(
   // watch_history stores episodes under media_type 'episode'; series-level
   // favorites leave no row there at all and arrive via user_watching_series,
   // which is why the series branch unions it in (see builder.ts).
+  //
+  // updated_at moves only when a row actually changes: the sync's upsert skips
+  // unchanged rows (watchHistorySyncUpdateSql). A DELETED row leaves no
+  // updated_at at all, which is what the row counts below are for.
   const watchHistorySql = isMovie
     ? `SELECT MAX(updated_at) FROM watch_history WHERE user_id = $1 AND media_type = 'movie'`
     : `SELECT GREATEST(
@@ -232,8 +272,12 @@ async function readSignals(
        -- write, including edits to the gate's own thresholds, which are not a
        -- reason to recompute anyone's picks.
        (SELECT MAX(scoring_updated_at) FROM recommendation_config) AS config,
-       (${newCandidatesSql})::int AS new_candidate_count`,
-    [userId, mediaType, lastRunAt]
+       (${newCandidatesSql})::int AS new_candidate_count,
+       -- The same counts the run stored, taken now (gateCounts.ts): one
+       -- definition for both, so they cannot count different rows.
+       ${inputCountsSql(mediaType, '$1')} AS current_input_counts,
+       ${outputCountsSql('$4')} AS current_output_counts`,
+    [userId, mediaType, lastRun.created_at, lastRun.id]
   )
 }
 
@@ -269,8 +313,13 @@ export async function shouldRegenerateRecommendations(
   mediaType: RecommendationMediaType
 ): Promise<RegenerationDecision> {
   try {
-    const lastRun = await queryOne<{ created_at: Date }>(
-      `SELECT created_at FROM recommendation_runs
+    const lastRun = await queryOne<{
+      id: string
+      created_at: Date
+      input_counts: GateCounts | null
+      output_counts: GateCounts | null
+    }>(
+      `SELECT id, created_at, input_counts, output_counts FROM recommendation_runs
         WHERE user_id = $1 AND media_type = $2 AND status = 'completed'
         ORDER BY created_at DESC
         LIMIT 1`,
@@ -297,7 +346,14 @@ export async function shouldRegenerateRecommendations(
       // works, and the pipeline will report the real problem itself.
     }
 
-    const signals = await readSignals(userId, mediaType, embeddingTable, lastRunAt, thresholds)
+    const current = await readSignals(userId, mediaType, embeddingTable, lastRun, thresholds)
+    // The stored halves of the count comparison ride on the run row; null on a
+    // run from before 0203, which decideRegeneration reads as "regenerate".
+    const signals = current && {
+      ...current,
+      input_counts: lastRun.input_counts,
+      output_counts: lastRun.output_counts,
+    }
     return decideRegeneration(lastRunAt, signals, thresholds)
   } catch (err) {
     // Fails open: a broken check must cost compute, never correctness.
