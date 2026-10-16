@@ -104,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth()
   }, [checkAuth])
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, options?: { uiLanguage?: string }) => {
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -123,6 +123,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await response.json()
+
+    // Saved BEFORE the user is set: setting it mounts the app, which reads the
+    // account's language and would otherwise switch back to it. A refusal (a
+    // language the admin has since disabled) leaves the stored one in place.
+    if (options?.uiLanguage) {
+      try {
+        await fetch('/api/auth/me/preferences', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ uiLanguage: options.uiLanguage }),
+        })
+      } catch {
+        // the stored language stands
+      }
+    }
+
     setUser(data.user)
     setCapabilities(data.capabilities ?? {})
 

@@ -180,8 +180,19 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       config: { rateLimit: loginOptionsRateLimit },
     },
     async (_request, reply) => {
+      // The app languages the admin enabled, for the login page's language
+      // flag. Public like the rest of this route: it is the language list the
+      // signed-in switcher offers, nothing about any account.
+      const { getSystemLanguageDefaults, APP_LOCALE_OPTIONS } = await import('@aperture/core')
+      const defaults = await getSystemLanguageDefaults()
       return reply.send({
         allowPasswordlessLogin: await isPasswordlessLoginEnabled(),
+        languages: {
+          defaultLanguage: defaults.defaultUiLanguage,
+          options: APP_LOCALE_OPTIONS.filter((o) =>
+            (defaults.enabledUiLanguages as readonly string[]).includes(o.code)
+          ).map((o) => ({ code: o.code, label: o.label })),
+        },
       })
     }
   )

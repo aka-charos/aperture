@@ -47,7 +47,12 @@ export interface AuthContextType {
   loading: boolean
   sessionError: string | null
   impersonation: ImpersonationState | null
-  login: (username: string, password: string) => Promise<void>
+  /**
+   * `uiLanguage` is a language picked on the login page: it is saved to the
+   * account before the session is applied, so signing in does not switch the
+   * page back to the language the account had stored.
+   */
+  login: (username: string, password: string, options?: { uiLanguage?: string }) => Promise<void>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
   /**

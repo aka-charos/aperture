@@ -15,9 +15,11 @@ import { useTheme } from '@mui/material/styles'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslation } from 'react-i18next'
 import { useAppName, useLogoUrl } from '@/lib/branding'
+import { applyEffectiveUiLanguage } from '@/i18n/syncUiLanguage'
+import { LoginLanguageButton, type LoginLanguageOption } from '@/components/LoginLanguageButton'
 
 export function LoginPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   // The visible wordmark is `common.appName`; this is the logo's alt text, which
   // has no translation to interpolate into.
   const appName = useAppName()
@@ -31,6 +33,11 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [allowPasswordlessLogin, setAllowPasswordlessLogin] = useState(false)
   const [loadingOptions, setLoadingOptions] = useState(true)
+  const [languageOptions, setLanguageOptions] = useState<LoginLanguageOption[]>([])
+  // Set only when the person picks a flag here; it is then saved to the
+  // account at sign-in. A language detected from the browser is not a choice.
+  const [pickedLanguage, setPickedLanguage] = useState<string | null>(null)
+  const currentLanguage = i18n.resolvedLanguage || i18n.language
   
   // Clear session error when user starts typing
   useEffect(() => {
@@ -47,6 +54,21 @@ export function LoginPage() {
         if (response.ok) {
           const data = await response.json()
           setAllowPasswordlessLogin(data.allowPasswordlessLogin)
+          const languages = data.languages as
+            | { defaultLanguage?: string; options?: LoginLanguageOption[] }
+            | undefined
+          const options = Array.isArray(languages?.options) ? languages.options : []
+          setLanguageOptions(options)
+          // A browser language the admin has not enabled shows the server's
+          // default instead, the language the person would get once inside.
+          const shown = i18n.resolvedLanguage || i18n.language
+          if (
+            options.length > 0 &&
+            !options.some((o) => o.code === shown) &&
+            languages?.defaultLanguage
+          ) {
+            await applyEffectiveUiLanguage(languages.defaultLanguage)
+          }
         }
       } catch {
         // Default to requiring password if we can't fetch options
@@ -55,7 +77,7 @@ export function LoginPage() {
       }
     }
     fetchLoginOptions()
-  }, [])
+  }, [i18n])
 
   // Redirect if already logged in
   useEffect(() => {
@@ -70,7 +92,7 @@ export function LoginPage() {
     setLoading(true)
 
     try {
-      await login(username, password)
+      await login(username, password, pickedLanguage ? { uiLanguage: pickedLanguage } : undefined)
       navigate('/')
     } catch (err) {
       const { code, serverName } = (err ?? {}) as { code?: string; serverName?: string }
@@ -190,6 +212,19 @@ export function LoginPage() {
           bottom: 0,
         }}
       />
+
+      {languageOptions.length > 1 && (
+        <Box sx={{ position: 'absolute', top: 16, insetInlineEnd: 16, zIndex: 2 }}>
+          <LoginLanguageButton
+            options={languageOptions}
+            value={currentLanguage}
+            onChange={(code) => {
+              setPickedLanguage(code)
+              void applyEffectiveUiLanguage(code)
+            }}
+          />
+        </Box>
+      )}
 
       <Card
         sx={{
