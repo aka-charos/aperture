@@ -9,6 +9,7 @@ import {
   regenerateUserRecommendations,
   getEffectiveAiExplanationSetting,
   refreshExplanations,
+  refreshExplanationForPick,
   evidenceSupportsCause,
   NOVELTY_ALIEN_FLOOR,
   blendWeightShares,
@@ -171,6 +172,43 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         const error = err instanceof Error ? err.message : 'Unknown error'
         fastify.log.error({ err, userId }, 'Failed to refresh explanations')
         return reply.status(500).send({ error: `Failed to refresh explanations: ${error}` })
+      }
+    }
+  )
+
+  /**
+   * POST /api/recommendations/:userId/:mediaType/:itemId/explanation
+   *
+   * Rewrite the explanation of ONE pick. The route above (and the job behind
+   * it) rewrites every pick, which is paid model calls for twenty titles to
+   * repair one — this is a single call. Same permission as the route above:
+   * the viewer for their own picks, or an admin. Covers both media types for
+   * the same reason that route does.
+   */
+  fastify.post<{ Params: { userId: string; mediaType: ExplanationMediaType; itemId: string } }>(
+    '/api/recommendations/:userId/:mediaType/:itemId/explanation',
+    { preHandler: requireAuth, schema: recommendationSchemas.refreshPickExplanation },
+    async (request, reply) => {
+      const { userId, mediaType, itemId } = request.params
+      const currentUser = request.user as SessionUser
+
+      if (userId !== currentUser.id && !currentUser.isAdmin) {
+        return reply.status(403).send({ error: 'Forbidden' })
+      }
+
+      try {
+        const result = await refreshExplanationForPick(userId, mediaType, itemId)
+        if (result.status === 'disabled') {
+          return reply.status(409).send({ error: 'AI explanations are switched off for this user' })
+        }
+        if (result.status === 'not-a-pick') {
+          return reply.status(404).send({ error: 'This title is not one of the current picks' })
+        }
+        return reply.send({ status: result.status })
+      } catch (err) {
+        const error = err instanceof Error ? err.message : 'Unknown error'
+        fastify.log.error({ err, userId, mediaType, itemId }, 'Failed to refresh one explanation')
+        return reply.status(500).send({ error: `Failed to refresh the explanation: ${error}` })
       }
     }
   )

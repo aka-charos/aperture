@@ -80,7 +80,12 @@ export function MediaDetailPage({
     favoriteLoading,
     toggleFavorite,
     updateRating,
+    refreshExplanation,
   } = useMediaDetail(mediaType, id, user?.id)
+
+  // Rewriting one explanation is a paid model call, so the button is the
+  // operator's. The route also allows a viewer's own picks, as the bulk one does.
+  const onRefreshExplanation = user?.isAdmin ? refreshExplanation : undefined
 
   if (loading) {
     return (
@@ -165,7 +170,12 @@ export function MediaDetailPage({
           page, not a page's — so that form renders inside the left column
           below. See insightsHaveDetail. */}
       {insights && insightsHaveDetail(insights) && (
-        <MovieInsights insights={insights} mediaType={mediaType} onOpenMedia={onOpenMedia} />
+        <MovieInsights
+          insights={insights}
+          mediaType={mediaType}
+          onOpenMedia={onOpenMedia}
+          onRefreshExplanation={onRefreshExplanation}
+        />
       )}
 
       {/* Main Content */}
@@ -180,6 +190,7 @@ export function MediaDetailPage({
                   insights={insights}
                   mediaType={mediaType}
                   onOpenMedia={onOpenMedia}
+                  onRefreshExplanation={onRefreshExplanation}
                 />
               )}
               {/* Grounded critical analysis — about the WORK, identical for

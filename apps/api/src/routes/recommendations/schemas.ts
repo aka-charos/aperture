@@ -144,6 +144,22 @@ const refreshExplanations = {
   },
 }
 
+const refreshPickExplanation = {
+  tags: ['recommendations'],
+  summary: 'Rewrite one recommendation explanation',
+  description:
+    "Re-runs the AI explanation for ONE pick on the user's newest recommendations: one text-generation call, scores and picks untouched. A taste-twin pick also has its shared titles re-chosen first. 404 when the title is not a current pick; 409 when AI explanations are off for this user.",
+  params: {
+    type: 'object' as const,
+    properties: {
+      userId: { type: 'string' as const, format: 'uuid', description: 'User ID' },
+      mediaType: { type: 'string' as const, enum: ['movie', 'series'] },
+      itemId: { type: 'string' as const, format: 'uuid', description: 'Movie or series ID' },
+    },
+    required: ['userId', 'mediaType', 'itemId'] as string[],
+  },
+}
+
 const getMovieInsights = {
   tags: ['recommendations'],
   summary: 'Get movie insights',
@@ -295,6 +311,7 @@ export const recommendationSchemas = {
   getMovieRecommendations,
   regenerateMovieRecommendations,
   refreshExplanations,
+  refreshPickExplanation,
   getMovieInsights,
   getSeriesRecommendations,
   regenerateSeriesRecommendations,

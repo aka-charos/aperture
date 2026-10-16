@@ -864,7 +864,9 @@
       "closestWithTwinConnectionMovie": "Films in your history that most resemble this one. {{name}} watched the marked ones too:",
       "closestWithTwinConnectionSeries": "Shows in your history that most resemble this one. {{name}} watched the marked ones too:",
       "twinMark": "Also watched by the person whose taste overlaps yours",
-      "twinMarkConnection": "{{name}} watched this too"
+      "twinMarkConnection": "{{name}} watched this too",
+      "rewriteExplanation": "Rewrite this explanation",
+      "rewriteExplanationFailed": "Could not rewrite it: {{detail}}"
     },
     "seasons": {
       "title": "에피소드",

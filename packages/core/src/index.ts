@@ -351,6 +351,8 @@ export {
   refreshExplanations,
   refreshAllExplanations,
   refreshExplanationsForRun,
+  refreshExplanationForPick,
+  type PickExplanationRefresh,
   type ExplanationMediaType,
   type ExplanationRefreshOptions,
   type ExplanationRefreshResult,

@@ -13,6 +13,7 @@ import {
   Tooltip,
   Collapse,
   IconButton,
+  CircularProgress,
 } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
@@ -24,6 +25,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import QueryStatsIcon from '@mui/icons-material/QueryStats'
 import GroupsIcon from '@mui/icons-material/Groups'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 import { gradients } from '@/theme'
 import { insightsHaveDetail } from '../helpers'
@@ -35,6 +37,12 @@ interface MovieInsightsProps {
   mediaType?: MediaType
   /** Show an evidence item without routing (set when this sits inside a dialog). */
   onOpenMedia?: (mediaType: MediaType, id: string) => void
+  /**
+   * Rewrite this pick's explanation (one paid model call); resolves to an
+   * error sentence or null. Absent hides the button — the page passes it to
+   * admins only.
+   */
+  onRefreshExplanation?: () => Promise<string | null>
 }
 
 interface ScoreMeter {
@@ -250,10 +258,14 @@ function MatchNotes({
   )
 }
 
-export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: MovieInsightsProps) {
+export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRefreshExplanation }: MovieInsightsProps) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const theme = useTheme()
+  // State for the per-pick "rewrite explanation" button, declared before the
+  // early return below like every other hook here.
+  const [rewriting, setRewriting] = useState(false)
+  const [rewriteError, setRewriteError] = useState<string | null>(null)
 
   // One of the run's picks, as opposed to a title the run merely scored. This
   // used to be a second condition on the early return below, so the panel could
@@ -421,6 +433,17 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   // the server drops rather than show.
   const twinShared = insights.twinShared ?? []
   const twinDonor = insights.twinDonor
+
+  // One pick's explanation, rewritten on demand. Only a selected pick has one.
+  const canRewrite = Boolean(onRefreshExplanation) && insights.isSelected === true
+  const rewriteExplanation = async () => {
+    if (!onRefreshExplanation || rewriting) return
+    setRewriting(true)
+    setRewriteError(null)
+    const error = await onRefreshExplanation()
+    setRewriteError(error)
+    setRewriting(false)
+  }
 
   // The evidence and a twin pick's shared titles (both viewers played them,
   // nearest the pick) as ONE row, closest first, the twin's marked. They were
@@ -742,10 +765,34 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                     <Typography variant="subtitle2" fontWeight={600}>
                       {t('mediaDetail.insights.aiExplanationTitle')}
                     </Typography>
+                    {canRewrite && (
+                      <Tooltip title={t('mediaDetail.insights.rewriteExplanation')}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={rewriteExplanation}
+                            disabled={rewriting}
+                            aria-label={t('mediaDetail.insights.rewriteExplanation')}
+                            sx={{ ml: 'auto' }}
+                          >
+                            {rewriting ? (
+                              <CircularProgress size={16} />
+                            ) : (
+                              <RefreshIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    )}
                   </Box>
                   <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
                     {insights.aiExplanation}
                   </Typography>
+                  {rewriteError && (
+                    <Typography variant="caption" color="error" display="block" sx={{ mt: 1 }}>
+                      {t('mediaDetail.insights.rewriteExplanationFailed', { detail: rewriteError })}
+                    </Typography>
+                  )}
                 </Box>
               )}
 

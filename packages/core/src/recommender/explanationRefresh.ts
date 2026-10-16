@@ -275,7 +275,8 @@ async function refreshTwinSharedIds(
 async function refreshMovieRun(
   runId: string,
   userId: string,
-  shouldCancel?: () => boolean
+  shouldCancel?: () => boolean,
+  onlyItemId?: string
 ): Promise<number> {
   const scale = await buildRunSimilarityScale(runId)
 
@@ -285,8 +286,9 @@ async function refreshMovieRun(
      FROM recommendation_candidates rc
      JOIN movies m ON m.id = rc.movie_id
      WHERE rc.run_id = $1 AND rc.is_selected = true
+       AND ($2::uuid IS NULL OR rc.movie_id = $2::uuid)
      ${PICK_ORDER}`,
-    [runId]
+    [runId, onlyItemId ?? null]
   )
 
   if (result.rows.length === 0) return 0
@@ -294,7 +296,11 @@ async function refreshMovieRun(
   // Picks still missing a decision-model verdict get one first, so switching
   // that integration on and refreshing reaches existing runs without
   // re-scoring them. Off, unconfigured or failing: a no-op. See judgeEvidence.ts.
-  await judgeRunEvidence(runId, 'movie', { shouldCancel, onlyUnjudged: true })
+  // Not for a single pick: judging is run-wide, and one pick's rewrite must
+  // not pay for verdicts on the other nineteen.
+  if (!onlyItemId) {
+    await judgeRunEvidence(runId, 'movie', { shouldCancel, onlyUnjudged: true })
+  }
 
   const twinShared = await refreshTwinSharedIds(
     runId,
@@ -338,7 +344,8 @@ async function refreshMovieRun(
 async function refreshSeriesRun(
   runId: string,
   userId: string,
-  shouldCancel?: () => boolean
+  shouldCancel?: () => boolean,
+  onlyItemId?: string
 ): Promise<number> {
   const scale = await buildRunSimilarityScale(runId)
 
@@ -351,14 +358,17 @@ async function refreshSeriesRun(
      FROM recommendation_candidates rc
      JOIN series s ON s.id = rc.series_id
      WHERE rc.run_id = $1 AND rc.is_selected = true
+       AND ($2::uuid IS NULL OR rc.series_id = $2::uuid)
      ${PICK_ORDER}`,
-    [runId]
+    [runId, onlyItemId ?? null]
   )
 
   if (result.rows.length === 0) return 0
 
   // Mirrors refreshMovieRun: verdicts first, for picks still missing one.
-  await judgeRunEvidence(runId, 'series', { shouldCancel, onlyUnjudged: true })
+  if (!onlyItemId) {
+    await judgeRunEvidence(runId, 'series', { shouldCancel, onlyUnjudged: true })
+  }
 
   const twinShared = await refreshTwinSharedIds(
     runId,
@@ -433,6 +443,48 @@ export async function refreshExplanationsForRun(
 
   logger.info({ userId, mediaType, runId: run.id, explanations }, '✅ Explanations refreshed')
   return { runId: run.id, explanations }
+}
+
+export type PickExplanationRefresh =
+  | { status: 'refreshed' }
+  /** AI explanations are off for this viewer, so nothing would render it. */
+  | { status: 'disabled' }
+  /** The title is not a pick on the viewer's newest completed run. */
+  | { status: 'not-a-pick' }
+
+/**
+ * Rewrite the explanation of ONE pick, on the viewer's newest completed run.
+ *
+ * The job rewrites every pick for every viewer, which is minutes of paid model
+ * calls to repair a handful — the twin picks whose prose was built on the
+ * rarest shared titles (F-157) being the case this exists for. This is one
+ * generation call: the pick's twin shared titles are re-chosen and stored
+ * first, as the job does, and run-wide evidence judging is skipped.
+ */
+export async function refreshExplanationForPick(
+  userId: string,
+  mediaType: ExplanationMediaType,
+  itemId: string
+): Promise<PickExplanationRefresh> {
+  if (!(await getEffectiveAiExplanationSetting(userId))) return { status: 'disabled' }
+
+  const run = await queryOne<{ id: string }>(
+    `SELECT id FROM recommendation_runs
+     WHERE user_id = $1 AND status = 'completed' AND media_type = $2
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [userId, mediaType]
+  )
+  if (!run) return { status: 'not-a-pick' }
+
+  const written =
+    mediaType === 'movie'
+      ? await refreshMovieRun(run.id, userId, undefined, itemId)
+      : await refreshSeriesRun(run.id, userId, undefined, itemId)
+  if (written === 0) return { status: 'not-a-pick' }
+
+  logger.info({ userId, mediaType, runId: run.id, itemId }, '✅ Explanation refreshed for one pick')
+  return { status: 'refreshed' }
 }
 
 /**

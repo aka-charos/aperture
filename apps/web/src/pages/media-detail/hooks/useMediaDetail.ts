@@ -73,6 +73,12 @@ export interface UseMediaDetailReturn {
   toggleFavorite: () => Promise<boolean>
   // Shared
   updateRating: (rating: number | null) => Promise<void>
+  /**
+   * Rewrite this pick's AI explanation (one model call), then reload the
+   * insights so the new text and any re-chosen shared titles show. Resolves
+   * to the server's error sentence, or null on success.
+   */
+  refreshExplanation: () => Promise<string | null>
 }
 
 export function useMediaDetail(
@@ -392,11 +398,34 @@ export function useMediaDetail(
     [mediaType, id, setSharedRating]
   )
 
+  const refreshExplanation = useCallback(async (): Promise<string | null> => {
+    if (!userId || !id) return null
+    try {
+      const response = await fetch(
+        `/api/recommendations/${userId}/${mediaType}/${id}/explanation`,
+        { method: 'POST', credentials: 'include' }
+      )
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        return body?.error ?? `HTTP ${response.status}`
+      }
+      const insightsResponse = await fetch(
+        `/api/recommendations/${userId}/${mediaType}/${id}/insights`,
+        { credentials: 'include' }
+      )
+      if (insightsResponse.ok) setInsights(await insightsResponse.json())
+      return null
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err)
+    }
+  }, [userId, id, mediaType])
+
   return {
     media,
     mediaType,
     similar,
     insights,
+    refreshExplanation,
     mediaServer,
     watchStatus,
     watchStats,

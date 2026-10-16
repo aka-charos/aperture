@@ -1276,6 +1276,8 @@
       "twinMark": "Also watched by the person whose taste overlaps yours",
       "twinMarkConnection": "{{name}} watched this too",
       "aiExplanationTitle": "Why {{appName}} picked this for you",
+      "rewriteExplanation": "Rewrite this explanation",
+      "rewriteExplanationFailed": "Could not rewrite it: {{detail}}",
       "subtitleMovie": "How close this movie is to your taste, measured against everything else considered in this run",
       "subtitleSeries": "How close this series is to your taste, measured against everything else considered in this run",
       "howWeCalculated": "How We Calculated Your Match",
