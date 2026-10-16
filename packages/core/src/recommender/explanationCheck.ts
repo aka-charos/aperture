@@ -64,6 +64,14 @@ export interface ExplanationCheckInput {
    * catch).
    */
   interestEvidence?: InterestEvidence | null
+  /**
+   * True for a pick stored before interest evidence existed (it carries a
+   * `weightedSimilarity`). Its prose was written under the old prompt, which
+   * said only "they like X", so the checker is told only that too (F-144 rule
+   * 1) — saying "nothing confirms it" would judge it against a fact its writer
+   * never had.
+   */
+  interestLegacy?: boolean
   /** The reception label the writer's prompt printed, verbatim. */
   reception: string
   pick: JudgedTitleFacts
@@ -126,9 +134,11 @@ export function pickOrigin(breakdown: unknown): {
   standing?: OwnStanding
   /** A stated-interest pick's stored evidence; absent otherwise and when unconfirmed. */
   interestEvidence?: InterestEvidence
+  /** A stated-interest pick stored before evidence existed; see ExplanationCheckInput. */
+  interestLegacy?: boolean
 } {
   const b = (breakdown ?? {}) as {
-    interestMatch?: { interestText?: unknown; evidence?: unknown } | null
+    interestMatch?: { interestText?: unknown; evidence?: unknown; weightedSimilarity?: unknown } | null
     twinMatch?: { sharedIds?: unknown; ownStanding?: unknown } | null
     acclaimedMatch?: unknown
   }
@@ -140,6 +150,7 @@ export function pickOrigin(breakdown: unknown): {
       interestText: typeof text === 'string' && text ? text : null,
       sharedIds: [],
       ...(interestEvidence ? { interestEvidence } : {}),
+      ...(!interestEvidence && b.interestMatch.weightedSimilarity != null ? { interestLegacy: true } : {}),
     }
   }
   if (b.twinMatch != null) {
@@ -233,7 +244,9 @@ export function buildExplanationCheckRequest(input: ExplanationCheckInput): Expl
         ? `${ORIGIN_TEXT.statedInterest}: "${input.interestText}"${
             input.interestEvidence
               ? ` — its genres and keywords include ${formatEvidenceTags(input.interestEvidence)}`
-              : ' — nothing in its genres or keywords confirms it is one; it was picked as close to that phrase'
+              : input.interestLegacy
+                ? ''
+                : ' — nothing in its genres or keywords confirms it is one; it was picked as close to that phrase'
           }`
         : ORIGIN_TEXT[input.origin],
     watchedTitlesShownAs:

@@ -105,7 +105,7 @@ test('phrase evidence sorts before parts and wins the best map', () => {
     })
   )
   // "dystopian sci-fi" is assembled from parts (0.8); "dystopia" is one keyword (1.0).
-  assert.equal(index.byInterest[0].matches[0].evidence.strength, 'parts')
+  assert.equal(index.byInterest[0].matches[0].evidence?.strength, 'parts')
   assert.equal(index.byInterest[0].matches[0].affinity, 0.8)
   assert.equal(index.best.get('a')?.interestId, 'i-dys2')
   assert.equal(index.best.get('a')?.affinity, 1.0)
@@ -223,4 +223,34 @@ test('deterministic on score ties, and nothing when no slots are reserved', () =
   const fillers = pickInterestSlotFillers([], candidates(['b', 0.5], ['a', 0.5]), index, 1)
   assert.deepEqual(fillers.map((f) => f.candidate.id), ['a'])
   assert.deepEqual(pickInterestSlotFillers([], candidates(['a', 0.5]), index, 0), [])
+})
+
+// ============================================================================
+// Non-Latin fallback
+// ============================================================================
+
+const GREEK = { interestId: 'i-gr', interestText: 'μαύρη κωμωδία', weight: 1 }
+
+test('a non-Latin interest nothing confirms falls back to its nearest titles, unconfirmed', () => {
+  const index = buildInterestMatchIndex(
+    [GREEK],
+    facts({ a: { genres: ['Drama'] }, b: { genres: ['Comedy'] } }),
+    new Map([['i-gr', ['b', 'a']]])
+  )
+  const matches = index.byInterest[0].matches
+  assert.deepEqual(matches.map((m) => [m.candidateId, m.evidence]), [['b', null], ['a', null]])
+  // Unconfirmed moves no score.
+  assert.equal(index.best.size, 0)
+  const fillers = pickInterestSlotFillers([], candidates(['a', 0.9], ['b', 0.4]), index, 1)
+  assert.deepEqual(fillers.map((f) => [f.candidate.id, f.match.evidence]), [['a', null]])
+})
+
+test('the fallback is ignored when a localised genre confirms the interest', () => {
+  const index = buildInterestMatchIndex(
+    [GREEK],
+    facts({ a: { genres: ['Μαύρη κωμωδία'] }, b: { genres: ['Comedy'] } }),
+    new Map([['i-gr', ['b']]])
+  )
+  assert.deepEqual(index.byInterest[0].matches.map((m) => m.candidateId), ['a'])
+  assert.equal(index.best.get('a')?.affinity, 1.0)
 })

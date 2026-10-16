@@ -87,6 +87,8 @@ interface CandidateExplanation {
   standing?: OwnStanding
   /** A stated-interest pick's evidence, which the writer was told. */
   interestEvidence?: InterestEvidence
+  /** A stated-interest pick stored before evidence existed. */
+  interestLegacy?: boolean
   ratingScore: number | null
   watchedIds: string[]
 }
@@ -144,7 +146,9 @@ async function loadCandidateExplanations(): Promise<CandidateExplanation[]> {
     const hash = explanationHash(p.ai_explanation)
     if (out.has(hash)) continue
     const rows = evidenceByCandidate.get(p.candidate_id) ?? []
-    const { origin, interestText, sharedIds, standing, interestEvidence } = pickOrigin(p.score_breakdown)
+    const { origin, interestText, sharedIds, standing, interestEvidence, interestLegacy } = pickOrigin(
+      p.score_breakdown
+    )
     // The heading the writer saw: a reserved-slot pick always gets the hedged
     // one; a ranked pick gets whatever evidenceSupportsCause decides, which is
     // the same read the explanation prompt makes.
@@ -169,6 +173,7 @@ async function loadCandidateExplanations(): Promise<CandidateExplanation[]> {
       sharedIds,
       standing,
       interestEvidence,
+      interestLegacy,
       ratingScore: Number.isFinite(rating) ? rating : null,
       watchedIds: rows.map((r) => r.watched_id).filter(Boolean),
     })
@@ -281,6 +286,7 @@ function toInput(item: CandidateExplanation, context: CheckContext): Explanation
     origin: item.origin,
     interestText: item.interestText,
     interestEvidence: item.interestEvidence ?? null,
+    interestLegacy: item.interestLegacy === true,
     reception: receptionLabel(item.mediaType, item.ratingScore),
     pick,
     analysis: context.analysis.get(`${item.mediaType}:${item.pickId}`) ?? null,

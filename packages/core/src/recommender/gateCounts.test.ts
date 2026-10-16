@@ -3,7 +3,14 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { compareCounts, inputCountsSql, isMissingRunCountsColumn, outputCountsSql } from './gateCounts.js'
+import {
+  ABSENT_MEANS_ZERO,
+  compareCounts,
+  INTEREST_MATCHING_VERSION,
+  inputCountsSql,
+  isMissingRunCountsColumn,
+  outputCountsSql,
+} from './gateCounts.js'
 import { sourceFiles, stripComments } from '../testing/sourceTree.js'
 import { decideRegeneration, type GateThresholds } from './activityGate.js'
 
@@ -204,4 +211,26 @@ test('the post-deploy check script counts what the gate counts', () => {
   assert.ok(script.includes(inputCountsSql('movie', 'r.user_id')), 'movie input counts match')
   assert.ok(script.includes(inputCountsSql('series', 'r.user_id')), 'series input counts match')
   assert.ok(script.includes(outputCountsSql('r.id')), 'output counts match')
+})
+
+test('the interest-matching version regenerates viewers with interests once, and nobody else', () => {
+  // A run stored before the marker existed has no key. For a viewer with
+  // interests the current value is the version, which differs from the 0 the
+  // absent key reads as; for one without interests both are 0.
+  const before = { watch_history: 240, custom_interests: 2 }
+  assert.deepEqual(
+    compareCounts(before, { ...before, interest_matching: INTEREST_MATCHING_VERSION }),
+    { kind: 'changed', key: 'interest_matching', stored: 0, current: INTEREST_MATCHING_VERSION }
+  )
+  assert.deepEqual(compareCounts({ watch_history: 240 }, { watch_history: 240, interest_matching: 0 }), {
+    kind: 'same',
+  })
+  // Once a run stores it, the next run skips as before.
+  const after = { ...before, interest_matching: INTEREST_MATCHING_VERSION }
+  assert.deepEqual(compareCounts(after, after), { kind: 'same' })
+  // Any other key a run lacks is still skipped.
+  assert.deepEqual(compareCounts({ a: 1 }, { a: 1, b: 9 }), { kind: 'same' })
+  assert.ok(ABSENT_MEANS_ZERO.has('interest_matching'))
+  assert.ok(inputCountsSql('movie', '$1').includes("'interest_matching'"))
+  assert.ok(inputCountsSql('series', '$1').includes("'interest_matching'"))
 })

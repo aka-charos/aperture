@@ -40,6 +40,23 @@ export type GateMediaType = 'movie' | 'series'
 export type GateCounts = Record<string, number>
 
 /**
+ * The version of interest matching (recommender/shared/interestEvidence.ts).
+ * Bump it when a change to how interests are matched would change a viewer's
+ * interest picks: every viewer WITH interests then regenerates once on their
+ * next scheduled run, and viewers without interests are untouched (their value
+ * stays 0). 1 = picks backed by a genre/keyword on the title (F-158).
+ */
+export const INTEREST_MATCHING_VERSION = 1
+
+/**
+ * Keys that a run which predates them must read as 0 rather than be skipped.
+ * compareCounts skips a key the stored snapshot lacks (a count added later,
+ * which the timestamps still cover); a version marker has no timestamp, so
+ * skipping it would mean the change it marks never reaches anyone.
+ */
+export const ABSENT_MEANS_ZERO = new Set(['interest_matching'])
+
+/**
  * Each input count, per media type. Scoped exactly as the matching timestamp
  * signal in activityGate.ts is, so a count and a timestamp always describe the
  * same rows. Every literal here is fixed text, never caller input.
@@ -68,6 +85,15 @@ function inputCountQueries(mediaType: GateMediaType, user: string): Array<[strin
     ['genre_weights', `SELECT COUNT(*) FROM user_genre_weights WHERE user_id = ${user}`],
     ['custom_interests', `SELECT COUNT(*) FROM user_custom_interests WHERE user_id = ${user}`],
   ]
+  // Not a count: which version of interest matching a run used, and only for
+  // a viewer who has interests (0 otherwise). A code change is not a gate
+  // signal, so when interest matching changes what a run picks, the viewers
+  // it affects regenerate once and nobody else does. Read as 0 when a run
+  // stored no such key (ABSENT_MEANS_ZERO).
+  counts.push([
+    'interest_matching',
+    `SELECT CASE WHEN EXISTS (SELECT 1 FROM user_custom_interests WHERE user_id = ${user}) THEN ${INTEREST_MATCHING_VERSION} ELSE 0 END`,
+  ])
   if (!isMovie) {
     // Series-level favourites live here rather than in watch_history.
     counts.push([
@@ -129,7 +155,8 @@ export type CountComparison =
  *
  * A key present now but absent from the stored snapshot is skipped rather
  * than read as a change: that is a count added after the run was made, and
- * the timestamps still cover it. Every run made before snapshots existed has
+ * the timestamps still cover it. The exception is a version marker
+ * (ABSENT_MEANS_ZERO), which no timestamp covers. Every run made before snapshots existed has
  * NULL and reads as `unknown`, which the gate treats as "regenerate" — one
  * extra run per viewer after the deploy, then normal skipping.
  */
@@ -139,7 +166,7 @@ export function compareCounts(
 ): CountComparison {
   if (!stored || !current) return { kind: 'unknown' }
   for (const [key, now] of Object.entries(current)) {
-    const then = stored[key]
+    const then = stored[key] ?? (ABSENT_MEANS_ZERO.has(key) ? 0 : null)
     if (then == null) continue
     if (Number(then) !== Number(now)) {
       return { kind: 'changed', key, stored: Number(then), current: Number(now) }

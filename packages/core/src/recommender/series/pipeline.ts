@@ -702,7 +702,7 @@ async function storeSeriesCandidates(
                     interestMatch: {
                       interestId: interestPick.interestId,
                       interestText: interestPick.interestText,
-                      evidence: interestPick.evidence,
+                      ...(interestPick.evidence ? { evidence: interestPick.evidence } : {}),
                     },
                   }
                 : {}),
@@ -1172,6 +1172,8 @@ export async function generateSeriesRecommendationsForUser(
             interestId: interest.id,
             interestText: interest.interestText,
             weight: interest.weight,
+            embedding: interest.embedding,
+            embeddingModel: interest.embeddingModel,
           })),
           candidates.map((candidate) => candidate.seriesId)
         )

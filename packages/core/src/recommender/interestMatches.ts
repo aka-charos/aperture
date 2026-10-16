@@ -6,8 +6,13 @@
  * pipeline is about to score. It replaces one nearest-neighbour query per
  * interest against the embedded phrase, whose ordering was set by the
  * phrase's words rather than its meaning (shared/interestEvidence.ts has the
- * measurement). The embedding of each interest is still stored; nothing here
- * reads it.
+ * measurement).
+ *
+ * The one place the embedding is still read: an interest written in a
+ * non-Latin script, which English TMDb keywords cannot confirm. Its nearest
+ * titles among the candidates are offered as an UNCONFIRMED fallback
+ * (shared/interestSlots.ts buildInterestMatchIndex), used only if no localised
+ * genre confirms it.
  *
  * Fails open like the code it replaces: any problem leaves every affinity
  * neutral and every interest slot unfilled, exactly as for a user with no
@@ -16,12 +21,13 @@
 
 import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
+import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import {
   buildInterestMatchIndex,
   type InterestInput,
   type InterestMatchIndex,
 } from './shared/interestSlots.js'
-import type { InterestTitleFacts } from './shared/interestEvidence.js'
+import { interestIsNonLatin, type InterestTitleFacts } from './shared/interestEvidence.js'
 
 const logger = createChildLogger('interest-matches')
 
@@ -33,6 +39,45 @@ const logger = createChildLogger('interest-matches')
  */
 export const MAX_QUERIED_INTERESTS = 10
 
+/** How many nearest titles a non-Latin interest's fallback offers the slot picker. */
+export const NON_LATIN_FALLBACK_POOL = 25
+
+/** An interest as the loader needs it: the matching fields plus its stored embedding. */
+export interface InterestLoaderInput extends InterestInput {
+  embedding: number[] | null
+  embeddingModel: string | null
+}
+
+/**
+ * The candidate ids nearest one interest's embedding, best first.
+ *
+ * An exact scan over the candidates' raw vectors, ordered by a computed
+ * similarity rather than by `embedding <=> $1`, so the planner cannot pick the
+ * HNSW index and post-filter the explicit id list down to almost nothing (the
+ * ef_search invariant). Raw, like every interest vector: the phrase was never
+ * centred.
+ */
+async function nearestCandidates(
+  mediaType: 'movie' | 'series',
+  vector: number[],
+  candidateIds: string[],
+  modelId: string
+): Promise<string[]> {
+  const table = await getActiveEmbeddingTableName(mediaType === 'movie' ? 'embeddings' : 'series_embeddings')
+  const column = mediaType === 'movie' ? 'movie_id' : 'series_id'
+  const result = await query<{ id: string }>(
+    `SELECT id FROM (
+       SELECT e.${column} AS id, 1 - (e.embedding <=> $1::halfvec) AS similarity
+         FROM ${table} e
+        WHERE e.model = $2 AND e.${column} = ANY($3::uuid[])
+     ) scored
+     ORDER BY similarity DESC, id
+     LIMIT $4`,
+    [`[${vector.join(',')}]`, modelId, candidateIds, NON_LATIN_FALLBACK_POOL]
+  )
+  return result.rows.map((row) => row.id)
+}
+
 /**
  * The verified interest matches among `candidateIds`.
  *
@@ -40,7 +85,7 @@ export const MAX_QUERIED_INTERESTS = 10
  */
 export async function loadInterestMatchIndex(
   mediaType: 'movie' | 'series',
-  interests: InterestInput[],
+  interests: InterestLoaderInput[],
   candidateIds: string[]
 ): Promise<InterestMatchIndex> {
   if (interests.length === 0 || candidateIds.length === 0) return buildInterestMatchIndex([], new Map())
@@ -62,7 +107,27 @@ export async function loadInterestMatchIndex(
   const facts = new Map<string, InterestTitleFacts>()
   for (const row of result.rows) facts.set(row.id, { genres: row.genres, keywords: row.keywords })
 
-  const index = buildInterestMatchIndex(queried, facts)
+  // Nearest titles for non-Latin interests only; the index uses them solely
+  // when no localised genre confirms the interest. A failure here costs the
+  // fallback, never the verified matches.
+  const nearest = new Map<string, string[]>()
+  const nonLatin = queried.filter((interest) => interestIsNonLatin(interest.interestText))
+  if (nonLatin.length > 0) {
+    try {
+      const modelId = await getActiveEmbeddingModelId()
+      for (const interest of nonLatin) {
+        if (!modelId || !interest.embedding?.length || interest.embeddingModel !== modelId) continue
+        nearest.set(
+          interest.interestId,
+          await nearestCandidates(mediaType, interest.embedding, candidateIds, modelId)
+        )
+      }
+    } catch (err) {
+      logger.warn({ err, mediaType }, 'Could not look up nearest titles for non-Latin interests')
+    }
+  }
+
+  const index = buildInterestMatchIndex(queried, facts, nearest)
 
   for (const interest of index.byInterest) {
     if (interest.matches.length === 0) {
@@ -71,6 +136,11 @@ export async function loadInterestMatchIndex(
       logger.info(
         { interestText: interest.interestText, mediaType, candidates: facts.size },
         'No candidate is tagged with this interest; its reserved slot stays unused'
+      )
+    } else if (interest.matches.every((match) => !match.evidence)) {
+      logger.info(
+        { interestText: interest.interestText, mediaType },
+        'Non-Latin interest confirmed by no genre; offering its nearest titles as unconfirmed'
       )
     } else {
       logger.debug(

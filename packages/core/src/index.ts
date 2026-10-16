@@ -1607,6 +1607,15 @@ export {
   type TwinStandingBand,
 } from './recommender/shared/explanationPrompt.js'
 
+// Whether a title's own genres/keywords say an interest the viewer typed. The
+// insights routes check an older interest pick on read with it.
+export {
+  matchInterestEvidence,
+  readInterestEvidence,
+  type InterestEvidence,
+  type InterestTitleFacts,
+} from './recommender/shared/interestEvidence.js'
+
 // What a taste-twin pick shows beside it: titles both viewers watched, nearest
 // to the pick, stored with their similarities. The API mirrors the order
 // marker in its pure lib/scoreBreakdown.ts.

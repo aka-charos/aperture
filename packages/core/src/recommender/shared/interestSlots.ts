@@ -29,9 +29,12 @@
 
 import {
   interestAffinityFromEvidence,
-  matchInterestEvidence,
+  matchPreparedEvidence,
+  prepareInterest,
+  prepareTitleFacts,
   type InterestEvidence,
   type InterestTitleFacts,
+  type PreparedTitleFacts,
 } from './interestEvidence.js'
 
 /**
@@ -53,8 +56,12 @@ export const DEFAULT_INTEREST_MAX_SLOTS = 3
 export interface InterestMatch {
   interestId: string
   interestText: string
-  /** The genres/keywords on the title that say the interest. */
-  evidence: InterestEvidence
+  /**
+   * The genres/keywords on the title that say the interest. Null only for the
+   * non-Latin fallback (`nearest` in buildInterestMatchIndex): a title near
+   * the phrase that nothing confirms, which every reader calls "close to" it.
+   */
+  evidence: InterestEvidence | null
   /** 0.5 (neutral) | 0.8 | 1.0, scaled by the interest's weight -- feeds PreferenceAffinities.interest. */
   affinity: number
 }
@@ -87,6 +94,11 @@ export interface InterestInput {
 
 const STRENGTH_ORDER: Record<InterestEvidence['strength'], number> = { phrase: 0, parts: 1 }
 
+/** Rank of a match's evidence, strongest first; an unconfirmed match is last. */
+function strengthRank(evidence: InterestEvidence | null): number {
+  return evidence ? STRENGTH_ORDER[evidence.strength] : 2
+}
+
 /**
  * Check every candidate's metadata against every interest and fold the
  * verified matches into the lookup structures the pipeline needs: one
@@ -95,18 +107,36 @@ const STRENGTH_ORDER: Record<InterestEvidence['strength'], number> = { phrase: 0
  *
  * `facts` is keyed by candidate id; a candidate missing from it simply has
  * nothing to match on.
+ *
+ * `nearest` is the one exception to "a match is a fact": candidate ids nearest
+ * an interest's embedded phrase, offered only for an interest written in a
+ * non-Latin script (interestIsNonLatin). TMDb's keywords are English, so such an
+ * interest can be confirmed only by a genre the media server stores in that
+ * language; when none is, these titles are used instead, with no evidence.
+ * They never move the score (affinity stays neutral) and every reader calls
+ * them "close to" the interest. Cross-script, the phrase shares no words with
+ * the English documents, so the lexical attraction that made this unusable for
+ * English phrases has nothing to grip — an argument, not a measurement.
  */
 export function buildInterestMatchIndex(
   interests: InterestInput[],
-  facts: Map<string, InterestTitleFacts>
+  facts: Map<string, InterestTitleFacts>,
+  nearest: Map<string, string[]> = new Map()
 ): InterestMatchIndex {
   const best = new Map<string, InterestMatch>()
   const byInterest: InterestMatchIndex['byInterest'] = []
 
+  // Each title's facts and each interest are normalised ONCE; matching is
+  // then lookups. Doing it inside the loop re-normalised every tag of every
+  // candidate once per interest.
+  const prepared = new Map<string, PreparedTitleFacts>()
+  for (const [candidateId, titleFacts] of facts) prepared.set(candidateId, prepareTitleFacts(titleFacts))
+
   for (const interest of interests) {
     const matches: InterestCandidateMatch[] = []
-    for (const [candidateId, titleFacts] of facts) {
-      const evidence = matchInterestEvidence(interest.interestText, titleFacts)
+    const preparedInterest = prepareInterest(interest.interestText)
+    for (const [candidateId, byPhrase] of prepared) {
+      const evidence = matchPreparedEvidence(preparedInterest, byPhrase)
       if (!evidence) continue
       matches.push({
         candidateId,
@@ -120,11 +150,26 @@ export function buildInterestMatchIndex(
     // Strongest evidence first, then id so the order is stable.
     matches.sort(
       (a, b) =>
-        STRENGTH_ORDER[a.evidence.strength] - STRENGTH_ORDER[b.evidence.strength] ||
+        strengthRank(a.evidence) - strengthRank(b.evidence) ||
         (a.candidateId < b.candidateId ? -1 : a.candidateId > b.candidateId ? 1 : 0)
     )
 
+    // The non-Latin fallback, only when nothing confirmed this interest.
+    if (matches.length === 0) {
+      for (const candidateId of nearest.get(interest.interestId) ?? []) {
+        matches.push({
+          candidateId,
+          interestId: interest.interestId,
+          interestText: interest.interestText,
+          evidence: null,
+          affinity: 0.5,
+        })
+      }
+    }
+
     for (const match of matches) {
+      // An unconfirmed match moves no score, so it has no place in `best`.
+      if (!match.evidence) continue
       const existing = best.get(match.candidateId)
       if (!existing || match.affinity > existing.affinity) {
         best.set(match.candidateId, {
@@ -218,7 +263,7 @@ export function pickInterestSlotFillers<T extends { id: string; finalScore: numb
       for (const match of interest.matches) {
         // matches are ordered strongest evidence first; once a pick exists,
         // weaker evidence cannot displace it.
-        if (bestMatch && STRENGTH_ORDER[match.evidence.strength] > STRENGTH_ORDER[bestMatch.evidence.strength]) {
+        if (bestMatch && strengthRank(match.evidence) > strengthRank(bestMatch.evidence)) {
           break
         }
         if (taken.has(match.candidateId)) continue

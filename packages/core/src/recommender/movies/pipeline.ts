@@ -550,6 +550,8 @@ export async function generateRecommendationsForUser(
             interestId: interest.id,
             interestText: interest.interestText,
             weight: interest.weight,
+            embedding: interest.embedding,
+            embeddingModel: interest.embeddingModel,
           })),
           candidates.map((candidate) => candidate.id)
         )

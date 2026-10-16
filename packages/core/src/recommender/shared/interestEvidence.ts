@@ -70,24 +70,32 @@ const SYNONYMS: Array<[RegExp, string]> = [
   [/\bromcom\b/g, 'romantic comedy'],
 ]
 
-/** Lowercase, strip accents, punctuation to spaces, synonyms applied. */
+/**
+ * Lowercase, accents stripped, anything that is not a letter or a digit in
+ * ANY script turned to a space, synonyms applied. Unicode-aware on purpose:
+ * an interest typed in Greek or Japanese must survive normalisation to match a
+ * genre the media server stores in that language — the first version kept only
+ * a-z and reduced every non-Latin interest to nothing.
+ */
 function normalise(text: string): string {
   let s = text
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{M}+/gu, '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
   for (const [pattern, replacement] of SYNONYMS) s = s.replace(pattern, replacement)
   return s.replace(/\s+/g, ' ').trim()
 }
 
 /**
- * A light stem, the same on both sides: plural and the "-ian" adjective, so
- * "comedies" meets "comedy" and "dystopian" meets "dystopia". It does not try
- * to be a real stemmer; a miss costs a slot, never a false claim.
+ * A light English stem, the same on both sides: plural and the "-ian"
+ * adjective, so "comedies" meets "comedy" and "dystopian" meets "dystopia".
+ * Applied to Latin-script words only. It does not try to be a real stemmer; a
+ * miss costs a slot, never a false claim.
  */
 function stem(word: string): string {
+  if (!/^[a-z0-9]+$/.test(word)) return word
   let w = word
   if (w.length > 4 && w.endsWith('ies')) w = `${w.slice(0, -3)}y`
   else if (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) w = w.slice(0, -1)
@@ -104,26 +112,97 @@ export function interestTerms(interestText: string): string[] {
 }
 
 /**
+ * True when an interest has words and none of them is in the Latin alphabet.
+ * TMDb's keywords are English, so such an interest can match only a genre the
+ * media server stores in that language; when nothing does, the pipeline falls
+ * back to the titles nearest the phrase, marked unconfirmed (interestMatches.ts).
+ */
+export function interestIsNonLatin(interestText: string): boolean {
+  const terms = interestTerms(interestText)
+  return terms.length > 0 && terms.every((term) => !/[a-z]/.test(term))
+}
+
+/**
+ * TMDb's TV genres are compound — "Sci-Fi & Fantasy", "Action & Adventure",
+ * "War & Politics" — so each fact also counts as each of its parts, or a
+ * dystopian show tagged "Sci-Fi & Fantasy" could never match "dystopian
+ * sci-fi". Split before normalisation turns the separator into a space.
+ * Only "&" and "/": splitting on "and" would make "rock and roll" match the
+ * interest "rock".
+ */
+const COMPOUND_SEPARATOR = /\s*[&/]\s*/
+
+/**
  * A fact as comparable phrases: as written, and with the interest's filler
  * words removed, so the keyword "Film Noir" meets the interest "film noir"
- * (whose "film" is filler) and "war film" meets "war".
+ * (whose "film" is filler) and "war film" meets "war"; then the same for each
+ * part of a compound fact.
  */
 function factPhrases(fact: string): string[] {
-  const words = normalise(fact).split(' ').filter(Boolean)
-  const full = words.map(stem).join(' ')
-  const content = words
-    .filter((word) => !FILLER_WORDS.has(word))
-    .map(stem)
-    .join(' ')
-  return content && content !== full ? [full, content] : [full]
+  const pieces = [fact, ...fact.split(COMPOUND_SEPARATOR).filter((part) => part.trim() && part !== fact)]
+  const phrases: string[] = []
+  for (const piece of pieces) {
+    const words = normalise(piece).split(' ').filter(Boolean)
+    const full = words.map(stem).join(' ')
+    const content = words
+      .filter((word) => !FILLER_WORDS.has(word))
+      .map(stem)
+      .join(' ')
+    if (full) phrases.push(full)
+    if (content && content !== full) phrases.push(content)
+  }
+  return phrases
+}
+
+/** A title's facts, normalised once and reused for every interest. */
+export type PreparedTitleFacts = Map<string, string>
+
+/** Normalise a title's genres and keywords once: comparable phrase -> the fact as stored. */
+export function prepareTitleFacts(facts: InterestTitleFacts): PreparedTitleFacts {
+  const byPhrase: PreparedTitleFacts = new Map()
+  for (const fact of [...(facts.genres ?? []), ...(facts.keywords ?? [])]) {
+    if (typeof fact !== 'string' || !fact.trim()) continue
+    for (const key of factPhrases(fact)) {
+      if (key && !byPhrase.has(key)) byPhrase.set(key, fact)
+    }
+  }
+  return byPhrase
+}
+
+/** An interest, normalised once and reused for every title. */
+export interface PreparedInterest {
+  terms: string[]
+  phrase: string
+}
+
+export function prepareInterest(interestText: string): PreparedInterest {
+  const terms = interestTerms(interestText)
+  return { terms, phrase: terms.join(' ') }
 }
 
 /** The longest span an interest may be split into when matched in parts. */
 const MAX_PART_WORDS = 4
 
 /**
- * The evidence on a title for an interest, or null when its metadata does not
- * say so. Three ways to match, strongest first:
+ * Cover every term with consecutive spans that are each a whole fact. Tries
+ * the longest span first at each position and BACKTRACKS: the first version
+ * took the longest span greedily and gave up when it left an uncoverable
+ * tail, though a shorter span there covered everything.
+ */
+function coverTerms(terms: string[], byPhrase: PreparedTitleFacts, from = 0): string[] | null {
+  if (from === terms.length) return []
+  for (let span = Math.min(MAX_PART_WORDS, terms.length - from); span >= 1; span--) {
+    const fact = byPhrase.get(terms.slice(from, from + span).join(' '))
+    if (!fact) continue
+    const rest = coverTerms(terms, byPhrase, from + span)
+    if (rest) return [fact, ...rest]
+  }
+  return null
+}
+
+/**
+ * The evidence on a title for a prepared interest, or null when its metadata
+ * does not say so. Three ways to match, strongest first:
  *
  * 1. a fact IS the interest ("dark comedy" ↔ keyword "dark comedy");
  * 2. a fact CONTAINS the interest, for interests of two words or more
@@ -134,22 +213,12 @@ const MAX_PART_WORDS = 4
  *
  * The weight of a match is not decided here; see interestAffinityFromEvidence.
  */
-export function matchInterestEvidence(
-  interestText: string,
-  facts: InterestTitleFacts
+export function matchPreparedEvidence(
+  interest: PreparedInterest,
+  byPhrase: PreparedTitleFacts
 ): InterestEvidence | null {
-  const terms = interestTerms(interestText)
-  if (terms.length === 0) return null
-  const phrase = terms.join(' ')
-
-  const byPhrase = new Map<string, string>()
-  for (const fact of [...(facts.genres ?? []), ...(facts.keywords ?? [])]) {
-    if (typeof fact !== 'string' || !fact.trim()) continue
-    for (const key of factPhrases(fact)) {
-      if (key && !byPhrase.has(key)) byPhrase.set(key, fact)
-    }
-  }
-  if (byPhrase.size === 0) return null
+  const { terms, phrase } = interest
+  if (terms.length === 0 || byPhrase.size === 0) return null
 
   const exact = byPhrase.get(phrase)
   if (exact) return { strength: 'phrase', matched: [exact] }
@@ -158,32 +227,25 @@ export function matchInterestEvidence(
     for (const [key, fact] of byPhrase) {
       if (` ${key} `.includes(` ${phrase} `)) return { strength: 'phrase', matched: [fact] }
     }
-  }
 
-  // Greedy cover, longest span first at each position. Every word must be
-  // accounted for; one uncovered word and the interest is not shown.
-  if (terms.length >= 2) {
-    const matched: string[] = []
-    let i = 0
-    while (i < terms.length) {
-      let found: string | null = null
-      let length = 0
-      for (let span = Math.min(MAX_PART_WORDS, terms.length - i); span >= 1; span--) {
-        const fact = byPhrase.get(terms.slice(i, i + span).join(' '))
-        if (fact) {
-          found = fact
-          length = span
-          break
-        }
-      }
-      if (!found) return null
-      if (!matched.includes(found)) matched.push(found)
-      i += length
+    const cover = coverTerms(terms, byPhrase)
+    if (cover) {
+      const matched = [...new Set(cover)]
+      // One fact covering every piece is the phrase case under another
+      // spelling, which the checks above already answered.
+      if (matched.length >= 2) return { strength: 'parts', matched }
     }
-    if (matched.length >= 2) return { strength: 'parts', matched }
   }
 
   return null
+}
+
+/** One-off form of matchPreparedEvidence, for callers checking a single title. */
+export function matchInterestEvidence(
+  interestText: string,
+  facts: InterestTitleFacts
+): InterestEvidence | null {
+  return matchPreparedEvidence(prepareInterest(interestText), prepareTitleFacts(facts))
 }
 
 /**

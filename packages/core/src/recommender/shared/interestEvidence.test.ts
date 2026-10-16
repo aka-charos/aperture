@@ -2,8 +2,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   interestAffinityFromEvidence,
+  interestIsNonLatin,
   interestTerms,
   matchInterestEvidence,
+  matchPreparedEvidence,
+  prepareInterest,
+  prepareTitleFacts,
   readInterestEvidence,
 } from './interestEvidence.js'
 
@@ -94,5 +98,62 @@ test('stored evidence is read back only when well formed', () => {
   })
   for (const value of [null, {}, { strength: 'close', matched: ['x'] }, { strength: 'phrase', matched: [] }, { strength: 'parts', matched: 'x' }]) {
     assert.equal(readInterestEvidence(value), null, JSON.stringify(value))
+  }
+})
+
+test('an interest in another script survives normalisation and meets a localised genre', () => {
+  // The first version kept only a-z, so a Greek interest had no words at all.
+  assert.deepEqual(interestTerms('Μαύρη κωμωδία'), ['μαυρη', 'κωμωδια'])
+  assert.deepEqual(
+    matchInterestEvidence('κωμωδία', { genres: ['Κωμωδία', 'Δράμα'] }),
+    { strength: 'phrase', matched: ['Κωμωδία'] }
+  )
+  assert.equal(interestIsNonLatin('Μαύρη κωμωδία'), true)
+  assert.equal(interestIsNonLatin('ブラックコメディ'), true)
+  assert.equal(interestIsNonLatin('dark comedy'), false)
+  assert.equal(interestIsNonLatin('movies'), false)
+})
+
+test('a compound TV genre counts as each of its parts', () => {
+  // TMDb's series genre names: "Sci-Fi & Fantasy", "War & Politics".
+  assert.deepEqual(
+    matchInterestEvidence('dystopian sci-fi', {
+      genres: ['Sci-Fi & Fantasy', 'Drama'],
+      keywords: ['dystopia'],
+    }),
+    { strength: 'parts', matched: ['dystopia', 'Sci-Fi & Fantasy'] }
+  )
+  assert.deepEqual(matchInterestEvidence('war', { genres: ['War & Politics'] }), {
+    strength: 'phrase',
+    matched: ['War & Politics'],
+  })
+  // "and" is not a separator: "rock and roll" is not "rock".
+  assert.equal(matchInterestEvidence('rock', { keywords: ['rock and roll'] }), null)
+})
+
+test('the parts cover backtracks instead of giving up on a greedy first span', () => {
+  // "space opera house": the greedy version took "space opera" and was left
+  // with "house", which nothing covers; backtracking finds "space" + "opera
+  // house".
+  const strand = { keywords: ['space opera', 'space', 'opera house'] }
+  assert.deepEqual(matchInterestEvidence('space opera house', strand), {
+    strength: 'parts',
+    matched: ['space', 'opera house'],
+  })
+  // And a cover the greedy version already found still comes back.
+  assert.notEqual(
+    matchInterestEvidence('folk horror revival', { keywords: ['folk horror', 'revival'] }),
+    null
+  )
+})
+
+test('prepared facts and interests give the same answer as the one-off form', () => {
+  const facts = { genres: ['Comedy'], keywords: ['dark comedy', 'dystopia'] }
+  for (const text of ['dark comedy', 'dystopian comedy', 'western']) {
+    assert.deepEqual(
+      matchPreparedEvidence(prepareInterest(text), prepareTitleFacts(facts)),
+      matchInterestEvidence(text, facts),
+      text
+    )
   }
 })

@@ -250,3 +250,16 @@ test('pickOrigin reads stored interest evidence, and only a well-formed one', ()
   // An older row: a similarity and no evidence.
   assert.equal(pickOrigin({ interestMatch: { interestText: 'x', weightedSimilarity: 0.61 } }).interestEvidence, undefined)
 })
+
+test('a stated-interest pick from before evidence is checked against what its writer was told', () => {
+  // Stored with a similarity: its prose was written under "they like X".
+  const origin = pickOrigin({ interestMatch: { interestText: 'dark comedy', weightedSimilarity: 0.61 } })
+  assert.equal(origin.interestLegacy, true)
+  const request = buildExplanationCheckRequest(
+    input({ origin: 'statedInterest', interestText: 'dark comedy', interestLegacy: true })
+  )
+  assert.equal(String(request.state.pickedBecause).endsWith('"dark comedy"'), true)
+  assert.doesNotMatch(String(request.state.pickedBecause), /confirms/)
+  // A refreshed or new unconfirmed pick has neither evidence nor a similarity.
+  assert.equal(pickOrigin({ interestMatch: { interestText: 'x' } }).interestLegacy, undefined)
+})

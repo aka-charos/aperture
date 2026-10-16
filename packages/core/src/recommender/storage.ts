@@ -27,7 +27,7 @@ export interface StoredInterestPick {
    * `weightedSimilarity` instead: embedding nearness to the phrase, which is
    * not evidence the title is what the viewer asked for.
    */
-  evidence: InterestEvidence
+  evidence: InterestEvidence | null
 }
 
 /**
@@ -191,7 +191,7 @@ export function buildCandidateRows(
             interestMatch: {
               interestId: interestPick.interestId,
               interestText: interestPick.interestText,
-              evidence: interestPick.evidence,
+              ...(interestPick.evidence ? { evidence: interestPick.evidence } : {}),
             },
           }
         : {}),

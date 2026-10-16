@@ -19,6 +19,7 @@ import {
 import { recommendationSchemas } from '../schemas.js'
 import { resolveTwinDonor, resolveTwinShared, twinCameClose } from '../../../lib/twinShared.js'
 import { publicScoreBreakdown } from '../../../lib/scoreBreakdown.js'
+import { withInterestEvidenceOnRead } from '../../../lib/interestEvidenceOnRead.js'
 import type { MovieRecommendationCandidate, RecommendationRun } from '../types.js'
 import { WATCH_HISTORY_TASTE_SQL, binderFor, getLibraryScopeForUser, libraryScopeSql } from '@aperture/core'
 
@@ -367,8 +368,9 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         ),
       ])
 
-      const movie = await queryOne<{ genres: string[] }>(
-        `SELECT genres FROM movies WHERE id = $1`,
+      // keywords too: an older interest pick has its evidence checked on read.
+      const movie = await queryOne<{ genres: string[]; keywords: string[] | null }>(
+        `SELECT genres, keywords FROM movies WHERE id = $1`,
         [movieId]
       )
 
@@ -422,7 +424,7 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         // before 0147, which is what the panel branches on to decide whether it
         // can state the arithmetic — the same rule it applies to base.
         scoreWeights,
-        scoreBreakdown: publicScoreBreakdown(candidate.score_breakdown),
+        scoreBreakdown: withInterestEvidenceOnRead(publicScoreBreakdown(candidate.score_breakdown), movie),
         twinShared,
         // Absent, never null, unless the twin is a visible connection.
         ...(twinDonor ? { twinDonor } : {}),
