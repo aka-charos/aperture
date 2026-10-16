@@ -115,7 +115,7 @@ describe('buildCandidateRows', () => {
     const pick: StoredInterestPick = {
       interestId: 'int-1',
       interestText: 'slow-burn folk horror',
-      weightedSimilarity: 0.73,
+      evidence: { strength: 'phrase', matched: ['folk horror'] },
     }
     const rows = buildCandidateRows(
       pool(2),

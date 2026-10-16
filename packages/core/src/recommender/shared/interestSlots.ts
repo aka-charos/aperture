@@ -5,20 +5,34 @@
  * outright rather than one inferred from watch history. It used to reach the
  * pipeline only as a preference multiplier, which cannot surface anything:
  * interest carries weight 0.3 of a 1.3 total in PREFERENCE_DIMENSION_WEIGHTS
- * and that is scaled by MAX_PREFERENCE_HEADROOM (0.5), so even a perfect
- * interest match closes just 11.5% of a candidate's remaining gap to 1.0 --
- * never enough to lift something the generic taste score already ranked below
- * the cut. Raising that weight was rejected: it is global, so it would retune
+ * and that is scaled by the preference strength, so even a perfect interest
+ * match closes a small share of a candidate's remaining gap to 1.0 -- never
+ * enough to lift something the generic taste score already ranked below the
+ * cut. Raising that weight was rejected: it is global, so it would retune
  * franchise/genre for every user, interests or not.
  *
  * So interests earn a small number of *reserved slots* in the final selection
  * instead. Scoring is left exactly as it was; a bounded few of the picks are
  * simply drawn from interest matches rather than from the top of the ranking.
  *
- * Everything here is pure -- no DB access -- so it can be unit-tested without
- * a database. The per-media-type ANN queries that produce the raw rows live in
- * recommender/movies/candidates.ts and recommender/series/pipeline.ts.
+ * WHAT COUNTS AS A MATCH is a fact on the title -- a genre or TMDb keyword that
+ * says the interest (interestEvidence.ts) -- and no longer embedding nearness
+ * to the typed phrase. That module says why: the cosine bars were dead on the
+ * current model and the nearest titles to a tone phrase were the ones sharing
+ * its words. Both the slots and the preference affinity read the same
+ * evidence, so a title the slots refuse cannot still be nudged as a "strong
+ * match" by the scoring loop.
+ *
+ * Everything here is pure -- no DB access. The facts are loaded by
+ * recommender/interestMatches.ts.
  */
+
+import {
+  interestAffinityFromEvidence,
+  matchInterestEvidence,
+  type InterestEvidence,
+  type InterestTitleFacts,
+} from './interestEvidence.js'
 
 /**
  * The shipped ceiling, now `recommendation_config.{movie,series}_interest_max_slots`
@@ -34,35 +48,14 @@
 export const DEFAULT_INTEREST_MAX_SLOTS = 3
 
 /**
- * A reserved slot is only filled by a match that clears the same "moderate
- * match" bar the affinity tiers already use (0.5 weighted cosine -> 0.8
- * affinity). An interest that matches nothing in the library leaves its slot
- * unused rather than padding the list with a weak pick.
- */
-export const MIN_INTEREST_SLOT_SIMILARITY = 0.5
-
-/**
- * How many of an interest's strongest matches a reserved slot may be drawn
- * from. This window is what keeps the slot recognizably *about* the interest.
- *
- * Picking purely by match strength would hand slots to whatever obscure thing
- * happens to sit closest to the phrase; picking purely by recommendation score
- * across every match would hand them to high-scoring titles that only
- * marginally relate to it, which is indistinguishable from doing nothing. So
- * the slot is filled by the best-scoring member of the interest's top matches:
- * unambiguously on-topic first, then the best of those.
- */
-export const INTEREST_SLOT_MATCH_POOL = 25
-
-/**
  * The single best interest match for one candidate.
  */
 export interface InterestMatch {
   interestId: string
   interestText: string
-  /** Cosine similarity to the interest embedding, scaled by the interest's own weight. */
-  weightedSimilarity: number
-  /** 0.5 (neutral) | 0.65 | 0.8 | 1.0 -- feeds PreferenceAffinities.interest. */
+  /** The genres/keywords on the title that say the interest. */
+  evidence: InterestEvidence
+  /** 0.5 (neutral) | 0.8 | 1.0, scaled by the interest's weight -- feeds PreferenceAffinities.interest. */
   affinity: number
 }
 
@@ -73,7 +66,10 @@ export interface InterestCandidateMatch extends InterestMatch {
 export interface InterestMatchIndex {
   /** candidateId -> its strongest match across all of the user's interests. */
   best: Map<string, InterestMatch>
-  /** Per-interest match lists, in the user's interest order, each sorted by descending similarity. */
+  /**
+   * Per-interest match lists, in the user's interest order. Only titles whose
+   * metadata backs the interest are listed, `phrase` evidence before `parts`.
+   */
   byInterest: Array<{
     interestId: string
     interestText: string
@@ -81,74 +77,68 @@ export interface InterestMatchIndex {
   }>
 }
 
-/**
- * One interest's raw ANN result, as returned by the per-media-type query.
- */
-export interface InterestQueryResult {
+/** One of the user's interests, as the pipeline hands it over. */
+export interface InterestInput {
   interestId: string
   interestText: string
-  /** The user's weight for this interest (defaults to 1.0 in user_custom_interests). */
-  weight: number
-  /** Rows from the pgvector query: raw cosine similarity, descending. */
-  rows: Array<{ candidateId: string; similarity: number }>
+  /** The user's weight for this interest (1.0 in user_custom_interests unless set). NUMERIC may arrive as text. */
+  weight: number | string | null
 }
 
+const STRENGTH_ORDER: Record<InterestEvidence['strength'], number> = { phrase: 0, parts: 1 }
+
 /**
- * Map a weighted cosine similarity onto a preference affinity.
+ * Check every candidate's metadata against every interest and fold the
+ * verified matches into the lookup structures the pipeline needs: one
+ * best-match-per-candidate map for the scoring loop, and the per-interest
+ * lists reserved slots are drawn from.
  *
- * These cut points are lifted verbatim from getCustomInterestAffinity
- * (taste-profile/index.ts), which now calls this function, so the two cannot
- * drift. Never returns below 0.5: custom interests are opt-in extra signal,
- * not an aversion list.
+ * `facts` is keyed by candidate id; a candidate missing from it simply has
+ * nothing to match on.
  */
-export function interestAffinityFromSimilarity(weightedSimilarity: number): number {
-  if (weightedSimilarity >= 0.7) return 1.0
-  if (weightedSimilarity >= 0.5) return 0.8
-  if (weightedSimilarity >= 0.3) return 0.65
-  return 0.5
-}
-
-/**
- * Fold per-interest ANN results into the lookup structures the pipeline needs:
- * one best-match-per-candidate map for the scoring loop, and the per-interest
- * lists that reserved slots are drawn from.
- */
-export function buildInterestMatchIndex(results: InterestQueryResult[]): InterestMatchIndex {
+export function buildInterestMatchIndex(
+  interests: InterestInput[],
+  facts: Map<string, InterestTitleFacts>
+): InterestMatchIndex {
   const best = new Map<string, InterestMatch>()
   const byInterest: InterestMatchIndex['byInterest'] = []
 
-  for (const result of results) {
-    const matches: InterestCandidateMatch[] = result.rows.map((row) => {
-      const weightedSimilarity = row.similarity * result.weight
-      return {
-        candidateId: row.candidateId,
-        interestId: result.interestId,
-        interestText: result.interestText,
-        weightedSimilarity,
-        affinity: interestAffinityFromSimilarity(weightedSimilarity),
-      }
-    })
+  for (const interest of interests) {
+    const matches: InterestCandidateMatch[] = []
+    for (const [candidateId, titleFacts] of facts) {
+      const evidence = matchInterestEvidence(interest.interestText, titleFacts)
+      if (!evidence) continue
+      matches.push({
+        candidateId,
+        interestId: interest.interestId,
+        interestText: interest.interestText,
+        evidence,
+        affinity: interestAffinityFromEvidence(evidence, interest.weight),
+      })
+    }
 
-    // The query already returns descending similarity and the weight is
-    // constant within an interest, but sorting here keeps the contract true
-    // regardless of what the caller hands over.
-    matches.sort((a, b) => b.weightedSimilarity - a.weightedSimilarity)
+    // Strongest evidence first, then id so the order is stable.
+    matches.sort(
+      (a, b) =>
+        STRENGTH_ORDER[a.evidence.strength] - STRENGTH_ORDER[b.evidence.strength] ||
+        (a.candidateId < b.candidateId ? -1 : a.candidateId > b.candidateId ? 1 : 0)
+    )
 
     for (const match of matches) {
       const existing = best.get(match.candidateId)
-      if (!existing || match.weightedSimilarity > existing.weightedSimilarity) {
+      if (!existing || match.affinity > existing.affinity) {
         best.set(match.candidateId, {
           interestId: match.interestId,
           interestText: match.interestText,
-          weightedSimilarity: match.weightedSimilarity,
+          evidence: match.evidence,
           affinity: match.affinity,
         })
       }
     }
 
     byInterest.push({
-      interestId: result.interestId,
-      interestText: result.interestText,
+      interestId: interest.interestId,
+      interestText: interest.interestText,
       matches,
     })
   }
@@ -187,13 +177,16 @@ export function computeReservedInterestSlots(
  * Walks the interests in order (their existing created_at DESC order, so the
  * newest interests get represented first) and gives each one slot before any
  * interest gets a second. For each, the filler is the highest-scoring
- * qualifying member of that interest's top INTEREST_SLOT_MATCH_POOL matches --
- * "the best time travel film you haven't seen", not an arbitrary one, and not
- * a high-scoring title that merely brushes against the phrase.
+ * candidate among its STRONGEST verified matches -- a title tagged with the
+ * whole phrase beats one assembled from parts, and among equals the viewer's
+ * own score decides: "the best dark comedy you haven't seen", backed by a tag
+ * that says it is one.
  *
- * Fully deterministic: ties on finalScore break to the lower candidate id, so
- * the same inputs always produce the same picks even though ANN tie order is
- * not guaranteed.
+ * An interest with no verified match fills nothing. That is the point: a
+ * missing pick costs nothing, and "this is what you asked for" said of a title
+ * that is not costs trust.
+ *
+ * Fully deterministic: ties on finalScore break to the lower candidate id.
  */
 export function pickInterestSlotFillers<T extends { id: string; finalScore: number }>(
   alreadySelected: T[],
@@ -211,8 +204,8 @@ export function pickInterestSlotFillers<T extends { id: string; finalScore: numb
   const taken = new Set(alreadySelected.map((candidate) => candidate.id))
   const fillers: Array<{ candidate: T; match: InterestCandidateMatch }> = []
 
-  // Round-robin so a single interest with many strong matches can't take every
-  // slot while another interest goes unrepresented.
+  // Round-robin so a single interest with many matches can't take every slot
+  // while another interest goes unrepresented.
   while (fillers.length < slots) {
     let pickedThisRound = false
 
@@ -222,11 +215,10 @@ export function pickInterestSlotFillers<T extends { id: string; finalScore: numb
       let bestCandidate: T | null = null
       let bestMatch: InterestCandidateMatch | null = null
 
-      // Only the interest's strongest matches are eligible -- see
-      // INTEREST_SLOT_MATCH_POOL. matches are similarity-sorted.
-      for (const match of interest.matches.slice(0, INTEREST_SLOT_MATCH_POOL)) {
-        if (match.weightedSimilarity < MIN_INTEREST_SLOT_SIMILARITY) {
-          // everything after this is weaker still
+      for (const match of interest.matches) {
+        // matches are ordered strongest evidence first; once a pick exists,
+        // weaker evidence cannot displace it.
+        if (bestMatch && STRENGTH_ORDER[match.evidence.strength] > STRENGTH_ORDER[bestMatch.evidence.strength]) {
           break
         }
         if (taken.has(match.candidateId)) continue

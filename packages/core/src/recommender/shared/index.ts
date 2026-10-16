@@ -58,17 +58,24 @@ export { EVIDENCE_HISTORY_LIMIT } from './evidencePool.js'
 export { allocateClusterCandidateLimits, MIN_CANDIDATES_PER_CLUSTER } from './clusterAllocation.js'
 
 export {
-  interestAffinityFromSimilarity,
   buildInterestMatchIndex,
   computeReservedInterestSlots,
   pickInterestSlotFillers,
   DEFAULT_INTEREST_MAX_SLOTS,
-  MIN_INTEREST_SLOT_SIMILARITY,
+  type InterestInput,
   type InterestMatch,
   type InterestCandidateMatch,
   type InterestMatchIndex,
-  type InterestQueryResult,
 } from './interestSlots.js'
+
+export {
+  interestAffinityFromEvidence,
+  interestTerms,
+  matchInterestEvidence,
+  readInterestEvidence,
+  type InterestEvidence,
+  type InterestTitleFacts,
+} from './interestEvidence.js'
 
 export {
   buildTwinIndex,

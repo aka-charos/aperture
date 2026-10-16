@@ -24,6 +24,7 @@ import {
   MOVIE_NOUNS,
   type OwnStanding,
 } from '../shared/explanationPrompt.js'
+import { formatEvidenceTags, type InterestEvidence } from '../shared/interestEvidence.js'
 import { evidenceSupportsCause } from '../evidenceStrength.js'
 import {
   describeExplanationBatch,
@@ -76,6 +77,12 @@ export interface MovieForExplanation {
    * an interest pick is exactly the signal that did *not* put it here.
    */
   interestText?: string | null
+  /**
+   * The genres/keywords that back an interest pick (shared/interestEvidence.ts).
+   * Absent on an interest pick means nothing confirms the match, and the
+   * prompt and the fallback must not claim it.
+   */
+  interestEvidence?: InterestEvidence | null
   /**
    * True when this pick came from a reserved taste-twin slot
    * (recommender/shared/twinSlots.ts). Same reasoning as interestText: what put
@@ -583,10 +590,11 @@ function generateFallbackExplanation(movie: MovieWithEvidence): string {
   // stated interest is the actual reason it's here, so leading with watch
   // history would misattribute it.
   if (movie.interestText) {
-    // "one of the closest" rather than "the closest": the slot goes to the
-    // best-scoring title among the interest's strongest matches, not to the
-    // single closest one, and the wording shouldn't claim more than that.
-    return `You told us you like ${movie.interestText.toLowerCase()} — this ${movie.genres[0]?.toLowerCase() || 'film'} pick is one of the closest matches in your library that you haven't seen yet.`
+    // Says what the title's own tags say and no more; an unverified pick (an
+    // older run whose title carries no such tag) is only "close to" it.
+    return movie.interestEvidence
+      ? `You told us you like ${movie.interestText.toLowerCase()}, and this ${movie.genres[0]?.toLowerCase() || 'film'} is tagged ${formatEvidenceTags(movie.interestEvidence)} — one you haven't seen yet.`
+      : `You told us you like ${movie.interestText.toLowerCase()} — this ${movie.genres[0]?.toLowerCase() || 'film'} is one of the titles in your library closest to that, and one you haven't seen yet.`
   }
 
   // Same reasoning one step down: a twin pick is here because a like-minded

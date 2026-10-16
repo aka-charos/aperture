@@ -23,7 +23,6 @@ import { buildSpaceFor, isCenteringReady } from '../recommender/centering.js'
 // Imported from the leaf module rather than recommender/shared/index.js: that
 // barrel pulls in scoring/selection, and the recommender already imports this
 // file. interestSlots.ts has no imports of its own, so there's no cycle.
-import { interestAffinityFromSimilarity } from '../recommender/shared/interestSlots.js'
 
 export * from './types.js'
 export { 
@@ -1152,65 +1151,3 @@ export function genreAffinityFromWeights(
   return avgWeight / 2
 }
 
-/**
- * Calculate cosine similarity between two vectors
- */
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0
-  
-  let dotProduct = 0
-  let normA = 0
-  let normB = 0
-  
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i]
-    normA += a[i] * a[i]
-    normB += b[i] * b[i]
-  }
-  
-  const denominator = Math.sqrt(normA) * Math.sqrt(normB)
-  return denominator === 0 ? 0 : dotProduct / denominator
-}
-
-/**
- * Get the custom interest affinity for a candidate: 0.5 (no match, or no
- * custom interests configured) - 1 (strong match). Never goes below neutral
- * — custom interests are opt-in extra signal, not an aversion list.
- *
- * Checks if the candidate's embedding is similar to any of the user's custom
- * interests (e.g., "I love time travel stories", "space opera adventures").
- *
- * @param userId - The user ID
- * @param candidateEmbedding - The candidate's embedding vector
- */
-export async function getCustomInterestAffinity(
-  userId: string,
-  candidateEmbedding: number[]
-): Promise<number> {
-  const interests = await getUserCustomInterests(userId)
-
-  // No custom interests = neutral
-  if (interests.length === 0) return 0.5
-
-  // Filter to interests that have embeddings
-  const interestsWithEmbeddings = interests.filter((i) => i.embedding && i.embedding.length > 0)
-  if (interestsWithEmbeddings.length === 0) return 0.5
-
-  // Find max similarity to any interest, weighted by user's interest weight
-  let maxWeightedSimilarity = 0
-
-  for (const interest of interestsWithEmbeddings) {
-    if (!interest.embedding) continue
-
-    const similarity = cosineSimilarity(candidateEmbedding, interest.embedding)
-    const weightedSimilarity = similarity * interest.weight
-
-    if (weightedSimilarity > maxWeightedSimilarity) {
-      maxWeightedSimilarity = weightedSimilarity
-    }
-  }
-
-  // Tiering lives in recommender/shared/interestSlots.ts so this and the
-  // recommendation pipeline's bulk path can't drift apart.
-  return interestAffinityFromSimilarity(maxWeightedSimilarity)
-}

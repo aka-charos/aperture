@@ -32,7 +32,6 @@ import {
   applyPreferenceAdjustment,
   DEFAULT_PREFERENCE_DIMENSION_WEIGHTS,
   type PreferenceDimensionWeights,
-  buildInterestMatchIndex,
   buildTwinIndex,
   computeReservedInterestSlots,
   computeReservedTwinSlots,
@@ -46,7 +45,6 @@ import {
   EVIDENCE_HISTORY_LIMIT,
   type InterestCandidateMatch,
   type InterestMatchIndex,
-  type InterestQueryResult,
   type TwinDonor,
   type TwinIndex,
   effectiveBlendWeights,
@@ -58,6 +56,7 @@ import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
 import { refreshTasteSynopsis } from '../../lib/tasteSynopsisRefresh.js'
 import { storeSeriesEvidence, getSeriesOverviews } from './storage.js'
 import { judgeRunEvidence } from '../judgeEvidence.js'
+import { loadInterestMatchIndex } from '../interestMatches.js'
 import { findNearestSharedTitles, storedSharedFields } from '../twinNearShared.js'
 import { ownStandingAt } from '../shared/explanationPrompt.js'
 import { twinMatchExtras, type StoredTwinPick } from '../storage.js'
@@ -506,108 +505,6 @@ export async function getMultiClusterSeriesCandidates(
   return mergeSeriesClusterCandidatesByMaxSimilarity(perClusterResults)
 }
 
-/**
- * Custom-interest matching, mirroring recommender/movies/candidates.ts's
- * getInterestMatchIndex -- one indexed ANN query per interest through the same
- * querySeriesCandidatesForVector used for taste retrieval, so no new SQL and
- * the same watched/parental filtering applies. See that function and
- * shared/interestSlots.ts for why interests need this rather than the old
- * per-candidate affinity loop.
- */
-export const SERIES_INTEREST_ANN_LIMIT = 1000
-export const MAX_QUERIED_SERIES_INTERESTS = 10
-
-export interface SeriesInterestQueryInput {
-  interestId: string
-  interestText: string
-  weight: number
-  embedding: number[] | null
-  embeddingModel: string | null
-}
-
-export async function getSeriesInterestMatchIndex(
-  interests: SeriesInterestQueryInput[],
-  watchedSeriesIds: Set<string>,
-  includeWatched: boolean,
-  scope: LibraryScope | null
-): Promise<InterestMatchIndex> {
-  if (interests.length === 0) return buildInterestMatchIndex([])
-
-  // Explicitly RAW, mirroring the movie interest path: the query vector is a
-  // fresh embedding of the interest TEXT, which nothing has centred, so it has
-  // to meet raw item vectors. Both sides raw is internally consistent, and this
-  // path is not what the centring measurement covered.
-  const ctx = await resolveSeriesCandidateQueryContext('raw')
-  if (!ctx) return buildInterestMatchIndex([])
-
-  // A stale-dimension embedding makes pgvector raise, and previously just
-  // scored 0 forever via cosineSimilarity's length guard. Skip those; they get
-  // re-embedded on the next profile rebuild.
-  const usable = interests.filter(
-    (interest) =>
-      interest.embedding && interest.embedding.length > 0 && interest.embeddingModel === ctx.model
-  )
-
-  const skipped = interests.length - usable.length
-  if (skipped > 0) {
-    logger.debug(
-      { skipped, activeModel: ctx.model },
-      'Skipped custom interests with a missing or stale-model embedding'
-    )
-  }
-
-  const queried = usable.slice(0, MAX_QUERIED_SERIES_INTERESTS)
-  if (queried.length < usable.length) {
-    logger.info(
-      { total: usable.length, queried: queried.length },
-      `Limiting interest matching to the ${MAX_QUERIED_SERIES_INTERESTS} most recent interests`
-    )
-  }
-
-  const results: InterestQueryResult[] = []
-
-  // Sequential on purpose: the interest count is user-controlled, unlike the
-  // fixed K<=3 cluster queries.
-  for (const interest of queried) {
-    try {
-      const vectorStr = `[${interest.embedding!.join(',')}]`
-      const rows = await querySeriesCandidatesForVector(
-        vectorStr,
-        SERIES_INTEREST_ANN_LIMIT,
-        includeWatched,
-        watchedSeriesIds,
-        scope,
-        ctx
-      )
-
-      const tail = rows[rows.length - 1]
-      if (
-        rows.length >= SERIES_INTEREST_ANN_LIMIT &&
-        tail &&
-        tail.similarity * interest.weight >= 0.3
-      ) {
-        logger.debug(
-          { interestText: interest.interestText, tailSimilarity: tail.similarity },
-          'Interest match list hit its limit while still above the neutral threshold'
-        )
-      }
-
-      results.push({
-        interestId: interest.interestId,
-        interestText: interest.interestText,
-        weight: interest.weight,
-        rows: rows.map((row) => ({ candidateId: row.seriesId, similarity: row.similarity })),
-      })
-    } catch (err) {
-      logger.warn(
-        { err, interestId: interest.interestId },
-        'Custom interest match query failed, skipping this interest'
-      )
-    }
-  }
-
-  return buildInterestMatchIndex(results)
-}
 
 /**
  * Score candidates using multiple factors
@@ -805,7 +702,7 @@ async function storeSeriesCandidates(
                     interestMatch: {
                       interestId: interestPick.interestId,
                       interestText: interestPick.interestText,
-                      weightedSimilarity: interestPick.weightedSimilarity,
+                      evidence: interestPick.evidence,
                     },
                   }
                 : {}),
@@ -1262,24 +1159,21 @@ export async function generateSeriesRecommendationsForUser(
     let genreSignalCount = 0
     let interestSignalCount = 0
 
-    // One indexed ANN query per custom interest instead of a per-candidate
-    // embedding fetch plus affinity call, so every candidate is measured
-    // rather than only the top 100. Fails open to all-neutral affinities.
+    // Mirrors the movie pipeline: interests matched against each candidate
+    // show's genres and TMDb keywords, one query per run. Fails open to
+    // all-neutral affinities.
     let interestIndex: InterestMatchIndex | null = null
     try {
       const customInterests = await getUserCustomInterests(user.id)
       if (customInterests.length > 0) {
-        interestIndex = await getSeriesInterestMatchIndex(
+        interestIndex = await loadInterestMatchIndex(
+          'series',
           customInterests.map((interest) => ({
             interestId: interest.id,
             interestText: interest.interestText,
             weight: interest.weight,
-            embedding: interest.embedding,
-            embeddingModel: interest.embeddingModel,
           })),
-          excludeIds,
-          includeWatched,
-          scope
+          candidates.map((candidate) => candidate.seriesId)
         )
       }
     } catch (err) {
@@ -1705,6 +1599,7 @@ export async function generateSeriesRecommendationsForUser(
           // credits what actually put the show here instead of inventing a
           // watch-history justification for it.
           interestText: interestPicks.get(s.seriesId)?.interestText ?? null,
+          interestEvidence: interestPicks.get(s.seriesId)?.evidence ?? null,
           // Same idea for a borrowed pick: the reason is a like-minded viewer,
           // not the ranking. A flag, never the donor's identity.
           fromTasteTwin: twinPicks.has(s.seriesId),

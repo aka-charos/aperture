@@ -1840,3 +1840,29 @@ Any reason that shows up for everyone is another writer restamping a signal, the
 13. **The badges appear only when SOME titles are the twin's** (`twinMarking`, pure, pinned in `closestRow.test.ts`). When every title is shared, the caption says so once ("{{name}} watched every one of them too"), since a badge on every poster carries nothing the caption does not.
 
 **Not changed:** how twins are found, the affinity bar and the slot arithmetic. The evidence heading for a reserved-slot pick stays non-causal.
+
+## F-158
+
+**An interest slot was filled by embedding nearness to the typed phrase, and the explanation was told to say it was what the viewer asked for.** Read on the live picks for one account with three interests. The 25 titles nearest the embedded phrase were eligible, gated at a weighted cosine of 0.5, and the slot went to whichever of them the viewer's own score liked best. The prompt said only *"picked because they told us they like X — lead with that"*, and the panel showed no banner at all: an interest pick only switched the evidence heading to "not why it was picked", so the reason existed nowhere outside the prose.
+
+**Measured on gemini-embedding-2 (bare), the live set.** Through `/api/similarity/search`, which embeds a query exactly as the interest is embedded:
+
+| Phrase | Nearest | #25 | #100 | #500 | #1000 | ≥ 0.5 | ≥ 0.7 |
+|---|---|---|---|---|---|---|---|
+| dark comedy | 0.638 | 0.611 | 0.598 | 0.576 | 0.566 | 1000 | 0 |
+| dystopian sci-fi | 0.690 | 0.661 | 0.641 | 0.605 | 0.590 | 1000 | 0 |
+
+So **the 0.5 slot bar refused nothing and the 0.7 "strong match" tier (affinity 1.0) was reached by nothing**. Both numbers came with the code from another model and were never measured on this one (the cosine invariant). Every candidate in the 1,000 nearest got affinity 0.8, and every other candidate 0.5, so the preference nudge said "among the phrase's 1,000 nearest" and nothing finer.
+
+**The ordering inside that band follows the phrase's words.** The nearest titles to "dark comedy" were Cannibal Mukbang, *Dark Horse* (2011, a drama), Faraway Eyes, a Frankenstein comedy, Bo Burnham: Make Happy, *The Dark* (2018, horror), Fifty Shades of Black, *The King of Comedy*, then more stand-up specials, *Dark Horse* (2005) and *Dark Crimes*. A subject phrase fared well: "dystopian sci-fi" opened on Oblivion, Dredd, Undergods, Aniara and The Colony. Nothing could tell the two kinds of phrase apart. The live "dark comedy" pick, The Drama (2026), was the 16th nearest and a genuine one only because its TMDb keywords say "dark comedy". Had the viewer's taste preferred *Dark Crimes*, a crime thriller would have been presented as the dark comedy they asked for. Its explanation also reached for a bridge: *"That is the trick you already love in Withnail & I, Parasite and The Banshees of Inisherin"*, a technique none of those films shares.
+
+**What changed.** A match is now a FACT on the title (`recommender/shared/interestEvidence.ts`, pure, pinned): a genre or TMDb keyword that says the interest. Six rules.
+
+1. **Three ways to match, strongest first.** A fact IS the interest ("dark comedy" ↔ keyword "dark comedy"). A fact CONTAINS it, only for interests of two words or more ("time travel" ↔ "time travel paradox", never "war" ↔ "star wars"). Or the interest splits into consecutive pieces that are each a whole fact ("dystopian sci-fi" ↔ keyword "dystopia" + genre "Science Fiction"). Light normalisation on both sides: accents, plural, the "-ian" adjective, filler words ("stories", "films", "movies"…), and a short synonym table (sci-fi, rom-com). A miss costs a slot, never a false claim.
+2. **It is checked over every candidate the pipeline scores**, one query per run (`recommender/interestMatches.ts`), not over the phrase's nearest neighbours, whose ordering is the fault. The interest embedding is still stored; nothing in recommendations reads it now. The per-pipeline ANN functions are deleted, and `getCustomInterestAffinity` with them, since nothing called it.
+3. **Affinity follows the evidence**: whole phrase 1.0, parts 0.8, nothing 0.5, scaled toward neutral by the interest's weight. These are the tiers the cosine bands produced; what moved is what earns them. Slots and the scoring nudge read the same index, so a title the slots refuse cannot be nudged as a strong match either.
+4. **The slot goes to the viewer's best-scoring title among the strongest verified matches**, whole-phrase tags before parts. An interest nothing is tagged with fills nothing and is logged at info. A missing pick costs nothing; "this is what you asked for" said of a title that is not costs trust.
+5. **The evidence is stored on the pick** (`interestMatch.evidence`, replacing `weightedSimilarity`) and every reader uses it. The prompt names the tags and says to claim no more than they do. An unconfirmed pick (an older run whose title the refresh finds no tag on) may only be called "close to" what was asked for. The CRITICAL rule also forbids saying the viewer "already loves" a technique in another title unless the data shows it. The non-AI fallbacks say the same. The checker is shown the same evidence (F-144 rule 1). The explanation refresh and the per-pick Rewrite re-check older picks against their current tags and store what they find.
+6. **The panel says it**: a banner beside the twin one, from `pages/media-detail/interestPick.ts` (pure, pinned), naming the interest and the tags, or saying nothing in the tags confirms it. No "rather than the scores below": an interest pick can score well too, F-157's lesson.
+
+**Not changed:** the slot count and its ceiling, and the round-robin across interests. A phrase that names a feeling rather than anything TMDb tags (no keyword says it) now fills no slot, which is the intended direction.

@@ -224,3 +224,29 @@ test('pickOrigin reads a stored standing off a twin pick, and only a well-formed
   assert.equal(pickOrigin({ twinMatch: {} }).standing, undefined)
   assert.equal(pickOrigin({}).standing, undefined)
 })
+
+test('a stated-interest pick reaches the checker with its tags, or as unconfirmed', () => {
+  const tagged = buildExplanationCheckRequest(
+    input({
+      origin: 'statedInterest',
+      interestText: 'dark comedy',
+      interestEvidence: { strength: 'phrase', matched: ['dark comedy'] },
+    })
+  )
+  assert.match(String(tagged.state.pickedBecause), /"dark comedy" — its genres and keywords include "dark comedy"/)
+
+  const unconfirmed = buildExplanationCheckRequest(
+    input({ origin: 'statedInterest', interestText: 'dark comedy', interestEvidence: null })
+  )
+  assert.match(String(unconfirmed.state.pickedBecause), /nothing in its genres or keywords confirms it is one/)
+})
+
+test('pickOrigin reads stored interest evidence, and only a well-formed one', () => {
+  assert.deepEqual(
+    pickOrigin({ interestMatch: { interestText: 'dark comedy', evidence: { strength: 'phrase', matched: ['dark comedy'] } } })
+      .interestEvidence,
+    { strength: 'phrase', matched: ['dark comedy'] }
+  )
+  // An older row: a similarity and no evidence.
+  assert.equal(pickOrigin({ interestMatch: { interestText: 'x', weightedSimilarity: 0.61 } }).interestEvidence, undefined)
+})

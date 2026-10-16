@@ -6,6 +6,7 @@ import { inputCountsSql, outputCountsSql } from './gateCounts.js'
 import { withRunCounts } from './runCountsFallback.js'
 import type { TWIN_SHARED_ORDER_NEAREST } from './twinNearShared.js'
 import type { OwnStanding } from './shared/explanationPrompt.js'
+import type { InterestEvidence } from './shared/interestEvidence.js'
 
 /**
  * Store recommendation candidates using bulk INSERT
@@ -20,7 +21,13 @@ import type { OwnStanding } from './shared/explanationPrompt.js'
 export interface StoredInterestPick {
   interestId: string
   interestText: string
-  weightedSimilarity: number
+  /**
+   * The genres/keywords on the title that say the interest
+   * (shared/interestEvidence.ts). Runs from before it hold a
+   * `weightedSimilarity` instead: embedding nearness to the phrase, which is
+   * not evidence the title is what the viewer asked for.
+   */
+  evidence: InterestEvidence
 }
 
 /**
@@ -184,7 +191,7 @@ export function buildCandidateRows(
             interestMatch: {
               interestId: interestPick.interestId,
               interestText: interestPick.interestText,
-              weightedSimilarity: interestPick.weightedSimilarity,
+              evidence: interestPick.evidence,
             },
           }
         : {}),

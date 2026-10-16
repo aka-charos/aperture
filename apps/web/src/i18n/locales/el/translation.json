@@ -3297,6 +3297,8 @@
       "tasteTwinConnection": "{{name}}, μία από τις συνδέσεις σας, έχει γούστο πολύ κοντά στο δικό σας και το έχει δει — αυτό το έφερε στη λίστα σας, όχι οι βαθμολογίες παρακάτω.",
       "tasteTwinClose": "Someone here whose taste closely overlaps yours has watched this. It already scored close to the top of your list on its own, and their watching is what put it in.",
       "tasteTwinConnectionClose": "{{name}}, one of your connections, has taste that closely overlaps yours and has watched this. It already scored close to the top of your list on its own, and their watching is what put it in.",
+      "interestPickTagged": "You told us you like “{{interest}}”, and this title's own genres and keywords say so: {{tags}}. That is what put it in your list.",
+      "interestPickUntagged": "You told us you like “{{interest}}”. This title was picked as one of the closest to that phrase in your library; nothing in its genres or keywords confirms it is one.",
       "closestInLibrary": "Οι πιο κοντινοί τίτλοι στη βιβλιοθήκη σας",
       "closestInLibraryMovie": "Ταινίες από το ιστορικό σας που μοιάζουν περισσότερο με αυτήν. Δίνονται για συμφραζόμενα — δεν είναι ο λόγος που επιλέχθηκε:",
       "closestInLibrarySeries": "Σειρές από το ιστορικό σας που μοιάζουν περισσότερο με αυτήν. Δίνονται για συμφραζόμενα — δεν είναι ο λόγος που επιλέχθηκε:",

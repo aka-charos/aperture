@@ -25,11 +25,13 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import QueryStatsIcon from '@mui/icons-material/QueryStats'
 import GroupsIcon from '@mui/icons-material/Groups'
+import EditNoteIcon from '@mui/icons-material/EditNote'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 import { gradients } from '@/theme'
 import { insightsHaveDetail } from '../helpers'
 import { buildClosestRow, twinMarking } from '../closestRow'
+import { readInterestPick } from '../interestPick'
 import type { RecommendationInsights, MediaType } from '../types'
 
 interface MovieInsightsProps {
@@ -398,6 +400,8 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
   const fromInterest =
     typeof insights.scoreBreakdown?.interestMatch === 'object' &&
     insights.scoreBreakdown.interestMatch !== null
+  // What the banner says about it: the interest, and the tags that back it.
+  const interestPick = readInterestPick(insights.scoreBreakdown)
 
   // And an acclaimed slot. Same rule: the ranking is precisely what did not
   // choose this title, so the similarity lookup below must not be labelled as
@@ -743,6 +747,37 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
                     slice of a tie that had nothing to do with the pick. They
                     are now the shared titles nearest the pick, and they join
                     the closest-titles row below, marked as the twin's too. */}
+              </Paper>
+            )}
+
+            {/* The same place for a stated interest, which used to have no
+                banner at all: the reason existed only in the AI prose. It says
+                what backs the match — the title's own tags — or, for an older
+                pick chosen by embedding nearness, that nothing does. */}
+            {interestPick && (
+              <Paper
+                sx={{
+                  p: 2,
+                  mb: 2.5,
+                  bgcolor: 'background.default',
+                  borderRadius: 2,
+                  borderInlineStart: '3px solid',
+                  borderInlineStartColor: 'secondary.main',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <EditNoteIcon sx={{ color: 'secondary.main', fontSize: 20, flexShrink: 0 }} />
+                  <Typography variant="body2" color="text.secondary">
+                    {interestPick.tags
+                      ? t('mediaDetail.insights.interestPickTagged', {
+                          interest: interestPick.interest,
+                          tags: interestPick.tags.join(', '),
+                        })
+                      : t('mediaDetail.insights.interestPickUntagged', {
+                          interest: interestPick.interest,
+                        })}
+                  </Typography>
+                </Box>
               </Paper>
             )}
 

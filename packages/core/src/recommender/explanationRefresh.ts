@@ -42,6 +42,11 @@ import {
 import { judgeRunEvidence } from './judgeEvidence.js'
 import { ownStandingAt, readOwnStanding, type OwnStanding } from './shared/explanationPrompt.js'
 import {
+  matchInterestEvidence,
+  readInterestEvidence,
+  type InterestEvidence,
+} from './shared/interestEvidence.js'
+import {
   findNearestSharedTitles,
   storedSharedFields,
   TWIN_SHARED_ORDER_NEAREST,
@@ -100,7 +105,7 @@ function numOrNull(value: string | number | null): number | null {
 }
 
 interface StoredBreakdown {
-  interestMatch?: { interestText?: unknown }
+  interestMatch?: { interestText?: unknown; evidence?: unknown }
   twinMatch?: { sharedIds?: unknown; sharedOrder?: unknown; donorId?: unknown; ownStanding?: unknown }
   acclaimedMatch?: unknown
 }
@@ -244,6 +249,86 @@ function resolveStanding(
 }
 
 /**
+ * Re-check each interest pick against its title's genres and keywords as they
+ * are now, and store the evidence back on the pick's score_breakdown.
+ *
+ * Runs from before interestEvidence.ts hold only an embedding similarity, and
+ * the prompt now refuses to let a pick with no evidence be called what the
+ * viewer asked for. Re-checking here is what lets this job (and the per-pick
+ * Rewrite button) repair an older pick: one that is tagged gets its evidence
+ * and the banner; one that is not keeps no evidence and is described as
+ * "close to" the interest. The old `weightedSimilarity` is dropped either
+ * way, since nothing reads it.
+ *
+ * A failed lookup writes nothing and falls back to whatever evidence the row
+ * already stored. Returns item id -> evidence (null = not confirmed).
+ */
+async function refreshInterestEvidence(
+  runId: string,
+  mediaType: ExplanationMediaType,
+  rows: Array<{ itemId: string; breakdown: unknown }>
+): Promise<Map<string, InterestEvidence | null>> {
+  const picks = rows.flatMap(({ itemId, breakdown }) => {
+    const interest = ((breakdown ?? {}) as StoredBreakdown).interestMatch
+    const text = interest?.interestText
+    return typeof text === 'string' && text
+      ? [{ itemId, interestText: text, stored: readInterestEvidence(interest?.evidence) }]
+      : []
+  })
+  if (picks.length === 0) return new Map()
+
+  const table = mediaType === 'movie' ? 'movies' : 'series'
+  const column = mediaType === 'movie' ? 'movie_id' : 'series_id'
+  let facts: Map<string, { genres: string[] | null; keywords: string[] | null }>
+  try {
+    const result = await query<{ id: string; genres: string[] | null; keywords: string[] | null }>(
+      `SELECT id, genres, keywords FROM ${table} WHERE id = ANY($1::uuid[])`,
+      [picks.map((pick) => pick.itemId)]
+    )
+    facts = new Map(result.rows.map((row) => [row.id, row]))
+  } catch (err) {
+    logger.warn({ err, runId, mediaType }, 'Could not re-check interest picks against their tags')
+    return new Map(picks.map((pick) => [pick.itemId, pick.stored]))
+  }
+
+  const evidence = new Map(
+    picks.map((pick) => [
+      pick.itemId,
+      matchInterestEvidence(pick.interestText, facts.get(pick.itemId) ?? {}),
+    ])
+  )
+
+  try {
+    await query(
+      `UPDATE recommendation_candidates rc
+          SET score_breakdown = jsonb_set(
+                rc.score_breakdown,
+                '{interestMatch}',
+                ((rc.score_breakdown->'interestMatch') - 'weightedSimilarity' - 'evidence')
+                  || u.fields::jsonb)
+         FROM unnest($2::uuid[], $3::text[]) AS u(item_id, fields)
+        WHERE rc.run_id = $1
+          AND rc.${column} = u.item_id
+          AND jsonb_typeof(rc.score_breakdown->'interestMatch') = 'object'`,
+      [
+        runId,
+        picks.map((pick) => pick.itemId),
+        picks.map((pick) => {
+          const found = evidence.get(pick.itemId)
+          return JSON.stringify(found ? { evidence: found } : {})
+        }),
+      ]
+    )
+  } catch (err) {
+    // The prose still gets the re-checked evidence; only the panel keeps the
+    // old row until the next refresh.
+    logger.warn({ err, runId, mediaType }, 'Could not store re-checked interest evidence')
+  }
+
+  return evidence
+}
+
+/**
  * Ordered by the rank the reader sees, so the numbering in the prompt matches
  * the list on the page — which matters only for the log line, but costs
  * nothing. selected_rank can be null on runs made before it existed, hence the
@@ -356,6 +441,11 @@ async function refreshMovieRun(
   const standings = new Map(
     result.rows.map((row) => [row.movie_id, resolveStanding(row.score_breakdown, row.rank, shape)])
   )
+  const interestEvidence = await refreshInterestEvidence(
+    runId,
+    'movie',
+    result.rows.map((row) => ({ itemId: row.movie_id, breakdown: row.score_breakdown }))
+  )
 
   const twinShared = await refreshTwinSharedIds(
     runId,
@@ -386,6 +476,7 @@ async function refreshMovieRun(
       novelty: numOrNull(row.novelty_score) ?? 0,
       ratingScore: numOrNull(row.rating_score) ?? 0,
       interestText: origin.interestText,
+      interestEvidence: interestEvidence.get(row.movie_id) ?? null,
       fromTasteTwin: origin.fromTasteTwin,
       twinSharedIds: twinShared.get(row.movie_id) ?? origin.twinSharedIds,
       ownStanding: standings.get(row.movie_id),
@@ -434,6 +525,11 @@ async function refreshSeriesRun(
   const standings = new Map(
     result.rows.map((row) => [row.series_id, resolveStanding(row.score_breakdown, row.rank, shape)])
   )
+  const interestEvidence = await refreshInterestEvidence(
+    runId,
+    'series',
+    result.rows.map((row) => ({ itemId: row.series_id, breakdown: row.score_breakdown }))
+  )
 
   const twinShared = await refreshTwinSharedIds(
     runId,
@@ -466,6 +562,7 @@ async function refreshSeriesRun(
       novelty: numOrNull(row.novelty_score) ?? 0,
       ratingScore: numOrNull(row.rating_score) ?? 0,
       interestText: origin.interestText,
+      interestEvidence: interestEvidence.get(row.series_id) ?? null,
       fromTasteTwin: origin.fromTasteTwin,
       twinSharedIds: twinShared.get(row.series_id) ?? origin.twinSharedIds,
       ownStanding: standings.get(row.series_id),

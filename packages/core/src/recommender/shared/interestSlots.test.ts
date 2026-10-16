@@ -1,61 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  interestAffinityFromSimilarity,
   buildInterestMatchIndex,
   computeReservedInterestSlots,
   pickInterestSlotFillers,
   DEFAULT_INTEREST_MAX_SLOTS,
-  MIN_INTEREST_SLOT_SIMILARITY,
-  INTEREST_SLOT_MATCH_POOL,
-  type InterestQueryResult,
 } from './interestSlots.js'
-
-// ============================================================================
-// Affinity tiering
-// ============================================================================
-
-/**
- * Verbatim copy of the tiering that lived inline in getCustomInterestAffinity
- * before it was extracted. Asserting against this is what makes the refactor
- * provably behavior-preserving rather than merely plausible.
- */
-function legacyAffinity(maxWeightedSimilarity: number): number {
-  if (maxWeightedSimilarity >= 0.7) return 1.0
-  if (maxWeightedSimilarity >= 0.5) return 0.8
-  if (maxWeightedSimilarity >= 0.3) return 0.65
-  return 0.5
-}
-
-test('interestAffinityFromSimilarity matches the previous inline tiering exactly', () => {
-  // Sweep the whole plausible range plus the exact boundary values and a
-  // hair either side of each, where an off-by-epsilon would hide.
-  const probes: number[] = [
-    -1, -0.001, 0, 0.2999, 0.3, 0.3001, 0.4999, 0.5, 0.5001, 0.6999, 0.7, 0.7001, 0.9, 1, 1.5,
-  ]
-  for (let v = -0.2; v <= 1.2; v += 0.01) probes.push(Number(v.toFixed(4)))
-
-  for (const probe of probes) {
-    assert.equal(
-      interestAffinityFromSimilarity(probe),
-      legacyAffinity(probe),
-      `affinity diverged at ${probe}`
-    )
-  }
-})
-
-test('interestAffinityFromSimilarity never returns below neutral', () => {
-  // Custom interests are opt-in extra signal, never an aversion list.
-  for (const probe of [-5, -1, -0.0001, 0, 0.1]) {
-    assert.equal(interestAffinityFromSimilarity(probe), 0.5)
-  }
-})
-
-test('the slot-filling bar sits exactly on the "moderate match" tier', () => {
-  // If these drift apart, a slot could be filled by something the affinity
-  // tiers still consider a weak match.
-  assert.equal(interestAffinityFromSimilarity(MIN_INTEREST_SLOT_SIMILARITY), 0.8)
-})
+import type { InterestTitleFacts } from './interestEvidence.js'
 
 // ============================================================================
 // Reserved slot count
@@ -120,73 +71,60 @@ test('computeReservedInterestSlots handles nonsense input without throwing', () 
 // Index building
 // ============================================================================
 
-function interestResult(
-  id: string,
-  text: string,
-  weight: number,
-  rows: Array<[string, number]>
-): InterestQueryResult {
-  return {
-    interestId: id,
-    interestText: text,
-    weight,
-    rows: rows.map(([candidateId, similarity]) => ({ candidateId, similarity })),
-  }
+const DARK = { interestId: 'i-dark', interestText: 'dark comedy', weight: 1 }
+const DYSTOPIA = { interestId: 'i-dys', interestText: 'dystopian sci-fi', weight: 1 }
+
+function facts(entries: Record<string, InterestTitleFacts>): Map<string, InterestTitleFacts> {
+  return new Map(Object.entries(entries))
 }
 
-test('buildInterestMatchIndex keeps the strongest match per candidate', () => {
-  const index = buildInterestMatchIndex([
-    interestResult('i1', 'time travel', 1, [
-      ['a', 0.8],
-      ['b', 0.4],
-    ]),
-    interestResult('i2', 'dark comedy', 1, [
-      ['a', 0.6],
-      ['b', 0.9],
-    ]),
-  ])
-
-  assert.equal(index.best.get('a')?.interestId, 'i1')
-  assert.equal(index.best.get('a')?.weightedSimilarity, 0.8)
-  assert.equal(index.best.get('b')?.interestId, 'i2')
-  assert.equal(index.best.get('b')?.weightedSimilarity, 0.9)
-  assert.equal(index.best.get('missing'), undefined)
-})
-
-test('buildInterestMatchIndex applies the interest weight before tiering', () => {
-  // Raw 0.8 would tier as a strong match; halved it is only moderate. This is
-  // the same `similarity * interest.weight` the old affinity loop applied.
-  const index = buildInterestMatchIndex([interestResult('i1', 'weighted', 0.5, [['a', 0.8]])])
-
-  assert.equal(index.best.get('a')?.weightedSimilarity, 0.4)
-  assert.equal(index.best.get('a')?.affinity, 0.65)
-})
-
-test('buildInterestMatchIndex preserves interest order and sorts matches', () => {
-  const index = buildInterestMatchIndex([
-    interestResult('i1', 'first', 1, [
-      ['a', 0.2],
-      ['b', 0.9],
-      ['c', 0.5],
-    ]),
-    interestResult('i2', 'second', 1, [['d', 0.7]]),
-  ])
-
-  assert.deepEqual(
-    index.byInterest.map((entry) => entry.interestId),
-    ['i1', 'i2']
+test('only titles whose metadata says the interest are matches', () => {
+  // The live nearest-by-embedding titles to "dark comedy" were mostly titles
+  // sharing its words. None of them is a match without the tag.
+  const index = buildInterestMatchIndex(
+    [DARK],
+    facts({
+      drama: { genres: ['Romance', 'Comedy', 'Drama'], keywords: ['dark comedy'] },
+      darkHorse: { genres: ['Drama'], keywords: [] },
+      kingOfComedy: { genres: ['Comedy', 'Crime'], keywords: ['stand-up comedy'] },
+    })
   )
   assert.deepEqual(
-    index.byInterest[0].matches.map((match) => match.candidateId),
-    ['b', 'c', 'a']
+    index.byInterest[0].matches.map((m) => m.candidateId),
+    ['drama']
   )
+  assert.equal(index.best.get('drama')?.affinity, 1.0)
+  assert.equal(index.best.has('darkHorse'), false)
 })
 
-test('buildInterestMatchIndex on no interests is an empty, usable index', () => {
-  const index = buildInterestMatchIndex([])
-  assert.equal(index.best.size, 0)
-  assert.deepEqual(index.byInterest, [])
-  assert.deepEqual(pickInterestSlotFillers([], [], index, 3), [])
+test('phrase evidence sorts before parts and wins the best map', () => {
+  const index = buildInterestMatchIndex(
+    [DYSTOPIA, { interestId: 'i-dys2', interestText: 'dystopia', weight: 1 }],
+    facts({
+      a: { genres: ['Science Fiction'], keywords: ['dystopia'] },
+    })
+  )
+  // "dystopian sci-fi" is assembled from parts (0.8); "dystopia" is one keyword (1.0).
+  assert.equal(index.byInterest[0].matches[0].evidence.strength, 'parts')
+  assert.equal(index.byInterest[0].matches[0].affinity, 0.8)
+  assert.equal(index.best.get('a')?.interestId, 'i-dys2')
+  assert.equal(index.best.get('a')?.affinity, 1.0)
+})
+
+test('the interest weight scales the affinity toward neutral', () => {
+  const index = buildInterestMatchIndex(
+    [{ ...DARK, weight: '0.5' }],
+    facts({ a: { keywords: ['dark comedy'] } })
+  )
+  assert.equal(index.best.get('a')?.affinity, 0.75)
+})
+
+test('interest order is preserved; no interests is an empty, usable index', () => {
+  const index = buildInterestMatchIndex([DYSTOPIA, DARK], facts({}))
+  assert.deepEqual(index.byInterest.map((i) => i.interestId), ['i-dys', 'i-dark'])
+  const empty = buildInterestMatchIndex([], new Map())
+  assert.equal(empty.best.size, 0)
+  assert.deepEqual(pickInterestSlotFillers([], [], empty, 3), [])
 })
 
 // ============================================================================
@@ -202,193 +140,87 @@ function candidates(...entries: Array<[string, number]>): TestCandidate[] {
   return entries.map(([id, finalScore]) => ({ id, finalScore }))
 }
 
-test('pickInterestSlotFillers takes the highest-scoring qualifying match', () => {
-  const index = buildInterestMatchIndex([
-    interestResult('i1', 'time travel', 1, [
-      ['weakScoreStrongMatch', 0.95],
-      ['strongScore', 0.6],
-    ]),
-  ])
-  const scored = candidates(['weakScoreStrongMatch', 0.2], ['strongScore', 0.8])
+const TAGGED = { keywords: ['dark comedy'] }
 
-  const fillers = pickInterestSlotFillers([], scored, index, 1)
-
-  assert.equal(fillers.length, 1)
-  // Deliberately the better *recommendation*, not the closer match to the
-  // interest text -- a reserved slot should be the best time travel film you
-  // haven't seen, not merely the most time-travel-ish one.
-  assert.equal(fillers[0].candidate.id, 'strongScore')
-  assert.equal(fillers[0].match.interestText, 'time travel')
-})
-
-test('pickInterestSlotFillers only draws from the interest top matches', () => {
-  // A high-scoring title that clears the similarity bar but sits outside the
-  // interest's strongest matches must not take the slot: it would be a pick
-  // the user cannot recognise as honouring what they asked for. This is the
-  // difference between the feature working and it looking like it did nothing.
-  const rows: Array<[string, number]> = []
-  for (let i = 0; i < INTEREST_SLOT_MATCH_POOL; i++) {
-    rows.push([`onTopic${i}`, 0.9 - i * 0.001])
-  }
-  rows.push(['marginal', MIN_INTEREST_SLOT_SIMILARITY + 0.01])
-
-  const index = buildInterestMatchIndex([interestResult('i1', 'time travel', 1, rows)])
-  const scored = [
-    ...rows.slice(0, INTEREST_SLOT_MATCH_POOL).map(([id]) => ({ id, finalScore: 0.3 })),
-    { id: 'marginal', finalScore: 0.99 },
-  ]
-
-  const fillers = pickInterestSlotFillers([], scored, index, 1)
-
-  assert.equal(fillers.length, 1)
-  assert.notEqual(fillers[0].candidate.id, 'marginal')
-  assert.ok(fillers[0].candidate.id.startsWith('onTopic'))
-})
-
-test('pickInterestSlotFillers skips matches below the moderate bar', () => {
-  const justUnder = MIN_INTEREST_SLOT_SIMILARITY - 0.01
-  const index = buildInterestMatchIndex([
-    interestResult('i1', 'obscure', 1, [
-      ['a', justUnder],
-      ['b', 0.2],
-    ]),
-  ])
-
-  assert.deepEqual(pickInterestSlotFillers([], candidates(['a', 0.9], ['b', 0.9]), index, 2), [])
-})
-
-test('pickInterestSlotFillers never returns an already-selected candidate', () => {
-  const index = buildInterestMatchIndex([
-    interestResult('i1', 'time travel', 1, [
-      ['already', 0.9],
-      ['fresh', 0.8],
-    ]),
-  ])
-  const scored = candidates(['already', 0.95], ['fresh', 0.5])
-
-  const fillers = pickInterestSlotFillers([scored[0]], scored, index, 1)
-
-  assert.equal(fillers.length, 1)
-  assert.equal(fillers[0].candidate.id, 'fresh')
-})
-
-test('pickInterestSlotFillers ignores matches that never made the candidate pool', () => {
-  // The ANN query can surface an item the scoring stage filtered out; it must
-  // not be resurrected into the final list.
-  const index = buildInterestMatchIndex([interestResult('i1', 'ghost', 1, [['notScored', 0.9]])])
-
-  assert.deepEqual(pickInterestSlotFillers([], candidates(['other', 0.9]), index, 1), [])
-})
-
-test('pickInterestSlotFillers gives every interest one slot before doubling up', () => {
-  const index = buildInterestMatchIndex([
-    interestResult('i1', 'greedy', 1, [
-      ['g1', 0.95],
-      ['g2', 0.94],
-      ['g3', 0.93],
-    ]),
-    interestResult('i2', 'quiet', 1, [['q1', 0.6]]),
-  ])
-  const scored = candidates(['g1', 0.9], ['g2', 0.89], ['g3', 0.88], ['q1', 0.1])
-
-  const two = pickInterestSlotFillers([], scored, index, 2)
-  assert.deepEqual(
-    two.map((f) => f.candidate.id),
-    ['g1', 'q1']
+test('the slot goes to the best-scoring title among the verified matches', () => {
+  const index = buildInterestMatchIndex([DARK], facts({ low: TAGGED, high: TAGGED, untagged: {} }))
+  const fillers = pickInterestSlotFillers(
+    [],
+    candidates(['low', 0.4], ['high', 0.7], ['untagged', 0.99]),
+    index,
+    1
   )
+  assert.deepEqual(fillers.map((f) => f.candidate.id), ['high'])
+  assert.deepEqual(fillers[0].match.evidence, { strength: 'phrase', matched: ['dark comedy'] })
+})
 
-  // Third slot goes back around to the interest that still has matches left.
-  const three = pickInterestSlotFillers([], scored, index, 3)
-  assert.deepEqual(
-    three.map((f) => f.candidate.id),
-    ['g1', 'q1', 'g2']
+test('a whole-phrase tag beats a higher-scoring title matched from parts', () => {
+  const index = buildInterestMatchIndex(
+    [DYSTOPIA],
+    facts({
+      parts: { genres: ['Science Fiction'], keywords: ['dystopia'] },
+      phrase: { keywords: ['dystopian science fiction'] },
+    })
   )
+  const fillers = pickInterestSlotFillers([], candidates(['parts', 0.9], ['phrase', 0.5]), index, 1)
+  assert.deepEqual(fillers.map((f) => f.candidate.id), ['phrase'])
 })
 
-test('pickInterestSlotFillers leaves slots unused rather than padding', () => {
-  const index = buildInterestMatchIndex([
-    interestResult('i1', 'one hit', 1, [['a', 0.9]]),
-    interestResult('i2', 'no hits', 1, [['weak', 0.1]]),
-  ])
-
-  const fillers = pickInterestSlotFillers([], candidates(['a', 0.9], ['weak', 0.9]), index, 3)
-
-  assert.equal(fillers.length, 1)
-  assert.equal(fillers[0].candidate.id, 'a')
-})
-
-test('pickInterestSlotFillers never duplicates or exceeds its slot count', () => {
-  const index = buildInterestMatchIndex([
-    interestResult('i1', 'a', 1, [
-      ['x', 0.9],
-      ['y', 0.8],
-      ['z', 0.7],
-    ]),
-    interestResult('i2', 'b', 1, [
-      ['x', 0.85],
-      ['y', 0.75],
-      ['z', 0.65],
-    ]),
-  ])
-  const scored = candidates(['x', 0.5], ['y', 0.4], ['z', 0.3])
-
-  for (const slots of [0, 1, 2, 3, 5, 50]) {
-    const fillers = pickInterestSlotFillers([], scored, index, slots)
-    const ids = fillers.map((f) => f.candidate.id)
-
-    assert.ok(fillers.length <= Math.max(0, slots), `exceeded ${slots} slots`)
-    assert.ok(fillers.length <= scored.length, 'invented candidates out of nowhere')
-    assert.equal(new Set(ids).size, ids.length, `duplicate filler at ${slots} slots`)
-  }
-})
-
-test('pickInterestSlotFillers is deterministic, including on score ties', () => {
-  const index = buildInterestMatchIndex([
-    interestResult('i1', 'tied', 1, [
-      ['bbb', 0.9],
-      ['aaa', 0.9],
-      ['ccc', 0.9],
-    ]),
-  ])
-  // Identical scores: the tiebreak is the lower id, so ANN ordering (which is
-  // not guaranteed for equal distances) can't make picks wobble between runs.
-  const scored = candidates(['bbb', 0.7], ['aaa', 0.7], ['ccc', 0.7])
-
-  const first = pickInterestSlotFillers([], scored, index, 2)
-  const second = pickInterestSlotFillers([], scored, index, 2)
-
-  assert.deepEqual(
-    first.map((f) => f.candidate.id),
-    ['aaa', 'bbb']
+test('parts evidence fills the slot when no whole-phrase tag is free', () => {
+  const index = buildInterestMatchIndex(
+    [DYSTOPIA],
+    facts({
+      parts: { genres: ['Science Fiction'], keywords: ['dystopia'] },
+      phrase: { keywords: ['dystopian science fiction'] },
+    })
   )
-  assert.deepEqual(
-    first.map((f) => f.candidate.id),
-    second.map((f) => f.candidate.id)
+  const fillers = pickInterestSlotFillers(
+    candidates(['phrase', 0.5]),
+    candidates(['parts', 0.9], ['phrase', 0.5]),
+    index,
+    1
   )
+  assert.deepEqual(fillers.map((f) => f.candidate.id), ['parts'])
 })
 
-test('pickInterestSlotFillers reports the interest that earned each slot', () => {
-  const index = buildInterestMatchIndex([
-    interestResult('i1', 'time travel stories', 1, [['a', 0.9]]),
-    interestResult('i2', 'dark comedies', 1, [['b', 0.8]]),
-  ])
-  const fillers = pickInterestSlotFillers([], candidates(['a', 0.5], ['b', 0.5]), index, 2)
-
-  // This is what gets written to score_breakdown.interestMatch, so it has to
-  // name the interest whose match set supplied the pick -- not simply the
-  // candidate's globally strongest interest.
-  assert.deepEqual(
-    fillers.map((f) => [f.candidate.id, f.match.interestId, f.match.candidateId]),
-    [
-      ['a', 'i1', 'a'],
-      ['b', 'i2', 'b'],
-    ]
-  )
+test('an interest nothing is tagged with leaves its slot unused', () => {
+  const index = buildInterestMatchIndex([DARK], facts({ a: { genres: ['Drama'] } }))
+  assert.deepEqual(pickInterestSlotFillers([], candidates(['a', 0.9]), index, 2), [])
 })
 
-test('pickInterestSlotFillers does nothing when no slots are reserved', () => {
-  const index = buildInterestMatchIndex([interestResult('i1', 'x', 1, [['a', 0.9]])])
+test('never an already-selected candidate, never one outside the scored pool', () => {
+  const index = buildInterestMatchIndex([DARK], facts({ taken: TAGGED, gone: TAGGED, free: TAGGED }))
+  const fillers = pickInterestSlotFillers(
+    candidates(['taken', 0.9]),
+    candidates(['taken', 0.9], ['free', 0.3]),
+    index,
+    3
+  )
+  assert.deepEqual(fillers.map((f) => f.candidate.id), ['free'])
+})
 
-  assert.deepEqual(pickInterestSlotFillers([], candidates(['a', 0.9]), index, 0), [])
-  assert.deepEqual(pickInterestSlotFillers([], candidates(['a', 0.9]), index, -1), [])
+test('every interest gets one slot before any gets a second', () => {
+  const index = buildInterestMatchIndex(
+    [DARK, DYSTOPIA],
+    facts({
+      d1: TAGGED,
+      d2: TAGGED,
+      s1: { keywords: ['dystopian science fiction'] },
+    })
+  )
+  const fillers = pickInterestSlotFillers(
+    [],
+    candidates(['d1', 0.9], ['d2', 0.8], ['s1', 0.1]),
+    index,
+    3
+  )
+  assert.deepEqual(fillers.map((f) => f.candidate.id), ['d1', 's1', 'd2'])
+  assert.deepEqual(fillers.map((f) => f.match.interestText), ['dark comedy', 'dystopian sci-fi', 'dark comedy'])
+})
+
+test('deterministic on score ties, and nothing when no slots are reserved', () => {
+  const index = buildInterestMatchIndex([DARK], facts({ b: TAGGED, a: TAGGED }))
+  const fillers = pickInterestSlotFillers([], candidates(['b', 0.5], ['a', 0.5]), index, 1)
+  assert.deepEqual(fillers.map((f) => f.candidate.id), ['a'])
+  assert.deepEqual(pickInterestSlotFillers([], candidates(['a', 0.5]), index, 0), [])
 })

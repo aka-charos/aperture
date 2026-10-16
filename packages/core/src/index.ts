@@ -1459,8 +1459,6 @@ export {
   // Delete functions
   deleteFranchisePreference,
   deleteGenreWeight,
-  // Custom interest affinity
-  getCustomInterestAffinity,
   // Types
   type TasteProfile,
   type FranchisePreference,

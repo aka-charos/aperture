@@ -270,3 +270,31 @@ test('the standing rides in the twin line, with or without shared titles', () =>
   // A pick that is not a twin pick never gets one, even if a standing leaks in.
   assert.equal(buildSlotLines({ ownStanding }, MOVIE_NOUNS), '')
 })
+
+test('an interest pick is introduced with the tags that back it, never "lead with that"', () => {
+  const line = buildSlotLines(
+    { interestText: 'dark comedy', interestEvidence: { strength: 'phrase', matched: ['dark comedy'] } },
+    MOVIE_NOUNS
+  )
+  assert.match(line, /THEY ASKED FOR THIS/)
+  assert.match(line, /own genres and keywords say so: "dark comedy"/)
+  assert.match(line, /claim no more about the match than those tags say/)
+  assert.doesNotMatch(line, /lead with that/)
+})
+
+test('an unconfirmed interest pick may only be called close to what was asked for', () => {
+  // Runs from before evidence, whose title the refresh found no tag on: the
+  // pick came from embedding nearness, which put a drama called Dark Horse
+  // second for "dark comedy".
+  const line = buildSlotLines({ interestText: 'dark comedy' }, SERIES_NOUNS)
+  assert.match(line, /nothing in its genres or keywords confirms it is one/)
+  assert.match(line, /never that it is one/)
+})
+
+test('the interest rule forbids claiming a borrowed trick the viewer "already loves"', () => {
+  for (const nouns of [MOVIE_NOUNS, SERIES_NOUNS]) {
+    const rules = buildSlotRules(nouns)
+    assert.match(rules, /using the tags the marker names as the evidence/)
+    assert.match(rules, /never say they "already love" a technique/)
+  }
+})

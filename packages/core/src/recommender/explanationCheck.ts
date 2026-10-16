@@ -34,6 +34,7 @@ import { readNoul, type SystemOneQuestion } from '../lib/decisionModelRules.js'
 import { EVIDENCE_JUDGMENT_MIN_YES } from './evidenceStrength.js'
 import type { JudgedTitleFacts } from './evidenceJudgment.js'
 import { readOwnStanding, type OwnStanding } from './shared/explanationPrompt.js'
+import { formatEvidenceTags, readInterestEvidence, type InterestEvidence } from './shared/interestEvidence.js'
 
 export const EXPLANATION_CHECKS = [
   'claimsContextAsReason',
@@ -56,6 +57,13 @@ export interface ExplanationCheckInput {
   origin: PickOrigin
   /** For a stated-interest pick: what the viewer said they like. */
   interestText?: string | null
+  /**
+   * For a stated-interest pick: the tags that back the match, as the writer
+   * was told them, or null when nothing confirmed it (the writer was then told
+   * to say "close to", and a claim that it IS one is what the checker should
+   * catch).
+   */
+  interestEvidence?: InterestEvidence | null
   /** The reception label the writer's prompt printed, verbatim. */
   reception: string
   pick: JudgedTitleFacts
@@ -116,18 +124,22 @@ export function pickOrigin(breakdown: unknown): {
   sharedIds: string[]
   /** A twin pick's stored own standing; absent otherwise and on older runs. */
   standing?: OwnStanding
+  /** A stated-interest pick's stored evidence; absent otherwise and when unconfirmed. */
+  interestEvidence?: InterestEvidence
 } {
   const b = (breakdown ?? {}) as {
-    interestMatch?: { interestText?: unknown } | null
+    interestMatch?: { interestText?: unknown; evidence?: unknown } | null
     twinMatch?: { sharedIds?: unknown; ownStanding?: unknown } | null
     acclaimedMatch?: unknown
   }
   if (b.interestMatch != null) {
     const text = b.interestMatch.interestText
+    const interestEvidence = readInterestEvidence(b.interestMatch.evidence)
     return {
       origin: 'statedInterest',
       interestText: typeof text === 'string' && text ? text : null,
       sharedIds: [],
+      ...(interestEvidence ? { interestEvidence } : {}),
     }
   }
   if (b.twinMatch != null) {
@@ -218,7 +230,11 @@ export function buildExplanationCheckRequest(input: ExplanationCheckInput): Expl
     recommended,
     pickedBecause:
       input.origin === 'statedInterest' && input.interestText
-        ? `${ORIGIN_TEXT.statedInterest}: "${input.interestText}"`
+        ? `${ORIGIN_TEXT.statedInterest}: "${input.interestText}"${
+            input.interestEvidence
+              ? ` — its genres and keywords include ${formatEvidenceTags(input.interestEvidence)}`
+              : ' — nothing in its genres or keywords confirms it is one; it was picked as close to that phrase'
+          }`
         : ORIGIN_TEXT[input.origin],
     watchedTitlesShownAs:
       input.heading === 'reason'

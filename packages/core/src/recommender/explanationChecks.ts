@@ -62,6 +62,7 @@ import { getUserTasteContext } from './movies/explanations.js'
 import { getUserSeriesTasteContext } from './series/explanations.js'
 import { NEWEST_RUNS_SQL, loadJudgedTitleFacts } from './judgeEvidence.js'
 import { describeStanding, type OwnStanding } from './shared/explanationPrompt.js'
+import type { InterestEvidence } from './shared/interestEvidence.js'
 
 const logger = createChildLogger('explanation-checks')
 
@@ -84,6 +85,8 @@ interface CandidateExplanation {
   sharedIds: string[]
   /** A taste-twin pick's own standing, which the writer was told. */
   standing?: OwnStanding
+  /** A stated-interest pick's evidence, which the writer was told. */
+  interestEvidence?: InterestEvidence
   ratingScore: number | null
   watchedIds: string[]
 }
@@ -141,7 +144,7 @@ async function loadCandidateExplanations(): Promise<CandidateExplanation[]> {
     const hash = explanationHash(p.ai_explanation)
     if (out.has(hash)) continue
     const rows = evidenceByCandidate.get(p.candidate_id) ?? []
-    const { origin, interestText, sharedIds, standing } = pickOrigin(p.score_breakdown)
+    const { origin, interestText, sharedIds, standing, interestEvidence } = pickOrigin(p.score_breakdown)
     // The heading the writer saw: a reserved-slot pick always gets the hedged
     // one; a ranked pick gets whatever evidenceSupportsCause decides, which is
     // the same read the explanation prompt makes.
@@ -165,6 +168,7 @@ async function loadCandidateExplanations(): Promise<CandidateExplanation[]> {
       interestText,
       sharedIds,
       standing,
+      interestEvidence,
       ratingScore: Number.isFinite(rating) ? rating : null,
       watchedIds: rows.map((r) => r.watched_id).filter(Boolean),
     })
@@ -276,6 +280,7 @@ function toInput(item: CandidateExplanation, context: CheckContext): Explanation
     heading: item.heading,
     origin: item.origin,
     interestText: item.interestText,
+    interestEvidence: item.interestEvidence ?? null,
     reception: receptionLabel(item.mediaType, item.ratingScore),
     pick,
     analysis: context.analysis.get(`${item.mediaType}:${item.pickId}`) ?? null,

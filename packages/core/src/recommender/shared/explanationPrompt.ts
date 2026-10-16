@@ -16,6 +16,7 @@
  * generators are near-duplicates, and the numbers drifting apart between them
  * is a bug nobody would notice.
  */
+import { formatEvidenceTags, type InterestEvidence } from './interestEvidence.js'
 
 /**
  * How much of a pick's own synopsis reaches the prompt.
@@ -109,6 +110,14 @@ export const SERIES_NOUNS: ExplanationNouns = { plural: 'series', singular: 'sho
  */
 export interface SlotMarkers {
   interestText?: string | null
+  /**
+   * The genres/keywords on the title that say the interest
+   * (shared/interestEvidence.ts). Absent on an interest pick means it was
+   * chosen by embedding nearness to the phrase (runs from before evidence
+   * existed, and the refresh found no tag either), so the prompt must not let
+   * the model claim it IS what was asked for.
+   */
+  interestEvidence?: InterestEvidence | null
   fromTasteTwin?: boolean
   /**
    * Titles both viewers played, nearest to the pick first
@@ -322,8 +331,13 @@ export function buildSlotLines(slot: SlotMarkers, nouns: ExplanationNouns): stri
   const lines: string[] = []
 
   if (slot.interestText) {
+    // Used to say only "lead with that", which instructed the model to assert
+    // the match whatever it was; with nothing to check it against, it wrote
+    // "this is a dark comedy" about whichever title the embedding offered.
     lines.push(
-      `\n   ✍️ THEY ASKED FOR THIS: picked because they told us they like "${slot.interestText}" — lead with that`
+      slot.interestEvidence
+        ? `\n   ✍️ THEY ASKED FOR THIS: they told us they like "${slot.interestText}", and this ${nouns.singular}'s own genres and keywords say so: ${formatEvidenceTags(slot.interestEvidence)}. Open with that, in their words, and claim no more about the match than those tags say`
+        : `\n   ✍️ THEY ASKED FOR THIS: they told us they like "${slot.interestText}". This ${nouns.singular} was picked as one of the titles closest to that phrase, and nothing in its genres or keywords confirms it is one — say it is close to what they asked for, never that it is one`
     )
   }
 
@@ -397,7 +411,7 @@ export function buildEvidenceRules(nouns: ExplanationNouns): string {
 export function buildSlotRules(nouns: ExplanationNouns): string {
   return `CRITICAL: Where a recommendation lists "${EVIDENCE_HEADING_RANKED}", those are the ${nouns.plural} it is genuinely closest to -- use that data and do not invent connections to random titles. Where it lists "${EVIDENCE_HEADING_RESERVED}" instead, the pick did NOT come from that similarity, and writing as though it did would be false.
 
-CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interest the user typed in themselves. Open by connecting the ${nouns.singular} to that interest in the user's own words. Never justify one of these on viewing-history similarity -- that is not why it is in the list -- and draw on the titles listed beneath it only if they genuinely fit.
+CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interest the user typed in themselves. Open by connecting the ${nouns.singular} to that interest in the user's own words, using the tags the marker names as the evidence, and claim no more than they say; where the marker says nothing confirms the match, say the ${nouns.singular} is close to what they asked for, never that it is one. Never justify one of these on viewing-history similarity -- that is not why it is in the list -- and draw on the titles listed beneath it only if they genuinely fit: never say they "already love" a technique, mood or trick in another title unless the data you were given shows that title has it.
 
 CRITICAL: A few recommendations are marked "A KINDRED VIEWER PICKED THIS". Those are in the list because another viewer with strongly overlapping taste watched them. Say that first. Where the marker says how the pick ranked on its own score, report that as given: one that nearly made the list by itself also matches this user's own taste, and the explanation must not claim otherwise. Where the marker names titles the two of them have both watched, those are the shared titles closest to this ${nouns.singular}: you may name one or two and say concretely what each shares with it, drawing on the data you were given, but never invent a thread running through them or claim the ${nouns.singular} sits "where they meet". The same goes for the titles listed beneath the recommendation: use them only if they genuinely fit. Refer to the other viewer only in general terms ("someone whose taste lines up with yours") -- you do not know who they are, so never name, guess at or describe them.
 

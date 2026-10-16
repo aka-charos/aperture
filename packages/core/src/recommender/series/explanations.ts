@@ -29,6 +29,7 @@ import {
   SERIES_NOUNS,
   type OwnStanding,
 } from '../shared/explanationPrompt.js'
+import { formatEvidenceTags, type InterestEvidence } from '../shared/interestEvidence.js'
 import { evidenceSupportsCause } from '../evidenceStrength.js'
 import {
   describeExplanationBatch,
@@ -79,6 +80,12 @@ export interface SeriesForExplanation {
    * MovieForExplanation.interestText.
    */
   interestText?: string | null
+  /**
+   * The genres/keywords that back an interest pick (shared/interestEvidence.ts).
+   * Absent on an interest pick means nothing confirms the match, and the
+   * prompt and the fallback must not claim it.
+   */
+  interestEvidence?: InterestEvidence | null
   /**
    * True when this pick came from a reserved taste-twin slot. Mirrors
    * MovieForExplanation.fromTasteTwin, including that it is a flag rather than
@@ -543,10 +550,10 @@ function generateFallbackSeriesExplanation(series: SeriesWithEvidence): string {
   // stated interest is the actual reason it's here, so leading with watch
   // history would misattribute it.
   if (series.interestText) {
-    // "one of the closest" rather than "the closest": the slot goes to the
-    // best-scoring title among the interest's strongest matches, not to the
-    // single closest one, and the wording shouldn't claim more than that.
-    return `You told us you like ${series.interestText.toLowerCase()} — this ${series.genres[0]?.toLowerCase() || 'series'} pick is one of the closest matches in your library that you haven't started yet.`
+    // Mirrors the movie fallback: the tags, or only "close to" without them.
+    return series.interestEvidence
+      ? `You told us you like ${series.interestText.toLowerCase()}, and this ${series.genres[0]?.toLowerCase() || 'series'} is tagged ${formatEvidenceTags(series.interestEvidence)} — one you haven't started yet.`
+      : `You told us you like ${series.interestText.toLowerCase()} — this ${series.genres[0]?.toLowerCase() || 'series'} is one of the shows in your library closest to that, and one you haven't started yet.`
   }
 
   // Same reasoning one step down: a twin pick is here because a like-minded

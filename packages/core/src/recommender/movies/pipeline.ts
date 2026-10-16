@@ -27,7 +27,8 @@ import { loadConfigForUser } from '../config.js'
 import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
 import { refreshTasteSynopsis } from '../../lib/tasteSynopsisRefresh.js'
 import { getWatchHistory, buildTasteProfile as buildLegacyTasteProfile, storeTasteProfile as storeLegacyTasteProfile, getUserMovieRatings, getDislikedMovieIds } from './taste.js'
-import { getCandidates, getMultiClusterCandidates, getInterestMatchIndex } from './candidates.js'
+import { getCandidates, getMultiClusterCandidates } from './candidates.js'
+import { loadInterestMatchIndex } from '../interestMatches.js'
 import { getLibraryScopeForUser } from '../../lib/libraryScope.js'
 import { loadRecommendationRecipients } from '../recipients.js'
 import { scoreCandidates } from './scoring.js'
@@ -534,28 +535,23 @@ export async function generateRecommendationsForUser(
     let interestSignalCount = 0
     let eraSignalCount = 0
 
-    // Custom interests get one indexed ANN query each rather than a
-    // per-candidate embedding fetch plus affinity call. That's what lets every
-    // candidate be measured instead of only the top 100 -- the old cap meant
-    // the signal was simply absent for everything below it -- while cutting
-    // roughly 200 DB round-trips per user per run down to one per interest.
-    // Fails open: any problem here leaves every affinity neutral, exactly as
-    // a user with no interests configured would score.
+    // Custom interests are matched against each candidate's own genres and
+    // TMDb keywords (recommender/interestMatches.ts), one query per run, so a
+    // slot and an affinity both rest on a tag a reader can check rather than
+    // on how near the embedded phrase sat. Fails open: any problem here leaves
+    // every affinity neutral, exactly as a user with no interests would score.
     let interestIndex: InterestMatchIndex | null = null
     try {
       const customInterests = await getUserCustomInterests(user.id)
       if (customInterests.length > 0) {
-        interestIndex = await getInterestMatchIndex(
+        interestIndex = await loadInterestMatchIndex(
+          'movie',
           customInterests.map((interest) => ({
             interestId: interest.id,
             interestText: interest.interestText,
             weight: interest.weight,
-            embedding: interest.embedding,
-            embeddingModel: interest.embeddingModel,
           })),
-          excludeIds,
-          includeWatched,
-          scope
+          candidates.map((candidate) => candidate.id)
         )
       }
     } catch (err) {
@@ -1025,6 +1021,7 @@ export async function generateRecommendationsForUser(
           // credits what actually put the film here instead of inventing a
           // watch-history justification for it.
           interestText: interestPicks.get(s.movieId)?.interestText ?? null,
+          interestEvidence: interestPicks.get(s.movieId)?.evidence ?? null,
           // Same idea for a borrowed pick: the reason is a like-minded viewer,
           // not the ranking. A flag, never the donor's identity.
           fromTasteTwin: twinPicks.has(s.movieId),

@@ -1268,6 +1268,8 @@
       "tasteTwinConnection": "{{name}}, one of your connections, has taste that closely overlaps yours and has watched this — that's what put it in your list, rather than the scores below.",
       "tasteTwinClose": "Someone here whose taste closely overlaps yours has watched this. It already scored close to the top of your list on its own, and their watching is what put it in.",
       "tasteTwinConnectionClose": "{{name}}, one of your connections, has taste that closely overlaps yours and has watched this. It already scored close to the top of your list on its own, and their watching is what put it in.",
+      "interestPickTagged": "You told us you like “{{interest}}”, and this title's own genres and keywords say so: {{tags}}. That is what put it in your list.",
+      "interestPickUntagged": "You told us you like “{{interest}}”. This title was picked as one of the closest to that phrase in your library; nothing in its genres or keywords confirms it is one.",
       "closestInLibrary": "Closest Titles in Your Library",
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",

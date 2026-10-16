@@ -125,7 +125,7 @@ async function getUserTasteVectors(userId: string, mediaType: MediaType): Promis
  * comparable to score against.
  *
  * MAX -- not average, and not weighted by cluster weight -- mirroring
- * mergeClusterCandidatesByMaxSimilarity and getCustomInterestAffinity: a
+ * mergeClusterCandidatesByMaxSimilarity: a
  * candidate that strongly matches any one facet of someone's taste is a strong
  * match, and averaging here would recreate the very dilution the clusters were
  * built to avoid. Cluster weight decides how many candidates each facet
