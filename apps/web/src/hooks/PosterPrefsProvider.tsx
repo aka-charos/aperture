@@ -11,7 +11,7 @@
  * the preference up without threading a prop through every call site.
  */
 
-import { useState, useCallback, useEffect, type ReactNode } from 'react'
+import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PosterDisplaySettingsContext } from '@aperture/ui'
 import { PosterPrefsContext } from './poster-prefs-context'
@@ -111,6 +111,25 @@ export function PosterPrefsProvider({ children }: { children: ReactNode }) {
 
   const effectiveHide = resolveEffective(prefs)
 
+  // Memoized because every poster in the app reads this context: a fresh object
+  // per render would re-render all of them whenever this provider renders. `t`
+  // changes identity on a language change, which is what refreshes the labels.
+  const posterDisplaySettings = useMemo(
+    () => ({
+      hideLibraryRatingBadge: effectiveHide,
+      watchedLabel: t('mediaPoster.watched'),
+      episodeProgressLabel: (watched: number, total: number) =>
+        t('mediaPoster.episodeProgress', { watched, total }),
+      watchingLabels: {
+        add: t('mediaDetail.hero.addToWatching'),
+        watching: t('mediaDetail.hero.watching'),
+        addTooltip: t('mediaDetail.hero.addToWatchingList'),
+        removeTooltip: t('mediaDetail.hero.removeFromWatchingList'),
+      },
+    }),
+    [effectiveHide, t]
+  )
+
   return (
     <PosterPrefsContext.Provider
       value={{
@@ -124,14 +143,7 @@ export function PosterPrefsProvider({ children }: { children: ReactNode }) {
       {/* The watched tick's label rides along here for the same reason the
           rating preference does: @aperture/ui has no i18n, and one home beats
           the same t() call threaded through twenty poster call sites. */}
-      <PosterDisplaySettingsContext.Provider
-        value={{
-          hideLibraryRatingBadge: effectiveHide,
-          watchedLabel: t('mediaPoster.watched'),
-          episodeProgressLabel: (watched, total) =>
-            t('mediaPoster.episodeProgress', { watched, total }),
-        }}
-      >
+      <PosterDisplaySettingsContext.Provider value={posterDisplaySettings}>
         {children}
       </PosterDisplaySettingsContext.Provider>
     </PosterPrefsContext.Provider>

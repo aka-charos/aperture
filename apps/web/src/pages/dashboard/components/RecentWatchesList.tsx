@@ -1,5 +1,5 @@
 import { Box, Typography, Card, Skeleton } from '@mui/material'
-import { useNavigate } from 'react-router-dom'
+import { useOpenMedia } from '@/hooks/useOpenMedia'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import MovieIcon from '@mui/icons-material/Movie'
@@ -147,7 +147,7 @@ function EmptyColumn({ type, t }: { type: 'movie' | 'series'; t: TFunction }) {
 
 export function RecentWatchesList({ watches, loading }: RecentWatchesListProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+  const openMedia = useOpenMedia()
 
   const movies = watches.filter((w) => w.type === 'movie')
   const series = watches.filter((w) => w.type === 'series')
@@ -252,7 +252,7 @@ export function RecentWatchesList({ watches, loading }: RecentWatchesListProps) 
                   key={item.id}
                   item={item}
                   t={t}
-                  onClick={() => navigate(`/movies/${item.id}`)}
+                  onClick={() => openMedia('movie', item.id)}
                 />
               ))}
             </Box>
@@ -278,7 +278,7 @@ export function RecentWatchesList({ watches, loading }: RecentWatchesListProps) 
                   key={item.id}
                   item={item}
                   t={t}
-                  onClick={() => navigate(`/series/${item.id}`)}
+                  onClick={() => openMedia('series', item.id)}
                 />
               ))}
             </Box>

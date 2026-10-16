@@ -492,6 +492,8 @@ export function SearchPage() {
                   isWatching={result.type === 'series' ? isWatching(result.id) : undefined}
                   onWatchingToggle={result.type === 'series' ? () => toggleWatching(result.id) : undefined}
                   hideWatchingToggle={result.type !== 'series'}
+                  // Movies and series share this grid; keep the cards one height.
+                  reserveWatchingToggleSpace
                   responsive
                   onClick={() => navigate(`/${result.type === 'movie' ? 'movies' : 'series'}/${result.id}`)}
                 />

@@ -21,12 +21,25 @@ export interface PosterDisplaySettings {
    * i18n placeholder syntax in a package that has no i18n.
    */
   episodeProgressLabel: (watched: number, total: number) => string
+  /** Text and tooltips for the series watching toggle under the genre line. */
+  watchingLabels: {
+    add: string
+    watching: string
+    addTooltip: string
+    removeTooltip: string
+  }
 }
 
 export const defaultPosterDisplaySettings: PosterDisplaySettings = {
   hideLibraryRatingBadge: false,
   watchedLabel: 'Watched',
   episodeProgressLabel: (watched, total) => `${watched} of ${total} episodes watched`,
+  watchingLabels: {
+    add: 'Add to Watching',
+    watching: 'Watching',
+    addTooltip: 'Add to watching list',
+    removeTooltip: 'Remove from watching list',
+  },
 }
 
 export const PosterDisplaySettingsContext = createContext<PosterDisplaySettings>(

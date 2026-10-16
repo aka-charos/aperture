@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react'
-import { Box, Typography, Paper, Chip, Skeleton, Tooltip, IconButton, Link, useMediaQuery } from '@mui/material'
+import { Box, Typography, Paper, Chip, Skeleton, Tooltip, IconButton, Link, Button, useMediaQuery } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import Star from '@mui/icons-material/Star'
 import AddToQueue from '@mui/icons-material/AddToQueue'
@@ -61,14 +61,18 @@ export interface MoviePosterProps {
   isWatching?: boolean
   /** Callback when user toggles watching status */
   onWatchingToggle?: () => void
-  /** Hide the watching toggle button */
+  /**
+   * Hide the watching toggle. It sits under the card's genre line, not over the
+   * artwork, which already carries the rating, the watched state and the
+   * explore and favourite buttons.
+   */
   hideWatchingToggle?: boolean
   /**
-   * Which corner the watching toggle sits in. Defaults to `bottomLeft`.
-   * `topRight` tucks it under whatever badge already owns that corner (the
-   * community rating or the match score) rather than on top of it.
+   * Keep the watching toggle's line even when this card shows no toggle. For
+   * grids mixing movies and series: without it the series cards are a line
+   * taller and every row staggers.
    */
-  watchingTogglePosition?: 'bottomLeft' | 'topRight'
+  reserveWatchingToggleSpace?: boolean
   /** Callback when user clicks explore button to view similarity graph */
   onExploreClick?: () => void
   /** Hide the explore button */
@@ -208,7 +212,7 @@ export function MoviePoster({
   isWatching = false,
   onWatchingToggle,
   hideWatchingToggle = false,
-  watchingTogglePosition = 'bottomLeft',
+  reserveWatchingToggleSpace = false,
   onExploreClick,
   hideExploreButton = false,
   hideYear = false,
@@ -229,7 +233,7 @@ export function MoviePoster({
   const [imageError, setImageError] = useState(false)
   const [isOffRatio, setIsOffRatio] = useState(false)
   const theme = useTheme()
-  const { hideLibraryRatingBadge } = usePosterDisplaySettings()
+  const { hideLibraryRatingBadge, watchingLabels } = usePosterDisplaySettings()
   const dimensions = sizeConfig[size]
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -243,10 +247,11 @@ export function MoviePoster({
   const proxiedPosterUrl = getProxiedImageUrl(posterUrl)
 
   // The top-right corner is a stack, not a slot: rating-or-score chip, then the
-  // watched tick, then the watching toggle when it is asked to sit up here. Each
-  // one pushes whatever follows it down by its own height plus the 8px gutter,
-  // so the offsets below are the running total rather than magic numbers. The
-  // chip renders at top 8 with height 24; the tick is 22.
+  // watched tick. Each one pushes whatever follows it down by its own height
+  // plus the 8px gutter, so the offsets below are the running total rather than
+  // magic numbers. The chip renders at top 8 with height 24; the tick is 22.
+  //
+  // The watching toggle is not part of the stack: it sits under the genre line.
   //
   // Top-LEFT is deliberately not used for the tick even though Emby has room
   // there: RankBadge draws a 36–90px square flush into that corner on Top Picks
@@ -258,11 +263,6 @@ export function MoviePoster({
   const watchedBadgeAnchor = { top: 8 + chipOffset }
   // Tick and pill are one slot, never both: a finished show is a tick, not 24/24.
   const progressVisible = !watched && episodeProgress != null && episodeProgress.total > 0
-  const watchStateVisible = watched || progressVisible
-  const watchingToggleAnchor =
-    watchingTogglePosition === 'topRight'
-      ? { top: 8 + chipOffset + (watchStateVisible ? 30 : 0), right: 8 }
-      : { bottom: 8, left: 8 }
 
   if (loading) {
     return (
@@ -393,34 +393,6 @@ export function MoviePoster({
             total={episodeProgress.total}
             sx={watchedBadgeAnchor}
           />
-        )}
-
-        {/* Watching toggle button - bottom left, or top right when asked */}
-        {!hideWatchingToggle && onWatchingToggle && (
-          <Tooltip title={isWatching ? 'Remove from watching list' : 'Add to watching list'} arrow>
-            <IconButton
-              onClick={(e) => {
-                e.stopPropagation()
-                onWatchingToggle()
-              }}
-              size="small"
-              sx={{
-                position: 'absolute',
-                ...watchingToggleAnchor,
-                zIndex: 4,
-                backgroundColor: isWatching ? alpha(theme.palette.primary.main, 0.9) : 'rgba(0, 0, 0, 0.6)',
-                color: 'white',
-                backdropFilter: 'blur(4px)',
-                transition: 'all 0.2s ease',
-                '&:hover': {
-                  backgroundColor: isWatching ? theme.palette.primary.main : 'rgba(0, 0, 0, 0.8)',
-                  transform: 'scale(1.1)',
-                },
-              }}
-            >
-              {isWatching ? <PlaylistAddCheckIcon fontSize="small" /> : <AddToQueueIcon fontSize="small" />}
-            </IconButton>
-          </Tooltip>
         )}
 
         {/* Bottom right button group: Explore + Heart */}
@@ -675,6 +647,54 @@ export function MoviePoster({
             {genres.slice(0, 3).join(' · ')}
           </Typography>
         )}
+        {(() => {
+          const showToggle = !hideWatchingToggle && onWatchingToggle != null
+          if (!showToggle && !reserveWatchingToggleSpace) return null
+          const button = (
+            <Button
+              size="small"
+              variant={isWatching ? 'contained' : 'outlined'}
+              startIcon={
+                isWatching ? <PlaylistAddCheckIcon fontSize="small" /> : <AddToQueueIcon fontSize="small" />
+              }
+              // A reserved slot renders the same button hidden, so its height
+              // matches a real one exactly whatever the theme does to buttons.
+              aria-hidden={showToggle ? undefined : true}
+              tabIndex={showToggle ? undefined : -1}
+              onClick={(e) => {
+                // The card itself opens the title; this only toggles the list.
+                e.stopPropagation()
+                onWatchingToggle?.()
+              }}
+              sx={{
+                mt: 0.75,
+                py: 0.25,
+                px: 1,
+                minHeight: 0,
+                fontSize: '0.7rem',
+                textTransform: 'none',
+                maxWidth: '100%',
+                ...(showToggle ? {} : { visibility: 'hidden' }),
+                '& .MuiButton-startIcon': { mr: 0.5 },
+                '& .MuiButton-startIcon > *:nth-of-type(1)': { fontSize: 16 },
+              }}
+            >
+              <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {isWatching ? watchingLabels.watching : watchingLabels.add}
+              </Box>
+            </Button>
+          )
+          return showToggle ? (
+            <Tooltip
+              title={isWatching ? watchingLabels.removeTooltip : watchingLabels.addTooltip}
+              arrow
+            >
+              {button}
+            </Tooltip>
+          ) : (
+            button
+          )
+        })()}
         {overviewBelow && overview && (
           <OverviewBelow
             text={overview}

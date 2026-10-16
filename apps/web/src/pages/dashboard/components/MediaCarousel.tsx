@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Box } from '@mui/material'
-import { useNavigate } from 'react-router-dom'
+import { useOpenMedia } from '@/hooks/useOpenMedia'
 import { MoviePoster, RankBadge, BaseCarousel, CarouselItem } from '@aperture/ui'
 import { useUserRatings } from '../../../hooks/useUserRatings'
 import { useWatchStatus } from '../../../hooks/useWatchStatus'
@@ -48,7 +48,7 @@ export function MediaCarousel({
 }: MediaCarouselProps) {
   const { t } = useTranslation()
   const emptyMessage = emptyMessageProp ?? t('dashboard.carouselEmpty')
-  const navigate = useNavigate()
+  const openMedia = useOpenMedia()
   const { getRating, setRating } = useUserRatings()
   const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
@@ -65,7 +65,7 @@ export function MediaCarousel({
   )
 
   const handleItemClick = (item: MediaItem) => {
-    navigate(`/${item.type === 'movie' ? 'movies' : 'series'}/${item.id}`)
+    openMedia(item.type, item.id)
   }
 
   const renderPoster = (item: MediaItem) => (
@@ -83,9 +83,6 @@ export function MediaCarousel({
       isWatching={item.type === 'series' ? isWatching(item.id) : undefined}
       onWatchingToggle={item.type === 'series' ? () => toggleWatching(item.id) : undefined}
       hideWatchingToggle={item.type !== 'series'}
-      // Dashboard posters carry burned-in artwork overlays (language flags, rating
-      // badges) along their bottom edge, so app controls stay out of that corner.
-      watchingTogglePosition="topRight"
       onClick={() => handleItemClick(item)}
       size="medium"
       // Fills the slot the carousel sized (fitItems), so a row always ends on

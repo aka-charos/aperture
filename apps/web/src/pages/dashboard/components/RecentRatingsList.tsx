@@ -1,5 +1,5 @@
 import { Box, Typography, Card, Skeleton } from '@mui/material'
-import { useNavigate } from 'react-router-dom'
+import { useOpenMedia } from '@/hooks/useOpenMedia'
 import { useTranslation } from 'react-i18next'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
@@ -52,7 +52,7 @@ function HeartDisplay({ rating }: { rating: number }) {
 
 export function RecentRatingsList({ ratings, loading }: RecentRatingsListProps) {
   const { t, i18n } = useTranslation()
-  const navigate = useNavigate()
+  const openMedia = useOpenMedia()
 
   if (loading) {
     return (
@@ -134,7 +134,7 @@ export function RecentRatingsList({ ratings, loading }: RecentRatingsListProps) 
         {ratings.map((item) => (
           <Box
             key={item.id}
-            onClick={() => navigate(`/${item.type === 'movie' ? 'movies' : 'series'}/${item.id}`)}
+            onClick={() => openMedia(item.type, item.id)}
             sx={{
               display: 'flex',
               gap: 1.5,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Link as RouterLink, useNavigate } from 'react-router-dom'
+import { Link as RouterLink } from 'react-router-dom'
 import {
   Alert,
   AppBar,
@@ -42,7 +42,7 @@ import {
 import type { SeerrRequestOptions } from '../../types/seerrRequest'
 import { PageHeading } from '@/components/PageHeading'
 import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
-import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
+import { useOpenMedia } from '@/hooks/useOpenMedia'
 import { adminPathFor } from './nav/registry'
 import { jobConsoleLink } from '../jobs/registry'
 import { GapCollectionRow } from './gapAnalysis/GapCollectionRow'
@@ -216,8 +216,7 @@ export function GapAnalysisPage() {
 function GapAnalysisContent() {
   const { t, i18n } = useTranslation()
   const theme = useTheme()
-  const navigate = useNavigate()
-  const openMediaDetail = useMediaDetailModal()
+  const openMedia = useOpenMedia()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [run, setRun] = useState<GapRun | null>(null)
@@ -484,8 +483,7 @@ function GapAnalysisContent() {
    */
   const openPart = (part: DisplayPart) => {
     if (part.libraryId) {
-      if (openMediaDetail) openMediaDetail('movie', part.libraryId)
-      else navigate(`/movies/${part.libraryId}`)
+      openMedia('movie', part.libraryId)
       return
     }
     openDetailModal(part)

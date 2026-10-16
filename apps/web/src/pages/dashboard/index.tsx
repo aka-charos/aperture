@@ -14,8 +14,19 @@ import {
   ConnectionsRecentWatches,
 } from './components'
 import { PageHeading } from '@/components/PageHeading'
+import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
 
 export function DashboardPage() {
+  // The dashboard is for browsing: a title opens over the page, so closing it
+  // returns the reader to the row they were in instead of sending them back.
+  return (
+    <MediaDetailModalProvider>
+      <DashboardContent />
+    </MediaDetailModalProvider>
+  )
+}
+
+function DashboardContent() {
   const { t } = useTranslation()
   const { user } = useAuth()
   const { data, loading, error } = useDashboardData()

@@ -7,10 +7,9 @@ import { alpha, useTheme } from '@mui/material/styles'
 import PersonIcon from '@mui/icons-material/Person'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
-import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
-import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
+import { useOpenMedia } from '@/hooks/useOpenMedia'
 import { extraColors } from '@/theme'
 import { ToolResultError } from '../ToolResultError'
 import type { Person, PersonResultData } from './types'
@@ -21,18 +20,9 @@ interface PersonCardProps {
 
 function PersonCardSingle({ person }: PersonCardProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const theme = useTheme()
-  // See ContentCard: null on surfaces where routing keeps the chat visible.
-  const openMediaDetail = useMediaDetailModal()
-
-  const openFilm = (type: 'movie' | 'series', id: string) => {
-    if (openMediaDetail) {
-      openMediaDetail(type, id)
-      return
-    }
-    navigate(`/${type === 'movie' ? 'movies' : 'series'}/${id}`)
-  }
+  // See ContentCard: routes instead on surfaces where routing keeps the chat visible.
+  const openFilm = useOpenMedia()
 
   const movies = person.filmography.filter(f => f.type === 'movie')
   const series = person.filmography.filter(f => f.type === 'series')

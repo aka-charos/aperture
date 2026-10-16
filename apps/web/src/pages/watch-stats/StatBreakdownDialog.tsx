@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next'
 import { MoviePoster } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
+import { useOpenMedia } from '@/hooks/useOpenMedia'
 import type { BreakdownItem, BreakdownRequest } from './types'
 
 interface StatBreakdownDialogProps {
@@ -40,6 +41,7 @@ export function StatBreakdownDialog({ request, onClose }: StatBreakdownDialogPro
   const { user } = useAuth()
   const navigate = useNavigate()
   const openMediaDetail = useMediaDetailModal()
+  const openMedia = useOpenMedia()
 
   const [items, setItems] = useState<BreakdownItem[]>([])
   const [total, setTotal] = useState(0)
@@ -94,12 +96,9 @@ export function StatBreakdownDialog({ request, onClose }: StatBreakdownDialogPro
   // reader keeps the dialog they drilled from. Routing is the fallback for a
   // surface with no host.
   const openItem = (item: BreakdownItem) => {
-    if (openMediaDetail) {
-      openMediaDetail(item.mediaType, item.id)
-      return
-    }
-    onClose()
-    navigate(item.mediaType === 'movie' ? `/movies/${item.id}` : `/series/${item.id}`)
+    // Routing away leaves this dialog behind; the in-place view stacks over it.
+    if (!openMediaDetail) onClose()
+    openMedia(item.mediaType, item.id)
   }
 
   const shown = items.length

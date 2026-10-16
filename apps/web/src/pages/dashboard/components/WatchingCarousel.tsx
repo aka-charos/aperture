@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next'
 import { Box, Typography, Chip } from '@mui/material'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import NewReleasesIcon from '@mui/icons-material/NewReleases'
-import { useNavigate } from 'react-router-dom'
+import { useOpenMedia } from '@/hooks/useOpenMedia'
 import { MoviePoster, BaseCarousel, CarouselItem } from '@aperture/ui'
 import { useUserRatings } from '../../../hooks/useUserRatings'
 import { useWatchStatus } from '../../../hooks/useWatchStatus'
@@ -110,7 +110,7 @@ export function WatchingCarousel({
   loading,
 }: WatchingCarouselProps) {
   const { t, i18n } = useTranslation()
-  const navigate = useNavigate()
+  const openMedia = useOpenMedia()
   const { getRating, setRating } = useUserRatings()
   const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { toggleWatching } = useWatching()
@@ -127,7 +127,7 @@ export function WatchingCarousel({
   )
 
   const handleItemClick = (item: WatchingItem) => {
-    navigate(`/series/${item.seriesId}`)
+    openMedia('series', item.seriesId)
   }
 
   // Don't render if no items (carousel handles empty state internally but we want to hide completely)
@@ -158,8 +158,6 @@ export function WatchingCarousel({
             onRate={(rating) => handleRate(item.seriesId, rating)}
             isWatching={true}
             onWatchingToggle={() => toggleWatching(item.seriesId)}
-            // See MediaCarousel: the poster's bottom edge belongs to the artwork.
-            watchingTogglePosition="topRight"
             size="medium"
             // Fills the slot the carousel sized (fitItems).
             responsive
