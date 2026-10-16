@@ -113,6 +113,10 @@ export async function tmdbRequest<T>(
     }
   }
 
+  // Only a 429 on every attempt reaches here. Report it as the failure it is,
+  // or a caller reads a rate-limited lookup as "TMDb has no such thing".
+  logger.error({ endpoint }, 'TMDb API rate limit persisted after retries')
+  onLog?.('tmdb', endpoint, 'error', 'Rate limited (429) after retries')
   return null
 }
 
