@@ -27,6 +27,7 @@ import GroupsIcon from '@mui/icons-material/Groups'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 import { gradients } from '@/theme'
 import { insightsHaveDetail } from '../helpers'
+import { buildClosestRow } from '../closestRow'
 import type { RecommendationInsights, MediaType } from '../types'
 
 interface MovieInsightsProps {
@@ -415,10 +416,28 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
   // claiming to be the cause.
   const evidenceIsNotTheReason = fromReservedSlot || evidenceIsTooFar
 
-  // Empty unless a twin slot placed this title *and* the run that produced it
-  // recorded the overlap, which runs generated before that shipped did not.
+  // Empty unless a twin slot placed this title *and* its run stored the shared
+  // titles nearest the pick. Older runs stored the rarest ones instead, which
+  // the server drops rather than show.
   const twinShared = insights.twinShared ?? []
   const twinDonor = insights.twinDonor
+
+  // The evidence and a twin pick's shared titles (both viewers played them,
+  // nearest the pick) as ONE row, closest first, the twin's marked. They were
+  // two rows that contradicted each other — see closestRow.ts.
+  const closestRow = buildClosestRow({
+    evidence: (insights.evidence ?? []).flatMap((ev) => {
+      const item = ev.similar_movie || ev.similar_series
+      return item
+        ? [{ id: ev.id, similarity: ev.similarity, evidence_type: ev.evidence_type, item }]
+        : []
+    }),
+    twinShared,
+  })
+  const rowHasTwinTitles = closestRow.some((row) => row.sharedWithTwin)
+  const twinMarkLabel = twinDonor
+    ? t('mediaDetail.insights.twinMarkConnection', { name: twinDonor.name })
+    : t('mediaDetail.insights.twinMark')
 
   // The two lists partition the title's genres exactly (both routes filter the
   // same DB column against the viewer's top genres), so these counts always add
@@ -673,60 +692,11 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                       : t('mediaDetail.insights.tasteTwin')}
                   </Typography>
                 </Box>
-
-                {/* The overlap that identified the twin in the first place, and
-                    so the only evidence on this page that actually explains the
-                    pick. Kept inside the same card as the claim it supports —
-                    the similarity carousel further down is computed after
-                    selection and had no part in it. */}
-                {twinShared.length > 0 && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                      {isSeriesView
-                        ? t('mediaDetail.insights.tasteTwinSharedSeries')
-                        : t('mediaDetail.insights.tasteTwinSharedMovie')}
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
-                      {twinShared.map((item) => (
-                        <Box
-                          key={item.id}
-                          onClick={() => openItem(item.id)}
-                          sx={{
-                            flexShrink: 0,
-                            width: 92,
-                            cursor: 'pointer',
-                            transition: 'transform 0.2s',
-                            '&:hover': { transform: 'scale(1.05)' },
-                          }}
-                        >
-                          <Box
-                            component="img"
-                            src={getProxiedImageUrl(item.poster_url)}
-                            alt={item.title}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = FALLBACK_POSTER_URL
-                            }}
-                            sx={{
-                              width: '100%',
-                              height: 124,
-                              objectFit: 'cover',
-                              borderRadius: 1.5,
-                              bgcolor: 'grey.800',
-                              display: 'block',
-                            }}
-                          />
-                          <Typography variant="caption" noWrap display="block" sx={{ mt: 0.5 }}>
-                            {item.title}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {item.year ?? t('mediaDetail.insights.na')}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-                )}
+                {/* The titles the two of them share used to be listed here as
+                    "what identified the match": the rarest ones, an arbitrary
+                    slice of a tie that had nothing to do with the pick. They
+                    are now the shared titles nearest the pick, and they join
+                    the closest-titles row below, marked as the twin's too. */}
               </Paper>
             )}
 
@@ -805,8 +775,9 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
               </Box>
             </Box>
 
-            {/* Evidence - Items that contributed to this recommendation */}
-            {insights.evidence && insights.evidence.length > 0 && (
+            {/* Closest titles in the reader's history, merged with a twin
+                pick's shared titles (closestRow.ts) */}
+            {closestRow.length > 0 && (
               <Box>
                 {/* These rows are the pick's nearest neighbours in the reader's
                     own history by embedding cosine, found *after* selection.
@@ -814,7 +785,12 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                     For a reserved-slot pick it is not — the ranking is exactly
                     what did not choose it — and calling it "why we think you'll
                     like this" directly contradicts the banner at the top of the
-                    panel. Same rows either way; only the claim changes. */}
+                    panel. Same rows either way; only the claim changes.
+
+                    On a twin pick the row also holds the titles both viewers
+                    played nearest the pick, marked. The banner already says
+                    what put it here, so the caption then says what the marks
+                    mean instead of repeating "not why it was picked". */}
                 {/* Heading and its qualifier on one wrapping line rather than
                     two stacked blocks — the qualifier is a clause about the
                     heading, and it read as a paragraph of its own. */}
@@ -833,56 +809,53 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                       : t('mediaDetail.insights.whyWeThink')}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {evidenceIsNotTheReason
-                      ? isSeriesView
-                        ? t('mediaDetail.insights.closestInLibrarySeries')
-                        : t('mediaDetail.insights.closestInLibraryMovie')
-                      : isSeriesView
-                        ? t('mediaDetail.insights.basedOnHistorySeries')
-                        : t('mediaDetail.insights.basedOnHistoryMovie')}
+                    {rowHasTwinTitles
+                      ? twinDonor
+                        ? isSeriesView
+                          ? t('mediaDetail.insights.closestWithTwinConnectionSeries', { name: twinDonor.name })
+                          : t('mediaDetail.insights.closestWithTwinConnectionMovie', { name: twinDonor.name })
+                        : isSeriesView
+                          ? t('mediaDetail.insights.closestWithTwinSeries')
+                          : t('mediaDetail.insights.closestWithTwinMovie')
+                      : evidenceIsNotTheReason
+                        ? isSeriesView
+                          ? t('mediaDetail.insights.closestInLibrarySeries')
+                          : t('mediaDetail.insights.closestInLibraryMovie')
+                        : isSeriesView
+                          ? t('mediaDetail.insights.basedOnHistorySeries')
+                          : t('mediaDetail.insights.basedOnHistoryMovie')}
                   </Typography>
                 </Box>
-                {/* Same poster size as the taste-twin row above, which was
-                    already the denser of the two treatments this file had for
-                    the same kind of row. */}
                 <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1 }}>
-                  {insights.evidence.map((ev) => {
-                    const item = ev.similar_movie || ev.similar_series
-                    if (!item) return null
-                    const evidenceType: MediaType = ev.similar_movie ? 'movie' : 'series'
-
-                    return (
-                      <Paper
-                        key={ev.id}
-                        onClick={() =>
-                          onOpenMedia
-                            ? onOpenMedia(evidenceType, item.id)
-                            : navigate(`/${evidenceType === 'movie' ? 'movies' : 'series'}/${item.id}`)
-                        }
-                        sx={{
-                          flexShrink: 0,
-                          width: 92,
-                          cursor: 'pointer',
-                          borderRadius: 2,
-                          overflow: 'hidden',
-                          transition: 'transform 0.2s',
-                          '&:hover': { transform: 'scale(1.05)' },
-                          bgcolor: 'background.default',
-                        }}
-                      >
-                        <Box sx={{ height: 124, bgcolor: 'grey.800', position: 'relative' }}>
-                          <Box
-                            component="img"
-                            src={getProxiedImageUrl(item.poster_url)}
-                            alt={item.title}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = FALLBACK_POSTER_URL
-                            }}
-                            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
+                  {closestRow.map((row) => (
+                    <Paper
+                      key={row.key}
+                      onClick={() => openItem(row.id)}
+                      sx={{
+                        flexShrink: 0,
+                        width: 92,
+                        cursor: 'pointer',
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        transition: 'transform 0.2s',
+                        '&:hover': { transform: 'scale(1.05)' },
+                        bgcolor: 'background.default',
+                      }}
+                    >
+                      <Box sx={{ height: 124, bgcolor: 'grey.800', position: 'relative' }}>
+                        <Box
+                          component="img"
+                          src={getProxiedImageUrl(row.poster_url)}
+                          alt={row.title}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = FALLBACK_POSTER_URL
+                          }}
+                          sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                        {row.similarity != null && (
                           <Chip
-                            label={`${Math.round(ev.similarity * 100)}%`}
+                            label={`${Math.round(row.similarity * 100)}%`}
                             size="small"
                             sx={{
                               position: 'absolute',
@@ -895,31 +868,56 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia }: Mo
                               color: 'white',
                             }}
                           />
-                          <Chip
-                            label={ev.evidence_type === 'favorite' ? '❤️' : ev.evidence_type === 'recent' ? '🕐' : '✓'}
-                            size="small"
-                            sx={{
-                              position: 'absolute',
-                              bottom: 4,
-                              left: 4,
-                              height: 20,
-                              minWidth: 20,
-                              fontSize: '0.7rem',
-                              bgcolor: 'rgba(0,0,0,0.7)',
-                            }}
-                          />
-                        </Box>
-                        <Box sx={{ p: 1 }}>
-                          <Typography variant="caption" fontWeight={500} noWrap display="block">
-                            {item.title}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {item.year ?? t('mediaDetail.insights.na')}
-                          </Typography>
-                        </Box>
-                      </Paper>
-                    )
-                  })}
+                        )}
+                        <Chip
+                          label={row.evidenceType === 'favorite' ? '❤️' : row.evidenceType === 'recent' ? '🕐' : '✓'}
+                          size="small"
+                          sx={{
+                            position: 'absolute',
+                            bottom: 4,
+                            left: 4,
+                            height: 20,
+                            minWidth: 20,
+                            fontSize: '0.7rem',
+                            bgcolor: 'rgba(0,0,0,0.7)',
+                          }}
+                        />
+                        {row.sharedWithTwin && (
+                          <Tooltip title={twinMarkLabel}>
+                            <Avatar
+                              src={twinDonor?.avatarUrl}
+                              alt={twinMarkLabel}
+                              sx={{
+                                position: 'absolute',
+                                bottom: 4,
+                                right: 4,
+                                width: 22,
+                                height: 22,
+                                fontSize: '0.7rem',
+                                bgcolor: 'secondary.main',
+                                border: '2px solid',
+                                borderColor: 'background.default',
+                              }}
+                            >
+                              {twinDonor ? (
+                                twinDonor.name.charAt(0).toUpperCase()
+                              ) : (
+                                <GroupsIcon sx={{ fontSize: 14 }} />
+                              )}
+                            </Avatar>
+                          </Tooltip>
+                        )}
+                      </Box>
+                      <Box sx={{ p: 1 }}>
+                        <Typography variant="caption" fontWeight={500} noWrap display="block">
+                          {row.title}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {row.year ?? t('mediaDetail.insights.na')}
+                        </Typography>
+                      </Box>
+                    </Paper>
+                  ))}
                 </Box>
               </Box>
             )}

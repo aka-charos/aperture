@@ -41,6 +41,12 @@ import {
 } from './series/explanations.js'
 import { judgeRunEvidence } from './judgeEvidence.js'
 import {
+  findNearestSharedTitles,
+  storedSharedFields,
+  TWIN_SHARED_ORDER_NEAREST,
+  type TwinMediaType,
+} from './twinNearShared.js'
+import {
   createJobProgress,
   updateJobProgress,
   setJobStep,
@@ -94,7 +100,7 @@ function numOrNull(value: string | number | null): number | null {
 
 interface StoredBreakdown {
   interestMatch?: { interestText?: unknown }
-  twinMatch?: { sharedIds?: unknown }
+  twinMatch?: { sharedIds?: unknown; sharedOrder?: unknown; donorId?: unknown }
   acclaimedMatch?: unknown
 }
 
@@ -111,7 +117,10 @@ interface StoredBreakdown {
  * available for a borrowed pick.
  *
  * A run made before `sharedIds` was recorded yields an empty list, and the
- * prompt falls back to the bare anonymous line.
+ * prompt falls back to the bare anonymous line. So does one whose ids carry no
+ * `sharedOrder`: those are the RAREST shared titles, unrelated to the pick,
+ * and the prompt now introduces whatever it receives as the titles closest to
+ * it — handing it the old ones would state a closeness nobody measured.
  */
 function readSlotOrigin(breakdown: unknown): {
   interestText: string | null
@@ -125,9 +134,10 @@ function readSlotOrigin(breakdown: unknown): {
   return {
     interestText: typeof interestText === 'string' && interestText ? interestText : null,
     fromTasteTwin: parsed.twinMatch != null,
-    twinSharedIds: Array.isArray(sharedIds)
-      ? sharedIds.filter((id): id is string => typeof id === 'string')
-      : [],
+    twinSharedIds:
+      parsed.twinMatch?.sharedOrder === TWIN_SHARED_ORDER_NEAREST && Array.isArray(sharedIds)
+        ? sharedIds.filter((id): id is string => typeof id === 'string')
+        : [],
     fromAcclaimed: parsed.acclaimedMatch != null,
   }
 }
@@ -200,6 +210,68 @@ function resolveNormalizedSimilarity(
  */
 const PICK_ORDER = `ORDER BY rc.selected_rank NULLS LAST, rc.rank`
 
+/**
+ * Re-choose the titles shown beside each twin pick, and store them back on the
+ * pick's score_breakdown.
+ *
+ * Runs made before twinNearShared.ts hold the RAREST titles the pair shared --
+ * an arbitrary slice of a tie, unrelated to the pick -- and the explanation
+ * prompt used to be told to build the reason on them. Recomputing here is what
+ * lets this job repair an existing run without re-scoring it: the prose it is
+ * about to write and the row the insights panel draws then name the same
+ * titles. Recomputed for newer runs too, since both viewers' histories move.
+ *
+ * A pick with nothing to show has its shared fields REMOVED, which every
+ * reader renders as the plain twin line -- deliberately not a fallback to the
+ * rarest titles. A failed lookup writes nothing and returns an empty map, so
+ * the generator reads the stored ids through readSlotOrigin, which uses them
+ * only when they were chosen by closeness. Returns item id -> ids.
+ */
+async function refreshTwinSharedIds(
+  runId: string,
+  userId: string,
+  mediaType: TwinMediaType,
+  rows: Array<{ itemId: string; breakdown: unknown }>
+): Promise<Map<string, string[]>> {
+  const picks = rows.flatMap(({ itemId, breakdown }) => {
+    const donorId = ((breakdown ?? {}) as StoredBreakdown).twinMatch?.donorId
+    return typeof donorId === 'string' && donorId ? [{ itemId, donorId }] : []
+  })
+  if (picks.length === 0) return new Map()
+
+  const nearest = await findNearestSharedTitles(mediaType, userId, picks)
+  if (!nearest) return new Map()
+
+  const itemIds = picks.map((pick) => pick.itemId)
+  // The same fields the pipelines store (storedSharedFields), so a refreshed
+  // pick and a freshly scored one are indistinguishable to every reader.
+  const fieldSets = itemIds.map((id) => JSON.stringify(storedSharedFields(nearest.get(id))))
+  const column = mediaType === 'movie' ? 'movie_id' : 'series_id'
+
+  try {
+    // Drop the old shared fields, then merge the new ones (possibly none).
+    await query(
+      `UPDATE recommendation_candidates rc
+          SET score_breakdown = jsonb_set(
+                rc.score_breakdown,
+                '{twinMatch}',
+                ((rc.score_breakdown->'twinMatch') - 'sharedIds' - 'sharedSimilarities' - 'sharedOrder')
+                  || u.fields::jsonb)
+         FROM unnest($2::uuid[], $3::text[]) AS u(item_id, fields)
+        WHERE rc.run_id = $1
+          AND rc.${column} = u.item_id
+          AND jsonb_typeof(rc.score_breakdown->'twinMatch') = 'object'`,
+      [runId, itemIds, fieldSets]
+    )
+  } catch (err) {
+    // The prose still gets the recomputed titles; only the panel keeps the old
+    // row until the next refresh.
+    logger.warn({ err, runId, mediaType }, 'Could not store recomputed twin shared titles')
+  }
+
+  return new Map(itemIds.map((id) => [id, (nearest.get(id) ?? []).map((title) => title.id)]))
+}
+
 async function refreshMovieRun(
   runId: string,
   userId: string,
@@ -224,6 +296,13 @@ async function refreshMovieRun(
   // re-scoring them. Off, unconfigured or failing: a no-op. See judgeEvidence.ts.
   await judgeRunEvidence(runId, 'movie', { shouldCancel, onlyUnjudged: true })
 
+  const twinShared = await refreshTwinSharedIds(
+    runId,
+    userId,
+    'movie',
+    result.rows.map((row) => ({ itemId: row.movie_id, breakdown: row.score_breakdown }))
+  )
+
   const movies: MovieForExplanation[] = result.rows.map((row) => {
     const similarity = numOrNull(row.similarity_score) ?? 0
     const origin = readSlotOrigin(row.score_breakdown)
@@ -243,7 +322,7 @@ async function refreshMovieRun(
       ratingScore: numOrNull(row.rating_score) ?? 0,
       interestText: origin.interestText,
       fromTasteTwin: origin.fromTasteTwin,
-      twinSharedIds: origin.twinSharedIds,
+      twinSharedIds: twinShared.get(row.movie_id) ?? origin.twinSharedIds,
       fromAcclaimed: origin.fromAcclaimed,
     }
   })
@@ -281,6 +360,13 @@ async function refreshSeriesRun(
   // Mirrors refreshMovieRun: verdicts first, for picks still missing one.
   await judgeRunEvidence(runId, 'series', { shouldCancel, onlyUnjudged: true })
 
+  const twinShared = await refreshTwinSharedIds(
+    runId,
+    userId,
+    'series',
+    result.rows.map((row) => ({ itemId: row.series_id, breakdown: row.score_breakdown }))
+  )
+
   const seriesList: SeriesForExplanation[] = result.rows.map((row) => {
     const similarity = numOrNull(row.similarity_score) ?? 0
     const origin = readSlotOrigin(row.score_breakdown)
@@ -302,7 +388,7 @@ async function refreshSeriesRun(
       ratingScore: numOrNull(row.rating_score) ?? 0,
       interestText: origin.interestText,
       fromTasteTwin: origin.fromTasteTwin,
-      twinSharedIds: origin.twinSharedIds,
+      twinSharedIds: twinShared.get(row.series_id) ?? origin.twinSharedIds,
       fromAcclaimed: origin.fromAcclaimed,
     }
   })

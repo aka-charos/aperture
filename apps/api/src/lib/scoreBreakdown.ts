@@ -17,6 +17,58 @@
  * sends nothing of it.
  */
 
+/**
+ * Core's TWIN_SHARED_ORDER_NEAREST (recommender/twinNearShared.ts), copied so
+ * this module stays free of runtime imports. Both test files pin the literal.
+ */
+export const TWIN_SHARED_ORDER_NEAREST = 'nearest'
+
+/** One shared title id and the raw cosine to the pick stored beside it. */
+export interface StoredTwinSharedTitle {
+  id: string
+  /** Null when the run stored ids without similarities. */
+  similarity: number | null
+}
+
+/**
+ * The shared titles stored on a twin pick, nearest to the pick first.
+ *
+ * Only ids stored with `sharedOrder: 'nearest'` are read. Runs from before
+ * that hold the RAREST titles the pair shared instead: an arbitrary slice of
+ * an idf tie, unrelated to the pick, which the panel used to show as the
+ * reason for it. Those read as no titles, and the explanation refresh job
+ * re-chooses them without re-scoring the run.
+ *
+ * Defensive at every step: score_breakdown is JSONB with no schema, so
+ * anything unexpected reads as "no titles", which every caller renders as the
+ * plain anonymous line.
+ */
+export function readTwinSharedTitles(scoreBreakdown: unknown): StoredTwinSharedTitle[] {
+  if (typeof scoreBreakdown !== 'object' || scoreBreakdown === null) return []
+  const twinMatch = (scoreBreakdown as Record<string, unknown>).twinMatch
+  if (typeof twinMatch !== 'object' || twinMatch === null) return []
+
+  const { sharedIds, sharedSimilarities, sharedOrder } = twinMatch as Record<string, unknown>
+  if (sharedOrder !== TWIN_SHARED_ORDER_NEAREST || !Array.isArray(sharedIds)) return []
+  const similarities = Array.isArray(sharedSimilarities) ? sharedSimilarities : []
+
+  const titles: StoredTwinSharedTitle[] = []
+  sharedIds.forEach((id, index) => {
+    if (typeof id !== 'string' || id.length === 0) return
+    const similarity = similarities[index]
+    titles.push({
+      id,
+      similarity: typeof similarity === 'number' && Number.isFinite(similarity) ? similarity : null,
+    })
+  })
+  return titles
+}
+
+/** The ids alone, for callers that resolve titles in batches. */
+export function readTwinSharedIds(scoreBreakdown: unknown): string[] {
+  return readTwinSharedTitles(scoreBreakdown).map((title) => title.id)
+}
+
 /** The donor's user id on a twin pick; null for every other pick and any unexpected shape. */
 export function readTwinDonorId(scoreBreakdown: unknown): string | null {
   if (typeof scoreBreakdown !== 'object' || scoreBreakdown === null) return null

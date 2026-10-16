@@ -293,41 +293,41 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         [candidate.id]
       )
 
-      // The titles that earned the taste-twin relationship, when a reserved
-      // twin slot is what put this film in the list.
-      //
-      // Distinct from `evidence` above in the way that matters: evidence is a
-      // content-similarity lookup run *after* the pick was made, so it explains
-      // nothing about why a borrowed title is here — the ranking is precisely
-      // what did not choose it. These are the rarest films the two viewers both
-      // watched, which is the quantity the affinity score is built from.
+      // For a twin pick: films both viewers watched, nearest to this one first
+      // (core recommender/twinNearShared.ts), each with the raw cosine the run
+      // stored, so the panel can merge them into the evidence row and mark
+      // which ones the twin watched too. Empty for older runs, whose stored
+      // titles were the rarest shared ones and unrelated to the pick.
       //
       // Resolved on read rather than stored as names, so a re-matched or
       // renamed film can't leave a stale title frozen in the run's JSONB.
-      const twinShared = await resolveTwinShared(candidate.score_breakdown, 'movies')
-
-      // Who the twin is, for a reader connected to them and nobody else:
-      // connection already shows each person the other's whole history, so
-      // the name tells them nothing that is not theirs to see. Decided for
-      // the account whose picks these are, like everything else here.
-      const twinDonor = await resolveTwinDonor(candidate.score_breakdown, userId)
-
-      const tasteInsights = await query<{
-        genre: string
-        watch_count: number
-      }>(
-        // Taste predicate, not played: this is the viewer's genre affinity,
-        // and a favorite is deliberate taste evidence — the same reading
-        // taste-profile/builder.ts uses to build the vector this panel explains.
-        `SELECT unnest(m.genres) as genre, COUNT(*) as watch_count
-         FROM watch_history wh
-         JOIN movies m ON m.id = wh.movie_id
-         WHERE wh.user_id = $1 AND ${WATCH_HISTORY_TASTE_SQL}
-         GROUP BY unnest(m.genres)
-         ORDER BY watch_count DESC
-         LIMIT 10`,
-        [userId]
-      )
+      //
+      // Who the twin is goes only to a reader connected to them: connection
+      // already shows each person the other's whole history, so the name tells
+      // them nothing that is not theirs to see. Decided for the account whose
+      // picks these are, like everything else here.
+      //
+      // The two lookups and the genre query below are independent.
+      const [twinShared, twinDonor, tasteInsights] = await Promise.all([
+        resolveTwinShared(candidate.score_breakdown, 'movies'),
+        resolveTwinDonor(candidate.score_breakdown, userId),
+        query<{
+          genre: string
+          watch_count: number
+        }>(
+          // Taste predicate, not played: this is the viewer's genre affinity,
+          // and a favorite is deliberate taste evidence — the same reading
+          // taste-profile/builder.ts uses to build the vector this panel explains.
+          `SELECT unnest(m.genres) as genre, COUNT(*) as watch_count
+           FROM watch_history wh
+           JOIN movies m ON m.id = wh.movie_id
+           WHERE wh.user_id = $1 AND ${WATCH_HISTORY_TASTE_SQL}
+           GROUP BY unnest(m.genres)
+           ORDER BY watch_count DESC
+           LIMIT 10`,
+          [userId]
+        ),
+      ])
 
       const movie = await queryOne<{ genres: string[] }>(
         `SELECT genres FROM movies WHERE id = $1`,

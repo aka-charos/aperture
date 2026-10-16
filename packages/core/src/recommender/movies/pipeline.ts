@@ -110,6 +110,7 @@ export {
 import type { User, Candidate, PipelineConfig } from '../types.js'
 import { eraAffinityFor, loadEraAffinities, summarizeEraAffinities } from '../eraAffinity.js'
 import { judgeRunEvidence } from '../judgeEvidence.js'
+import { findNearestSharedTitles, storedSharedFields } from '../twinNearShared.js'
 
 const logger = createChildLogger('recommender')
 
@@ -828,13 +829,25 @@ export async function generateRecommendationsForUser(
       reservedTwinSlots
     )
 
+    // What each twin pick shows beside it: titles both viewers played, nearest
+    // to the pick -- not the rarest ones the pair was matched on, which are an
+    // arbitrary slice of a tie and unrelated to the pick (twinNearShared.ts).
+    const nearestShared = await findNearestSharedTitles(
+      'movie',
+      user.id,
+      twinFillers.map((filler) => ({
+        itemId: filler.candidate.movieId,
+        donorId: filler.twin.donorId,
+      }))
+    )
+
     const twinPicks = new Map<string, StoredTwinPick>()
     for (const filler of twinFillers) {
       twinPicks.set(filler.candidate.movieId, {
         donorId: filler.twin.donorId,
         affinity: filler.twin.affinity,
         sharedCount: filler.twin.sharedCount,
-        sharedIds: filler.twin.sharedTopIds,
+        ...storedSharedFields(nearestShared?.get(filler.candidate.movieId)),
       })
       logger.info(
         {

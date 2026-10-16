@@ -4,6 +4,7 @@ import type { Candidate, WatchedMovie } from './types.js'
 import type { BlendWeights } from './shared/scoring.js'
 import { inputCountsSql, outputCountsSql } from './gateCounts.js'
 import { withRunCounts } from './runCountsFallback.js'
+import type { TWIN_SHARED_ORDER_NEAREST } from './twinNearShared.js'
 
 /**
  * Store recommendation candidates using bulk INSERT
@@ -32,11 +33,35 @@ export interface StoredTwinPick {
   affinity: number
   sharedCount: number
   /**
-   * The rarest titles the two viewers both watched, which is what the panel
-   * shows as the reason. Stored as ids and resolved to titles on read, so a
-   * renamed or re-matched film cannot leave a stale name frozen in JSONB.
+   * Titles both viewers played, nearest to the pick first (twinNearShared.ts).
+   * Stored as ids and resolved to titles on read, so a renamed or re-matched
+   * film cannot leave a stale name frozen in JSONB.
+   *
+   * Runs written before `sharedOrder` existed hold the RAREST shared titles
+   * here instead, which is why the order is stored beside them.
    */
   sharedIds?: string[]
+  /**
+   * Raw cosine of each shared title to the pick, aligned with `sharedIds`.
+   * Stored rather than recomputed on read so the panel compares it with the
+   * evidence rows of the same run, in the same embedding set.
+   */
+  sharedSimilarities?: number[]
+  /** How `sharedIds` was chosen; absent on older runs (rarest-first). */
+  sharedOrder?: typeof TWIN_SHARED_ORDER_NEAREST
+}
+
+/**
+ * The shared-title fields of a stored twin pick, as written into
+ * score_breakdown.twinMatch. One copy for both pipelines' writers.
+ */
+export function twinSharedJson(pick: StoredTwinPick): Record<string, unknown> {
+  if (!pick.sharedIds?.length) return {}
+  return {
+    sharedIds: pick.sharedIds,
+    ...(pick.sharedSimilarities?.length ? { sharedSimilarities: pick.sharedSimilarities } : {}),
+    ...(pick.sharedOrder ? { sharedOrder: pick.sharedOrder } : {}),
+  }
 }
 
 /**
@@ -157,7 +182,7 @@ export function buildCandidateRows(
               donorId: twinPick.donorId,
               affinity: twinPick.affinity,
               sharedCount: twinPick.sharedCount,
-              ...(twinPick.sharedIds?.length ? { sharedIds: twinPick.sharedIds } : {}),
+              ...twinSharedJson(twinPick),
             },
           }
         : {}),

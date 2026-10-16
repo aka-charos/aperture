@@ -1426,8 +1426,6 @@
       "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you",
       "tasteTwin": "这里有一位口味与你高度重合的人看过这部作品——它进入你的列表是因为这一点，而不是下面的分数。",
       "tasteTwinConnection": "与你关联的 {{name}} 口味与你高度重合，并看过这部作品——它进入你的列表是因为这一点，而不是下面的分数。",
-      "tasteTwinSharedMovie": "你们俩都看过、而这里很少有人看过的电影——正是这些重合找出了这次匹配：",
-      "tasteTwinSharedSeries": "你们俩都看过、而这里很少有人看过的剧集——正是这些重合找出了这次匹配：",
       "closestInLibrary": "Closest Titles in Your Library",
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",
@@ -1442,7 +1440,13 @@
       "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%.",
       "weightShare": "{{pct}}% of this match",
       "scaleRange": "scale {{min}}–{{max}}%",
-      "blendedScoreWeighted": "At {{similarity}}% / {{novelty}}% / {{rating}}%, these blend to"
+      "blendedScoreWeighted": "At {{similarity}}% / {{novelty}}% / {{rating}}%, these blend to",
+      "closestWithTwinMovie": "Films in your history that most resemble this one. The marked ones were also watched by the person whose taste overlaps yours:",
+      "closestWithTwinSeries": "Shows in your history that most resemble this one. The marked ones were also watched by the person whose taste overlaps yours:",
+      "closestWithTwinConnectionMovie": "Films in your history that most resemble this one. {{name}} watched the marked ones too:",
+      "closestWithTwinConnectionSeries": "Shows in your history that most resemble this one. {{name}} watched the marked ones too:",
+      "twinMark": "Also watched by the person whose taste overlaps yours",
+      "twinMarkConnection": "{{name}} watched this too"
     },
     "seasons": {
       "title": "剧集数",

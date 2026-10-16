@@ -235,20 +235,22 @@ export interface RecommendationInsights {
   } | null
   scoreBreakdown?: Record<string, unknown>
   /**
-   * The rarest titles the reader and their taste twin have both watched — the
-   * overlap that earned a borrowed pick its reserved slot, and so the honest
-   * answer to "why is this here".
+   * For a taste-twin pick: titles the reader and their twin both PLAYED,
+   * nearest to the pick first. The twin is why the pick is here; these are
+   * what it resembles in the history the two share, merged into the evidence
+   * row (closestRow.ts) and marked as the twin's.
    *
-   * Deliberately not the same thing as `evidence` below, which is a
-   * content-similarity lookup run *after* selection: for a twin pick the
-   * ranking is precisely what did not choose it. Empty for every other pick,
-   * and for twin picks made by a run that predates this field.
+   * `similarity` is the same raw cosine an evidence row carries, null when
+   * the title has no vector. Empty for every other pick, and for twin picks
+   * from runs that stored the rarest shared titles instead (unrelated to the
+   * pick, so the server sends none).
    */
   twinShared?: Array<{
     id: string
     title: string
     year: number | null
     poster_url: string | null
+    similarity: number | null
   }>
   /**
    * Who the taste twin is — present ONLY when they are one of the reader's

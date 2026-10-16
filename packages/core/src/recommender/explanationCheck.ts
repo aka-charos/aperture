@@ -69,7 +69,7 @@ export interface ExplanationCheckInput {
    * titles; without this the checker would call that link unsupported.
    */
   viewer?: ViewerContext | null
-  /** For a taste-twin pick: the titles the two viewers both watched, which the writer was told to build on. */
+  /** For a taste-twin pick: the titles both viewers played, nearest to the pick, which the writer was offered. */
   sharedWithKindredViewer?: string[]
 }
 
@@ -105,7 +105,7 @@ export function receptionLabel(mediaType: 'movie' | 'series', ratingScore: numbe
 export function pickOrigin(breakdown: unknown): {
   origin: PickOrigin
   interestText: string | null
-  /** A twin pick's shared title ids, rarest first; empty otherwise. */
+  /** A twin pick's shared title ids (nearest to the pick on current runs); empty otherwise. */
   sharedIds: string[]
 } {
   const b = (breakdown ?? {}) as {

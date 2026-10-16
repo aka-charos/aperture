@@ -3,9 +3,67 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { publicScoreBreakdown, readTwinDonorId } from './scoreBreakdown.js'
+import {
+  publicScoreBreakdown,
+  readTwinDonorId,
+  readTwinSharedIds,
+  readTwinSharedTitles,
+  TWIN_SHARED_ORDER_NEAREST,
+} from './scoreBreakdown.js'
 
 const DONOR = '0b5c7e2a-1f3d-4c6b-9a8e-2d4f6a8c0e1b'
+
+describe('readTwinSharedTitles', () => {
+  it('copies core’s order marker exactly', () => {
+    // Core pins the same literal in twinNearShared.test.ts.
+    assert.equal(TWIN_SHARED_ORDER_NEAREST, 'nearest')
+  })
+
+  it('reads ids chosen by closeness, with their stored similarities', () => {
+    const breakdown = {
+      twinMatch: {
+        donorId: DONOR,
+        sharedIds: ['a', 'b'],
+        sharedSimilarities: [0.81, 0.77],
+        sharedOrder: 'nearest',
+      },
+    }
+    assert.deepEqual(readTwinSharedTitles(breakdown), [
+      { id: 'a', similarity: 0.81 },
+      { id: 'b', similarity: 0.77 },
+    ])
+    assert.deepEqual(readTwinSharedIds(breakdown), ['a', 'b'])
+  })
+
+  it('reads the old rarest-first ids as no titles', () => {
+    // Runs from before the order marker: an arbitrary slice of an idf tie,
+    // unrelated to the pick. Showing them is the fault this replaced.
+    for (const twinMatch of [
+      { sharedIds: ['rare-1', 'rare-2'] },
+      { sharedIds: ['rare-1'], sharedOrder: 'rarest' },
+    ]) {
+      assert.deepEqual(readTwinSharedTitles({ twinMatch }), [], JSON.stringify(twinMatch))
+    }
+  })
+
+  it('keeps an id whose similarity is missing, and drops junk ids', () => {
+    assert.deepEqual(
+      readTwinSharedTitles({
+        twinMatch: { sharedIds: ['a', 7, '', 'b'], sharedSimilarities: [0.5], sharedOrder: 'nearest' },
+      }),
+      [
+        { id: 'a', similarity: 0.5 },
+        { id: 'b', similarity: null },
+      ]
+    )
+  })
+
+  it('answers nothing for every other shape', () => {
+    for (const value of [null, {}, { twinMatch: null }, { twinMatch: { sharedOrder: 'nearest' } }]) {
+      assert.deepEqual(readTwinSharedTitles(value), [], JSON.stringify(value))
+    }
+  })
+})
 
 describe('readTwinDonorId', () => {
   it('reads the donor of a twin pick', () => {

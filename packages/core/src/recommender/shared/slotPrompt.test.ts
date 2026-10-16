@@ -54,14 +54,30 @@ test('the rules only name headings the picks can actually carry', () => {
   }
 })
 
-test('a twin pick is explained by the shared titles when it has them', () => {
+test('a twin pick offers the shared titles as material, never as a bridge to build', () => {
   const line = buildSlotLines(
     { fromTasteTwin: true, twinSharedTitles: ['Stalker (1979)', 'Come and See (1985)'] },
     MOVIE_NOUNS
   )
   assert.match(line, /Stalker \(1979\)/)
   assert.match(line, /Come and See \(1985\)/)
-  assert.match(line, /shared ground is the reason/)
+  // The reason is the other viewer; the titles are the shared ones nearest the
+  // pick, usable one at a time where the link is concrete.
+  assert.match(line, /that is why it is in the list/)
+  assert.match(line, /closest to this movie/)
+  assert.match(line, /never link them to each other/)
+  // The instruction that made the model invent "where those four meet".
+  assert.doesNotMatch(line, /shared ground/)
+  assert.doesNotMatch(line, /build the explanation on/)
+})
+
+test('the twin rule forbids a thread through the shared titles', () => {
+  for (const nouns of [MOVIE_NOUNS, SERIES_NOUNS]) {
+    const rules = buildSlotRules(nouns)
+    assert.match(rules, /never invent a thread running through them/)
+    assert.doesNotMatch(rules, /shared ground IS the reason/)
+    assert.doesNotMatch(rules, /build the explanation on them/)
+  }
 })
 
 test('a twin pick from an older run falls back to the anonymous line', () => {

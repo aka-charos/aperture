@@ -1426,8 +1426,6 @@
       "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you",
       "tasteTwin": "あなたと好みがよく似ている人がこれを観ています。下のスコアではなく、それがリストに入った理由です。",
       "tasteTwinConnection": "つながりのある{{name}}さんはあなたと好みがよく似ていて、これを観ています。下のスコアではなく、それがリストに入った理由です。",
-      "tasteTwinSharedMovie": "お二人とも観ていて、ここではほかにほとんど観ている人がいない映画です。この重なりが一致の決め手になりました：",
-      "tasteTwinSharedSeries": "お二人とも観ていて、ここではほかにほとんど観ている人がいないシリーズです。この重なりが一致の決め手になりました：",
       "closestInLibrary": "Closest Titles in Your Library",
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",
@@ -1442,7 +1440,13 @@
       "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%.",
       "weightShare": "{{pct}}% of this match",
       "scaleRange": "scale {{min}}–{{max}}%",
-      "blendedScoreWeighted": "At {{similarity}}% / {{novelty}}% / {{rating}}%, these blend to"
+      "blendedScoreWeighted": "At {{similarity}}% / {{novelty}}% / {{rating}}%, these blend to",
+      "closestWithTwinMovie": "Films in your history that most resemble this one. The marked ones were also watched by the person whose taste overlaps yours:",
+      "closestWithTwinSeries": "Shows in your history that most resemble this one. The marked ones were also watched by the person whose taste overlaps yours:",
+      "closestWithTwinConnectionMovie": "Films in your history that most resemble this one. {{name}} watched the marked ones too:",
+      "closestWithTwinConnectionSeries": "Shows in your history that most resemble this one. {{name}} watched the marked ones too:",
+      "twinMark": "Also watched by the person whose taste overlaps yours",
+      "twinMarkConnection": "{{name}} watched this too"
     },
     "seasons": {
       "title": "エピソード",

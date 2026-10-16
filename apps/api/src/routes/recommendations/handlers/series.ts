@@ -248,35 +248,32 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         [candidate.id]
       )
 
-      // The shows that earned the taste-twin relationship, when a reserved twin
-      // slot is what put this series in the list. Unlike `evidence` above,
-      // which is a content-similarity lookup run after the fact, these are what
-      // the affinity score is actually made of. See handlers/twinShared.ts.
-      const twinShared = await resolveTwinShared(candidate.score_breakdown, 'series')
-
-      // Who the twin is, for a reader connected to them and nobody else:
-      // connection already shows each person the other's whole history, so
-      // the name tells them nothing that is not theirs to see. Decided for
-      // the account whose picks these are, like everything else here.
-      const twinDonor = await resolveTwinDonor(candidate.score_breakdown, userId)
-
-      const tasteInsights = await query<{
-        genre: string
-        watch_count: number
-      }>(
-        // Taste predicate, mirroring the movie handler: a favorite is taste
-        // evidence, which is what this panel's genre affinity is measuring.
-        `SELECT unnest(s.genres) as genre, COUNT(DISTINCT s.id) as watch_count
-         FROM watch_history wh
-         JOIN episodes e ON e.id = wh.episode_id
-         JOIN series s ON s.id = e.series_id
-         WHERE wh.user_id = $1 AND wh.media_type = 'episode'
-           AND ${WATCH_HISTORY_TASTE_SQL}
-         GROUP BY unnest(s.genres)
-         ORDER BY watch_count DESC
-         LIMIT 10`,
-        [userId]
-      )
+      // For a twin pick: shows both viewers watched, nearest to this one, each
+      // with the similarity the run stored, so the panel merges them into the
+      // evidence row. The twin's name goes only to a connected reader. Mirrors
+      // the movie handler, including running the three lookups together;
+      // see lib/twinShared.ts.
+      const [twinShared, twinDonor, tasteInsights] = await Promise.all([
+        resolveTwinShared(candidate.score_breakdown, 'series'),
+        resolveTwinDonor(candidate.score_breakdown, userId),
+        query<{
+          genre: string
+          watch_count: number
+        }>(
+          // Taste predicate, mirroring the movie handler: a favorite is taste
+          // evidence, which is what this panel's genre affinity is measuring.
+          `SELECT unnest(s.genres) as genre, COUNT(DISTINCT s.id) as watch_count
+           FROM watch_history wh
+           JOIN episodes e ON e.id = wh.episode_id
+           JOIN series s ON s.id = e.series_id
+           WHERE wh.user_id = $1 AND wh.media_type = 'episode'
+             AND ${WATCH_HISTORY_TASTE_SQL}
+           GROUP BY unnest(s.genres)
+           ORDER BY watch_count DESC
+           LIMIT 10`,
+          [userId]
+        ),
+      ])
 
       const targetSeries = await queryOne<{ genres: string[] }>(
         `SELECT genres FROM series WHERE id = $1`,

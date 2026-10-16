@@ -30,7 +30,7 @@ export interface ContentItem {
    * the insights panel does — never carries the donor's identity.
    */
   source?: 'ranked' | 'twin' | 'interest' | 'acclaimed'
-  /** Only on a `twin` pick: titles the user and that viewer have both watched, rarest first. */
+  /** Only on a `twin` pick: titles the user and that viewer have both played, nearest to the pick first. */
   sharedTitles?: string[]
   /**
    * Whether the user has already watched this title, read from their history.

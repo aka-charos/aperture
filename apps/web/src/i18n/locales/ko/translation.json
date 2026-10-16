@@ -844,8 +844,6 @@
       "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you",
       "tasteTwin": "회원님과 취향이 많이 겹치는 누군가가 이 작품을 봤습니다. 아래 점수가 아니라 이것이 목록에 들어온 이유입니다.",
       "tasteTwinConnection": "연결된 {{name}} 님은 회원님과 취향이 많이 겹치며 이 작품을 봤습니다. 아래 점수가 아니라 이것이 목록에 들어온 이유입니다.",
-      "tasteTwinSharedMovie": "두 분 모두 봤지만 여기서는 본 사람이 거의 없는 영화입니다. 이 겹침이 취향 일치를 찾아냈습니다:",
-      "tasteTwinSharedSeries": "두 분 모두 봤지만 여기서는 본 사람이 거의 없는 시리즈입니다. 이 겹침이 취향 일치를 찾아냈습니다:",
       "closestInLibrary": "Closest Titles in Your Library",
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",
@@ -860,7 +858,13 @@
       "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%.",
       "weightShare": "{{pct}}% of this match",
       "scaleRange": "scale {{min}}–{{max}}%",
-      "blendedScoreWeighted": "At {{similarity}}% / {{novelty}}% / {{rating}}%, these blend to"
+      "blendedScoreWeighted": "At {{similarity}}% / {{novelty}}% / {{rating}}%, these blend to",
+      "closestWithTwinMovie": "Films in your history that most resemble this one. The marked ones were also watched by the person whose taste overlaps yours:",
+      "closestWithTwinSeries": "Shows in your history that most resemble this one. The marked ones were also watched by the person whose taste overlaps yours:",
+      "closestWithTwinConnectionMovie": "Films in your history that most resemble this one. {{name}} watched the marked ones too:",
+      "closestWithTwinConnectionSeries": "Shows in your history that most resemble this one. {{name}} watched the marked ones too:",
+      "twinMark": "Also watched by the person whose taste overlaps yours",
+      "twinMarkConnection": "{{name}} watched this too"
     },
     "seasons": {
       "title": "에피소드",

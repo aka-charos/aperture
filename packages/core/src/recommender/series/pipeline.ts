@@ -58,6 +58,8 @@ import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
 import { refreshTasteSynopsis } from '../../lib/tasteSynopsisRefresh.js'
 import { storeSeriesEvidence, getSeriesOverviews } from './storage.js'
 import { judgeRunEvidence } from '../judgeEvidence.js'
+import { findNearestSharedTitles, storedSharedFields } from '../twinNearShared.js'
+import { twinSharedJson, type StoredTwinPick } from '../storage.js'
 import { getSeriesEmbeddings } from './embeddings.js'
 import {
   embeddingColumnFor,
@@ -750,7 +752,7 @@ async function storeSeriesCandidates(
   selected: SeriesCandidate[],
   selectedRanks: Map<string, number>,
   interestPicks?: Map<string, InterestCandidateMatch>,
-  twinPicks?: Map<string, TwinDonor>,
+  twinPicks?: Map<string, StoredTwinPick>,
   acclaimedPicks?: Map<string, StoredAcclaimedPick>
 ): Promise<void> {
   if (candidates.length === 0) return
@@ -812,9 +814,7 @@ async function storeSeriesCandidates(
                       donorId: twinPick.donorId,
                       affinity: twinPick.affinity,
                       sharedCount: twinPick.sharedCount,
-                      ...(twinPick.sharedTopIds?.length
-                        ? { sharedIds: twinPick.sharedTopIds }
-                        : {}),
+                      ...twinSharedJson(twinPick),
                     },
                   }
                 : {}),
@@ -1516,9 +1516,25 @@ export async function generateSeriesRecommendationsForUser(
       reservedTwinSlots
     )
 
-    const twinPicks = new Map<string, TwinDonor>()
+    // Mirrors the movie pipeline: titles both viewers played, nearest to the
+    // pick, rather than the rarest ones the pair was matched on.
+    const nearestShared = await findNearestSharedTitles(
+      'series',
+      user.id,
+      twinFillers.map((filler) => ({
+        itemId: filler.candidate.seriesId,
+        donorId: filler.twin.donorId,
+      }))
+    )
+
+    const twinPicks = new Map<string, StoredTwinPick>()
     for (const filler of twinFillers) {
-      twinPicks.set(filler.candidate.seriesId, filler.twin)
+      twinPicks.set(filler.candidate.seriesId, {
+        donorId: filler.twin.donorId,
+        affinity: filler.twin.affinity,
+        sharedCount: filler.twin.sharedCount,
+        ...storedSharedFields(nearestShared?.get(filler.candidate.seriesId)),
+      })
       logger.info(
         {
           title: filler.candidate.title,
@@ -1685,7 +1701,7 @@ export async function generateSeriesRecommendationsForUser(
           // borrowed pick is in the list, and without it the model explains the
           // film from the similarity evidence -- which is the ranking that did
           // not choose it.
-          twinSharedIds: twinPicks.get(s.seriesId)?.sharedTopIds,
+          twinSharedIds: twinPicks.get(s.seriesId)?.sharedIds,
           fromAcclaimed: acclaimedPicks.has(s.seriesId),
         }))
 

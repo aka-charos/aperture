@@ -17,26 +17,14 @@
  * slot allocation can be unit-tested without a database.
  */
 
-/**
- * The rarest titles two viewers both watched -- the ones that earned the pair
- * its affinity, and therefore the honest answer to "why is this in my list".
- *
- * Display-only: nothing in the slot arithmetic reads it, which is why it is
- * optional. A pair whose ids could not be collected still allocates slots
- * normally and simply has no titles to show.
- */
-export type SharedTitleIds = string[]
-
 /** One candidate pair, before any acceptance threshold is applied. */
 export interface TwinPair {
   recipientId: string
   donorId: string
   /** Rarity-weighted cosine of the two watch sets, 0-1. */
   affinity: number
-  /** Titles both have watched. Carried for diagnostics and the insights panel. */
+  /** Titles both have watched. Carried for diagnostics. */
   sharedCount: number
-  /** The highest-idf few of those, for the insights panel. See SHARED_TITLE_SAMPLE. */
-  sharedTopIds?: SharedTitleIds
 }
 
 /** One viewer whose taste overlaps a recipient's enough to borrow from. */
@@ -44,7 +32,6 @@ export interface TwinDonor {
   donorId: string
   affinity: number
   sharedCount: number
-  sharedTopIds?: SharedTitleIds
 }
 
 /** recipientId -> their qualifying donors, strongest first. */
@@ -105,7 +92,6 @@ export function buildTwinIndex(pairs: TwinPair[], k: number): TwinIndex {
       donorId: pair.donorId,
       affinity: pair.affinity,
       sharedCount: pair.sharedCount,
-      sharedTopIds: pair.sharedTopIds,
     })
     index.set(pair.recipientId, donors)
   }

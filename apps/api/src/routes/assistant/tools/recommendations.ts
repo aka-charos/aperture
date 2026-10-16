@@ -22,8 +22,9 @@ export function createRecommendationTools(ctx: ToolContext) {
         '`source` saying how it earned its place: a "twin" or "interest" pick was placed by a ' +
         'reserved slot rather than by the ranking, so say so instead of explaining it as being ' +
         'similar to something they watched — for a "twin" pick, similarity is exactly what did ' +
-        'not choose it. Explain a twin pick with its `sharedTitles`: the films the user and that ' +
-        'viewer have both watched. Never identify the other viewer behind a twin pick.',
+        'not choose it. Explain a twin pick by the other viewer; its `sharedTitles` are films both ' +
+        'have played that are closest to it, to mention only where the link is concrete. Never ' +
+        'identify the other viewer behind a twin pick.',
       inputSchema: nullSafe(z.object({
         type: z.enum(['movies', 'series', 'both']).default('both'),
         limit: z.number().optional().default(15).describe('Number of results (default 15, max 50)'),

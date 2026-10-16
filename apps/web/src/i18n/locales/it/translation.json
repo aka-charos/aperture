@@ -845,8 +845,6 @@
       "consideredSubtitle": "{{pct}}% match · one of {{total}} titles scored for you",
       "tasteTwin": "Qualcuno qui con gusti molto simili ai tuoi l'ha visto: è questo che l'ha messo nella tua lista, non i punteggi qui sotto.",
       "tasteTwinConnection": "{{name}}, una delle tue connessioni, ha gusti molto simili ai tuoi e l'ha visto: è questo che l'ha messo nella tua lista, non i punteggi qui sotto.",
-      "tasteTwinSharedMovie": "Film che avete visto entrambi e che pochi altri qui hanno visto: è questa sovrapposizione ad aver individuato l'affinità:",
-      "tasteTwinSharedSeries": "Serie che avete visto entrambi e che pochi altri qui hanno visto: è questa sovrapposizione ad aver individuato l'affinità:",
       "closestInLibrary": "Closest Titles in Your Library",
       "closestInLibraryMovie": "Films in your history that most resemble this one. Shown for context — they are not why it was picked:",
       "closestInLibrarySeries": "Shows in your history that most resemble this one. Shown for context — they are not why it was picked:",
@@ -861,7 +859,13 @@
       "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%.",
       "weightShare": "{{pct}}% of this match",
       "scaleRange": "scale {{min}}–{{max}}%",
-      "blendedScoreWeighted": "At {{similarity}}% / {{novelty}}% / {{rating}}%, these blend to"
+      "blendedScoreWeighted": "At {{similarity}}% / {{novelty}}% / {{rating}}%, these blend to",
+      "closestWithTwinMovie": "Films in your history that most resemble this one. The marked ones were also watched by the person whose taste overlaps yours:",
+      "closestWithTwinSeries": "Shows in your history that most resemble this one. The marked ones were also watched by the person whose taste overlaps yours:",
+      "closestWithTwinConnectionMovie": "Films in your history that most resemble this one. {{name}} watched the marked ones too:",
+      "closestWithTwinConnectionSeries": "Shows in your history that most resemble this one. {{name}} watched the marked ones too:",
+      "twinMark": "Also watched by the person whose taste overlaps yours",
+      "twinMarkConnection": "{{name}} watched this too"
     },
     "seasons": {
       "title": "Episodi",

@@ -1598,6 +1598,17 @@ export {
   type EvidenceVerdictRow,
 } from './recommender/evidenceStrength.js'
 
+// What a taste-twin pick shows beside it: titles both viewers watched, nearest
+// to the pick, stored with their similarities. The API mirrors the order
+// marker in its pure lib/scoreBreakdown.ts.
+export {
+  TWIN_SHARED_ORDER_NEAREST,
+  SERIES_SHARED_MIN_COMPLETION,
+  findNearestSharedTitles,
+  type NearSharedTitle,
+  type TwinPickRef,
+} from './recommender/twinNearShared.js'
+
 // The optional decision model that can judge that evidence instead of the
 // cosine bar. Off by default; every failure falls back to the bar above.
 export {

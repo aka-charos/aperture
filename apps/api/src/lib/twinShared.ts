@@ -6,16 +6,23 @@
  * assistant's recommendation tool, which are otherwise unrelated.
  *
  * The ids come from `score_breakdown.twinMatch.sharedIds`, written by core's
- * recommender/storage.ts. They are the *rarest* titles both viewers watched,
- * which is the quantity the affinity score is literally made of — so they are
- * the honest answer to "why is this in my list", as opposed to
- * `recommendation_evidence`, which is a content-similarity lookup run after the
- * pick was made and had no part in it.
+ * recommender/storage.ts: titles both viewers PLAYED, nearest to the pick first
+ * (core recommender/twinNearShared.ts). They are not why the pick is here — the
+ * twin is — but they are the honest version of "you both watched these, which
+ * are like this one".
+ *
+ * Runs from before that stored the RAREST shared titles instead, with no
+ * `sharedOrder`. Those are an arbitrary slice of a tie and unrelated to the
+ * pick, and reading as if they explained it is the fault this replaced — so
+ * they are read as no titles at all, never shown. The rule itself is pure and
+ * pinned in lib/scoreBreakdown.ts (`readTwinSharedTitles`).
  */
 
 import { getVisibleConnection } from '@aperture/core'
 import { query } from './db.js'
-import { readTwinDonorId } from './scoreBreakdown.js'
+import { readTwinDonorId, readTwinSharedIds, readTwinSharedTitles } from './scoreBreakdown.js'
+
+export { readTwinSharedIds }
 
 /** The taste twin, as the reader is allowed to see them. */
 export interface TwinDonor {
@@ -46,31 +53,17 @@ export interface TwinSharedItem {
   title: string
   year: number | null
   poster_url: string | null
+  /**
+   * Raw cosine to the pick, stored by the run beside the id — the same measure
+   * and the same embedding set as that run's evidence rows, so the panel can
+   * merge the two into one row ordered by closeness. Null when not stored.
+   */
+  similarity: number | null
 }
 
 /**
- * Pull the stored shared-title ids off a candidate's score_breakdown.
- *
- * Defensive at every step: score_breakdown is JSONB with no schema, holds
- * whatever the pipeline version that wrote the run put there, and runs written
- * before this shipped have a twinMatch with no sharedIds at all. Anything
- * unexpected reads as "no titles", which every caller renders as the plain
- * anonymous line they had before.
- */
-export function readTwinSharedIds(scoreBreakdown: unknown): string[] {
-  if (typeof scoreBreakdown !== 'object' || scoreBreakdown === null) return []
-
-  const twinMatch = (scoreBreakdown as Record<string, unknown>).twinMatch
-  if (typeof twinMatch !== 'object' || twinMatch === null) return []
-
-  const ids = (twinMatch as Record<string, unknown>).sharedIds
-  if (!Array.isArray(ids)) return []
-
-  return ids.filter((id): id is string => typeof id === 'string')
-}
-
-/**
- * The rarest titles both the reader and their twin have watched, for one pick.
+ * The titles both the reader and their twin watched, nearest to the pick
+ * first, each with the similarity the run stored.
  *
  * `table` is a literal union, never request data, so interpolating it is not an
  * injection surface — every caller passes its own constant.
@@ -79,13 +72,14 @@ export async function resolveTwinShared(
   scoreBreakdown: unknown,
   table: 'movies' | 'series'
 ): Promise<TwinSharedItem[]> {
-  const ids = readTwinSharedIds(scoreBreakdown)
-  if (ids.length === 0) return []
+  const stored = readTwinSharedTitles(scoreBreakdown)
+  if (stored.length === 0) return []
+  const ids = stored.map((title) => title.id)
+  const similarityById = new Map(stored.map((title) => [title.id, title.similarity]))
 
-  // array_position preserves the stored order, which is rarest-first and so is
-  // the order in which these titles best explain the match. ANY() on its own
+  // array_position preserves the stored order, nearest first. ANY() on its own
   // returns rows in whatever order the planner finds convenient.
-  const result = await query<TwinSharedItem>(
+  const result = await query<Omit<TwinSharedItem, 'similarity'>>(
     `SELECT id, title, year, poster_url
        FROM ${table}
       WHERE id = ANY($1::uuid[])
@@ -93,7 +87,7 @@ export async function resolveTwinShared(
     [ids]
   )
 
-  return result.rows
+  return result.rows.map((row) => ({ ...row, similarity: similarityById.get(row.id) ?? null }))
 }
 
 /**

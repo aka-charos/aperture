@@ -78,11 +78,13 @@ export const ContentItemSchema = z.object({
     .array(z.string())
     .optional()
     .describe(
-      'Only on a "twin" pick: titles the user and that other viewer have BOTH watched, rarest ' +
-        'first. This overlap is what identified the match, so it is the honest way to explain ' +
-        'the pick — e.g. "you both watched X and Y, and they also watched this". These are ' +
-        "films from the user's own history, so naming them reveals nothing about the other " +
-        'viewer, who still must never be identified.'
+      'Only on a "twin" pick: titles the user and that other viewer have BOTH played, nearest ' +
+        'to this pick first. The reason the pick is here is the other viewer; these show what ' +
+        'it resembles in the history the two share — e.g. "someone whose taste overlaps yours ' +
+        'watched this; you both watched X, which it is close to". Mention one only where its ' +
+        'connection to the pick is concrete, and never invent a thread linking them to each ' +
+        "other. They are films from the user's own history, so naming them reveals nothing " +
+        'about the other viewer, who still must never be identified.'
     ),
   episode: EpisodeRefSchema.optional().describe(
     'Present ONLY when this card is a single episode rather than a whole show (searchEpisodes). ' +
