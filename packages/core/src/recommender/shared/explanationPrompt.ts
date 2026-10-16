@@ -128,7 +128,136 @@ export interface SlotMarkers {
    * anonymous line is the fallback.
    */
   twinSharedTitles?: string[]
+  /**
+   * Where a twin pick ranked on its OWN score, before the twin slot placed it.
+   * Without it the model only knows "the other viewer is the reason" and
+   * writes the contrast as total — "rather than any pattern in your own
+   * viewing" — about a film that scored a 90% taste match and came 26th
+   * against a list of 20. See twinStandingLine.
+   */
+  ownStanding?: OwnStanding
   fromAcclaimed?: boolean
+}
+
+/**
+ * A pick's own place in the run: `rank` among the `scored` titles that COULD
+ * have been picked (favourites excluded at selection are not counted — they
+ * never compete for a slot), against a final list of `listSize`.
+ *
+ * Built once, by the pipeline that scored the run (`ownStandingAt`), and
+ * stored on the pick's `twinMatch` so the explanation writer, the refresh, the
+ * explanation checker and the insights banner all read the same numbers
+ * instead of each re-deriving them from columns that count different pools.
+ */
+export interface OwnStanding {
+  rank: number
+  scored: number
+  listSize: number
+}
+
+/** Where a twin pick stood on its own score. */
+export type TwinStandingBand = 'inside' | 'near' | 'strong' | 'far'
+
+/**
+ * How far outside the list counts as "nearly made it": within twice the list
+ * size. Provisional and deliberately tight — saying a pick nearly made it when
+ * it did not is the overclaim this exists to remove, in the other direction.
+ */
+export const TWIN_NEAR_MISS_FACTOR = 2
+
+/** The top share of the scored pool that still counts as a strong match on its own. */
+export const TWIN_STRONG_SHARE = 0.05
+
+/**
+ * The standing of the title at `index` in the run's selectable candidates,
+ * sorted by finalScore. Undefined when the title is not among them, or any
+ * count is unusable — never a guessed rank.
+ */
+export function ownStandingAt(index: number, scored: number, listSize: number): OwnStanding | undefined {
+  const standing = { rank: index + 1, scored, listSize }
+  return index >= 0 && isUsableStanding(standing) ? standing : undefined
+}
+
+function isUsableStanding(standing: OwnStanding): boolean {
+  const { rank, scored, listSize } = standing
+  return (
+    [rank, scored, listSize].every((n) => Number.isInteger(n) && n > 0) && rank <= scored
+  )
+}
+
+/**
+ * Read a stored standing back off score_breakdown JSONB. Anything malformed is
+ * undefined: the twin line then carries no standing, which is what it did
+ * before standings existed.
+ */
+export function readOwnStanding(value: unknown): OwnStanding | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const { rank, scored, listSize } = value as Record<string, unknown>
+  if (typeof rank !== 'number' || typeof scored !== 'number' || typeof listSize !== 'number') {
+    return undefined
+  }
+  const standing = { rank, scored, listSize }
+  return isUsableStanding(standing) ? standing : undefined
+}
+
+/**
+ * Which band a standing falls in. `inside` is its own band: a twin pick that
+ * out-scored most of the list on its own and was passed over at selection
+ * (diversity, or reserved slots taking the room) did not "nearly" make it.
+ */
+export function twinStandingBand(standing: OwnStanding | undefined): TwinStandingBand | null {
+  if (!standing || !isUsableStanding(standing)) return null
+  const { rank, scored, listSize } = standing
+  if (rank <= listSize) return 'inside'
+  if (rank <= listSize * TWIN_NEAR_MISS_FACTOR) return 'near'
+  if (rank <= scored * TWIN_STRONG_SHARE) return 'strong'
+  return 'far'
+}
+
+/**
+ * The same standing as a plain fact, for the explanation checker's state —
+ * the checker must be shown what the writer was shown (F-144 rule 1), but not
+ * the writer's instructions. Null exactly when twinStandingLine is.
+ */
+export function describeStanding(standing: OwnStanding | undefined): string | null {
+  const band = twinStandingBand(standing)
+  if (!band || !standing) return null
+  const reach = {
+    inside: "inside the list's range, but passed over at selection",
+    near: 'just outside the list — it nearly made it by itself',
+    strong: 'well outside the list, though a strong match',
+    far: 'far outside the list',
+  }[band]
+  return `On its own score it ranked #${standing.rank.toLocaleString('en-US')} of ${standing.scored.toLocaleString('en-US')} titles scored, against a list of ${standing.listSize.toLocaleString('en-US')}: ${reach}`
+}
+
+/**
+ * The sentence that tells the model how close a twin pick came on its own,
+ * with the numbers, so it can say so honestly. Null when the standing is
+ * absent or malformed, which leaves the twin line as it was.
+ *
+ * Bands are decided here rather than by the model, which reads "#26 of
+ * 12,451" as either far or close depending on the run. The numbers are for
+ * the model's judgement; the prose may give the rank but never the pool size,
+ * which is a fact about the library, not the viewer.
+ */
+export function twinStandingLine(standing: OwnStanding | undefined): string | null {
+  const band = twinStandingBand(standing)
+  if (!band || !standing) return null
+
+  const format = (n: number) => n.toLocaleString('en-US')
+  const place = `#${format(standing.rank)} of ${format(standing.scored)} titles scored, against a list of ${format(standing.listSize)}`
+  const numbers = 'Never quote the number of titles scored to the reader'
+  switch (band) {
+    case 'inside':
+      return `On its own score it ranked ${place} — inside the list's range by itself, but the selection passed it over; the other viewer's watching is what secured its place. Say that their own taste already rated it highly. ${numbers}`
+    case 'near':
+      return `On its own score it ranked ${place} — it nearly made the list by itself, and the other viewer's watching tipped it in. Say that; do not write as though their own taste had nothing to do with it. ${numbers}`
+    case 'strong':
+      return `On its own score it ranked ${place} — a strong match for them, but well outside the list; the other viewer's watching is what brought it in. ${numbers}`
+    case 'far':
+      return `On its own score it ranked ${place}, far outside the list — the other viewer's watching is essentially the whole reason. ${numbers}`
+  }
 }
 
 /**
@@ -200,10 +329,11 @@ export function buildSlotLines(slot: SlotMarkers, nouns: ExplanationNouns): stri
 
   if (slot.fromTasteTwin) {
     const shared = (slot.twinSharedTitles ?? []).slice(0, TWIN_SHARED_TITLE_LIMIT)
+    const standing = twinStandingLine(slot.ownStanding)
     lines.push(
       shared.length > 0
-        ? `\n   👥 A KINDRED VIEWER PICKED THIS: someone here whose taste closely overlaps theirs watched it — that is why it is in the list, so lead with that. Of the titles the two of them have both watched, the closest to this ${nouns.singular} are: ${shared.join(', ')} (nearest first). Use one only where its connection to this ${nouns.singular} is concrete; never link them to each other or present them as a group with a shared thread. Never name or describe the other viewer`
-        : `\n   👥 A KINDRED VIEWER PICKED THIS: another viewer here whose taste closely overlaps theirs watched it — lead with that, and never name or describe that person`
+        ? `\n   👥 A KINDRED VIEWER PICKED THIS: someone here whose taste closely overlaps theirs watched it — that is why it is in the list, so lead with that.${standing ? ` ${standing}.` : ''} Of the titles the two of them have both watched, the closest to this ${nouns.singular} are: ${shared.join(', ')} (nearest first). Use one only where its connection to this ${nouns.singular} is concrete; never link them to each other or present them as a group with a shared thread. Never name or describe the other viewer`
+        : `\n   👥 A KINDRED VIEWER PICKED THIS: another viewer here whose taste closely overlaps theirs watched it — lead with that, and never name or describe that person.${standing ? ` ${standing}` : ''}`
     )
   }
 
@@ -269,7 +399,7 @@ export function buildSlotRules(nouns: ExplanationNouns): string {
 
 CRITICAL: A few recommendations are marked "THEY ASKED FOR THIS" with an interest the user typed in themselves. Open by connecting the ${nouns.singular} to that interest in the user's own words. Never justify one of these on viewing-history similarity -- that is not why it is in the list -- and draw on the titles listed beneath it only if they genuinely fit.
 
-CRITICAL: A few recommendations are marked "A KINDRED VIEWER PICKED THIS". Those are in the list because another viewer with strongly overlapping taste watched them, which is a different reason from similarity to this user's own history. Say that first. Where the marker names titles the two of them have both watched, those are the shared titles closest to this ${nouns.singular}: you may name one or two and say concretely what each shares with it, drawing on the data you were given, but never invent a thread running through them or claim the ${nouns.singular} sits "where they meet". The same goes for the titles listed beneath the recommendation: use them only if they genuinely fit. Refer to the other viewer only in general terms ("someone whose taste lines up with yours") -- you do not know who they are, so never name, guess at or describe them.
+CRITICAL: A few recommendations are marked "A KINDRED VIEWER PICKED THIS". Those are in the list because another viewer with strongly overlapping taste watched them. Say that first. Where the marker says how the pick ranked on its own score, report that as given: one that nearly made the list by itself also matches this user's own taste, and the explanation must not claim otherwise. Where the marker names titles the two of them have both watched, those are the shared titles closest to this ${nouns.singular}: you may name one or two and say concretely what each shares with it, drawing on the data you were given, but never invent a thread running through them or claim the ${nouns.singular} sits "where they meet". The same goes for the titles listed beneath the recommendation: use them only if they genuinely fit. Refer to the other viewer only in general terms ("someone whose taste lines up with yours") -- you do not know who they are, so never name, guess at or describe them.
 
 CRITICAL: A few recommendations are marked "WIDELY ACCLAIMED". Those are in the list because the ${nouns.singular} is very highly rated by a large number of viewers, which is a different reason from similarity to this user's history -- do not claim their viewing history led here. Say plainly that it is a landmark they have not seen yet, and use the titles listed beneath it only as secondary support if it genuinely fits.`
 }

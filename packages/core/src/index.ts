@@ -1600,6 +1600,15 @@ export {
   type EvidenceVerdictRow,
 } from './recommender/evidenceStrength.js'
 
+// Where a taste-twin pick stood on its own score, stored on twinMatch. The
+// insights routes read it to decide the banner's copy server-side.
+export {
+  readOwnStanding,
+  twinStandingBand,
+  type OwnStanding,
+  type TwinStandingBand,
+} from './recommender/shared/explanationPrompt.js'
+
 // What a taste-twin pick shows beside it: titles both viewers watched, nearest
 // to the pick, stored with their similarities. The API mirrors the order
 // marker in its pure lib/scoreBreakdown.ts.

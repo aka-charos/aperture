@@ -27,6 +27,7 @@ import {
   buildSlotRules,
   evidenceHeading,
   SERIES_NOUNS,
+  type OwnStanding,
 } from '../shared/explanationPrompt.js'
 import { evidenceSupportsCause } from '../evidenceStrength.js'
 import {
@@ -98,6 +99,12 @@ export interface SeriesForExplanation {
    * this -- not the similarity evidence -- is why a borrowed pick is here.
    */
   twinSharedIds?: string[]
+  /**
+   * A twin pick's own place in the run (see twinStandingLine in
+   * shared/explanationPrompt.ts), so the prose can say how close it came
+   * without the twin. Absent for every other pick.
+   */
+  ownStanding?: OwnStanding
 }
 
 export interface EvidenceSeries {

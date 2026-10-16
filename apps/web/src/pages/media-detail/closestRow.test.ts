@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildClosestRow } from './closestRow'
+import { buildClosestRow, twinMarking } from './closestRow'
 
 const film = (id: string) => ({ id, title: id, year: 2000, poster_url: null })
 
@@ -72,4 +72,28 @@ test('with no twin, the row is the evidence unchanged', () => {
       ['b', false],
     ]
   )
+})
+
+test('marking: badges only when some titles are shared, one caption when all are', () => {
+  const evidence = [{ id: 'e1', similarity: 0.81, evidence_type: 'watched', item: film('anomalisa') }]
+
+  assert.equal(twinMarking(buildClosestRow({ evidence, twinShared: [] })), 'none')
+  assert.equal(
+    twinMarking(buildClosestRow({ evidence, twinShared: [{ ...film('eternal'), similarity: 0.77 }] })),
+    'some'
+  )
+  // The live Synecdoche row: every title nearest the pick was one both watched.
+  assert.equal(
+    twinMarking(
+      buildClosestRow({
+        evidence,
+        twinShared: [
+          { ...film('anomalisa'), similarity: 0.81 },
+          { ...film('eternal'), similarity: 0.77 },
+        ],
+      })
+    ),
+    'all'
+  )
+  assert.equal(twinMarking([]), 'none')
 })

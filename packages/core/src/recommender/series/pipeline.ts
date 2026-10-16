@@ -59,7 +59,8 @@ import { refreshTasteSynopsis } from '../../lib/tasteSynopsisRefresh.js'
 import { storeSeriesEvidence, getSeriesOverviews } from './storage.js'
 import { judgeRunEvidence } from '../judgeEvidence.js'
 import { findNearestSharedTitles, storedSharedFields } from '../twinNearShared.js'
-import { twinSharedJson, type StoredTwinPick } from '../storage.js'
+import { ownStandingAt } from '../shared/explanationPrompt.js'
+import { twinMatchExtras, type StoredTwinPick } from '../storage.js'
 import { getSeriesEmbeddings } from './embeddings.js'
 import {
   embeddingColumnFor,
@@ -814,7 +815,7 @@ async function storeSeriesCandidates(
                       donorId: twinPick.donorId,
                       affinity: twinPick.affinity,
                       sharedCount: twinPick.sharedCount,
-                      ...twinSharedJson(twinPick),
+                      ...twinMatchExtras(twinPick),
                     },
                   }
                 : {}),
@@ -1604,6 +1605,16 @@ export async function generateSeriesRecommendationsForUser(
       )
     }
 
+    // Mirrors the movie pipeline: each twin pick's rank among the shows that
+    // could have been picked, against the final list, stored on twinMatch.
+    for (const [seriesId, pick] of twinPicks) {
+      pick.ownStanding = ownStandingAt(
+        selectableCandidates.findIndex((c) => c.seriesId === seriesId),
+        selectableCandidates.length,
+        finalSelected.length
+      )
+    }
+
     const finalSelectedRanks = new Map<string, number>()
     finalSelected.forEach((candidate, index) => {
       finalSelectedRanks.set(candidate.seriesId, index + 1)
@@ -1702,6 +1713,7 @@ export async function generateSeriesRecommendationsForUser(
           // film from the similarity evidence -- which is the ranking that did
           // not choose it.
           twinSharedIds: twinPicks.get(s.seriesId)?.sharedIds,
+          ownStanding: twinPicks.get(s.seriesId)?.ownStanding,
           fromAcclaimed: acclaimedPicks.has(s.seriesId),
         }))
 

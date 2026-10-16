@@ -14,7 +14,7 @@ import {
   NOVELTY_PEAK,
 } from '@aperture/core'
 import { recommendationSchemas } from '../schemas.js'
-import { resolveTwinDonor, resolveTwinShared } from '../../../lib/twinShared.js'
+import { resolveTwinDonor, resolveTwinShared, twinCameClose } from '../../../lib/twinShared.js'
 import { publicScoreBreakdown } from '../../../lib/scoreBreakdown.js'
 import type { SeriesRecommendationCandidate, RecommendationRun } from '../types.js'
 import { WATCH_HISTORY_TASTE_SQL, binderFor, getLibraryScopeForUser, libraryScopeSql } from '@aperture/core'
@@ -326,6 +326,9 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         twinShared,
         // Absent, never null, unless the twin is a visible connection.
         ...(twinDonor ? { twinDonor } : {}),
+        // Decided server-side: whether this twin pick nearly made the list on
+        // its own score. Absent when not a twin pick or the run stored no standing.
+        ...twinCameClose(candidate.score_breakdown),
         // The decision-model verdict stays server-side: it is an input to the
         // boolean below, not something the panel should reason about.
         evidence: evidence.rows.map(({ judged_connection: _judged, ...row }) => row),

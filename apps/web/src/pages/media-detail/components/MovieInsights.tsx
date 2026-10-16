@@ -29,7 +29,7 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 import { gradients } from '@/theme'
 import { insightsHaveDetail } from '../helpers'
-import { buildClosestRow } from '../closestRow'
+import { buildClosestRow, twinMarking } from '../closestRow'
 import type { RecommendationInsights, MediaType } from '../types'
 
 interface MovieInsightsProps {
@@ -457,7 +457,26 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
     }),
     twinShared,
   })
-  const rowHasTwinTitles = closestRow.some((row) => row.sharedWithTwin)
+  // Badges when only some titles are the twin's; one caption when all are,
+  // since a badge on every poster says nothing the caption does not.
+  const marking = twinMarking(closestRow)
+  const twinName = twinDonor ? { name: twinDonor.name } : undefined
+  const twinCaption =
+    marking === 'all'
+      ? twinDonor
+        ? isSeriesView
+          ? t('mediaDetail.insights.closestAllTwinConnectionSeries', twinName)
+          : t('mediaDetail.insights.closestAllTwinConnectionMovie', twinName)
+        : isSeriesView
+          ? t('mediaDetail.insights.closestAllTwinSeries')
+          : t('mediaDetail.insights.closestAllTwinMovie')
+      : twinDonor
+        ? isSeriesView
+          ? t('mediaDetail.insights.closestWithTwinConnectionSeries', twinName)
+          : t('mediaDetail.insights.closestWithTwinConnectionMovie', twinName)
+        : isSeriesView
+          ? t('mediaDetail.insights.closestWithTwinSeries')
+          : t('mediaDetail.insights.closestWithTwinMovie')
   const twinMarkLabel = twinDonor
     ? t('mediaDetail.insights.twinMarkConnection', { name: twinDonor.name })
     : t('mediaDetail.insights.twinMark')
@@ -710,9 +729,13 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
                     <GroupsIcon sx={{ color: 'secondary.main', fontSize: 20 }} />
                   )}
                   <Typography variant="body2" color="text.secondary">
-                    {twinDonor
-                      ? t('mediaDetail.insights.tasteTwinConnection', { name: twinDonor.name })
-                      : t('mediaDetail.insights.tasteTwin')}
+                    {insights.twinCameClose === true
+                      ? twinDonor
+                        ? t('mediaDetail.insights.tasteTwinConnectionClose', { name: twinDonor.name })
+                        : t('mediaDetail.insights.tasteTwinClose')
+                      : twinDonor
+                        ? t('mediaDetail.insights.tasteTwinConnection', { name: twinDonor.name })
+                        : t('mediaDetail.insights.tasteTwin')}
                   </Typography>
                 </Box>
                 {/* The titles the two of them share used to be listed here as
@@ -856,14 +879,8 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
                       : t('mediaDetail.insights.whyWeThink')}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {rowHasTwinTitles
-                      ? twinDonor
-                        ? isSeriesView
-                          ? t('mediaDetail.insights.closestWithTwinConnectionSeries', { name: twinDonor.name })
-                          : t('mediaDetail.insights.closestWithTwinConnectionMovie', { name: twinDonor.name })
-                        : isSeriesView
-                          ? t('mediaDetail.insights.closestWithTwinSeries')
-                          : t('mediaDetail.insights.closestWithTwinMovie')
+                    {marking !== 'none'
+                      ? twinCaption
                       : evidenceIsNotTheReason
                         ? isSeriesView
                           ? t('mediaDetail.insights.closestInLibrarySeries')
@@ -929,7 +946,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
                             bgcolor: 'rgba(0,0,0,0.7)',
                           }}
                         />
-                        {row.sharedWithTwin && (
+                        {marking === 'some' && row.sharedWithTwin && (
                           <Tooltip title={twinMarkLabel}>
                             <Avatar
                               src={twinDonor?.avatarUrl}

@@ -262,6 +262,13 @@ export interface RecommendationInsights {
     avatarUrl: string
   }
   /**
+   * Decided server-side: a twin pick that came close to the list on its own
+   * score (inside its range, or just outside). The banner then says so instead
+   * of crediting the twin "rather than the scores below". Absent on any other
+   * pick and on runs that stored no standing, which keep the old copy.
+   */
+  twinCameClose?: boolean
+  /**
    * Whether `evidence` below is close enough to be called the reason for the
    * pick, decided server-side by hasCausalEvidence against a raw-cosine floor.
    *

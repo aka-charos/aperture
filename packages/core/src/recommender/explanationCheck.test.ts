@@ -200,3 +200,27 @@ test('only the three labels are accepted', () => {
   assert.ok(isExplanationLabel('accept') && isExplanationLabel('reject') && isExplanationLabel('unsure'))
   assert.ok(!isExplanationLabel('yes') && !isExplanationLabel(undefined))
 })
+
+test('a twin pick’s standing reaches the checker as a plain fact, before the explanation', () => {
+  // The writer is told where the pick ranked on its own; without the same fact
+  // the checker reads "it nearly made your list on its own" as invented.
+  const request = buildExplanationCheckRequest(
+    input({
+      origin: 'kindredViewer',
+      kindredViewerStanding:
+        'On its own score it ranked #26 of 12,451 titles scored, against a list of 20: just outside the list — it nearly made it by itself',
+    })
+  )
+  assert.match(String(request.state.kindredViewerStanding), /#26 of 12,451/)
+  assert.equal(Object.keys(request.state).at(-1), 'explanation')
+  // No standing, no key.
+  assert.equal(buildExplanationCheckRequest(input({})).state.kindredViewerStanding, undefined)
+})
+
+test('pickOrigin reads a stored standing off a twin pick, and only a well-formed one', () => {
+  const ownStanding = { rank: 26, scored: 12451, listSize: 20 }
+  assert.deepEqual(pickOrigin({ twinMatch: { sharedIds: [], ownStanding } }).standing, ownStanding)
+  assert.equal(pickOrigin({ twinMatch: { ownStanding: { rank: 0, scored: 1, listSize: 1 } } }).standing, undefined)
+  assert.equal(pickOrigin({ twinMatch: {} }).standing, undefined)
+  assert.equal(pickOrigin({}).standing, undefined)
+})

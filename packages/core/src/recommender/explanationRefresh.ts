@@ -40,6 +40,7 @@ import {
   type SeriesForExplanation,
 } from './series/explanations.js'
 import { judgeRunEvidence } from './judgeEvidence.js'
+import { ownStandingAt, readOwnStanding, type OwnStanding } from './shared/explanationPrompt.js'
 import {
   findNearestSharedTitles,
   storedSharedFields,
@@ -100,7 +101,7 @@ function numOrNull(value: string | number | null): number | null {
 
 interface StoredBreakdown {
   interestMatch?: { interestText?: unknown }
-  twinMatch?: { sharedIds?: unknown; sharedOrder?: unknown; donorId?: unknown }
+  twinMatch?: { sharedIds?: unknown; sharedOrder?: unknown; donorId?: unknown; ownStanding?: unknown }
   acclaimedMatch?: unknown
 }
 
@@ -173,6 +174,7 @@ async function buildRunSimilarityScale(runId: string): Promise<SimilarityScale> 
 }
 
 interface StoredPickRow {
+  rank: number | null
   title: string
   year: number | null
   genres: string[] | null
@@ -200,6 +202,45 @@ function resolveNormalizedSimilarity(
 ): number {
   const value = numOrNull(stored)
   return value ?? normalizeSimilarity(rawSimilarity, scale)
+}
+
+/**
+ * How many titles the run scored and how many it picked, for a twin pick's
+ * own standing (twinStandingLine). Null when the run recorded neither, which
+ * leaves the twin line without a standing rather than inventing one.
+ */
+async function readRunListShape(runId: string): Promise<{ scored: number; listSize: number } | null> {
+  const run = await queryOne<{ candidate_count: number | null; selected_count: number | null }>(
+    `SELECT candidate_count, selected_count FROM recommendation_runs WHERE id = $1`,
+    [runId]
+  )
+  const scored = Number(run?.candidate_count ?? 0)
+  const listSize = Number(run?.selected_count ?? 0)
+  return scored > 0 && listSize > 0 ? { scored, listSize } : null
+}
+
+/**
+ * A twin pick's own standing: the one the pipeline stored on twinMatch, else
+ * a fallback for runs made before standings were stored.
+ *
+ * The fallback is approximate, and errs toward a WORSE rank: `rc.rank` and
+ * `candidate_count` count the viewer's favourites, which never compete for a
+ * slot, so a pick can read slightly further from the list than it was. It is
+ * refused outright when the rank exceeds the count, which is what an older run
+ * whose stored pool was truncated (F-048) can produce. Undefined for any pick
+ * that is not a twin pick.
+ */
+function resolveStanding(
+  breakdown: unknown,
+  rank: number | null,
+  shape: { scored: number; listSize: number } | null
+): OwnStanding | undefined {
+  const twin = ((breakdown ?? {}) as StoredBreakdown).twinMatch
+  if (twin == null) return undefined
+  const stored = readOwnStanding(twin.ownStanding)
+  if (stored) return stored
+  if (rank == null || !shape) return undefined
+  return ownStandingAt(Number(rank) - 1, shape.scored, shape.listSize)
 }
 
 /**
@@ -231,8 +272,9 @@ async function refreshTwinSharedIds(
   runId: string,
   userId: string,
   mediaType: TwinMediaType,
-  rows: Array<{ itemId: string; breakdown: unknown }>
+  rows: Array<{ itemId: string; breakdown: unknown; standing?: OwnStanding }>
 ): Promise<Map<string, string[]>> {
+  const standingById = new Map(rows.map((row) => [row.itemId, row.standing]))
   const picks = rows.flatMap(({ itemId, breakdown }) => {
     const donorId = ((breakdown ?? {}) as StoredBreakdown).twinMatch?.donorId
     return typeof donorId === 'string' && donorId ? [{ itemId, donorId }] : []
@@ -243,9 +285,17 @@ async function refreshTwinSharedIds(
   if (!nearest) return new Map()
 
   const itemIds = picks.map((pick) => pick.itemId)
-  // The same fields the pipelines store (storedSharedFields), so a refreshed
-  // pick and a freshly scored one are indistinguishable to every reader.
-  const fieldSets = itemIds.map((id) => JSON.stringify(storedSharedFields(nearest.get(id))))
+  // The same fields the pipelines store (storedSharedFields, plus the
+  // standing), so a refreshed pick and a freshly scored one are
+  // indistinguishable to every reader — including the insights banner, which
+  // reads the standing off the row.
+  const fieldSets = itemIds.map((id) => {
+    const standing = standingById.get(id)
+    return JSON.stringify({
+      ...storedSharedFields(nearest.get(id)),
+      ...(standing ? { ownStanding: standing } : {}),
+    })
+  })
   const column = mediaType === 'movie' ? 'movie_id' : 'series_id'
 
   try {
@@ -255,7 +305,7 @@ async function refreshTwinSharedIds(
           SET score_breakdown = jsonb_set(
                 rc.score_breakdown,
                 '{twinMatch}',
-                ((rc.score_breakdown->'twinMatch') - 'sharedIds' - 'sharedSimilarities' - 'sharedOrder')
+                ((rc.score_breakdown->'twinMatch') - 'sharedIds' - 'sharedSimilarities' - 'sharedOrder' - 'ownStanding')
                   || u.fields::jsonb)
          FROM unnest($2::uuid[], $3::text[]) AS u(item_id, fields)
         WHERE rc.run_id = $1
@@ -282,7 +332,7 @@ async function refreshMovieRun(
 
   const result = await query<StoredPickRow & { movie_id: string }>(
     `SELECT rc.movie_id, rc.similarity_score, rc.normalized_similarity, rc.novelty_score,
-            rc.rating_score, rc.score_breakdown, m.title, m.year, m.genres, m.overview
+            rc.rating_score, rc.score_breakdown, rc.rank, m.title, m.year, m.genres, m.overview
      FROM recommendation_candidates rc
      JOIN movies m ON m.id = rc.movie_id
      WHERE rc.run_id = $1 AND rc.is_selected = true
@@ -302,11 +352,20 @@ async function refreshMovieRun(
     await judgeRunEvidence(runId, 'movie', { shouldCancel, onlyUnjudged: true })
   }
 
+  const shape = await readRunListShape(runId)
+  const standings = new Map(
+    result.rows.map((row) => [row.movie_id, resolveStanding(row.score_breakdown, row.rank, shape)])
+  )
+
   const twinShared = await refreshTwinSharedIds(
     runId,
     userId,
     'movie',
-    result.rows.map((row) => ({ itemId: row.movie_id, breakdown: row.score_breakdown }))
+    result.rows.map((row) => ({
+      itemId: row.movie_id,
+      breakdown: row.score_breakdown,
+      standing: standings.get(row.movie_id),
+    }))
   )
 
   const movies: MovieForExplanation[] = result.rows.map((row) => {
@@ -329,6 +388,7 @@ async function refreshMovieRun(
       interestText: origin.interestText,
       fromTasteTwin: origin.fromTasteTwin,
       twinSharedIds: twinShared.get(row.movie_id) ?? origin.twinSharedIds,
+      ownStanding: standings.get(row.movie_id),
       fromAcclaimed: origin.fromAcclaimed,
     }
   })
@@ -353,7 +413,7 @@ async function refreshSeriesRun(
     StoredPickRow & { series_id: string; network: string | null; status: string | null }
   >(
     `SELECT rc.series_id, rc.similarity_score, rc.normalized_similarity, rc.novelty_score,
-            rc.rating_score, rc.score_breakdown, s.title, s.year, s.genres, s.overview,
+            rc.rating_score, rc.score_breakdown, rc.rank, s.title, s.year, s.genres, s.overview,
             s.network, s.status
      FROM recommendation_candidates rc
      JOIN series s ON s.id = rc.series_id
@@ -370,11 +430,20 @@ async function refreshSeriesRun(
     await judgeRunEvidence(runId, 'series', { shouldCancel, onlyUnjudged: true })
   }
 
+  const shape = await readRunListShape(runId)
+  const standings = new Map(
+    result.rows.map((row) => [row.series_id, resolveStanding(row.score_breakdown, row.rank, shape)])
+  )
+
   const twinShared = await refreshTwinSharedIds(
     runId,
     userId,
     'series',
-    result.rows.map((row) => ({ itemId: row.series_id, breakdown: row.score_breakdown }))
+    result.rows.map((row) => ({
+      itemId: row.series_id,
+      breakdown: row.score_breakdown,
+      standing: standings.get(row.series_id),
+    }))
   )
 
   const seriesList: SeriesForExplanation[] = result.rows.map((row) => {
@@ -399,6 +468,7 @@ async function refreshSeriesRun(
       interestText: origin.interestText,
       fromTasteTwin: origin.fromTasteTwin,
       twinSharedIds: twinShared.get(row.series_id) ?? origin.twinSharedIds,
+      ownStanding: standings.get(row.series_id),
       fromAcclaimed: origin.fromAcclaimed,
     }
   })

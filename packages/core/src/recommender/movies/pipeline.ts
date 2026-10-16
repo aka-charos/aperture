@@ -111,6 +111,7 @@ import type { User, Candidate, PipelineConfig } from '../types.js'
 import { eraAffinityFor, loadEraAffinities, summarizeEraAffinities } from '../eraAffinity.js'
 import { judgeRunEvidence } from '../judgeEvidence.js'
 import { findNearestSharedTitles, storedSharedFields } from '../twinNearShared.js'
+import { ownStandingAt } from '../shared/explanationPrompt.js'
 
 const logger = createChildLogger('recommender')
 
@@ -915,6 +916,18 @@ export async function generateRecommendationsForUser(
       )
     }
 
+    // Each twin pick's own standing: its rank among the titles that could have
+    // been picked (selectableCandidates, finalScore order, favourites already
+    // out), against the final list. Stored on twinMatch so the explanation,
+    // refresh, checker and banner all read the same numbers.
+    for (const [movieId, pick] of twinPicks) {
+      pick.ownStanding = ownStandingAt(
+        selectableCandidates.findIndex((c) => c.movieId === movieId),
+        selectableCandidates.length,
+        finalSelected.length
+      )
+    }
+
     const finalSelectedRanks = new Map<string, number>()
     finalSelected.forEach((candidate, index) => {
       finalSelectedRanks.set(candidate.movieId, index + 1)
@@ -1020,6 +1033,7 @@ export async function generateRecommendationsForUser(
           // film from the similarity evidence -- which is the ranking that did
           // not choose it.
           twinSharedIds: twinPicks.get(s.movieId)?.sharedIds,
+          ownStanding: twinPicks.get(s.movieId)?.ownStanding,
           fromAcclaimed: acclaimedPicks.has(s.movieId),
         }))
 

@@ -18,11 +18,27 @@
  * pinned in lib/scoreBreakdown.ts (`readTwinSharedTitles`).
  */
 
-import { getVisibleConnection } from '@aperture/core'
+import { getVisibleConnection, readOwnStanding, twinStandingBand } from '@aperture/core'
 import { query } from './db.js'
 import { readTwinDonorId, readTwinSharedIds, readTwinSharedTitles } from './scoreBreakdown.js'
 
 export { readTwinSharedIds }
+
+/**
+ * Whether a twin pick came close to the list on its OWN score (core
+ * twinStandingBand: inside the list's range, or just outside it), as a field
+ * to spread into the insights response. Decided here so the banner can stop
+ * saying the twin put it there "rather than the scores below" when the scores
+ * below nearly did it alone. No field for any other pick, or for a run that
+ * stored no standing: the banner then keeps its old copy.
+ */
+export function twinCameClose(scoreBreakdown: unknown): { twinCameClose?: boolean } {
+  if (typeof scoreBreakdown !== 'object' || scoreBreakdown === null) return {}
+  const twinMatch = (scoreBreakdown as Record<string, unknown>).twinMatch
+  if (typeof twinMatch !== 'object' || twinMatch === null) return {}
+  const band = twinStandingBand(readOwnStanding((twinMatch as Record<string, unknown>).ownStanding))
+  return band == null ? {} : { twinCameClose: band === 'inside' || band === 'near' }
+}
 
 /** The taste twin, as the reader is allowed to see them. */
 export interface TwinDonor {

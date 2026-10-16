@@ -47,6 +47,23 @@ export interface ClosestRowItem {
 }
 
 /**
+ * Whether the twin's titles are marked one by one, or said once.
+ *
+ * `some`: a badge on each title the twin also watched, which tells the reader
+ * which ones. `all`: every title in the row is shared — normal for a strong
+ * twin, since the films nearest a pick are then mostly ones both watched — so
+ * a badge on every poster says nothing a single caption does not, and the
+ * caption says it instead. `none`: no twin titles at all.
+ */
+export type TwinMarking = 'none' | 'some' | 'all'
+
+export function twinMarking(row: ClosestRowItem[]): TwinMarking {
+  const shared = row.filter((item) => item.sharedWithTwin).length
+  if (shared === 0) return 'none'
+  return shared === row.length ? 'all' : 'some'
+}
+
+/**
  * Evidence and shared titles as one list, closest first.
  *
  * A title in both lists appears once, keeping its evidence badge and gaining

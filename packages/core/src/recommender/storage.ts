@@ -5,6 +5,7 @@ import type { BlendWeights } from './shared/scoring.js'
 import { inputCountsSql, outputCountsSql } from './gateCounts.js'
 import { withRunCounts } from './runCountsFallback.js'
 import type { TWIN_SHARED_ORDER_NEAREST } from './twinNearShared.js'
+import type { OwnStanding } from './shared/explanationPrompt.js'
 
 /**
  * Store recommendation candidates using bulk INSERT
@@ -49,18 +50,29 @@ export interface StoredTwinPick {
   sharedSimilarities?: number[]
   /** How `sharedIds` was chosen; absent on older runs (rarest-first). */
   sharedOrder?: typeof TWIN_SHARED_ORDER_NEAREST
+  /**
+   * Where the pick ranked on its own score among the titles that could have
+   * been picked (shared/explanationPrompt.ts `OwnStanding`). Stored so every
+   * reader — the writer, the refresh, the checker, the banner — uses the same
+   * numbers. Absent on older runs.
+   */
+  ownStanding?: OwnStanding
 }
 
 /**
- * The shared-title fields of a stored twin pick, as written into
- * score_breakdown.twinMatch. One copy for both pipelines' writers.
+ * The fields of a stored twin pick beyond donor, affinity and count, as
+ * written into score_breakdown.twinMatch. One copy for both pipelines.
  */
-export function twinSharedJson(pick: StoredTwinPick): Record<string, unknown> {
-  if (!pick.sharedIds?.length) return {}
+export function twinMatchExtras(pick: StoredTwinPick): Record<string, unknown> {
   return {
-    sharedIds: pick.sharedIds,
-    ...(pick.sharedSimilarities?.length ? { sharedSimilarities: pick.sharedSimilarities } : {}),
-    ...(pick.sharedOrder ? { sharedOrder: pick.sharedOrder } : {}),
+    ...(pick.sharedIds?.length
+      ? {
+          sharedIds: pick.sharedIds,
+          ...(pick.sharedSimilarities?.length ? { sharedSimilarities: pick.sharedSimilarities } : {}),
+          ...(pick.sharedOrder ? { sharedOrder: pick.sharedOrder } : {}),
+        }
+      : {}),
+    ...(pick.ownStanding ? { ownStanding: pick.ownStanding } : {}),
   }
 }
 
@@ -182,7 +194,7 @@ export function buildCandidateRows(
               donorId: twinPick.donorId,
               affinity: twinPick.affinity,
               sharedCount: twinPick.sharedCount,
-              ...twinSharedJson(twinPick),
+              ...twinMatchExtras(twinPick),
             },
           }
         : {}),

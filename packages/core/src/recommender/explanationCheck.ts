@@ -33,6 +33,7 @@ import { createHash } from 'node:crypto'
 import { readNoul, type SystemOneQuestion } from '../lib/decisionModelRules.js'
 import { EVIDENCE_JUDGMENT_MIN_YES } from './evidenceStrength.js'
 import type { JudgedTitleFacts } from './evidenceJudgment.js'
+import { readOwnStanding, type OwnStanding } from './shared/explanationPrompt.js'
 
 export const EXPLANATION_CHECKS = [
   'claimsContextAsReason',
@@ -71,6 +72,12 @@ export interface ExplanationCheckInput {
   viewer?: ViewerContext | null
   /** For a taste-twin pick: the titles both viewers played, nearest to the pick, which the writer was offered. */
   sharedWithKindredViewer?: string[]
+  /**
+   * For a taste-twin pick: where it ranked on its own score, as the writer was
+   * told (describeStanding). Without it "it nearly made your list on its own"
+   * reads as a fact nobody gave the writer.
+   */
+  kindredViewerStanding?: string
 }
 
 /** What the writer is told about the viewer. Mirrors both writers' taste context. */
@@ -107,10 +114,12 @@ export function pickOrigin(breakdown: unknown): {
   interestText: string | null
   /** A twin pick's shared title ids (nearest to the pick on current runs); empty otherwise. */
   sharedIds: string[]
+  /** A twin pick's stored own standing; absent otherwise and on older runs. */
+  standing?: OwnStanding
 } {
   const b = (breakdown ?? {}) as {
     interestMatch?: { interestText?: unknown } | null
-    twinMatch?: { sharedIds?: unknown } | null
+    twinMatch?: { sharedIds?: unknown; ownStanding?: unknown } | null
     acclaimedMatch?: unknown
   }
   if (b.interestMatch != null) {
@@ -123,10 +132,12 @@ export function pickOrigin(breakdown: unknown): {
   }
   if (b.twinMatch != null) {
     const ids = b.twinMatch.sharedIds
+    const standing = readOwnStanding(b.twinMatch.ownStanding)
     return {
       origin: 'kindredViewer',
       interestText: null,
       sharedIds: Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [],
+      ...(standing ? { standing } : {}),
     }
   }
   if (b.acclaimedMatch != null) return { origin: 'acclaimed', interestText: null, sharedIds: [] }
@@ -222,6 +233,7 @@ export function buildExplanationCheckRequest(input: ExplanationCheckInput): Expl
   if (viewer) state.viewer = viewer
   const shared = (input.sharedWithKindredViewer ?? []).filter(Boolean)
   if (shared.length > 0) state.sharedWithKindredViewer = shared
+  if (input.kindredViewerStanding) state.kindredViewerStanding = input.kindredViewerStanding
 
   state.explanation = input.explanation.trim()
 

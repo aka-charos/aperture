@@ -61,6 +61,7 @@ import {
 import { getUserTasteContext } from './movies/explanations.js'
 import { getUserSeriesTasteContext } from './series/explanations.js'
 import { NEWEST_RUNS_SQL, loadJudgedTitleFacts } from './judgeEvidence.js'
+import { describeStanding, type OwnStanding } from './shared/explanationPrompt.js'
 
 const logger = createChildLogger('explanation-checks')
 
@@ -81,6 +82,8 @@ interface CandidateExplanation {
   interestText: string | null
   /** A taste-twin pick's shared title ids, which the writer was given as titles. */
   sharedIds: string[]
+  /** A taste-twin pick's own standing, which the writer was told. */
+  standing?: OwnStanding
   ratingScore: number | null
   watchedIds: string[]
 }
@@ -138,7 +141,7 @@ async function loadCandidateExplanations(): Promise<CandidateExplanation[]> {
     const hash = explanationHash(p.ai_explanation)
     if (out.has(hash)) continue
     const rows = evidenceByCandidate.get(p.candidate_id) ?? []
-    const { origin, interestText, sharedIds } = pickOrigin(p.score_breakdown)
+    const { origin, interestText, sharedIds, standing } = pickOrigin(p.score_breakdown)
     // The heading the writer saw: a reserved-slot pick always gets the hedged
     // one; a ranked pick gets whatever evidenceSupportsCause decides, which is
     // the same read the explanation prompt makes.
@@ -161,6 +164,7 @@ async function loadCandidateExplanations(): Promise<CandidateExplanation[]> {
       origin,
       interestText,
       sharedIds,
+      standing,
       ratingScore: Number.isFinite(rating) ? rating : null,
       watchedIds: rows.map((r) => r.watched_id).filter(Boolean),
     })
@@ -284,6 +288,7 @@ function toInput(item: CandidateExplanation, context: CheckContext): Explanation
       .map((id) => context.facts.get(`${item.mediaType}:${id}`))
       .filter((f): f is JudgedTitleFacts => f != null)
       .map((f) => withYear(f.title, f.year)),
+    kindredViewerStanding: describeStanding(item.standing) ?? undefined,
   }
 }
 
