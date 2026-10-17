@@ -5,6 +5,7 @@ import { SettingsCard } from '../SettingsCard'
 import { WeightList } from './WeightList'
 import { GENRE_SCALE } from './weights'
 import type { GenreWeight } from './useTasteData'
+import { HelpHint } from '@/components/HelpHint'
 
 interface GenresCardProps {
   genres: GenreWeight[]
@@ -25,8 +26,13 @@ export function GenresCard({ genres, newGenres, saving, scanLabel, onChange, onR
   const { t } = useTranslation()
   return (
     <SettingsCard
+      tourAnchor="settings-weights"
       icon={<TheaterComedyIcon />}
-      title={t('userSettings.recs.genresTitle')}
+      title={
+        <>
+          {t('userSettings.recs.genresTitle')} <HelpHint doc="user-settings/recommendations" anchor="genres" />
+        </>
+      }
       description={t('userSettings.recs.genresBody')}
       footer={saving ? t('watcherIdentity.savingSlider') : t('userSettings.recs.autoSaveNote')}
     >

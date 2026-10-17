@@ -2004,3 +2004,8 @@ export {
   MAX_CURATED_SITES,
   sanitizeCuratedSites,
 } from './analysis/curatedSearch.js'
+
+// Onboarding (./onboarding): the welcome tour, the getting-started checklist
+// and the first-visit hints a person has seen; whether the tour starts by
+// itself is decided here, never in the bundle.
+export * from './onboarding/index.js'

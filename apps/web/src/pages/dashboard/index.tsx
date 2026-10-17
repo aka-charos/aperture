@@ -14,6 +14,7 @@ import {
   ConnectionsRecentWatches,
 } from './components'
 import { PageHeading } from '@/components/PageHeading'
+import { GettingStartedCard } from './components/GettingStartedCard'
 import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
 
 export function DashboardPage() {
@@ -70,8 +71,10 @@ function DashboardContent() {
         </Alert>
       )}
 
+      <GettingStartedCard />
+
       {/* Quick Stats */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 4 }} data-tour="home-stats">
         <QuickStatsBar
           moviesWatched={data?.stats.moviesWatched || 0}
           seriesWatched={data?.stats.seriesWatched || 0}
@@ -83,7 +86,7 @@ function DashboardContent() {
       </Box>
 
       {/* Your AI Movie Recommendations */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 4 }} data-tour="home-rows">
         <MediaCarousel
           title={t('dashboard.aiMovieRecommendations')}
           subtitle={t('dashboard.subtitlePersonalized')}

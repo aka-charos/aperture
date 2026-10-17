@@ -195,6 +195,7 @@ export function GraphExplorer({
     >
       {/* Header */}
       <Box
+        data-tour="explore-controls"
         sx={{
           display: 'flex',
           flexDirection: { xs: 'column', md: 'row' },
@@ -350,7 +351,7 @@ export function GraphExplorer({
       </Box>
 
       {/* Graph Area */}
-      <Box sx={{ flex: 1, position: 'relative', minHeight: 0 }}>
+      <Box sx={{ flex: 1, position: 'relative', minHeight: 0 }} data-tour="explore-graph">
         <SimilarityGraph
           data={data}
           loading={loading}

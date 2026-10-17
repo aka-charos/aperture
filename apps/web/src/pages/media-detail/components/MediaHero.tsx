@@ -408,6 +408,7 @@ export function MediaHero({
   return (
     <>
       <Box
+        data-tour="title-hero"
         sx={{
           display: 'flex',
           gap: 4,
@@ -754,6 +755,7 @@ export function MediaHero({
           {/* Action buttons — one consistent group; the primary "open" action leads,
               secondary actions follow. Wraps as a whole instead of squishing individual buttons. */}
           <Box
+            data-tour="title-actions"
             sx={{
               display: 'flex',
               flexWrap: 'wrap',

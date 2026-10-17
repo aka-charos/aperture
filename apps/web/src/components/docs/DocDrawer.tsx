@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Box, Drawer, IconButton, Tab, Tabs, Tooltip, Typography } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
@@ -29,6 +29,10 @@ interface DocDrawerProps {
   /** Prepended to heading ids, so they never collide with the page underneath. */
   idPrefix: string
   labels: DocDrawerLabels
+  /** A heading on the first page to open at, as the page's own heading id. */
+  initialAnchor?: string
+  /** Shown in the header beside the page title (the user guide's "Show me around"). */
+  headerAction?: ReactNode
   onClose: () => void
 }
 
@@ -51,13 +55,15 @@ export function DocDrawer({
   codeRoute,
   idPrefix,
   labels,
+  initialAnchor,
+  headerAction,
   onClose,
 }: DocDrawerProps) {
   const navigate = useNavigate()
   const bodyRef = useRef<HTMLDivElement>(null)
   const [active, setActive] = useState(slugs[0])
   const [trail, setTrail] = useState<string[]>([])
-  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null)
+  const [pendingAnchor, setPendingAnchor] = useState<string | null>(initialAnchor ?? null)
 
   // The host keys this component on the screen it describes, so a new screen
   // starts fresh; this only covers its pages changing under the same key.
@@ -122,6 +128,9 @@ export function DocDrawer({
       open={open}
       onClose={onClose}
       keepMounted
+      // Above a dialog: a title page opens in one, and its inline ? icons
+      // open this drawer, which would otherwise slide in behind it.
+      sx={{ zIndex: (theme) => theme.zIndex.modal + 1 }}
       slotProps={{ paper: { sx: { width: { xs: '100%', sm: 560 }, maxWidth: '100%' } } }}
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -141,6 +150,7 @@ export function DocDrawer({
               {doc?.title ?? active}
             </Typography>
           </Box>
+          {headerAction}
           <Tooltip title={labels.openInNewTab}>
             <IconButton
               size="small"

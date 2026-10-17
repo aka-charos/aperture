@@ -38,6 +38,7 @@ import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import CheckIcon from '@mui/icons-material/Check'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import {
   MoviePoster,
   RankBadge,
@@ -52,6 +53,7 @@ import { useUserRatings } from '@/hooks/useUserRatings'
 import { useWatchStatus } from '@/hooks/useWatchStatus'
 import { useWatching } from '@/hooks/useWatching'
 import { useViewMode } from '@/hooks/useViewMode'
+import { useOnboarding } from '@/hooks/useOnboarding'
 import { PageHeading } from '@/components/PageHeading'
 import { formatRuntime } from '@/pages/media-detail/hooks'
 
@@ -135,6 +137,7 @@ function recommendationMetaLine(
 
 export function MyRecommendationsPage() {
   const { t } = useTranslation()
+  const { showRecommenderExplainer } = useOnboarding()
   const navigate = useNavigate()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -398,6 +401,24 @@ export function MyRecommendationsPage() {
           </Button>
         )}
 
+        {/* The explainer used to open by itself here; it is a link now. */}
+        {isMobile ? (
+          <Tooltip title={t('onboarding.tour.howPicksAreMade')}>
+            <IconButton
+              onClick={showRecommenderExplainer}
+              size="small"
+              aria-label={t('onboarding.tour.howPicksAreMade')}
+              sx={{ border: 1, borderColor: 'divider' }}
+            >
+              <HelpOutlineIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        ) : (
+          <Button size="small" startIcon={<HelpOutlineIcon />} onClick={showRecommenderExplainer}>
+            {t('onboarding.tour.howPicksAreMade')}
+          </Button>
+        )}
+
         <ToggleButtonGroup
           value={viewMode}
           exclusive
@@ -531,7 +552,7 @@ export function MyRecommendationsPage() {
             const type = mediaType === 'movies' ? 'movie' : 'series'
             const metaLine = recommendationMetaLine(mediaType, rec, t)
             return (
-              <Grid item xs={6} sm={4} md={3} lg={2} key={id}>
+              <Grid item xs={6} sm={4} md={3} lg={2} key={id} data-tour={index === 0 ? 'recs-results' : undefined}>
                 <Box position="relative">
                   <MoviePoster
                     title={item.title}
@@ -616,6 +637,7 @@ export function MyRecommendationsPage() {
             return (
               <Card
                 key={id}
+                data-tour={index === 0 ? 'recs-results' : undefined}
                 sx={{
                   backgroundColor: 'background.paper',
                   borderRadius: 2,

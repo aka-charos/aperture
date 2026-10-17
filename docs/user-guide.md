@@ -4,7 +4,7 @@ Welcome to Aperture! Aperture is a recommendation and watch-tracking layer on to
 
 Depending on how your administrator configured the server, a few of the features below may be switched off or hidden (each one says so).
 
-Inside Aperture, the **?** button in the top bar opens the pages that describe the screen you're on, and **User guide** in your avatar menu opens this guide.
+Inside Aperture, the **?** button in the top bar opens the pages that describe the screen you're on (and, on many screens, a **Show me around** tour of it), and **User guide** in your avatar menu opens this guide. **Take the tour** in the same menu shows you around the whole app.
 
 ---
 
@@ -21,8 +21,9 @@ Before users can access Aperture, an administrator must complete the initial set
 Start here if you're new to Aperture.
 
 1. [Logging In](features/logging-in.md) - Sign in with your media server credentials
-2. [Dashboard Overview](features/dashboard.md) - Your personalized home screen
-3. [Global Search](features/global-search.md) - Find movies and series across your library, with an optional AI semantic mode
+2. [Getting Started](features/getting-started.md) - The welcome tour, the getting-started list on Home, and the tips on each screen
+3. [Dashboard Overview](features/dashboard.md) - Your personalized home screen
+4. [Global Search](features/global-search.md) - Find movies and series across your library, with an optional AI semantic mode
 
 ---
 
@@ -30,21 +31,21 @@ Start here if you're new to Aperture.
 
 Explore and navigate your media collection.
 
-4. [Browse Movies & Series](features/browse.md) - Movies, Series, and People tabs; filters, sorting, and filter presets
-5. [Movie Details](features/movie-detail.md) - Movie pages: actions, ratings, personal insights, and related content
-6. [Series Details](features/series-detail.md) - Seasons, episodes, resume, and requesting missing episodes
-7. [Title Analysis](features/title-analysis.md) - A grounded critical essay on how a title was made and received
-8. [Watch History](features/watch-history.md) - Your viewing log, with search, filters, and management
-9. [Watch Stats](features/watch-stats.md) - Analytics and viewing insights, with drill-down everywhere
-10. [Franchise Tracker](features/franchises.md) - Your progress through the movie collections on your server, and each collection's own page
-11. [Person Pages](features/person-pages.md) - Actor and director filmographies, including titles you don't have yet
-12. [Studio Pages](features/studio-pages.md) - Studio and network catalogs
+5. [Browse Movies & Series](features/browse.md) - Movies, Series, and People tabs; filters, sorting, and filter presets
+6. [Movie Details](features/movie-detail.md) - Movie pages: actions, ratings, personal insights, and related content
+7. [Series Details](features/series-detail.md) - Seasons, episodes, resume, and requesting missing episodes
+8. [Title Analysis](features/title-analysis.md) - A grounded critical essay on how a title was made and received
+9. [Watch History](features/watch-history.md) - Your viewing log, with search, filters, and management
+10. [Watch Stats](features/watch-stats.md) - Analytics and viewing insights, with drill-down everywhere
+11. [Franchise Tracker](features/franchises.md) - Your progress through the movie collections on your server, and each collection's own page
+12. [Person Pages](features/person-pages.md) - Actor and director filmographies, including titles you don't have yet
+13. [Studio Pages](features/studio-pages.md) - Studio and network catalogs
 
 ---
 
 ## Rating Content
 
-13. [The Rating System](features/ratings.md) - 1–10 star ratings and what happens when you rate something
+14. [The Rating System](features/ratings.md) - 1–10 star ratings and what happens when you rate something
 
 ---
 
@@ -52,8 +53,8 @@ Explore and navigate your media collection.
 
 Personalized picks, powered by AI.
 
-14. [My Recommendations](features/recommendations.md) - Your personal movie and series recommendations
-15. [Top Picks](features/top-picks.md) - The most popular titles across all users of your server
+15. [My Recommendations](features/recommendations.md) - Your personal movie and series recommendations
+16. [Top Picks](features/top-picks.md) - The most popular titles across all users of your server
 
 ---
 
@@ -61,31 +62,31 @@ Personalized picks, powered by AI.
 
 Find content that isn't in your library yet, and get it in.
 
-16. [Discover](features/discovery.md) - AI-surfaced suggestions from outside your library, requestable in one click
-17. [My Requests](features/my-requests.md) - Track your requests, request anything by name, and report playback problems
-18. [Media Graph](features/explore.md) - Explore your library as a visual similarity graph
-19. [Related-Content Graphs](features/similarity-graphs.md) - See what connects a title to its neighbours
+17. [Discover](features/discovery.md) - AI-surfaced suggestions from outside your library, requestable in one click
+18. [My Requests](features/my-requests.md) - Track your requests, request anything by name, and report playback problems
+19. [Media Graph](features/explore.md) - Explore your library as a visual similarity graph
+20. [Related-Content Graphs](features/similarity-graphs.md) - See what connects a title to its neighbours
 
 ---
 
 ## Organizing Content
 
-20. [Shows You Watch](features/shows-you-watch.md) - Track ongoing series and upcoming episodes
-21. [Playlists](features/playlists.md) - AI-generated personal playlists, written back to your media server
-22. [Collections](features/collections.md) - AI-generated collections, shared with everyone on the server
-23. [Virtual Libraries](features/virtual-libraries.md) - The older AI Picks and Top Picks libraries (legacy, being phased out)
+21. [Shows You Watch](features/shows-you-watch.md) - Track ongoing series and upcoming episodes
+22. [Playlists](features/playlists.md) - AI-generated personal playlists, written back to your media server
+23. [Collections](features/collections.md) - AI-generated collections, shared with everyone on the server
+24. [Virtual Libraries](features/virtual-libraries.md) - The older AI Picks and Top Picks libraries (legacy, being phased out)
 
 ---
 
 ## Sharing With Connections
 
-24. [Watch This](features/watch-this.md) - Recommend titles to the people you're connected to, and see what they sent you
+25. [Watch This](features/watch-this.md) - Recommend titles to the people you're connected to, and see what they sent you
 
 ---
 
 ## AI Assistant
 
-25. [AI Assistant (Encore)](features/ai-assistant.md) - Ask for content in plain language; answers are grounded in your library and the web
+26. [AI Assistant (Encore)](features/ai-assistant.md) - Ask for content in plain language; answers are grounded in your library and the web
 
 ---
 
@@ -93,23 +94,23 @@ Find content that isn't in your library yet, and get it in.
 
 Your settings open from the avatar menu, in up to four tabs: Recommendations, Display, Account (when it has something on it) and Emby home screen (Emby only). Your language is set from the flag in the top bar.
 
-26. [Recommendations](features/user-settings/recommendations.md) - Your taste (interests, genres, franchises, libraries), what may be recommended, and your own scoring weights
-27. [Display](features/user-settings/display.md) - Poster rating badges and the similarity graph, plus where the language setting lives
-28. [Account](features/user-settings/account.md) - Your email address, Trakt, and the legacy AI library names
-29. [Emby Home Screen](features/user-settings/home-screen.md) - The rows Aperture adds to your Emby home screen, and where they go
+27. [Recommendations](features/user-settings/recommendations.md) - Your taste (interests, genres, franchises, libraries), what may be recommended, and your own scoring weights
+28. [Display](features/user-settings/display.md) - Poster rating badges and the similarity graph, plus where the language setting lives
+29. [Account](features/user-settings/account.md) - Your email address, Trakt, and the legacy AI library names
+30. [Emby Home Screen](features/user-settings/home-screen.md) - The rows Aperture adds to your Emby home screen, and where they go
 
 ---
 
 ## Integrations
 
-30. [Trakt Integration](features/trakt-integration.md) - Two-way rating sync and extra Discover sources
+31. [Trakt Integration](features/trakt-integration.md) - Two-way rating sync and extra Discover sources
 
 ---
 
 ## UI Features
 
-31. [Collapsible Sidebar](features/collapsible-sidebar.md) - Save screen space
-32. [Grid & List Views](features/grid-list-views.md) - Per-page display modes, remembered per account
+32. [Collapsible Sidebar](features/collapsible-sidebar.md) - Save screen space
+33. [Grid & List Views](features/grid-list-views.md) - Per-page display modes, remembered per account
 
 ---
 

@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { SettingsCard } from '../SettingsCard'
 import { MediaTypeToggle } from './MediaTypeToggle'
 import type { MediaType } from './useTasteData'
+import { HelpHint } from '@/components/HelpHint'
 
 interface AlgorithmWeights {
   similarityWeight: number
@@ -230,7 +231,12 @@ export function CustomWeightsCard({ mediaTypes }: { mediaTypes: MediaType[] }) {
   return (
     <SettingsCard
       icon={<TuneIcon />}
-      title={t('userSettings.recs.customWeightsTitle')}
+      title={
+        <>
+          {t('userSettings.recs.customWeightsTitle')}{' '}
+          <HelpHint doc="user-settings/recommendations" anchor="use-my-own-weights" />
+        </>
+      }
       description={t('algorithmSettings.masterSubtitle')}
       action={
         <Switch

@@ -196,6 +196,7 @@ export function GlobalSearch() {
       {/* Search trigger button in header */}
       <Tooltip title={searchShortcutTooltip}>
         <IconButton
+          data-tour="app-search"
           onClick={() => setOpen(true)}
           color="inherit"
           sx={{ opacity: 0.8 }}

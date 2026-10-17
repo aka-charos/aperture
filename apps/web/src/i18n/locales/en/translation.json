@@ -51,7 +51,8 @@
     "roleLabelUser": "User",
     "watchThis": "Watch This",
     "sharedWithMeBadge_one": "{{count}} new recommendation",
-    "sharedWithMeBadge_other": "{{count}} new recommendations"
+    "sharedWithMeBadge_other": "{{count}} new recommendations",
+    "userMenu": "Account menu"
   },
   "admin": {
     "title": "Administration",
@@ -4364,10 +4365,6 @@
   "welcomeModal": {
     "title": "How your recommendations are made",
     "subtitle": "What {{appName}} measures, and why a title ends up on your list",
-    "remindMeLater": "Remind me later",
-    "snoozeNextSignIn": "Next time I sign in",
-    "snoozeTomorrow": "Tomorrow",
-    "snoozeNextWeek": "Next week",
     "stepLearns": "What it learns from",
     "stepReads": "How it reads a title",
     "stepScore": "How a pick is scored",
@@ -6203,6 +6200,230 @@
       "watching": "{{count}} watching",
       "waiting": "{{count}} waiting",
       "unavailable": "{{count}} can't open"
+    }
+  },
+  "onboarding": {
+    "explainerDone": "Got it",
+    "helpHint": "How this works",
+    "menu": {
+      "takeTour": "Take the tour"
+    },
+    "hint": {
+      "dismiss": "Don't show this again"
+    },
+    "offer": {
+      "title": "New: a quick tour",
+      "body": "See where everything is in {{appName}} in about a minute.",
+      "take": "Take the tour",
+      "decline": "No thanks",
+      "later": "Not now"
+    },
+    "tour": {
+      "progress": "Step {{current}} of {{total}}",
+      "start": "Show me around",
+      "later": "Not now",
+      "skip": "Skip tour",
+      "close": "Close",
+      "done": "Done",
+      "next": "Next",
+      "back": "Back",
+      "readMore": "Read more",
+      "howPicksAreMade": "How picks are made",
+      "showMeAround": "Show me around"
+    },
+    "tours": {
+      "welcome": {
+        "intro": {
+          "title": "Welcome to {{appName}}",
+          "body": "{{appName}} works alongside your media server. It learns from what you watch and rate, and suggests what to watch next. This quick tour shows you where everything is. It takes about a minute."
+        },
+        "recommendations": {
+          "title": "Your recommendations",
+          "body": "Movies and series picked for you from your own library. Each pick tells you why it was chosen, and the list changes as your taste does."
+        },
+        "rating": {
+          "title": "Rate what you've seen",
+          "body": "Use the stars on any poster to rate a title from 1 to 10. Rating is the fastest way to teach {{appName}} what you like, and what you don't."
+        },
+        "search": {
+          "title": "Search everything",
+          "body": "Find any movie, series or person in your library. Press Ctrl+K (⌘K on a Mac) from any screen."
+        },
+        "assistant": {
+          "title": "Ask the assistant",
+          "body": "Say what you're in the mood for in your own words, like \"a slow-burn thriller set in winter\", and it finds matches in your library."
+        },
+        "more": {
+          "title": "More for you",
+          "body": "A few more places worth a look:",
+          "items": {
+            "topPicks": "Top Picks: what's popular on your server right now",
+            "watching": "Shows You Watch: new and upcoming episodes of the series you follow",
+            "discover": "Discover: titles you don't have yet that suit your taste, ready to request",
+            "watchThis": "Watch This: titles people you're connected with recommend to you",
+            "collections": "Collections: themed lists built for you and saved to your media server",
+            "explore": "Explore: a map of how the titles in your library connect"
+          }
+        },
+        "help": {
+          "title": "Help is always here",
+          "body": "The ? button explains the screen you're on. Many screens also have a \"Show me around\" tour like this one."
+        },
+        "menu": {
+          "title": "Your settings",
+          "body": "Your picture opens your settings, the full user guide, and this tour again. Your getting-started list is on Home."
+        }
+      },
+      "home": {
+        "checklist": {
+          "title": "Getting started",
+          "body": "A few things that teach {{appName}} about you. Each one ticks itself off once it's done."
+        },
+        "stats": {
+          "title": "Your numbers at a glance",
+          "body": "What you've watched and rated lately. Watch Stats has the full picture."
+        },
+        "rows": {
+          "title": "Rows picked for you",
+          "body": "Your latest recommendations come first, then Top Picks and your shows. Click a poster to open it, or the stars to rate it."
+        }
+      },
+      "browse": {
+        "tabs": {
+          "title": "Movies, series and people",
+          "body": "Switch between the three here. People lists the cast and crew of everything in your library."
+        },
+        "filters": {
+          "title": "Narrow it down",
+          "body": "Filter by genre, year, rating, country and more. Save a mix you use often as a preset."
+        },
+        "view": {
+          "title": "Grid or list",
+          "body": "Posters, or a list with more detail. Your choice is remembered."
+        },
+        "open": {
+          "title": "Open or rate",
+          "body": "Click a title to open its page, or rate it from the poster without leaving the list."
+        }
+      },
+      "title": {
+        "hero": {
+          "title": "Everything about this title",
+          "body": "The synopsis, the cast, scores from IMDb and others, and whether you've watched it."
+        },
+        "actions": {
+          "title": "Play, rate, mark watched",
+          "body": "Open it on your media server, rate it, mark it watched or add it to your favorites."
+        },
+        "insights": {
+          "title": "Why it fits you",
+          "body": "How close it is to your taste, which titles in your history it resembles and, for a pick, a written explanation."
+        },
+        "analysis": {
+          "title": "Title analysis",
+          "body": "A short essay on the work itself: where it comes from, what it does, how it was made and how it was received. It's closed until you open it."
+        },
+        "similar": {
+          "title": "More like this",
+          "body": "The titles in your library closest to this one. Switch to the graph to see how they connect."
+        }
+      },
+      "recommendations": {
+        "list": {
+          "title": "Your picks",
+          "body": "Ranked for you. The number on a poster is its place in the list. Open one to see why it is there."
+        },
+        "why": {
+          "title": "How picks are made",
+          "body": "Each pick weighs how close a title is to your taste, how much it widens it, and how well it is regarded. The explainer goes through it step by step."
+        },
+        "teach": {
+          "title": "Steer them",
+          "body": "Rate titles, add interests and adjust genres in Settings → Recommendations. Your picks update by themselves as your history grows."
+        }
+      },
+      "explore": {
+        "graph": {
+          "title": "A map of your library",
+          "body": "Each point is a title, and lines join titles that are alike. Click one to move it to the middle and follow where it leads."
+        },
+        "controls": {
+          "title": "Search and find your way back",
+          "body": "Start from any title, step back along the path you took, and change what the map shows."
+        },
+        "playlist": {
+          "title": "Turn it into a playlist",
+          "body": "Found a thread you like? Make a playlist from the titles on the map."
+        }
+      },
+      "settings-recommendations": {
+        "interests": {
+          "title": "Say what you like",
+          "body": "Add interests in your own words, like \"heist films\" or \"Nordic noir\". Titles that match them get their own places in your list."
+        },
+        "weights": {
+          "title": "Turn genres up or down",
+          "body": "How much each genre counts is worked out from what you watch. Adjust one if it looks wrong."
+        },
+        "rescan": {
+          "title": "Start again from your history",
+          "body": "Rescan rebuilds your taste from your whole watch history. It helps after a long break, or when what you watch has changed a lot."
+        }
+      }
+    },
+    "hints": {
+      "home": "This is your home screen: your picks, your shows and what is popular, in one place.",
+      "browse": "Everything on your server is here. Filter, sort, and rate titles straight from their posters.",
+      "title": "Rate this title with the stars, and scroll down to see why it suits you.",
+      "recommendations": "Your picks come from your own library and change as your taste does. Rating titles makes them better.",
+      "watching": "Follow a series to see its new and upcoming episodes here.",
+      "discovery": "Titles your server doesn't have yet that you would probably like. Request one to have it added.",
+      "stats": "Click any number or chart to see the titles behind it.",
+      "settings-recommendations": "These settings shape your picks. A change shows from the next refresh of your recommendations."
+    },
+    "checklist": {
+      "title": "Getting started",
+      "subtitle": "A few things that make your recommendations yours.",
+      "dismiss": "Hide this list",
+      "progress": "{{done}} of {{total}} done",
+      "counted": "{{progress}} of {{goal}}",
+      "items": {
+        "watch": {
+          "title": "Watch something",
+          "detail": "Play a movie or an episode on your media server. Your history is read from there."
+        },
+        "rate": {
+          "title": "Rate 5 titles",
+          "detail": "Rating is the fastest way to teach it."
+        },
+        "interest": {
+          "title": "Add an interest",
+          "detail": "Say what you like in your own words."
+        },
+        "why": {
+          "title": "See why a title was picked",
+          "detail": "Open any recommendation and read the panel on it."
+        },
+        "assistant": {
+          "title": "Ask the assistant something",
+          "detail": "Describe what you're in the mood for."
+        },
+        "watching": {
+          "title": "Follow a show",
+          "detail": "New episodes of the shows you follow appear on Home."
+        }
+      },
+      "recommendations": {
+        "ready": "Your recommendations are ready.",
+        "pending": "Your first recommendations are on their way. They are made at the next scheduled update, so check back later.",
+        "off": "Recommendations are switched off for your account."
+      }
+    },
+    "settings": {
+      "title": "Tour and tips",
+      "description": "Take the welcome tour again, or bring back the tips you've closed and the getting-started list on Home.",
+      "reset": "Show tips again",
+      "resetDone": "Tips are back"
     }
   }
 }

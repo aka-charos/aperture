@@ -1,40 +1,29 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { IconButton, Tooltip } from '@mui/material'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import { docsForLocation } from '@/pages/guide/routeDocs'
+import { useUserHelp } from '@/hooks/useUserHelp'
 import { USER_GUIDE_ROUTE } from './docs/guidePaths'
-
-/**
- * Lazy, and mounted only once asked for: it carries the whole user guide,
- * which someone who never opens help never downloads.
- */
-const UserHelpDrawer = lazy(async () => ({
-  default: (await import('@/pages/guide/UserHelpDrawer')).UserHelpDrawer,
-}))
 
 /**
  * The app bar's help button: the user guide pages for the screen you are on,
  * in a drawer beside it, or the guide's contents where no page describes the
  * screen. Absent in the admin console, which has its own Guide button per
- * section, and on the guide itself.
+ * section, and on the guide itself. The drawer belongs to `UserHelpProvider`,
+ * so a hint or an inline ? icon opens the same one.
  */
 export function UserHelpButton() {
   const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
-  const [requested, setRequested] = useState(false)
+  const { openHelp } = useUserHelp()
 
   const docs = useMemo(
     () => docsForLocation(location.pathname, location.search),
     [location.pathname, location.search]
   )
-
-  useEffect(() => {
-    setOpen(false)
-  }, [location.pathname, location.search])
 
   const path = location.pathname
   if (path.startsWith('/admin') || path === USER_GUIDE_ROUTE || path.startsWith(`${USER_GUIDE_ROUTE}/`)) {
@@ -44,35 +33,21 @@ export function UserHelpButton() {
   const label = docs.length > 0 ? t('userGuide.help.tooltip') : t('userGuide.help.openGuide')
 
   return (
-    <>
-      <Tooltip title={label}>
-        <IconButton
-          size="small"
-          aria-label={label}
-          onClick={() => {
-            if (docs.length === 0) {
-              navigate(USER_GUIDE_ROUTE)
-              return
-            }
-            setRequested(true)
-            setOpen(true)
-          }}
-        >
-          <HelpOutlineIcon />
-        </IconButton>
-      </Tooltip>
-
-      {requested && docs.length > 0 && (
-        <Suspense fallback={null}>
-          <UserHelpDrawer
-            // A new screen starts on its own first page with no history.
-            key={`${location.pathname}${location.search}`}
-            open={open}
-            docs={docs}
-            onClose={() => setOpen(false)}
-          />
-        </Suspense>
-      )}
-    </>
+    <Tooltip title={label}>
+      <IconButton
+        size="small"
+        aria-label={label}
+        data-tour="app-help"
+        onClick={() => {
+          if (docs.length === 0) {
+            navigate(USER_GUIDE_ROUTE)
+            return
+          }
+          openHelp(docs)
+        }}
+      >
+        <HelpOutlineIcon />
+      </IconButton>
+    </Tooltip>
   )
 }

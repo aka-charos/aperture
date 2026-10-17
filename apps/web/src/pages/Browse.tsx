@@ -210,7 +210,7 @@ export function BrowsePage() {
           sx={{ mb: 0 }}
         />
 
-        <ToggleButtonGroup value={currentViewMode} exclusive onChange={handleViewModeChange} size="small">
+        <ToggleButtonGroup value={currentViewMode} exclusive onChange={handleViewModeChange} size="small" data-tour="browse-view">
           <ToggleButton value="grid">
             <GridViewIcon fontSize="small" />
           </ToggleButton>
@@ -220,7 +220,7 @@ export function BrowsePage() {
         </ToggleButtonGroup>
       </Box>
 
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }} data-tour="browse-tabs">
         <Tabs
           variant="scrollable"
           scrollButtons="auto"

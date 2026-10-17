@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Box, Typography, CircularProgress, Grid } from '@mui/material'
@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useCapability } from '../../hooks/useCapability'
 import { useWatching } from '../../hooks/useWatching'
 import { useConnections } from '../../hooks/useConnections'
+import { useOnboarding } from '../../hooks/useOnboarding'
 import { useMediaDetail } from './hooks'
 import {
   MediaBackdrop,
@@ -86,6 +87,16 @@ export function MediaDetailPage({
   // Rewriting one explanation is a paid model call, so the button is the
   // operator's. The route also allows a viewer's own picks, as the bulk one does.
   const onRefreshExplanation = user?.isAdmin ? refreshExplanation : undefined
+
+  // Reading why a title was scored is one of the getting-started steps, and
+  // only the browser sees it happen. The panel draws only for a scored title
+  // (`isRecommended`), so that is when it counts.
+  const { summary: onboarding, record: recordOnboarding } = useOnboarding()
+  const insightsSeen = onboarding?.state.seen?.includes('insights') === true
+  const insightsShown = insights?.isRecommended === true
+  useEffect(() => {
+    if (insightsShown && onboarding && !insightsSeen) recordOnboarding({ seen: ['insights'] })
+  }, [insightsShown, onboarding, insightsSeen, recordOnboarding])
 
   if (loading) {
     return (
@@ -218,7 +229,7 @@ export function MediaDetailPage({
           </Grid>
 
           {/* Right Column - Similar */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={6} data-tour="title-similar">
             <SimilarMedia
               mediaType={mediaType}
               mediaId={id}

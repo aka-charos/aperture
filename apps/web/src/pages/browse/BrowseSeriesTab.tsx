@@ -124,6 +124,7 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
   return (
     <>
       <Box
+        data-tour="browse-filters"
         sx={{
           // Sticky only where the filters fit on one or two rows: on a phone they
           // stack to ~400px, and pinning that would cover half the screen.
@@ -251,8 +252,17 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
         <>
           {viewMode === 'grid' ? (
             <Grid container spacing={2} ref={plots.containerRef}>
-              {series.series.map((show) => (
-                <Grid item xs={6} sm={4} md={3} lg={2} key={show.id} data-row-card={show.id}>
+              {series.series.map((show, index) => (
+                <Grid
+                  item
+                  xs={6}
+                  sm={4}
+                  md={3}
+                  lg={2}
+                  key={show.id}
+                  data-row-card={show.id}
+                  data-tour={index === 0 ? 'browse-results' : undefined}
+                >
                   <MoviePoster
                     title={show.title}
                     year={show.year}

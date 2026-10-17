@@ -376,7 +376,7 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   // two-column grid, where the prose ran the whole width of the page and the
   // panel's right edge had nothing to line up with.
   return (
-    <Box>
+    <Box data-tour="title-analysis">
       <Accordion
         // Collapsed by default even when present — see the spoiler note above.
         defaultExpanded={false}

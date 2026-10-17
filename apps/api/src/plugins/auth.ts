@@ -196,6 +196,14 @@ export async function createSession(userId: string): Promise<string> {
   await query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [userId]).catch((err) =>
     sessionLogger.warn({ err, userId }, 'Failed to update last_login_at')
   )
+  // Stamped once and never moved: it is what tells a new account (the welcome
+  // tour starts by itself) from an existing one (it is only offered), core
+  // onboarding/rules.ts. Its own statement, so a database behind the image
+  // (no 0205 yet) still records the login above.
+  await query(
+    'UPDATE users SET first_login_at = NOW() WHERE id = $1 AND first_login_at IS NULL',
+    [userId]
+  ).catch((err) => sessionLogger.warn({ err, userId }, 'Failed to update first_login_at'))
 
   return token
 }

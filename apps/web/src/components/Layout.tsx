@@ -44,11 +44,10 @@ import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
 import MenuOpenIcon from '@mui/icons-material/MenuOpen'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
 import RecommendIcon from '@mui/icons-material/Recommend'
+import ExploreOutlinedIcon from '@mui/icons-material/ExploreOutlined'
 import { useAuth } from '@/hooks/useAuth'
 import { useConnections } from '@/hooks/useConnections'
 import { useAssistantDock } from '@/hooks/useAssistantDock'
-import { WelcomeModal } from './WelcomeModal'
-import { useWelcomeModal } from './useWelcomeModal'
 import { ExplorationConfigModal } from './ExplorationConfigModal'
 import { RunningJobsWidget } from './RunningJobsWidget'
 import { AdminMenuButton } from './AdminMenuButton'
@@ -59,6 +58,14 @@ import { UserHelpButton } from './UserHelpButton'
 import { LanguageMenuButton } from './LanguageMenuButton'
 import { AppBarPageHeading } from './PageHeading'
 import { PageHeaderProvider } from '@/hooks/PageHeaderProvider'
+import { UserHelpProvider } from '@/hooks/UserHelpProvider'
+import { OnboardingProvider } from '@/hooks/OnboardingProvider'
+import { useOnboarding } from '@/hooks/useOnboarding'
+import { TourProvider } from './tour/TourProvider'
+import { TourOverlay } from './tour/TourOverlay'
+import { WelcomeStarter } from './tour/WelcomeStarter'
+import { useTour } from './tour/useTour'
+import { ScreenHint } from './ScreenHint'
 import { USER_SETTINGS_TAB_KEYS } from '@/pages/UserSettings/tabHelpers'
 import { useAppName, useLogoUrl } from '@/lib/branding'
 import { useTranslation } from 'react-i18next'
@@ -99,13 +106,15 @@ type NavItem = {
    * This — and that entry is listed only while something was received or sent.
    */
   badge?: 'socialInbox'
+  /** What a tour step names to point at this entry (components/tour/tours.ts). */
+  tourAnchor?: string
 }
 
 // Base user-facing navigation items (some may be conditionally hidden)
 const baseUserMenuItems: NavItem[] = [
-  { textKey: 'nav.dashboard', icon: <HomeIcon />, path: '/', feature: null },
-  { textKey: 'nav.assistant', icon: <SmartToyIcon />, path: '/assistant', feature: null, capability: 'assistant' },
-  { textKey: 'nav.recommendations', icon: <AutoAwesomeIcon />, path: '/recommendations', feature: null },
+  { textKey: 'nav.dashboard', icon: <HomeIcon />, path: '/', feature: null, tourAnchor: 'nav-home' },
+  { textKey: 'nav.assistant', icon: <SmartToyIcon />, path: '/assistant', feature: null, capability: 'assistant', tourAnchor: 'nav-assistant' },
+  { textKey: 'nav.recommendations', icon: <AutoAwesomeIcon />, path: '/recommendations', feature: null, tourAnchor: 'nav-recommendations' },
   // `social` is decided data (has at least one visible connection), not a
   // permission; the filter below treats it like any other capability.
   { textKey: 'nav.watchThis', icon: <RecommendIcon />, path: '/watch-this', feature: null, capability: 'social', badge: 'socialInbox' },
@@ -148,12 +157,22 @@ const userSettingsMenuItems: {
  * the bar and the outlet both — the bar reads what the page under it publishes.
  */
 export function Layout() {
+  // Onboarding outermost: the tour records how it ended there. The help
+  // drawer inside the tour, so its "Show me around" can start one; the tour's
+  // overlay is drawn by the shell, inside the drawer's provider, so a step's
+  // "Read more" can open the guide.
   return (
-    <PageHeaderProvider>
-      <AdminSearchGate>
-        <AppShell />
-      </AdminSearchGate>
-    </PageHeaderProvider>
+    <OnboardingProvider>
+      <TourProvider>
+        <UserHelpProvider>
+          <PageHeaderProvider>
+            <AdminSearchGate>
+              <AppShell />
+            </AdminSearchGate>
+          </PageHeaderProvider>
+        </UserHelpProvider>
+      </TourProvider>
+    </OnboardingProvider>
   )
 }
 
@@ -200,7 +219,8 @@ function AppShell() {
   const [watchingEnabled, setWatchingEnabled] = useState(true) // Default to true until we know
   const { user, capabilities, logout, impersonation } = useAuth()
   const { pendingCount, sentCount } = useConnections()
-  const { open: welcomeOpen, showWelcome, hideWelcome } = useWelcomeModal()
+  const { showRecommenderExplainer } = useOnboarding()
+  const { startTour } = useTour()
   // Space reserved on the inline-end side for the docked AI assistant;
   // while its resize handle is dragged, transitions are dropped so the
   // content tracks the pointer instead of easing behind it.
@@ -442,6 +462,7 @@ function AppShell() {
           <ListItem key={item.path} disablePadding>
             <Tooltip title={labels ? '' : t(item.textKey)} placement="right" arrow>
               <ListItemButton
+                data-tour={item.tourAnchor}
                 selected={isPathActive(item.path)}
                 onClick={() => handleNavClick(item.path)}
                 // A badge's number is not announced on its own, so the button
@@ -688,7 +709,7 @@ function AppShell() {
           {/* User menu */}
           {user && (
             <>
-              <IconButton onClick={handleUserMenuOpen} size="small">
+              <IconButton onClick={handleUserMenuOpen} size="small" data-tour="app-user-menu" aria-label={t('nav.userMenu')}>
                 <Avatar
                   src={user.avatarUrl || undefined}
                   sx={{
@@ -747,7 +768,13 @@ function AppShell() {
                   </ListItemIcon>
                   {t('userGuide.menu')}
                 </MenuItem>
-                <MenuItem onClick={() => { handleUserMenuClose(); showWelcome(); }}>
+                <MenuItem onClick={() => { handleUserMenuClose(); startTour('welcome'); }}>
+                  <ListItemIcon>
+                    <ExploreOutlinedIcon fontSize="small" />
+                  </ListItemIcon>
+                  {t('onboarding.menu.takeTour')}
+                </MenuItem>
+                <MenuItem onClick={() => { handleUserMenuClose(); showRecommenderExplainer(); }}>
                   <ListItemIcon>
                     <HelpOutlineIcon fontSize="small" />
                   </ListItemIcon>
@@ -850,12 +877,15 @@ function AppShell() {
               }),
         }}
       >
+        {/* The first-visit tip for this screen, above the page it describes. */}
+        <ScreenHint />
         <Outlet key={i18n.language} />
       </Box>
 
-      {/* Welcome Modal - opens itself on the recommendations page it explains,
-          and on request from the user menu anywhere */}
-      <WelcomeModal open={welcomeOpen} onClose={hideWelcome} />
+      {/* The welcome tour: started by itself for a new account, offered once
+          to an existing one, and drawn over everything while it runs. */}
+      <WelcomeStarter />
+      <TourOverlay />
 
       {/* Exploration Config Modal - prompts admins to configure new AI provider */}
       <ExplorationConfigModal />

@@ -36,6 +36,8 @@ interface SettingsCardProps {
   /** A closing caption, for when a change takes effect or what it does not cover. */
   footer?: ReactNode
   id?: string
+  /** What a tour step names to point at this card (components/tour/tours.ts). */
+  tourAnchor?: string
 }
 
 /**
@@ -44,9 +46,9 @@ interface SettingsCardProps {
  * settings tab has this shape; a card that needs more room says so in its
  * children, not by inventing a second header.
  */
-export function SettingsCard({ icon, title, description, action, children, footer, id }: SettingsCardProps) {
+export function SettingsCard({ icon, title, description, action, children, footer, id, tourAnchor }: SettingsCardProps) {
   return (
-    <Card id={id} variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
+    <Card id={id} data-tour={tourAnchor} variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
       <CardContent sx={{ '&:last-child': { pb: 2 } }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
           <SettingsCardIcon>{icon}</SettingsCardIcon>

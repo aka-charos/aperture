@@ -33,6 +33,7 @@ import { insightsHaveDetail } from '../helpers'
 import { buildClosestRow, twinMarking } from '../closestRow'
 import { readInterestPick } from '../interestPick'
 import type { RecommendationInsights, MediaType } from '../types'
+import { HelpHint } from '@/components/HelpHint'
 
 interface MovieInsightsProps {
   insights: RecommendationInsights
@@ -560,6 +561,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
     // detail page's left column, which supplies both margin and gutter.
     <Box sx={collapsible ? { mt: 4, px: { xs: 0, sm: 3 } } : undefined}>
       <Paper
+        data-tour="title-insights"
         sx={{
           borderRadius: 3,
           overflow: 'hidden',
@@ -625,6 +627,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
                 {isPick
                   ? t('mediaDetail.insights.recommendedForYou')
                   : t('mediaDetail.insights.consideredForYou')}
+                <HelpHint doc="recommendations" anchor="understanding-a-pick-in-depth" />
                 {insights.rank != null && (
                   <Chip
                     label={`#${insights.rank}`}

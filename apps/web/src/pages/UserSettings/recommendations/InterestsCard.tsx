@@ -28,6 +28,7 @@ export function InterestsCard({ interests, onAdd, onRemove }: InterestsCardProps
 
   return (
     <SettingsCard
+      tourAnchor="settings-interests"
       icon={<AutoAwesomeIcon />}
       title={t('userSettings.recs.interestsTitle')}
       description={t('userSettings.recs.interestsBody')}

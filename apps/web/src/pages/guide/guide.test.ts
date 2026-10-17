@@ -13,7 +13,7 @@ import {
 import { docSummary, docTitle } from '@/components/docs/markdown'
 import { parseGuideIndex } from './guideIndex'
 import { userLinkTarget } from './links'
-import { ROUTE_DOCS, appPathIn, docsForLocation, screenForDoc } from './routeDocs'
+import { ROUTE_DOCS, appPathIn, docsForLocation, hintForLocation, screenForDoc, tourForLocation } from './routeDocs'
 
 /**
  * What keeps the in-app user guide honest. The pages ship inside the web
@@ -137,15 +137,15 @@ test('parseGuideIndex reads sections and entries, and drops the rest', () => {
 })
 
 test('docsForLocation picks the pages for the screen', () => {
-  assert.deepEqual(docsForLocation('/'), ['dashboard'])
+  assert.deepEqual(docsForLocation('/'), ['dashboard', 'getting-started'])
   assert.deepEqual(docsForLocation('/browse/'), ['browse', 'grid-list-views'])
   assert.equal(docsForLocation('/movies/123')[0], 'movie-detail')
   assert.equal(docsForLocation('/series/abc')[0], 'series-detail')
   assert.deepEqual(docsForLocation('/settings', '?tab=home'), ['user-settings/home-screen'])
-  assert.deepEqual(docsForLocation('/settings', '?tab=display'), ['user-settings/display', 'similarity-graphs'])
+  assert.deepEqual(docsForLocation('/settings', '?tab=display'), ['user-settings/display', 'similarity-graphs', 'getting-started'])
   assert.deepEqual(docsForLocation('/settings'), ['user-settings/recommendations'])
   // A retired tab name gets the pages for the tab it now opens.
-  assert.deepEqual(docsForLocation('/settings', '?tab=preferences'), ['user-settings/display', 'similarity-graphs'])
+  assert.deepEqual(docsForLocation('/settings', '?tab=preferences'), ['user-settings/display', 'similarity-graphs', 'getting-started'])
   assert.deepEqual(docsForLocation('/settings', '?tab=algorithm'), ['user-settings/recommendations'])
   assert.deepEqual(docsForLocation('/no-such-screen'), [])
   assert.deepEqual(docsForLocation('/admin/ops/jobs'), [])
@@ -173,4 +173,15 @@ test('userLinkTarget shows admin pages to admins only', () => {
   assert.deepEqual(userLinkTarget('../../user-guide.md', from, known, false), { kind: 'route', href: '/help' })
   assert.deepEqual(userLinkTarget('/recommendations', from, known, false), { kind: 'route', href: '/recommendations' })
   assert.deepEqual(userLinkTarget('../../api-reference.md', from, known, true), { kind: 'text' })
+})
+
+test('a screen names its tour and its first-visit hint through the same table', () => {
+  assert.equal(tourForLocation('/'), 'home')
+  assert.equal(tourForLocation('/movies/123'), 'title')
+  assert.equal(tourForLocation('/settings', '?tab=algorithm'), 'settings-recommendations')
+  assert.equal(tourForLocation('/history'), null)
+  assert.equal(hintForLocation('/browse/'), 'browse')
+  // Explore fills the viewport; a line above it would push the graph down.
+  assert.equal(hintForLocation('/explore'), null)
+  assert.equal(tourForLocation('/explore'), 'explore')
 })

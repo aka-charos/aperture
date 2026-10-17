@@ -122,6 +122,7 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
   return (
     <>
       <Box
+        data-tour="browse-filters"
         sx={{
           // Sticky only where the filters fit on one or two rows: on a phone they
           // stack to ~400px, and pinning that would cover half the screen.
@@ -262,8 +263,17 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
         <>
           {viewMode === 'grid' ? (
             <Grid container spacing={2} ref={plots.containerRef}>
-              {movies.movies.map((movie) => (
-                <Grid item xs={6} sm={4} md={3} lg={2} key={movie.id} data-row-card={movie.id}>
+              {movies.movies.map((movie, index) => (
+                <Grid
+                  item
+                  xs={6}
+                  sm={4}
+                  md={3}
+                  lg={2}
+                  key={movie.id}
+                  data-row-card={movie.id}
+                  data-tour={index === 0 ? 'browse-results' : undefined}
+                >
                   <MoviePoster
                     title={movie.title}
                     year={movie.year}
