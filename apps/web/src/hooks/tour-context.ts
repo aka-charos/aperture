@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { TourId, TourStep } from './tours'
+import type { TourId, TourStep } from '@/components/tour/tours'
 
 export interface ActiveTour {
   id: TourId

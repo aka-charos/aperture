@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { WelcomeModal } from '@/components/WelcomeModal'
 import { useWelcomeModal } from '@/components/useWelcomeModal'
 import { useAuth } from './useAuth'
+import { applyOnboardingPatch } from './onboardingState'
 import {
   OnboardingContext,
   type OnboardingContextValue,
@@ -12,32 +13,24 @@ import {
 /** A refresh asked for sooner than this after the last one is dropped. */
 const REFRESH_MIN_INTERVAL_MS = 3000
 
-type State = OnboardingSummary['state']
-const LISTS = ['toursSeen', 'hintsDismissed', 'seen'] as const
-
 /**
- * The same merge the server does (core onboarding/rules.ts), applied on screen
- * before the answer arrives, so a closed hint does not flicker back. The
- * server's answer replaces it when it lands.
+ * Session storage, holding the user id it was set for: the tour offer closed
+ * with × stays away until this person signs in again, the way the old
+ * welcome dialog's "next time I sign in" did. Another user signing in in the
+ * same tab does not inherit it.
  */
-function applyPatch(state: State, patch: OnboardingPatch): State {
-  const next: State = { ...state }
-  if (patch.welcome) next.welcome = patch.welcome
-  if (patch.checklistDismissed !== undefined) {
-    if (patch.checklistDismissed) next.checklistDismissed = true
-    else delete next.checklistDismissed
+const OFFER_SNOOZE_KEY = 'aperture-tour-offer-snoozed'
+
+function readOfferSnooze(userId: string | null): boolean {
+  if (!userId) return false
+  try {
+    return window.sessionStorage.getItem(OFFER_SNOOZE_KEY) === userId
+  } catch {
+    return false
   }
-  if (patch.resetTips) {
-    delete next.toursSeen
-    delete next.hintsDismissed
-  }
-  for (const key of LISTS) {
-    const added = patch[key]
-    if (!added?.length) continue
-    next[key] = [...new Set([...(next[key] ?? []), ...added])]
-  }
-  return next
 }
+
+type State = OnboardingSummary['state']
 
 /**
  * What the person has seen of the welcome tour, the screen tours and the
@@ -54,6 +47,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const canSave = !impersonation
   const [summary, setSummary] = useState<OnboardingSummary | null>(null)
   const lastFetch = useRef(0)
+  const [offerSnoozed, setOfferSnoozed] = useState(() => readOfferSnooze(userId))
   const { open: explainerOpen, showWelcome, hideWelcome } = useWelcomeModal()
 
   const load = useCallback(async () => {
@@ -70,8 +64,19 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setSummary(null)
+    setOfferSnoozed(readOfferSnooze(userId))
     if (userId) void load()
   }, [userId, load])
+
+  const snoozeOffer = useCallback(() => {
+    setOfferSnoozed(true)
+    if (!userId) return
+    try {
+      window.sessionStorage.setItem(OFFER_SNOOZE_KEY, userId)
+    } catch {
+      // Without storage the offer simply comes back on the next load.
+    }
+  }, [userId])
 
   const refresh = useCallback(() => {
     if (Date.now() - lastFetch.current < REFRESH_MIN_INTERVAL_MS) return
@@ -80,7 +85,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   const record = useCallback(
     (patch: OnboardingPatch) => {
-      setSummary((prev) => (prev ? { ...prev, state: applyPatch(prev.state, patch), mode: patch.welcome ? 'none' : prev.mode } : prev))
+      setSummary((prev) => (prev ? { ...prev, state: applyOnboardingPatch(prev.state, patch), mode: patch.welcome ? 'none' : prev.mode } : prev))
       if (!canSave) return
       void fetch('/api/onboarding', {
         method: 'PATCH',
@@ -92,15 +97,29 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
           if (!response.ok) return
           const state = (await response.json()) as State
           setSummary((prev) => (prev ? { ...prev, state } : prev))
+          // The checklist is decided by the server from this state, so a
+          // "seen" it counts (reading why a title was picked) needs it asked
+          // again — the card may be on screen under a title's dialog, and
+          // would otherwise stay unticked until Home is opened again.
+          if (patch.seen?.length) void load()
         })
         .catch(() => {})
     },
-    [canSave]
+    [canSave, load]
   )
 
   const value = useMemo<OnboardingContextValue>(
-    () => ({ summary, record, refresh, showRecommenderExplainer: showWelcome, explainerOpen, canSave }),
-    [summary, record, refresh, showWelcome, explainerOpen, canSave]
+    () => ({
+      summary,
+      record,
+      refresh,
+      showRecommenderExplainer: showWelcome,
+      explainerOpen,
+      canSave,
+      offerSnoozed,
+      snoozeOffer,
+    }),
+    [summary, record, refresh, showWelcome, explainerOpen, canSave, offerSnoozed, snoozeOffer]
   )
 
   return (

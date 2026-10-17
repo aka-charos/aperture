@@ -8,7 +8,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook'
 import { hintForLocation, tourForLocation } from '@/pages/guide/routeDocs'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import { useUserHelp } from '@/hooks/useUserHelp'
-import { useTour } from './tour/useTour'
+import { useTour } from '@/hooks/useTour'
 import { isTourId } from './tour/tours'
 
 /**
@@ -16,14 +16,14 @@ import { isTourId } from './tour/tours'
  * to the screen's tour and its guide pages. Closed for good with ×, or by
  * taking the tour.
  *
- * It waits for the welcome tour to have been answered (`mode: 'none'`): one
- * thing at a time, and the welcome tour is the one that explains what these
- * are. Not shown in an assumed session, where closing it could not be saved.
+ * It waits for the welcome tour to have been answered (`mode: 'none'`), or
+ * its offer to an existing account to have been put off with ×: one thing at
+ * a time, and the welcome tour is the one that explains what these are. Not shown in an assumed session, where closing it could not be saved.
  */
 export function ScreenHint() {
   const { t } = useTranslation()
   const location = useLocation()
-  const { summary, record, canSave } = useOnboarding()
+  const { summary, record, canSave, offerSnoozed } = useOnboarding()
   const { active, startTour } = useTour()
   const { openHelp } = useUserHelp()
 
@@ -31,7 +31,10 @@ export function ScreenHint() {
   const tour = tourForLocation(location.pathname, location.search)
 
   if (!hint || !summary || !canSave || active) return null
-  if (summary.mode !== 'none') return null
+  // After the welcome tour is answered, or once its offer was put off for
+  // this sign-in — the offer and a tip never show at once.
+  if (summary.mode === 'tour') return null
+  if (summary.mode === 'offer' && !offerSnoozed) return null
   if (summary.state.hintsDismissed?.includes(hint)) return null
 
   const dismiss = () => record({ hintsDismissed: [hint] })
@@ -70,7 +73,7 @@ export function ScreenHint() {
             {t('onboarding.tour.showMeAround')}
           </Button>
         )}
-        <Button size="small" color="inherit" startIcon={<MenuBookIcon fontSize="small" />} onClick={() => openHelp()}>
+        <Button size="small" color="inherit" startIcon={<MenuBookIcon fontSize="small" />} onClick={() => openHelp(undefined, { offerScreenTour: true })}>
           {t('onboarding.tour.readMore')}
         </Button>
       </Box>

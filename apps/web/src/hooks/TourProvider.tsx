@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { useAuth } from '@/hooks/useAuth'
-import { useOnboarding } from '@/hooks/useOnboarding'
+import { useAuth } from './useAuth'
+import { useOnboarding } from './useOnboarding'
 import { TourContext, type ActiveTour, type TourContextValue } from './tour-context'
-import { TOURS, resolveSteps, type TourId } from './tours'
+import { TOURS, resolveSteps, type TourId } from '@/components/tour/tours'
 
 /**
  * Which tour is running and on which step. The overlay that draws it is

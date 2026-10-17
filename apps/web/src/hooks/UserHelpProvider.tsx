@@ -43,7 +43,7 @@ export function UserHelpProvider({ children }: { children: ReactNode }) {
       setRequest({
         docs: pages,
         anchor: options.anchor,
-        tour: tourForLocation(location.pathname, location.search) ?? undefined,
+        tour: options.offerScreenTour ? (tourForLocation(location.pathname, location.search) ?? undefined) : undefined,
         key: counter.current,
       })
       setOpen(true)

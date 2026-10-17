@@ -8,6 +8,8 @@ const NO_ONBOARDING: OnboardingContextValue = {
   showRecommenderExplainer: () => {},
   explainerOpen: false,
   canSave: false,
+  offerSnoozed: false,
+  snoozeOffer: () => {},
 }
 
 /** Onboarding state for the person signed in; inert outside Layout. */

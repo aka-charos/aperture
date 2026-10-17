@@ -1,9 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, relative, resolve } from 'node:path'
 import { docHeadings } from '@/components/docs/markdown'
+import { USER_GUIDE_TRANSLATIONS, userDocsFolder } from '@/components/docs/guidePaths'
+import { translatedAnchor } from '@/pages/guide/translatedAnchor'
 import { ROUTE_DOCS } from '@/pages/guide/routeDocs'
 import { TOURS, resolveSteps, stepItemKey, stepKey, isTourId, type TourAudience } from './tours'
 
@@ -165,6 +167,55 @@ test('every checklist item the server can send has its words', () => {
   for (const state of ['ready', 'pending']) {
     assert.ok(hasKey(`onboarding.checklist.recommendations.${state}`), `missing onboarding.checklist.recommendations.${state}`)
   }
+})
+
+/** Every (page, heading) the app opens the guide at: tour steps and inline ? icons. */
+function namedAnchors(): { slug: string; anchor: string; where: string }[] {
+  const out: { slug: string; anchor: string; where: string }[] = []
+  for (const tour of Object.values(TOURS)) {
+    for (const step of tour.steps) {
+      if (step.doc?.anchor) out.push({ slug: step.doc.slug, anchor: step.doc.anchor, where: `${tour.id}/${step.id}` })
+    }
+  }
+  for (const [file, source] of SOURCES) {
+    for (const m of source.matchAll(/<HelpHint\b([^>]*)\/>/g)) {
+      const slug = /\bdoc="([^"]+)"/.exec(m[1])?.[1]
+      const anchor = /\banchor="([^"]+)"/.exec(m[1])?.[1]
+      if (slug && anchor) out.push({ slug, anchor, where: relative(SRC, file) })
+    }
+  }
+  return out
+}
+
+test('every anchor the app names lands on the same section of each translation', () => {
+  // A translated page's heading ids are its own (Greek slugs), so an English
+  // anchor is carried over by position; this fails when a translation stops
+  // mirroring the English headings where an anchor points.
+  const anchors = namedAnchors()
+  assert.ok(anchors.length >= 3, `expected the named anchors, found ${anchors.length}`)
+  for (const lang of USER_GUIDE_TRANSLATIONS) {
+    for (const { slug, anchor, where } of anchors) {
+      const file = resolve(REPO, userDocsFolder(lang), `${slug}.md`)
+      if (!existsSync(file)) continue
+      const english = docHeadings(PAGES.get(slug) ?? '')
+      const shown = docHeadings(readFileSync(file, 'utf8'))
+      assert.ok(
+        translatedAnchor(english, shown, anchor),
+        `${where}: #${anchor} has no matching heading in the ${lang} page ${slug}.md`
+      )
+    }
+  }
+})
+
+test('an anchor maps by position and refuses a heading that no longer lines up', () => {
+  const english = [{ slug: 'a', depth: 2 }, { slug: 'b', depth: 3 }]
+  assert.equal(translatedAnchor(english, english, 'b'), 'b')
+  assert.equal(translatedAnchor(english, [{ slug: 'α', depth: 2 }, { slug: 'β', depth: 3 }], 'b'), 'β')
+  assert.equal(translatedAnchor(english, [{ slug: 'α', depth: 2 }, { slug: 'β', depth: 2 }], 'b'), undefined)
+  assert.equal(translatedAnchor(english, [{ slug: 'α', depth: 2 }], 'b'), undefined)
+  // An untranslated page IS the English page: the anchor passes through.
+  assert.equal(translatedAnchor(english, english, 'b'), 'b')
+  assert.equal(translatedAnchor(english, [{ slug: 'α', depth: 2 }, { slug: 'β', depth: 3 }], 'missing'), undefined)
 })
 
 const NOBODY: TourAudience = { capabilities: {}, features: {} }

@@ -5,10 +5,22 @@ import { Box, Button, IconButton, Paper, Slide, Typography } from '@mui/material
 import CloseIcon from '@mui/icons-material/Close'
 import ExploreOutlinedIcon from '@mui/icons-material/ExploreOutlined'
 import { useOnboarding } from '@/hooks/useOnboarding'
-import { useTour } from './useTour'
+import { useTour } from '@/hooks/useTour'
 
 /** Long enough for the first screen to draw, so the tour does not land on a blank page. */
 const START_DELAY_MS = 900
+/** How often a tour held back by an open dialog looks again. */
+const DIALOG_RECHECK_MS = 1000
+
+/**
+ * Another dialog, drawer or menu is showing. MUI marks a closed modal that
+ * stays mounted (the phone's sidebar, the guide drawer) `MuiModal-hidden`, so
+ * only the ones actually open count. The tour waits for them: one thing at a
+ * time, and its spotlight would otherwise point at things a dialog covers.
+ */
+function anotherDialogIsOpen(): boolean {
+  return document.querySelector('.MuiModal-root:not(.MuiModal-hidden)') !== null
+}
 
 /** Screens the welcome tour never starts on: it points at chrome they do not have. */
 function isQuietPath(pathname: string): boolean {
@@ -24,7 +36,7 @@ function isQuietPath(pathname: string): boolean {
 export function WelcomeStarter() {
   const { t } = useTranslation()
   const { pathname } = useLocation()
-  const { summary, record, canSave } = useOnboarding()
+  const { summary, record, canSave, offerSnoozed, snoozeOffer } = useOnboarding()
   const { active, startTour } = useTour()
   const started = useRef(false)
   const [offerHidden, setOfferHidden] = useState(false)
@@ -34,14 +46,22 @@ export function WelcomeStarter() {
 
   useEffect(() => {
     if (mode !== 'tour' || started.current || quiet) return
-    const timer = setTimeout(() => {
-      started.current = true
-      startTour('welcome')
-    }, START_DELAY_MS)
+    let timer: ReturnType<typeof setTimeout>
+    const attempt = (delay: number) => {
+      timer = setTimeout(() => {
+        if (anotherDialogIsOpen()) {
+          attempt(DIALOG_RECHECK_MS)
+          return
+        }
+        started.current = true
+        startTour('welcome')
+      }, delay)
+    }
+    attempt(START_DELAY_MS)
     return () => clearTimeout(timer)
   }, [mode, quiet, startTour])
 
-  const showOffer = mode === 'offer' && !active && !offerHidden && !quiet
+  const showOffer = mode === 'offer' && !active && !offerHidden && !offerSnoozed && !quiet
 
   return (
     <Slide direction="up" in={showOffer} mountOnEnter unmountOnExit>
@@ -96,11 +116,12 @@ export function WelcomeStarter() {
             </Button>
           </Box>
         </Box>
-        {/* Closing for now is not an answer: the offer comes back next time. */}
+        {/* Closing for now is not an answer: the offer comes back at the next
+            sign-in, and the tips are free to show meanwhile. */}
         <IconButton
           size="small"
           aria-label={t('onboarding.offer.later')}
-          onClick={() => setOfferHidden(true)}
+          onClick={snoozeOffer}
           sx={{ alignSelf: 'flex-start', mt: -0.5, me: -0.5 }}
         >
           <CloseIcon fontSize="small" />

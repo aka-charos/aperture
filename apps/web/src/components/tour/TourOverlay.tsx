@@ -16,7 +16,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { useUserHelp } from '@/hooks/useUserHelp'
 import { useOnboarding } from '@/hooks/useOnboarding'
-import { useTour } from './useTour'
+import { useTour } from '@/hooks/useTour'
 import { stepItemKey, stepKey, type TourPlacement } from './tours'
 import { findTourAnchor } from './anchors'
 
@@ -87,49 +87,105 @@ export function TourOverlay() {
     else if (active.id !== 'welcome' && location.pathname !== startPath.current) skip()
   }, [active, location.pathname, skip])
 
-  // Follow the element: it may mount late, scroll, or move when the layout
-  // does. One animation-frame loop while a tour runs is cheaper than wiring
-  // resize, scroll and mutation observers on every ancestor.
+  // Follow the element. Finding it polls once a frame, for at most
+  // ANCHOR_WAIT_MS, because it may mount late (a lazy section, a list still
+  // loading). Once found it is measured only when something could move it —
+  // a scroll anywhere, a window resize, a size change of the element or of
+  // the page — instead of a selector query and a layout read on every frame
+  // for as long as the step is open. An element React replaced, or one that
+  // stopped showing, sends it back to finding.
   useEffect(() => {
     setRect(null)
     setSettled(false)
     if (!step || hidden) return
-    if (!step.anchor) {
+    const anchor = step.anchor
+    if (!anchor) {
       setSettled(true)
       return
     }
-    const started = performance.now()
-    let scrolled = false
     let frame = 0
+    let element: HTMLElement | null = null
+    let observer: ResizeObserver | null = null
+    let scrolled = false
     let last: Rect | null = null
-    const tick = () => {
-      const element = findTourAnchor(step.anchor!)
-      if (element) {
-        if (!scrolled) {
-          scrolled = true
-          const box = element.getBoundingClientRect()
-          if (box.top < 0 || box.bottom > window.innerHeight) {
-            element.scrollIntoView({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' })
-          }
+
+    function clearRect() {
+      if (last) {
+        last = null
+        setRect(null)
+      }
+    }
+
+    function detach() {
+      observer?.disconnect()
+      observer = null
+      window.removeEventListener('scroll', onMove, true)
+      window.removeEventListener('resize', onMove)
+      element = null
+    }
+
+    function measure() {
+      if (!element) return
+      const box = element.getBoundingClientRect()
+      if (!element.isConnected || box.width <= 0 || box.height <= 0) {
+        detach()
+        clearRect()
+        find()
+        return
+      }
+      const current = { top: box.top, left: box.left, width: box.width, height: box.height }
+      if (!sameRect(current, last)) {
+        last = current
+        setRect(current)
+      }
+    }
+
+    function onMove() {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(measure)
+    }
+
+    function attach(found: HTMLElement) {
+      element = found
+      if (!scrolled) {
+        scrolled = true
+        const box = found.getBoundingClientRect()
+        if (box.top < 0 || box.bottom > window.innerHeight) {
+          found.scrollIntoView({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' })
         }
-        const box = element.getBoundingClientRect()
-        const current = { top: box.top, left: box.left, width: box.width, height: box.height }
-        if (!sameRect(current, last)) {
-          last = current
-          setRect(current)
+      }
+      observer = new ResizeObserver(onMove)
+      observer.observe(found)
+      observer.observe(document.body)
+      window.addEventListener('scroll', onMove, { capture: true, passive: true })
+      window.addEventListener('resize', onMove)
+      measure()
+      setSettled(true)
+    }
+
+    function find() {
+      const started = performance.now()
+      const tick = () => {
+        const found = findTourAnchor(anchor!)
+        if (found) {
+          attach(found)
+          return
         }
-        setSettled(true)
-      } else {
-        if (last) {
-          last = null
-          setRect(null)
+        // Gave up: the step shows centred, with the same words.
+        if (performance.now() - started > ANCHOR_WAIT_MS) {
+          setSettled(true)
+          return
         }
-        if (performance.now() - started > ANCHOR_WAIT_MS) setSettled(true)
+        frame = requestAnimationFrame(tick)
       }
       frame = requestAnimationFrame(tick)
     }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
+
+    find()
+    return () => {
+      cancelAnimationFrame(frame)
+      detach()
+    }
   }, [step, hidden, reducedMotion])
 
   // The card takes focus on every step, so a screen reader reads the step and

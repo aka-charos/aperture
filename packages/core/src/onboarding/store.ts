@@ -13,6 +13,7 @@ import { getSystemSetting, getWatchingLibraryConfig } from '../settings/systemSe
 import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
 import { RECOMMENDATION_RECIPIENT_SQL } from '../recommender/recipients.js'
 import {
+  RATINGS_GOAL,
   buildChecklist,
   decideOnboardingMode,
   mergeOnboardingState,
@@ -70,28 +71,35 @@ export async function getOnboardingSummary(
     ),
     getSystemSetting('onboarding_introduced_at'),
     getWatchingLibraryConfig().catch(() => null),
+    // Asked on every app load, so each answer stops at the first row it
+    // needs: EXISTS for the yes/no items, and ratings counted no further
+    // than the goal. A run with a channel_id built a playlist or a
+    // collection, not this person's recommendations, so it does not make
+    // them "ready".
     queryOne<{
-      played: string
+      played: boolean
       ratings: string
-      interests: string
-      conversations: string
-      watching: string
-      runs: string
+      interests: boolean
+      conversations: boolean
+      watching: boolean
+      runs: boolean
     }>(
       `SELECT
-         (SELECT COUNT(*) FROM watch_history wh WHERE wh.user_id = $1 AND ${WATCH_HISTORY_PLAYED_SQL}) AS played,
-         (SELECT COUNT(*) FROM user_ratings WHERE user_id = $1) AS ratings,
-         (SELECT COUNT(*) FROM user_custom_interests WHERE user_id = $1) AS interests,
-         (SELECT COUNT(*) FROM assistant_conversations WHERE user_id = $1) AS conversations,
-         (SELECT COUNT(*) FROM user_watching_series WHERE user_id = $1) AS watching,
-         (SELECT COUNT(*) FROM recommendation_runs WHERE user_id = $1 AND status = 'completed') AS runs`,
-      [userId]
+         EXISTS (SELECT 1 FROM watch_history wh WHERE wh.user_id = $1 AND ${WATCH_HISTORY_PLAYED_SQL}) AS played,
+         (SELECT COUNT(*) FROM (SELECT 1 FROM user_ratings WHERE user_id = $1 LIMIT $2) r) AS ratings,
+         EXISTS (SELECT 1 FROM user_custom_interests WHERE user_id = $1) AS interests,
+         EXISTS (SELECT 1 FROM assistant_conversations WHERE user_id = $1) AS conversations,
+         EXISTS (SELECT 1 FROM user_watching_series WHERE user_id = $1) AS watching,
+         EXISTS (
+           SELECT 1 FROM recommendation_runs
+            WHERE user_id = $1 AND status = 'completed' AND channel_id IS NULL
+         ) AS runs`,
+      [userId, RATINGS_GOAL]
     ),
   ])
 
-  // COUNT(*) arrives as a string (bigint), and Number() of a missing row is 0,
-  // which is the right answer for a count.
-  const count = (value: string | undefined) => Number(value ?? 0)
+  // COUNT(*) arrives as a string (bigint); a missing row is no rows.
+  const yes = (value: boolean | undefined) => (value === true ? 1 : 0)
   const watchingEnabled = watching?.enabled ?? true
 
   return {
@@ -104,12 +112,12 @@ export async function getOnboardingSummary(
     watchingEnabled,
     checklist: buildChecklist(
       {
-        playedTitles: count(facts?.played),
-        ratings: count(facts?.ratings),
-        interests: count(facts?.interests),
-        conversations: count(facts?.conversations),
-        watchingSeries: count(facts?.watching),
-        hasRecommendations: count(facts?.runs) > 0,
+        playedTitles: yes(facts?.played),
+        ratings: Number(facts?.ratings ?? 0),
+        interests: yes(facts?.interests),
+        conversations: yes(facts?.conversations),
+        watchingSeries: yes(facts?.watching),
+        hasRecommendations: facts?.runs === true,
         receivesRecommendations: user?.receives === true,
       },
       state,

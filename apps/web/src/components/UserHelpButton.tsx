@@ -43,7 +43,7 @@ export function UserHelpButton() {
             navigate(USER_GUIDE_ROUTE)
             return
           }
-          openHelp(docs)
+          openHelp(docs, { offerScreenTour: true })
         }}
       >
         <HelpOutlineIcon />

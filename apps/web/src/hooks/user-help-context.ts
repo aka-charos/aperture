@@ -1,8 +1,15 @@
 import { createContext } from 'react'
 
 export interface OpenHelpOptions {
-  /** A heading on the first page to scroll to, as the page's own heading id. */
+  /** A heading on the first page to scroll to, as its ENGLISH heading id (mapped onto a translation). */
   anchor?: string
+  /**
+   * Offer the tour of the screen underneath ("Show me around"). Only for help
+   * opened ABOUT that screen (the app bar's ?, a screen's tip): an inline ?
+   * can sit inside a title page opened in a dialog over another screen, whose
+   * tour would point at things the dialog covers.
+   */
+  offerScreenTour?: boolean
 }
 
 export interface UserHelpContextValue {

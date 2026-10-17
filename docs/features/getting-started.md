@@ -10,7 +10,7 @@ The first time you sign in, a short tour starts by itself. It dims the screen an
 - **Skip tour** (or Esc) ends it at any point.
 - **Read more** opens the guide page for that step beside the tour, and the tour waits until you close it.
 
-If you used Aperture before the tour existed, it doesn't start by itself. A small card offers it once instead: **Take the tour** starts it, **No thanks** puts the offer away for good, and the × asks again next time.
+If you used Aperture before the tour existed, it doesn't start by itself. A small card offers it once instead: **Take the tour** starts it, **No thanks** puts the offer away for good, and the × asks again the next time you sign in (the tips start showing in the meantime).
 
 You can take the tour again whenever you like from your avatar menu (**Take the tour**).
 
@@ -37,7 +37,7 @@ The card goes away once everything is done, or when you close it with ×.
 
 ## First-Visit Tips
 
-The first time you open some screens, a one-line tip sits at the top of the page, with **Show me around** (where the screen has a tour) and **Read more**. The × closes it for good. Tips wait until you've taken or skipped the welcome tour.
+The first time you open some screens, a one-line tip sits at the top of the page, with **Show me around** (where the screen has a tour) and **Read more**. The × closes it for good. Tips wait until you've taken or skipped the welcome tour, or put off its offer.
 
 ## Small ? Icons
 

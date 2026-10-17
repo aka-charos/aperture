@@ -5,7 +5,7 @@ import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
 import ExploreOutlinedIcon from '@mui/icons-material/ExploreOutlined'
 import ReplayIcon from '@mui/icons-material/Replay'
 import { useOnboarding } from '@/hooks/useOnboarding'
-import { useTour } from '@/components/tour/useTour'
+import { useTour } from '@/hooks/useTour'
 import { SettingsCard } from './SettingsCard'
 
 /**

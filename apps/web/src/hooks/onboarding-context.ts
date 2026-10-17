@@ -43,6 +43,9 @@ export interface OnboardingContextValue {
   explainerOpen: boolean
   /** False in an assumed session: what is shown there is not saved. */
   canSave: boolean
+  /** The tour offer was closed with × in this sign-in: it is not answered, only put off. */
+  offerSnoozed: boolean
+  snoozeOffer: () => void
 }
 
 export const OnboardingContext = createContext<OnboardingContextValue | null>(null)

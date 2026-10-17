@@ -5,13 +5,14 @@ import ExploreOutlinedIcon from '@mui/icons-material/ExploreOutlined'
 import { DocDrawer } from '@/components/docs/DocDrawer'
 import type { DocPage } from '@/components/docs/pages'
 import { userGuidePath } from '@/components/docs/guidePaths'
-import { useTour } from '@/components/tour/useTour'
+import { useTour } from '@/hooks/useTour'
 import { isTourId } from '@/components/tour/tours'
 import { useAuth } from '@/hooks/useAuth'
 import { USER_DOC_PAGES, userDocPages } from './docs'
 import { useGuideLanguage } from './useGuideLanguage'
 import { userLinkTarget } from './links'
 import { appPathIn } from './routeDocs'
+import { translatedAnchor } from './translatedAnchor'
 
 interface UserHelpDrawerProps {
   open: boolean
@@ -31,6 +32,13 @@ export function UserHelpDrawer({ open, docs, anchor, tour, onClose }: UserHelpDr
   const { startTour } = useTour()
   const isAdmin = user?.isAdmin === true
   const language = useGuideLanguage()
+  const pages = userDocPages(language)
+  // The anchor is an English heading id; a translated page has its own.
+  const initialAnchor = translatedAnchor(
+    USER_DOC_PAGES.get(docs[0])?.headings,
+    pages.get(docs[0])?.headings,
+    anchor
+  )
 
   const linkTarget = useCallback(
     (href: string, page: DocPage) => userLinkTarget(href, page.file, (slug) => USER_DOC_PAGES.has(slug), isAdmin),
@@ -68,14 +76,14 @@ export function UserHelpDrawer({ open, docs, anchor, tour, onClose }: UserHelpDr
     <DocDrawer
       open={open}
       slugs={docs}
-      pages={userDocPages(language)}
+      pages={pages}
       pagePath={(slug) => userGuidePath(slug)}
       linkTarget={linkTarget}
       codeRoute={appPathIn}
       // Never collides with an id on the screen underneath.
       idPrefix="user-help-"
       labels={labels}
-      initialAnchor={anchor}
+      initialAnchor={initialAnchor}
       headerAction={showMeAround}
       onClose={onClose}
     />
