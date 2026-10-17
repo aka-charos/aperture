@@ -17,6 +17,41 @@ The page's mode selector chooses **where analysis gets its sources**:
 
 A readiness warning appears when the current mode can't run (Title Analysis model unset / grounding without a Gemini model / service unconfigured), with the exact reason. Switching to grounding keeps the service fields saved but unused.
 
+## Running the Service
+
+Aperture does not ship the service; you run it beside Aperture. The repo has a ready-made compose file, [`docker-compose.crw.yml`](https://github.com/aka-charos/aperture/blob/dev/docker-compose.crw.yml), that starts the whole stack — fastCRW (`crw-camofox`), LightPanda, Camofox and Byparr — with the settings Aperture works best with. It is standalone: download that one file, nothing else.
+
+```bash
+docker compose -f docker-compose.crw.yml up -d
+docker compose -f docker-compose.crw.yml ps
+```
+
+`ps` should list four running services, with `camofox` healthy. The first start pulls several images and takes a few minutes.
+
+Then set the **Service URL** in Aperture. Aperture runs in its own container, so the address is the one *that container* uses to reach the host, never `localhost`:
+
+| Aperture runs on | Service URL |
+|------------------|-------------|
+| Docker Desktop (Windows, Mac) | `http://host.docker.internal:3000` |
+| Linux, same machine | `http://<the machine's LAN address>:3000` (or add `extra_hosts: ["host.docker.internal:host-gateway"]` to Aperture's service) |
+| Another machine | `http://<that machine's address>:3000` |
+
+If port 3000 is taken, put `CRW_HOST_PORT=3010` in a `.env` file beside the compose file and use that port. Press **Test**: it names the engine that answered.
+
+What the file changes from the image's defaults, and why:
+
+- **One search per title per engine** (`CRW_SEARCH__QUERY_EXPAND=false`). The image triples the searches for each title; search engines block on request rate, and Aperture builds its own prompt from the raw results.
+- **A Firefox user agent** on the plain HTTP tier, which otherwise announces itself as `CRW/0.0.1` and is blocked by simple CDN rules.
+- **Two render tabs** and the **10 requests per second cap** restored, so one title's pages do not arrive as a burst.
+- **Memory limits and a restart policy** on every service. Byparr and Camofox are real browsers; an exit code of 137 in `docker compose ps` means a limit killed one, so raise it.
+
+Keep these in mind:
+
+- **Do not publish the service to the internet.** It has no login in this setup; anyone who can reach port 3000 can make your machine fetch pages. Byparr and Camofox are deliberately not published at all.
+- **All four services are required.** The image sends walled pages to Byparr and searches through Camofox.
+- **Updating is deliberate.** Change the tag on the `crw` image, then `pull` and `up -d`. A tag, `latest` included, never updates itself.
+- A datacenter IP is the commonest reason pages come back walled. The file has a commented `CRW_CRAWLER__PROXY` line for a proxy; it covers the HTTP tier only, not the search or the browsers.
+
 ## Service Configuration
 
 | Field | Default | Notes |

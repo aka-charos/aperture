@@ -1,0 +1,165 @@
+# fastCRW retrieval service for Aperture's Title Analysis (crw-camofox 1.6.1).
+#
+# STANDALONE: this is the only file you need. No clone, no Dockerfile, no
+# config file, no .env. It runs next to Aperture, not inside Aperture's own
+# compose file, so you can put it on the same machine or on another one.
+#
+# What it is: fastCRW (search + scrape) with a browser ladder behind it.
+#   crw      - the API Aperture talks to (port 3000)
+#   lightpanda - light, fast JS renderer (first browser tier)
+#   camofox  - stealth Firefox; the heavy tier AND the backend of /v1/search
+#   byparr   - Cloudflare challenge solver, called last and only after a wall
+# All of it is needed: the image's built-in config sends walled pages to Byparr
+# and searches through Camofox, so removing a service breaks that path.
+#
+# Start:     docker compose -f docker-compose.crw.yml up -d
+# Check:     docker compose -f docker-compose.crw.yml ps
+#            (all four should be running; camofox shows "healthy")
+# Update:    change the tag on the `crw` image, then
+#              docker compose -f docker-compose.crw.yml pull
+#              docker compose -f docker-compose.crw.yml up -d
+#            A tag never updates itself, `latest` included.
+#
+# Then in Aperture: Admin -> Integrations -> fastCRW, switch it on, set the
+# Service URL (see docs/admin/crw.md, "Running the service"), press Test.
+#
+# SECURITY: crw has no login of its own here and anyone who can reach port 3000
+# can use your machine to fetch arbitrary pages. Do not forward the port to the
+# internet. Set CRW_BIND_ADDRESS (in a .env beside this file, or in your shell)
+# to the one address Aperture reaches it on if the machine has several.
+# Byparr (8191) and Camofox (9377) are never published; leave it that way, they
+# have no authentication at all.
+#
+# Resource use: this is a real browser stack. The memory limits below are
+# ceilings that stop a runaway page (they add up to 8 GB; normal use sits well
+# under that). If a service restarts during heavy use, exit code 137 in
+# `docker compose ps` means its memory limit killed it; raise that service's
+# mem_limit and memswap_limit together.
+
+services:
+  crw:
+    image: ghcr.io/adambenhassen/crw-camofox:1.6.1
+    restart: unless-stopped
+    ports:
+      # Host side only; the container always listens on 3000. Change the host
+      # port if 3000 is taken (then use that port in Aperture's Service URL).
+      - "${CRW_BIND_ADDRESS:-0.0.0.0}:${CRW_HOST_PORT:-3000}:3000"
+    depends_on:
+      lightpanda:
+        condition: service_started
+      # Wait until the browser is up so the first search after `up` does not
+      # race its cold start.
+      camofox:
+        condition: service_healthy
+      # service_started, not healthy: Byparr's own healthcheck launches a
+      # browser every 15 minutes, and crw only calls it after a challenge.
+      byparr:
+        condition: service_started
+    environment:
+      - RUST_LOG=info
+      - CRW_CONFIG=config.docker
+      # One search per title per engine. The image turns on a 3-variant query
+      # expansion, which triples requests to the search engines per title, and
+      # engines block on request velocity. Aperture reads the raw results and
+      # builds its own prompt, so the expansion buys it nothing.
+      - CRW_SEARCH__QUERY_EXPAND=false
+      # The plain HTTP tier otherwise announces itself as `CRW/0.0.1`, which
+      # simple CDN rules block on sight. A Firefox-family UA matches the tier
+      # that renders most pages. (The Chrome-impersonating HTTP tier ignores
+      # this on purpose, and LightPanda ignores it too.)
+      - "CRW_CRAWLER__USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0"
+      # Parallel render tabs (code default 4). Two keeps a title's page fetches
+      # from arriving as a burst from one browser profile. Aperture analyses
+      # one title at a time, so throughput barely changes.
+      - CRW_RENDERER__POOL_SIZE=2
+      # The image's config zeroes the global rate cap for benchmarking; this
+      # puts the 10 requests/second default back as a safety net against bursts
+      # (retries, a job started twice). A per-site limit stays on regardless.
+      - CRW_SERVER__RATE_LIMIT_RPS=10
+      # Optional: send the HTTP tier and crawl jobs through a proxy. A
+      # datacenter IP is the most common bot signal; a residential gateway is
+      # the documented use. This does NOT cover the search leg (Camofox drives
+      # Google itself) or the browser tiers.
+      # - CRW_CRAWLER__PROXY=socks5://user:pass@host:1080
+    # Defense in depth for untrusted pages: a hard memory ceiling, no swap
+    # escape, bounded process count, read-only root, no capabilities.
+    mem_limit: 2g
+    memswap_limit: 2g
+    pids_limit: 512
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # Stealth Firefox (Camoufox) behind a REST API. It is the heavy tier for SPAs
+  # and anti-bot pages AND the backend of /v1/search, which is how Aperture
+  # finds pages at all. Reachable only from the other services here as
+  # camofox:9377; the port is not published, which is why auth is disabled.
+  camofox:
+    # Pinned, never :latest: Camoufox ships fingerprint data with each release
+    # and a stale fingerprint is itself a signal, so update on purpose. 2.4.6 is
+    # the version crw-camofox 1.6.1 targets.
+    image: ghcr.io/redf0x1/camofox-browser:2.4.6
+    restart: unless-stopped
+    environment:
+      - CAMOFOX_HOST=0.0.0.0
+      - CAMOFOX_PORT=9377
+      - CAMOFOX_API_KEY=${CAMOFOX_API_KEY:-}
+      - CAMOFOX_AUTH_MODE=${CAMOFOX_AUTH_MODE:-disabled}
+      # Refuses to OPEN a private/internal URL. It does not stop a redirect from
+      # landing on one, so crw also refuses to return a page whose final URL is
+      # internal. Pinned so a changed default is a visible diff.
+      - CAMOFOX_ALLOW_PRIVATE_NETWORK=false
+    mem_limit: 2g
+    memswap_limit: 2g
+    shm_size: "1g"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9377/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Cloudflare challenge solver. Called last, and only when the HTTP tier or
+  # Camofox came back with a challenge: it opens a fresh Firefox, clicks the
+  # Turnstile checkbox and returns the page plus the cookie crw reuses.
+  # NO authentication: never publish its port.
+  byparr:
+    image: ghcr.io/thephaseless/byparr:3.0.4
+    restart: unless-stopped
+    # Each solve launches its own Firefox; two can run at once.
+    shm_size: "2g"
+    mem_limit: 3g
+    memswap_limit: 3g
+
+  # Light JS renderer (~64 MB): the first browser tier, falling back to Camofox
+  # for pages it cannot handle. `restart: unless-stopped` matters: LightPanda
+  # can crash on heavy pages, and without a restart its breaker stays open and
+  # every JS page falls through to the much heavier Camofox.
+  lightpanda:
+    image: lightpanda/browser:latest
+    environment:
+      # It sends usage telemetry to a third party by default.
+      - LIGHTPANDA_DISABLE_TELEMETRY=true
+    # OPTIONAL hardening, off here: crw-camofox ships a `command:` that makes
+    # LightPanda refuse private/internal addresses itself (the engine already
+    # checks every request, but cannot see websockets or workers). It needs a
+    # RECENT image: a stale cached `latest` exits on the flags and restart-loops,
+    # which takes the tier down. To enable, take the `command:` block for
+    # lightpanda from the crw-camofox release's docker-compose.yml, then
+    #   docker compose -f docker-compose.crw.yml pull lightpanda
+    #   docker compose -f docker-compose.crw.yml up -d
+    # and check that lightpanda stays "running" in `docker compose ps`.
+    restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1g
+    healthcheck:
+      # The slash form is required; "127.0.0.1:9222" is not a valid path.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9222"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

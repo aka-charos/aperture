@@ -106,6 +106,8 @@ What arrived unchanged is under [Inherited from upstream](#inherited-from-upstre
 
 > ¹ Docker Desktop with Emby/Jellyfin running natively on Windows needs extra path mapping — see the [Windows guide](docs/admin/windows-docker-desktop.md).
 
+> Using Title Analysis? Its self-hosted search and scraping service (fastCRW and its browsers) is a separate stack: [`docker-compose.crw.yml`](https://raw.githubusercontent.com/aka-charos/aperture/dev/docker-compose.crw.yml), set up in [Running the service](docs/admin/crw.md#running-the-service). Skip it if you use Google grounding instead.
+
 ### 2. Check the image line
 
 The compose files already point at this fork's image — no edit needed on an amd64 host:

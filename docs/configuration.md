@@ -32,6 +32,8 @@ We provide pre-configured docker-compose files for common platforms:
 
 Download the file for your platform and edit the required values (IP address, session secret, paths).
 
+Optional, for [Title Analysis](admin/crw.md): [`docker-compose.crw.yml`](https://github.com/aka-charos/aperture/blob/dev/docker-compose.crw.yml) runs the self-hosted search and scraping service (fastCRW with its browsers) as its own stack. It is a separate file with nothing to edit; see [Running the service](admin/crw.md#running-the-service).
+
 > **Windows Users**: If you're running Emby/Jellyfin directly on Windows (not in Docker) with Docker Desktop for Aperture, see the [Windows Docker Desktop Setup Guide](admin/windows-docker-desktop.md) for detailed instructions.
 
 ### Volume Mounts
