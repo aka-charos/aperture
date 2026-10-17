@@ -1,5 +1,6 @@
 import { Box, Typography, Card, Skeleton } from '@mui/material'
 import { useOpenMedia } from '@/hooks/useOpenMedia'
+import { LIST_THUMB_WIDTH, LIST_THUMB_HEIGHT } from '../posterSize'
 import { useTranslation } from 'react-i18next'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
@@ -70,7 +71,7 @@ export function RecentRatingsList({ ratings, loading }: RecentRatingsListProps) 
         </Typography>
         {Array.from({ length: 3 }).map((_, i) => (
           <Box key={i} sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
-            <Skeleton variant="rounded" width={48} height={72} />
+            <Skeleton variant="rounded" width={LIST_THUMB_WIDTH} height={LIST_THUMB_HEIGHT} />
             <Box sx={{ flex: 1 }}>
               <Skeleton width="60%" />
               <Skeleton width="40%" />
@@ -156,8 +157,8 @@ export function RecentRatingsList({ ratings, loading }: RecentRatingsListProps) 
                 target.src = FALLBACK_POSTER_URL
               }}
               sx={{
-                width: 48,
-                height: 72,
+                width: LIST_THUMB_WIDTH,
+                height: LIST_THUMB_HEIGHT,
                 objectFit: 'cover',
                 borderRadius: 1,
                 flexShrink: 0,

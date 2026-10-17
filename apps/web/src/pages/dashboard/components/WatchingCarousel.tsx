@@ -5,10 +5,10 @@ import { Box, Typography, Chip } from '@mui/material'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import NewReleasesIcon from '@mui/icons-material/NewReleases'
 import { useOpenMedia } from '@/hooks/useOpenMedia'
+import { useDashboardPosterMinWidth } from '../posterSize'
 import { MoviePoster, BaseCarousel, CarouselItem } from '@aperture/ui'
 import { useUserRatings } from '../../../hooks/useUserRatings'
 import { useWatchStatus } from '../../../hooks/useWatchStatus'
-import { useWatching } from '../../../hooks/useWatching'
 
 interface UpcomingEpisode {
   seasonNumber: number
@@ -111,9 +111,9 @@ export function WatchingCarousel({
 }: WatchingCarouselProps) {
   const { t, i18n } = useTranslation()
   const openMedia = useOpenMedia()
+  const posterMinWidth = useDashboardPosterMinWidth()
   const { getRating, setRating } = useUserRatings()
   const { isWatched, getEpisodeProgress } = useWatchStatus()
-  const { toggleWatching } = useWatching()
 
   const handleRate = useCallback(
     async (id: string, rating: number | null) => {
@@ -142,6 +142,7 @@ export function WatchingCarousel({
       loading={loading}
       hasItems={items.length > 0}
       fitItems
+      itemMinWidth={posterMinWidth}
     >
       {items.map((item) => (
         <CarouselItem key={item.id}>
@@ -156,8 +157,8 @@ export function WatchingCarousel({
             watched={isWatched('series', item.seriesId)}
             episodeProgress={getEpisodeProgress('series', item.seriesId)}
             onRate={(rating) => handleRate(item.seriesId, rating)}
-            isWatching={true}
-            onWatchingToggle={() => toggleWatching(item.seriesId)}
+            // No watching toggle: every show in this row is here because the
+            // viewer is watching it, so the button could only ever say so.
             size="medium"
             // Fills the slot the carousel sized (fitItems).
             responsive

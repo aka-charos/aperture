@@ -7,6 +7,7 @@ import { useUserRatings } from '../../../hooks/useUserRatings'
 import { useWatchStatus } from '../../../hooks/useWatchStatus'
 import { useWatching } from '../../../hooks/useWatching'
 import { MediaTypeChip } from '../../../components/MediaTypeChip'
+import { useDashboardPosterMinWidth } from '../posterSize'
 
 interface MediaItem {
   id: string
@@ -33,6 +34,11 @@ interface MediaCarouselProps {
    * the top-left corner with the rank badge, so never set it with `showRank`.
    */
   showMediaType?: boolean
+  /**
+   * Leave the watching toggle off series posters. For a row whose shows the
+   * viewer is choosing among rather than following, the button is noise.
+   */
+  hideWatchingToggle?: boolean
 }
 
 export function MediaCarousel({
@@ -45,9 +51,11 @@ export function MediaCarousel({
   emptyMessage: emptyMessageProp,
   rows = 1,
   showMediaType = false,
+  hideWatchingToggle = false,
 }: MediaCarouselProps) {
   const { t } = useTranslation()
   const emptyMessage = emptyMessageProp ?? t('dashboard.carouselEmpty')
+  const posterMinWidth = useDashboardPosterMinWidth()
   const openMedia = useOpenMedia()
   const { getRating, setRating } = useUserRatings()
   const { isWatched, getEpisodeProgress } = useWatchStatus()
@@ -82,7 +90,7 @@ export function MediaCarousel({
       onRate={(rating) => handleRate(item.type, item.id, rating)}
       isWatching={item.type === 'series' ? isWatching(item.id) : undefined}
       onWatchingToggle={item.type === 'series' ? () => toggleWatching(item.id) : undefined}
-      hideWatchingToggle={item.type !== 'series'}
+      hideWatchingToggle={hideWatchingToggle || item.type !== 'series'}
       onClick={() => handleItemClick(item)}
       size="medium"
       // Fills the slot the carousel sized (fitItems), so a row always ends on
@@ -104,6 +112,7 @@ export function MediaCarousel({
         emptyMessage={emptyMessage}
         hasItems={items.length > 0}
         fitItems
+        itemMinWidth={posterMinWidth}
       >
         {Array.from({ length: Math.ceil(items.length / 2) }).map((_, colIndex) => {
           const topItem = items[colIndex * 2]
@@ -130,6 +139,7 @@ export function MediaCarousel({
       emptyMessage={emptyMessage}
       hasItems={items.length > 0}
       fitItems
+      itemMinWidth={posterMinWidth}
     >
       {items.map((item) => (
         <CarouselItem key={`${item.type}-${item.id}`}>

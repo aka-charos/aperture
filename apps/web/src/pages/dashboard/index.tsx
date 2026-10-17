@@ -109,6 +109,8 @@ function DashboardContent() {
           showScore
           showRank
           emptyMessage={t('dashboard.emptySeriesRecs')}
+          // Recommendations are shows to try, not shows being followed yet.
+          hideWatchingToggle
         />
       </Box>
 
