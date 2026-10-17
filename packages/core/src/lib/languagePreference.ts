@@ -67,6 +67,30 @@ export function aiLanguageFollowsApp(aiPref: string | null | undefined): boolean
 }
 
 /**
+ * What the stored recommendations language becomes when the app language
+ * changes from `previousUi` to `nextUi` and the same save names no
+ * recommendations language of its own: `AI_LANGUAGE_FOLLOWS_APP` when the
+ * stored choice is an explicit language that resolved to the OLD app language,
+ * otherwise `undefined` (leave it alone).
+ *
+ * Recommendations that matched the app keep matching it, even when that match
+ * was an explicit choice — the switcher shows such a viewer the app's own
+ * language pressed, so leaving them behind would contradict what they saw. A
+ * deliberate split (Greek app, English recommendations) stays put. It lives
+ * here, applied by the save route, so every writer of the app language — the
+ * app-bar flag, the login page, anything later — gets the same answer.
+ */
+export function aiLanguageAfterAppChange(
+  storedAi: string | null | undefined,
+  previousUi: AppLocaleCode,
+  nextUi: AppLocaleCode,
+  defaults: LanguageDefaults
+): typeof AI_LANGUAGE_FOLLOWS_APP | undefined {
+  if (previousUi === nextUi || aiLanguageFollowsApp(storedAi)) return undefined
+  return resolveAiLanguage(storedAi, previousUi, defaults) === previousUi ? AI_LANGUAGE_FOLLOWS_APP : undefined
+}
+
+/**
  * Why a requested override cannot be stored, or null when it can. `null` (back
  * to the default) is always allowed. A language the admin has not enabled is
  * refused rather than stored: the resolver would ignore it, so saving it would

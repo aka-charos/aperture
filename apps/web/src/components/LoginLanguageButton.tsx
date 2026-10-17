@@ -1,19 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  alpha,
-  IconButton,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
-  Tooltip,
-  useTheme,
-} from '@mui/material'
-import CheckIcon from '@mui/icons-material/Check'
+import { alpha, IconButton, Popover, Tooltip, useTheme } from '@mui/material'
+import { AppLanguageList, type AppLanguageOption } from './AppLanguageList'
 import { LocaleFlag } from './LocaleFlag'
 
-export type LoginLanguageOption = { code: string; label: string }
+export type LoginLanguageOption = AppLanguageOption
 
 interface LoginLanguageButtonProps {
   options: LoginLanguageOption[]
@@ -26,7 +17,8 @@ interface LoginLanguageButtonProps {
  * changes the page (and the browser's remembered language); the login page
  * saves the choice to the account when the person signs in. Only the app
  * language is offered — the recommendations language follows it unless the
- * person sets it apart later, from the flag in the app bar.
+ * person sets it apart later, from the flag in the app bar. The list is the
+ * same component the app-bar switcher uses.
  */
 export function LoginLanguageButton({ options, value, onChange }: LoginLanguageButtonProps) {
   const { t } = useTranslation()
@@ -55,34 +47,23 @@ export function LoginLanguageButton({ options, value, onChange }: LoginLanguageB
           <LocaleFlag locale={value} width={22} />
         </IconButton>
       </Tooltip>
-      <Menu
-        anchorEl={anchorEl}
+      <Popover
         open={Boolean(anchorEl)}
+        anchorEl={anchorEl}
         onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: side }}
         transformOrigin={{ vertical: 'top', horizontal: side }}
-        slotProps={{ paper: { sx: { minWidth: 200, mt: 0.5 } } }}
+        slotProps={{ paper: { sx: { minWidth: 220, mt: 0.5, pt: 1 } } }}
       >
-        {options.map((o) => (
-          <MenuItem
-            key={o.code}
-            selected={o.code === value}
-            lang={o.code}
-            onClick={() => {
-              setAnchorEl(null)
-              if (o.code !== value) onChange(o.code)
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 36 }}>
-              <LocaleFlag locale={o.code} />
-            </ListItemIcon>
-            <ListItemText primary={o.label} />
-            {o.code === value && (
-              <CheckIcon fontSize="small" color="primary" sx={{ marginInlineStart: 1 }} />
-            )}
-          </MenuItem>
-        ))}
-      </Menu>
+        <AppLanguageList
+          options={options}
+          value={value}
+          onSelect={(code) => {
+            setAnchorEl(null)
+            onChange(code)
+          }}
+        />
+      </Popover>
     </>
   )
 }

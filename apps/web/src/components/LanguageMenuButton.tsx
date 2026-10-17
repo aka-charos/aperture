@@ -6,10 +6,6 @@ import {
   Box,
   Divider,
   IconButton,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Popover,
   ToggleButton,
   ToggleButtonGroup,
@@ -17,9 +13,14 @@ import {
   Typography,
   useTheme,
 } from '@mui/material'
-import CheckIcon from '@mui/icons-material/Check'
 import { useAuth } from '@/hooks/useAuth'
-import { applyEffectiveUiLanguage } from '@/i18n/syncUiLanguage'
+import {
+  applyEffectiveUiLanguage,
+  saveLanguagePreferences,
+  shownLanguage,
+  type LanguagePreferencesResponse,
+} from '@/i18n/syncUiLanguage'
+import { AppLanguageList } from './AppLanguageList'
 import { LocaleFlag } from './LocaleFlag'
 
 /** Stored `aiLanguage` meaning "same as the app" (core `AI_LANGUAGE_FOLLOWS_APP`, a wire value). */
@@ -40,12 +41,7 @@ interface LanguageState {
   aiFollowingApp: string
 }
 
-interface PrefsResponse {
-  aiFollowsApp?: boolean
-  effectiveUiLanguage?: string
-  effectiveAiLanguage?: string
-  aiLanguageFollowingApp?: string
-}
+type PrefsResponse = LanguagePreferencesResponse
 
 function applyPrefs(prev: LanguageState, prefs: PrefsResponse): LanguageState {
   return {
@@ -66,9 +62,10 @@ function applyPrefs(prev: LanguageState, prefs: PrefsResponse): LanguageState {
  *
  * Recommendations follow the app language unless the viewer chose otherwise
  * (core `languagePreference.ts`), so the flag alone is enough for most people.
- * Switching the app language here also keeps recommendations that MATCHED the
- * app matching it, even when that match was an explicit choice — only a
- * deliberate split (Greek app, English recommendations) stays put.
+ * Changing the app language also keeps recommendations that MATCHED the app
+ * matching it, even when that match was an explicit choice — only a deliberate
+ * split (Greek app, English recommendations) stays put. The save route decides
+ * that (core `aiLanguageAfterAppChange`), so the login page behaves the same.
  *
  * The toggle is deliberately two options, not a second language list: the
  * app's own language (stored as FOLLOW_APP, so it moves when the app language
@@ -156,7 +153,7 @@ export function LanguageMenuButton() {
 
   // The flag shows what is on screen, which during an assumption may be a
   // tab-only choice the server does not know about.
-  const appLang = i18n.resolvedLanguage || i18n.language || state.effectiveUi
+  const appLang = shownLanguage() || state.effectiveUi
   const split = state.effectiveAi !== appLang
   const tooltip = split
     ? t('languageMenu.tooltipSplit', { app: label(appLang), content: label(state.effectiveAi) })
@@ -165,23 +162,11 @@ export function LanguageMenuButton() {
   const save = async (body: { uiLanguage?: string; aiLanguage?: string | null }) => {
     setSaving(true)
     setError(null)
-    try {
-      const res = await fetch('/api/auth/me/preferences', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) throw new Error(String(res.status))
-      const prefs = (await res.json()) as PrefsResponse
-      setState((prev) => (prev ? applyPrefs(prev, prefs) : prev))
-      return prefs
-    } catch {
-      setError(t('languageMenu.saveFailed'))
-      return null
-    } finally {
-      setSaving(false)
-    }
+    const prefs = await saveLanguagePreferences(body)
+    if (prefs) setState((prev) => (prev ? applyPrefs(prev, prefs) : prev))
+    else setError(t('languageMenu.saveFailed'))
+    setSaving(false)
+    return prefs
   }
 
   const chooseApp = async (code: string) => {
@@ -191,10 +176,9 @@ export function LanguageMenuButton() {
     // in the language just picked, which is its own confirmation.
     await applyEffectiveUiLanguage(code)
     if (readOnly) return
-    // Recommendations in the same language as the app keep matching it, even
-    // when that language was picked explicitly; a deliberate split stays.
-    const keepTogether = !state.aiFollows && state.effectiveAi === previous
-    const prefs = await save(keepTogether ? { uiLanguage: code, aiLanguage: FOLLOW_APP } : { uiLanguage: code })
+    // Recommendations that matched the app follow it; the save route decides
+    // that (core aiLanguageAfterAppChange), so the login page gets it too.
+    const prefs = await save({ uiLanguage: code })
     if (!prefs) await applyEffectiveUiLanguage(previous)
   }
 
@@ -267,25 +251,12 @@ export function LanguageMenuButton() {
         {showUi && (
           <>
             <SectionHeading>{t('languageMenu.appHeading')}</SectionHeading>
-            <List dense disablePadding sx={{ pb: 1 }}>
-              {uiOptions.map((l) => (
-                <ListItemButton
-                  key={l.code}
-                  selected={l.code === appLang}
-                  disabled={saving}
-                  onClick={() => void chooseApp(l.code)}
-                  lang={l.code}
-                >
-                  <ListItemIcon sx={{ minWidth: 36 }}>
-                    <LocaleFlag locale={l.code} />
-                  </ListItemIcon>
-                  <ListItemText primary={l.label} />
-                  {l.code === appLang && (
-                    <CheckIcon fontSize="small" color="primary" sx={{ marginInlineStart: 1 }} />
-                  )}
-                </ListItemButton>
-              ))}
-            </List>
+            <AppLanguageList
+              options={uiOptions}
+              value={appLang}
+              onSelect={(code) => void chooseApp(code)}
+              disabled={saving}
+            />
           </>
         )}
 

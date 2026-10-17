@@ -184,9 +184,12 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       // flag. Public like the rest of this route: it is the language list the
       // signed-in switcher offers, nothing about any account.
       const { getSystemLanguageDefaults, APP_LOCALE_OPTIONS } = await import('@aperture/core')
-      const defaults = await getSystemLanguageDefaults()
+      const [defaults, allowPasswordlessLogin] = await Promise.all([
+        getSystemLanguageDefaults(),
+        isPasswordlessLoginEnabled(),
+      ])
       return reply.send({
-        allowPasswordlessLogin: await isPasswordlessLoginEnabled(),
+        allowPasswordlessLogin,
         languages: {
           defaultLanguage: defaults.defaultUiLanguage,
           options: APP_LOCALE_OPTIONS.filter((o) =>
@@ -456,17 +459,35 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       
       // A language the admin has not enabled is refused rather than stored:
       // the resolver would ignore it, so the save would look made and do nothing.
+      const currentPrefs = await getUserUiPreferences(request.user!.id)
+      const updates: Partial<UserUiPreferences> = { ...body }
+
       if (body.uiLanguage !== undefined || body.aiLanguage !== undefined) {
-        const { getSystemLanguageDefaults, languagePreferenceRefusal } = await import('@aperture/core')
+        const {
+          getSystemLanguageDefaults,
+          languagePreferenceRefusal,
+          resolveUiLanguage,
+          aiLanguageAfterAppChange,
+        } = await import('@aperture/core')
         const defaults = await getSystemLanguageDefaults()
         const refusal =
           languagePreferenceRefusal('uiLanguage', body.uiLanguage, defaults) ??
           languagePreferenceRefusal('aiLanguage', body.aiLanguage, defaults)
         if (refusal) return reply.status(400).send({ error: refusal })
-      }
 
-      const currentPrefs = await getUserUiPreferences(request.user!.id)
-      const updates: Partial<UserUiPreferences> = { ...body }
+        // A new app language carries recommendations that matched the old one
+        // (core languagePreference.ts), whichever surface changed it — unless
+        // this same save names a recommendations language of its own.
+        if (body.uiLanguage !== undefined && body.aiLanguage === undefined) {
+          const following = aiLanguageAfterAppChange(
+            currentPrefs.aiLanguage,
+            resolveUiLanguage(currentPrefs.uiLanguage, defaults),
+            resolveUiLanguage(body.uiLanguage, defaults),
+            defaults
+          )
+          if (following) updates.aiLanguage = following
+        }
+      }
       
       if (body.viewModes) {
         updates.viewModes = {

@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
-import { syncUiLanguageFromServer } from '@/i18n/syncUiLanguage'
+import {
+  applyEffectiveUiLanguage,
+  saveLanguagePreferences,
+  syncUiLanguageFromServer,
+} from '@/i18n/syncUiLanguage'
 import { clearUserScopedCaches } from '@/lib/clientCaches'
 import {
   AuthContext,
@@ -125,28 +129,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await response.json()
 
     // Saved BEFORE the user is set: setting it mounts the app, which reads the
-    // account's language and would otherwise switch back to it. A refusal (a
-    // language the admin has since disabled) leaves the stored one in place.
+    // account's language and would otherwise switch back to it. The save
+    // answers with the language now in effect, so no second read is needed.
+    let languageApplied = false
     if (options?.uiLanguage) {
-      try {
-        await fetch('/api/auth/me/preferences', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ uiLanguage: options.uiLanguage }),
-        })
-      } catch {
-        // the stored language stands
+      const saved = await saveLanguagePreferences({ uiLanguage: options.uiLanguage })
+      if (saved?.effectiveUiLanguage) {
+        await applyEffectiveUiLanguage(saved.effectiveUiLanguage)
+        languageApplied = true
+      } else {
+        // Refused (the admin disabled it meanwhile) or unanswered: the
+        // account's stored language is applied below instead. Said here, since
+        // the page switching back otherwise looks like the bug this prevents.
+        console.warn("Could not save the language picked at sign-in; using the account's language instead")
       }
     }
 
     setUser(data.user)
     setCapabilities(data.capabilities ?? {})
 
-    try {
-      await syncUiLanguageFromServer()
-    } catch {
-      // ignore locale sync failures
+    if (!languageApplied) {
+      try {
+        await syncUiLanguageFromServer()
+      } catch {
+        // ignore locale sync failures
+      }
     }
   }
 

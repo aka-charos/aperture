@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   AI_LANGUAGE_FOLLOWS_APP,
+  aiLanguageAfterAppChange,
   aiLanguageFollowsApp,
   languagePreferenceRefusal,
   resolveAiLanguage,
@@ -72,4 +73,28 @@ test('storing: a language the admin has not enabled is refused, per side', () =>
   assert.notEqual(languagePreferenceRefusal('aiLanguage', 'de', defaults), null)
   assert.notEqual(languagePreferenceRefusal('uiLanguage', 'xx', defaults), null)
   assert.notEqual(languagePreferenceRefusal('uiLanguage', 42, defaults), null)
+})
+
+test('changing the app language carries recommendations that matched it', () => {
+  // Explicit English with an English app: the switcher showed them together.
+  assert.equal(aiLanguageAfterAppChange('en', 'en', 'el', defaults), AI_LANGUAGE_FOLLOWS_APP)
+})
+
+test('a deliberate split survives an app language change', () => {
+  assert.equal(aiLanguageAfterAppChange('en', 'el', 'de', defaults), undefined)
+})
+
+test('a choice that already follows the app is left alone', () => {
+  assert.equal(aiLanguageAfterAppChange(null, 'en', 'el', defaults), undefined)
+  assert.equal(aiLanguageAfterAppChange(AI_LANGUAGE_FOLLOWS_APP, 'en', 'el', defaults), undefined)
+})
+
+test('no change of app language changes nothing', () => {
+  assert.equal(aiLanguageAfterAppChange('en', 'en', 'en', defaults), undefined)
+})
+
+test('a stored language the admin disabled is judged by what it resolved to', () => {
+  // 'de' is not an AI language here, so it resolved to the default 'en'.
+  assert.equal(aiLanguageAfterAppChange('de', 'en', 'el', defaults), AI_LANGUAGE_FOLLOWS_APP)
+  assert.equal(aiLanguageAfterAppChange('de', 'el', 'en', defaults), undefined)
 })

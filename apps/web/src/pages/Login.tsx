@@ -15,11 +15,11 @@ import { useTheme } from '@mui/material/styles'
 import { useAuth } from '@/hooks/useAuth'
 import { useTranslation } from 'react-i18next'
 import { useAppName, useLogoUrl } from '@/lib/branding'
-import { applyEffectiveUiLanguage } from '@/i18n/syncUiLanguage'
+import { applyEffectiveUiLanguage, shownLanguage } from '@/i18n/syncUiLanguage'
 import { LoginLanguageButton, type LoginLanguageOption } from '@/components/LoginLanguageButton'
 
 export function LoginPage() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   // The visible wordmark is `common.appName`; this is the logo's alt text, which
   // has no translation to interpolate into.
   const appName = useAppName()
@@ -37,7 +37,8 @@ export function LoginPage() {
   // Set only when the person picks a flag here; it is then saved to the
   // account at sign-in. A language detected from the browser is not a choice.
   const [pickedLanguage, setPickedLanguage] = useState<string | null>(null)
-  const currentLanguage = i18n.resolvedLanguage || i18n.language
+  // Re-read every render: useTranslation re-renders on a language change.
+  const currentLanguage = shownLanguage()
   
   // Clear session error when user starts typing
   useEffect(() => {
@@ -61,7 +62,7 @@ export function LoginPage() {
           setLanguageOptions(options)
           // A browser language the admin has not enabled shows the server's
           // default instead, the language the person would get once inside.
-          const shown = i18n.resolvedLanguage || i18n.language
+          const shown = shownLanguage()
           if (
             options.length > 0 &&
             !options.some((o) => o.code === shown) &&
@@ -77,7 +78,7 @@ export function LoginPage() {
       }
     }
     fetchLoginOptions()
-  }, [i18n])
+  }, [])
 
   // Redirect if already logged in
   useEffect(() => {

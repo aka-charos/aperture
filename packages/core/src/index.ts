@@ -562,6 +562,7 @@ export {
 export {
   AI_LANGUAGE_FOLLOWS_APP,
   aiLanguageFollowsApp,
+  aiLanguageAfterAppChange,
   resolveUiLanguage,
   resolveAiLanguage,
   languagePreferenceRefusal,
