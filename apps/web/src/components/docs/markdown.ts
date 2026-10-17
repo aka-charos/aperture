@@ -1,11 +1,12 @@
 /**
- * What the guide needs to know about a page before rendering it: its title,
+ * What a guide needs to know about a page before rendering it: its title,
  * a one-line summary for the index, and the anchor of every heading.
  *
- * Pure and DOM-free so `help.test.ts` can run it over the real files. The
- * pages are written for GitHub first, so the anchors follow GitHub's rule —
- * that is what every `page.md#fragment` link in `docs/admin/` was written
- * against, and a different rule would break them silently.
+ * Shared by the admin guide and the user guide. Pure and DOM-free so both
+ * guides' tests can run it over the real files. The pages are written for
+ * GitHub first, so the anchors follow GitHub's rule — that is what every
+ * `page.md#fragment` link in `docs/` was written against, and a different
+ * rule would break them silently.
  */
 
 export interface DocHeading {

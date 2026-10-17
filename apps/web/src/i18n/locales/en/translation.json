@@ -1957,6 +1957,30 @@
     "accessDisabled": "Your {{appName}} access is turned off. Contact your {{server}} administrator.",
     "yourMediaServer": "media server"
   },
+  "userGuide": {
+    "title": "User guide",
+    "blurb": "How each part of {{appName}} works",
+    "menu": "User guide",
+    "index": {
+      "filter": "Search the guide",
+      "noMatches": "No page mentions “{{query}}”."
+    },
+    "page": {
+      "allPages": "All guide pages",
+      "notFound": "There is no guide page called “{{slug}}”.",
+      "openScreen": "Go to this page"
+    },
+    "help": {
+      "tooltip": "How this page works",
+      "openGuide": "User guide",
+      "back": "Back",
+      "openInNewTab": "Open in a new tab",
+      "close": "Close"
+    },
+    "link": {
+      "outside": "This page is not part of the user guide"
+    }
+  },
   "userSettings": {
     "pageTitle": "Settings",
     "pageSubtitle": "What you are recommended, how things look, and your account",

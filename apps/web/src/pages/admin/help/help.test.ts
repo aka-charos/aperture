@@ -1,12 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { ADMIN_ENTRIES, adminEntryPath } from '../nav/registry'
 import { guideDocSlugs, guideSections } from './guide'
-import { consolePathIn, guideDocPath, resolveDocHref } from './links'
-import { docHeadings, docSummary, docTitle, githubSlug } from './markdown'
+import { docSummary, docTitle } from '@/components/docs/markdown'
+import { adminLinkTarget, consolePathIn, guideDocPath } from './links'
 
 /**
  * What keeps the in-app admin guide honest.
@@ -93,76 +93,6 @@ test('every console address a page names is a real section', () => {
   }
 })
 
-test('every link between pages lands on a page and a heading', () => {
-  const anchorsOf = (slug: string) => new Set(docHeadings(PAGES.get(slug) ?? '').map((h) => h.slug))
-
-  for (const [slug, markdown] of PAGES) {
-    for (const [line, text] of proseLines(markdown)) {
-      // Images are dropped in the app (the screenshots show the console before
-      // it was redesigned), so only real links are checked here.
-      for (const match of text.matchAll(/(?<!!)\[[^\]]*\]\(([^)\s]+)\)/g)) {
-        const where = `docs/admin/${slug}.md:${line} → ${match[1]}`
-        const link = resolveDocHref(match[1])
-
-        if (link.kind === 'doc') {
-          assert.ok(PAGES.has(link.slug), `${where}: no such page`)
-          if (link.anchor) {
-            assert.ok(anchorsOf(link.slug).has(link.anchor), `${where}: no such heading`)
-          }
-        } else if (link.kind === 'anchor') {
-          assert.ok(anchorsOf(slug).has(link.anchor), `${where}: no such heading on this page`)
-        } else if (link.kind === 'outside') {
-          assert.ok(existsSync(resolve(REPO, link.path)), `${where}: ${link.path} does not exist`)
-        } else if (link.kind === 'section') {
-          assert.ok(consolePathIn(link.path), `${where}: no such section`)
-        }
-      }
-    }
-  }
-})
-
-test('githubSlug follows GitHub', () => {
-  assert.equal(githubSlug('Accounts No Longer on the Media Server'), 'accounts-no-longer-on-the-media-server')
-  assert.equal(githubSlug('Logo & Favicon'), 'logo--favicon')
-  assert.equal(githubSlug('What Emails Look Like'), 'what-emails-look-like')
-  assert.equal(githubSlug('Step 2: Install pgvector'), 'step-2-install-pgvector')
-  assert.equal(githubSlug('Über `config`'), 'über-config')
-})
-
-test('docHeadings skips code fences and numbers repeats the way GitHub does', () => {
-  const md = ['# Title', '', '```bash', '# not a heading', '```', '## Setup', 'text', '## Setup', '### **Bold** `code`'].join('\n')
-  assert.deepEqual(
-    docHeadings(md).map((h) => [h.line, h.depth, h.slug]),
-    [
-      [1, 1, 'title'],
-      [6, 2, 'setup'],
-      [8, 2, 'setup-1'],
-      [9, 3, 'bold-code'],
-    ]
-  )
-})
-
-test('docSummary is the opening paragraph and nothing else', () => {
-  assert.equal(
-    docSummary('# T\n\nThe **mail** server, see [SMTP](smtp.md).\nSecond line.\n\n## Next'),
-    'The mail server, see SMTP. Second line.'
-  )
-  assert.equal(docSummary('# T\n\n| a | b |\n|---|---|'), '')
-  assert.equal(docSummary('# T\n\n![shot](x.png)\n\nText'), '')
-})
-
-test('resolveDocHref routes each kind of link', () => {
-  assert.deepEqual(resolveDocHref('smtp.md#account-drift'), { kind: 'doc', slug: 'smtp', anchor: 'account-drift' })
-  assert.deepEqual(resolveDocHref('./tmdb.md'), { kind: 'doc', slug: 'tmdb', anchor: undefined })
-  assert.deepEqual(resolveDocHref('../admin/omdb.md'), { kind: 'doc', slug: 'omdb', anchor: undefined })
-  assert.deepEqual(resolveDocHref('#installing-pgvector'), { kind: 'anchor', anchor: 'installing-pgvector' })
-  assert.deepEqual(resolveDocHref('../features/discovery.md'), { kind: 'outside', path: 'docs/features/discovery.md' })
-  assert.deepEqual(resolveDocHref('../api-reference.md#gap'), { kind: 'outside', path: 'docs/api-reference.md' })
-  assert.deepEqual(resolveDocHref('https://n8n.io'), { kind: 'external', href: 'https://n8n.io' })
-  assert.deepEqual(resolveDocHref('mailto:a@b.c'), { kind: 'external', href: 'mailto:a@b.c' })
-  assert.deepEqual(resolveDocHref('/admin/ops/jobs/'), { kind: 'section', path: '/admin/ops/jobs' })
-})
-
 test('consolePathIn links only real sections', () => {
   assert.equal(consolePathIn('/admin/integrations/smtp'), '/admin/integrations/smtp')
   assert.equal(consolePathIn('/admin/integrations/smtp/'), '/admin/integrations/smtp')
@@ -174,4 +104,17 @@ test('consolePathIn links only real sections', () => {
 test('guideDocPath is under the guide entry', () => {
   assert.equal(guideDocPath('smtp'), '/admin/help/smtp')
   assert.equal(guideDocPath('smtp', 'account-drift'), '/admin/help/smtp#account-drift')
+})
+
+test('adminLinkTarget routes each kind of link', () => {
+  const from = 'docs/admin/tmdb.md'
+  const known = (slug: string) => PAGES.has(slug)
+  assert.deepEqual(adminLinkTarget('smtp.md#account-drift', from, known), {
+    kind: 'page', slug: 'smtp', anchor: 'account-drift', href: '/admin/help/smtp#account-drift',
+  })
+  assert.deepEqual(adminLinkTarget('../features/discovery.md', from, known), { kind: 'route', href: '/help/discovery' })
+  assert.deepEqual(adminLinkTarget('../user-guide.md', from, known), { kind: 'route', href: '/help' })
+  assert.deepEqual(adminLinkTarget('../api-reference.md#gap', from, known), { kind: 'text' })
+  assert.deepEqual(adminLinkTarget('/admin/ops/jobs/', from, known), { kind: 'route', href: '/admin/ops/jobs' })
+  assert.deepEqual(adminLinkTarget('nope.md', from, known), { kind: 'text' })
 })

@@ -17,10 +17,11 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import SearchIcon from '@mui/icons-material/Search'
 import { PageHeading } from '@/components/PageHeading'
 import { adminEntryPath, adminPathFor } from '../nav/registry'
-import { filterAdminDocs, getAdminDoc } from './docs'
+import { DocMarkdown } from '@/components/docs/DocMarkdown'
+import type { DocPage } from '@/components/docs/pages'
+import { ADMIN_DOC_PAGES, filterAdminDocs, getAdminDoc } from './docs'
 import { guideSections, sectionsForDoc } from './guide'
-import { guideDocPath } from './links'
-import { HelpMarkdown } from './HelpMarkdown'
+import { adminLinkTarget, consolePathIn, guideDocPath } from './links'
 
 /**
  * `/admin/help` (the index) and `/admin/help/:slug` (one page).
@@ -134,7 +135,11 @@ function GuideDoc({ slug }: { slug: string }) {
   }, [slug, location.hash])
 
   const openDoc = useCallback((target: string, anchor?: string) => navigate(guideDocPath(target, anchor)), [navigate])
-  const openSection = useCallback((path: string) => navigate(path), [navigate])
+  const openRoute = useCallback((path: string) => navigate(path), [navigate])
+  const linkTarget = useCallback(
+    (href: string, page: DocPage) => adminLinkTarget(href, page.file, (s) => ADMIN_DOC_PAGES.has(s)),
+    []
+  )
   // Through the router rather than scrollIntoView, so the shell flashes the
   // heading and a second click on the same link still lands.
   const toAnchor = useCallback((anchor: string) => navigate({ hash: anchor }), [navigate])
@@ -178,7 +183,15 @@ function GuideDoc({ slug }: { slug: string }) {
       </Box>
 
       <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-        <HelpMarkdown doc={doc} onOpenDoc={openDoc} onOpenSection={openSection} onAnchor={toAnchor} />
+        <DocMarkdown
+          doc={doc}
+          linkTarget={linkTarget}
+          codeRoute={consolePathIn}
+          textLinkHint={t('adminDocs.link.outside')}
+          onOpenPage={openDoc}
+          onNavigate={openRoute}
+          onAnchor={toAnchor}
+        />
       </Paper>
     </Box>
   )

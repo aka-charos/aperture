@@ -33,6 +33,7 @@ import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined'
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined'
 import TuneIcon from '@mui/icons-material/Tune'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
+import MenuBookIcon from '@mui/icons-material/MenuBook'
 import WhatshotIcon from '@mui/icons-material/Whatshot'
 import InsightsIcon from '@mui/icons-material/Insights'
 import AddToQueueIcon from '@mui/icons-material/AddToQueue'
@@ -54,6 +55,7 @@ import { AdminMenuButton } from './AdminMenuButton'
 import { ImpersonationBanner, IMPERSONATION_BANNER_HEIGHT } from './ImpersonationBanner'
 import { AdminSearchProvider } from '@/hooks/AdminSearchProvider'
 import { GlobalSearch } from './GlobalSearch'
+import { UserHelpButton } from './UserHelpButton'
 import { LanguageMenuButton } from './LanguageMenuButton'
 import { AppBarPageHeading } from './PageHeading'
 import { PageHeaderProvider } from '@/hooks/PageHeaderProvider'
@@ -676,6 +678,9 @@ function AppShell() {
           {/* Global Search */}
           <GlobalSearch />
 
+          {/* Help for the screen you are on: its user guide pages in a drawer. */}
+          <UserHelpButton />
+
           {/* Language: the app's, and the one AI writes in. Beside the avatar
               because it is a choice about the person, not the library. */}
           <LanguageMenuButton />
@@ -736,6 +741,12 @@ function AppShell() {
                 {/* No My Watch History here: it is a sidebar destination
                     (nav.watchHistory, /history), and this menu is for the
                     things that have no other entry point. */}
+                <MenuItem onClick={() => { handleUserMenuClose(); navigate('/help'); }}>
+                  <ListItemIcon>
+                    <MenuBookIcon fontSize="small" />
+                  </ListItemIcon>
+                  {t('userGuide.menu')}
+                </MenuItem>
                 <MenuItem onClick={() => { handleUserMenuClose(); showWelcome(); }}>
                   <ListItemIcon>
                     <HelpOutlineIcon fontSize="small" />

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { I18nextProvider } from 'react-i18next'
 import i18n from './i18n/config'
@@ -46,6 +46,14 @@ import { MyRequestsPage } from './pages/MyRequests'
 // Admin pages are lazy and reached through the registry, so none is imported here.
 import { adminChildRoutes } from './pages/admin/nav/routes'
 import { Box, CircularProgress } from '@mui/material'
+
+/**
+ * The user guide carries every page of docs/features compiled in, so it is
+ * the one route loaded on demand: nobody downloads the guide until they open it.
+ */
+const UserGuidePage = lazy(async () => ({
+  default: (await import('./pages/guide/UserGuidePage')).UserGuidePage,
+}))
 
 function SetupGuard({ children }: { children: React.ReactNode }) {
   const { status, loading } = useSetupStatus()
@@ -219,6 +227,14 @@ function AppRoutes() {
         <Route path="person/:name" element={<PersonDetailPage />} />
         <Route path="studio/:name" element={<StudioDetailPage />} />
         <Route path="settings" element={<UserSettingsPage />} />
+        <Route
+          path="help/*"
+          element={
+            <Suspense fallback={null}>
+              <UserGuidePage />
+            </Suspense>
+          }
+        />
 
         {/* Admin Routes — the whole subtree is generated from the registry in
             `pages/admin/nav`, which is also what the nav column and the

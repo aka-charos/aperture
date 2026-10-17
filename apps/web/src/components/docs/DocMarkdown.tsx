@@ -1,5 +1,4 @@
 import { useMemo, type MouseEvent, type ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
 import Markdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
@@ -17,11 +16,11 @@ import {
   Typography,
 } from '@mui/material'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import type { AdminDoc } from './docs'
-import { consolePathIn, guideDocPath, resolveDocHref } from './links'
+import type { DocLinkTarget } from './docLinks'
+import type { DocPage } from './pages'
 
-interface HelpMarkdownProps {
-  doc: AdminDoc
+interface DocMarkdownProps {
+  doc: DocPage
   /**
    * Prepended to every heading id. The drawer renders over a section whose own
    * DOM carries ids, and a heading called "Configuration" must not collide
@@ -30,8 +29,17 @@ interface HelpMarkdownProps {
   idPrefix?: string
   /** Gap left above a heading scrolled to; defaults to clearing the app bar. */
   scrollMarginTop?: number | string
-  onOpenDoc: (slug: string, anchor?: string) => void
-  onOpenSection: (path: string) => void
+  /** Where each link lands; decided by the guide, which knows its routes and its reader. */
+  linkTarget: (href: string, page: DocPage) => DocLinkTarget
+  /**
+   * An in-app address written as inline code (`/admin/integrations/smtp`),
+   * or null. Optional: only a guide whose pages name addresses links them.
+   */
+  codeRoute?: (text: string) => string | null
+  /** Tooltip on a link that has nothing in the app to open. */
+  textLinkHint: string
+  onOpenPage: (slug: string, anchor?: string) => void
+  onNavigate: (href: string) => void
   onAnchor: (anchor: string) => void
 }
 
@@ -53,23 +61,26 @@ function routeClick(event: MouseEvent, go: () => void) {
 }
 
 /**
- * One admin guide page.
+ * One docs page, for either guide.
  *
- * The page's `# Title` is not rendered: both hosts show it in their own
- * header. Links are routed by `resolveDocHref`, so a link to another admin
- * page opens it in the guide, a console address in inline code opens that
- * section, and a link into the rest of `docs/` reads as text — there is
- * nothing in the app for it to open yet.
+ * The page's `# Title` is not rendered: every host shows it in its own
+ * header. Where a link lands is the guide's decision (`linkTarget`): another
+ * page of the same guide opens in place, an in-app address navigates, and a
+ * link with nothing in the app to open reads as text rather than as a link
+ * to a dead route. Screenshots are never drawn — the reader is looking at
+ * the real screen.
  */
-export function HelpMarkdown({
+export function DocMarkdown({
   doc,
   idPrefix = '',
   scrollMarginTop = 'calc(var(--aperture-chrome-top, 64px) + 16px)',
-  onOpenDoc,
-  onOpenSection,
+  linkTarget,
+  codeRoute,
+  textLinkHint,
+  onOpenPage,
+  onNavigate,
   onAnchor,
-}: HelpMarkdownProps) {
-  const { t } = useTranslation()
+}: DocMarkdownProps) {
 
   const components = useMemo<Components>(() => {
     const slugByLine = new Map(doc.headings.map((h) => [h.line, h.slug]))
@@ -111,7 +122,7 @@ export function HelpMarkdown({
       img: () => null,
       hr: () => <Divider sx={{ my: 3 }} />,
       a: ({ href, children }) => {
-        const link = resolveDocHref(href ?? '')
+        const link = linkTarget(href ?? '', doc)
         switch (link.kind) {
           case 'external':
             return (
@@ -126,24 +137,21 @@ export function HelpMarkdown({
                 {children}
               </Link>
             )
-          case 'doc':
+          case 'page':
             return (
-              <Link
-                href={guideDocPath(link.slug, link.anchor)}
-                onClick={(e) => routeClick(e, () => onOpenDoc(link.slug, link.anchor))}
-              >
+              <Link href={link.href} onClick={(e) => routeClick(e, () => onOpenPage(link.slug, link.anchor))}>
                 {children}
               </Link>
             )
-          case 'section':
+          case 'route':
             return (
-              <Link href={link.path} onClick={(e) => routeClick(e, () => onOpenSection(link.path))}>
+              <Link href={link.href} onClick={(e) => routeClick(e, () => onNavigate(link.href))}>
                 {children}
               </Link>
             )
-          case 'outside':
+          case 'text':
             return (
-              <Tooltip title={t('adminDocs.link.outside')}>
+              <Tooltip title={textLinkHint}>
                 <Box component="span" sx={{ borderBottom: 1, borderColor: 'divider', borderBottomStyle: 'dotted' }}>
                   {children}
                 </Box>
@@ -153,10 +161,10 @@ export function HelpMarkdown({
       },
       code: ({ className, children }) => {
         const text = textOf(children)
-        const path = !className && !text.includes('\n') ? consolePathIn(text) : null
+        const path = codeRoute && !className && !text.includes('\n') ? codeRoute(text) : null
         if (path) {
           return (
-            <Link href={path} onClick={(e) => routeClick(e, () => onOpenSection(path))}>
+            <Link href={path} onClick={(e) => routeClick(e, () => onNavigate(path))}>
               <code>{children}</code>
             </Link>
           )
@@ -183,7 +191,7 @@ export function HelpMarkdown({
       ),
       td: ({ children }) => <TableCell sx={{ verticalAlign: 'top' }}>{children}</TableCell>,
     }
-  }, [doc, idPrefix, onAnchor, onOpenDoc, onOpenSection, t])
+  }, [doc, idPrefix, linkTarget, codeRoute, textLinkHint, onAnchor, onOpenPage, onNavigate])
 
   return (
     <Box
