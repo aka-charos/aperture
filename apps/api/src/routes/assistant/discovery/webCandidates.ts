@@ -320,6 +320,9 @@ export async function gatherWebCandidates(
       slot: structuring.keySlot,
       status,
       ...usage,
+      // Structuring is handed no search tool, so an answered call ran none — a
+      // real 0. A failed one stays "not recorded".
+      ...(status === 'ok' ? { searchQueries: 0 } : {}),
     })
   }
 

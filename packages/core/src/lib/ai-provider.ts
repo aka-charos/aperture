@@ -1730,6 +1730,12 @@ export interface WebSearchUsageTokens {
 export interface WebSearchCallOutcome<T> {
   value: T
   usage?: WebSearchUsageTokens
+  /**
+   * Google searches the call ran, from `groundingSearchCount`. A request is
+   * often several searches and some plans bill per search, so the meter
+   * records it beside the request; omitted, the row stores "not recorded".
+   */
+  searchQueries?: number
 }
 
 /**
@@ -1767,6 +1773,7 @@ export async function withGroundingModel<T>(
         slot: attempt.slot,
         status: 'ok',
         ...outcome.usage,
+        searchQueries: outcome.searchQueries,
       })
       return outcome.value
     } catch (err) {

@@ -154,6 +154,7 @@ export {
   keySlotName,
   recordWebSearchCall,
   getWebSearchUsageSummary,
+  groundingSearchCount,
   type WebSearchKeySlot,
   type FreeTierLimits,
   type ResolvedLimits,

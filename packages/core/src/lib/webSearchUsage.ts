@@ -57,6 +57,13 @@ export interface WebSearchCallRecord {
   inputTokens?: number
   outputTokens?: number
   totalTokens?: number
+  /**
+   * Google searches the request ran (`groundingSearchCount`). One request is
+   * often several searches, and some paid plans bill per search. Omit it when
+   * no response arrived: the row then stores NULL, "not recorded", which the
+   * summary keeps apart from a real 0.
+   */
+  searchQueries?: number
 }
 
 /** Rolling meter, not an audit log — rows past this are dropped. */
@@ -65,6 +72,9 @@ const RETENTION_DAYS = 3
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000
 
 let lastPruneAt = 0
+
+/** Postgres `undefined_column`: the column a migration adds is not there yet. */
+const UNDEFINED_COLUMN = '42703'
 
 /** SQL for the start of the current Gemini day (midnight US/Pacific). */
 const PACIFIC_DAY_START =
@@ -80,14 +90,28 @@ export async function recordWebSearchCall(record: WebSearchCallRecord): Promise<
   const output = toInt(record.outputTokens)
   // Providers sometimes report only the parts, sometimes only the total.
   const total = toInt(record.totalTokens) || input + output
+  const searches = record.searchQueries == null ? null : toInt(record.searchQueries)
+  const base = [record.role, record.provider, record.model, record.slot, record.status, input, output, total]
 
   try {
-    await query(
-      `INSERT INTO web_search_usage
-         (role, provider, model, key_slot, status, input_tokens, output_tokens, total_tokens)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [record.role, record.provider, record.model, record.slot, record.status, input, output, total]
-    )
+    try {
+      await query(
+        `INSERT INTO web_search_usage
+           (role, provider, model, key_slot, status, input_tokens, output_tokens, total_tokens, search_queries)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [...base, searches]
+      )
+    } catch (err) {
+      // A database behind the image (0206 not applied) must still be metered:
+      // losing the request count to save the search count would be backwards.
+      if ((err as { code?: string }).code !== UNDEFINED_COLUMN) throw err
+      await query(
+        `INSERT INTO web_search_usage
+           (role, provider, model, key_slot, status, input_tokens, output_tokens, total_tokens)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        base
+      )
+    }
   } catch (err) {
     logger.warn({ err, role: record.role, slot: record.slot }, 'Failed to record Web Search usage')
     return
@@ -111,6 +135,15 @@ async function pruneOldUsage(): Promise<void> {
 export interface WebSearchUsageWindow {
   requests: number
   tokens: number
+  /** Google searches those requests ran, over the requests that recorded a count. */
+  searches: number
+  /**
+   * Answered requests with NO search count — written before 0206, or by a
+   * database that does not have the column yet. `searches` undercounts by
+   * whatever these ran, so the panel says so rather than showing it as exact.
+   * Refused and failed requests are not in it: Gemini never answered them.
+   */
+  uncountedRequests: number
 }
 
 export interface WebSearchSlotUsage {
@@ -150,8 +183,12 @@ interface UsageRow {
   key_slot: string
   minute_requests: number
   minute_tokens: string | number
+  minute_searches: string | number
+  minute_uncounted: number
   day_requests: number
   day_tokens: string | number
+  day_searches: string | number
+  day_uncounted: number
   rate_limited_today: number
   last_rate_limited_at: Date | null
   last_used_at: Date | null
@@ -161,8 +198,8 @@ function emptySlot(role: AIFunction, slot: WebSearchKeySlot, now: number): WebSe
   const cooldown = getSlotCooldownUntil(role, slot, now)
   return {
     slot,
-    minute: { requests: 0, tokens: 0 },
-    day: { requests: 0, tokens: 0 },
+    minute: { requests: 0, tokens: 0, searches: 0, uncountedRequests: 0 },
+    day: { requests: 0, tokens: 0, searches: 0, uncountedRequests: 0 },
     rateLimitedToday: 0,
     lastRateLimitedAt: null,
     lastUsedAt: null,
@@ -214,23 +251,39 @@ export async function getWebSearchUsageSummary(
 
     // `model IS NULL OR model = $1` keeps the meter honest when the role has no
     // model configured yet: show everything rather than silently nothing.
-    const rows = await query<UsageRow>(
-      `SELECT
+    //
+    // `searches` is the column, or NULL on a database without 0206 — then every
+    // answered request reads as uncounted rather than the whole meter failing.
+    const usageSql = (searches: string) => {
+      const minute = `created_at >= NOW() - INTERVAL '1 minute'`
+      const day = `created_at >= ${PACIFIC_DAY_START}`
+      const uncounted = `${searches} IS NULL AND status IN ('ok', 'empty')`
+      return `SELECT
          key_slot,
-         COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 minute')::int AS minute_requests,
-         COALESCE(SUM(total_tokens) FILTER (WHERE created_at >= NOW() - INTERVAL '1 minute'), 0) AS minute_tokens,
-         COUNT(*) FILTER (WHERE created_at >= ${PACIFIC_DAY_START})::int AS day_requests,
-         COALESCE(SUM(total_tokens) FILTER (WHERE created_at >= ${PACIFIC_DAY_START}), 0) AS day_tokens,
-         COUNT(*) FILTER (WHERE created_at >= ${PACIFIC_DAY_START} AND status = 'rate_limited')::int AS rate_limited_today,
+         COUNT(*) FILTER (WHERE ${minute})::int AS minute_requests,
+         COALESCE(SUM(total_tokens) FILTER (WHERE ${minute}), 0) AS minute_tokens,
+         COALESCE(SUM(${searches}) FILTER (WHERE ${minute}), 0) AS minute_searches,
+         COUNT(*) FILTER (WHERE ${minute} AND ${uncounted})::int AS minute_uncounted,
+         COUNT(*) FILTER (WHERE ${day})::int AS day_requests,
+         COALESCE(SUM(total_tokens) FILTER (WHERE ${day}), 0) AS day_tokens,
+         COALESCE(SUM(${searches}) FILTER (WHERE ${day}), 0) AS day_searches,
+         COUNT(*) FILTER (WHERE ${day} AND ${uncounted})::int AS day_uncounted,
+         COUNT(*) FILTER (WHERE ${day} AND status = 'rate_limited')::int AS rate_limited_today,
          MAX(created_at) FILTER (WHERE status = 'rate_limited') AS last_rate_limited_at,
          MAX(created_at) AS last_used_at
        FROM web_search_usage
        WHERE created_at >= ${PACIFIC_DAY_START} - INTERVAL '1 day'
          AND role = $2
          AND ($1::text IS NULL OR model = $1)
-       GROUP BY key_slot`,
-      [model, role]
-    )
+       GROUP BY key_slot`
+    }
+    let rows
+    try {
+      rows = await query<UsageRow>(usageSql('search_queries'), [model, role])
+    } catch (err) {
+      if ((err as { code?: string }).code !== UNDEFINED_COLUMN) throw err
+      rows = await query<UsageRow>(usageSql('NULL::int'), [model, role])
+    }
 
     const bySlot = new Map(rows.rows.map((r) => [r.key_slot, r]))
     const slotUsage = slots.map((slot) => {
@@ -239,8 +292,18 @@ export async function getWebSearchUsageSummary(
       const cooldown = getSlotCooldownUntil(role, slot, now)
       return {
         slot,
-        minute: { requests: row.minute_requests, tokens: Number(row.minute_tokens) },
-        day: { requests: row.day_requests, tokens: Number(row.day_tokens) },
+        minute: {
+          requests: row.minute_requests,
+          tokens: Number(row.minute_tokens),
+          searches: Number(row.minute_searches),
+          uncountedRequests: row.minute_uncounted,
+        },
+        day: {
+          requests: row.day_requests,
+          tokens: Number(row.day_tokens),
+          searches: Number(row.day_searches),
+          uncountedRequests: row.day_uncounted,
+        },
         rateLimitedToday: row.rate_limited_today,
         lastRateLimitedAt: row.last_rate_limited_at?.toISOString() ?? null,
         lastUsedAt: row.last_used_at?.toISOString() ?? null,

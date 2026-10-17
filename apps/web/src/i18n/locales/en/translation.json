@@ -5918,7 +5918,13 @@
     "groundingBlocked": "This model has no free-tier grounding allowance, so grounded searches are refused no matter how much of the budget above is left. On the free tier only the Gemini 2.x models can ground.",
     "limitsObserved": "Ceilings shown were enforced by Google against this key.",
     "limitsAssumed": "Ceilings shown are the free-tier defaults for this model. Google enforces the real ones, and they replace these as soon as a rate-limit response names them.",
-    "limitsMixed": "Some ceilings shown were enforced by Google against this key; the rest are free-tier defaults, replaced as Google names them."
+    "limitsMixed": "Some ceilings shown were enforced by Google against this key; the rest are free-tier defaults, replaced as Google names them.",
+    "titlePaid": "Usage today",
+    "resetsPaid": "Today's counts reset at {{time}}",
+    "searchesDetail": "Requests {{requests}} · Google searches {{searches}}",
+    "searchesUncounted": "{{count}} request today was recorded before searches were counted, so the search figures above are low.",
+    "searchesUncounted_plural": "{{count}} requests today were recorded before searches were counted, so the search figures above are low.",
+    "searchesNote": "One request can run several Google searches; Gemini decides how many. Check your Google plan for whether grounding is billed per request or per search."
   },
   "inferenceDashboard": {
     "title": "AI Spend",

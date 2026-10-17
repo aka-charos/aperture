@@ -4863,7 +4863,13 @@
     "groundingBlocked": "This model has no free-tier grounding allowance, so grounded searches are refused no matter how much of the budget above is left. On the free tier only the Gemini 2.x models can ground.",
     "limitsObserved": "Ceilings shown were enforced by Google against this key.",
     "limitsAssumed": "Ceilings shown are the free-tier defaults for this model. Google enforces the real ones, and they replace these as soon as a rate-limit response names them.",
-    "limitsMixed": "Some ceilings shown were enforced by Google against this key; the rest are free-tier defaults, replaced as Google names them."
+    "limitsMixed": "Some ceilings shown were enforced by Google against this key; the rest are free-tier defaults, replaced as Google names them.",
+    "titlePaid": "Χρήση σήμερα",
+    "resetsPaid": "Οι σημερινές μετρήσεις μηδενίζονται στις {{time}}",
+    "searchesDetail": "Αιτήματα {{requests}} · Αναζητήσεις Google {{searches}}",
+    "searchesUncounted": "{{count}} αίτημα σήμερα καταγράφηκε πριν αρχίσει η μέτρηση αναζητήσεων, οπότε οι αριθμοί αναζητήσεων παραπάνω είναι χαμηλότεροι από τους πραγματικούς.",
+    "searchesUncounted_plural": "{{count}} αιτήματα σήμερα καταγράφηκαν πριν αρχίσει η μέτρηση αναζητήσεων, οπότε οι αριθμοί αναζητήσεων παραπάνω είναι χαμηλότεροι από τους πραγματικούς.",
+    "searchesNote": "Ένα αίτημα μπορεί να εκτελέσει πολλές αναζητήσεις Google· το Gemini αποφασίζει πόσες. Ελέγξτε στο πρόγραμμά σας στη Google αν η αναζήτηση (grounding) χρεώνεται ανά αίτημα ή ανά αναζήτηση."
   },
   "inferenceDashboard": {
     "title": "AI Spend",

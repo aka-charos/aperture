@@ -9,6 +9,11 @@
  * own quota.
  *
  * Rendered inside the Web Search card via AIFunctionCard's `footer` slot.
+ *
+ * It also counts Google SEARCHES, beside requests: Gemini runs several per
+ * request, and some paid plans bill grounding per search, so the panel shows on
+ * a paid key too — with only the limits Google itself enforced, never the
+ * free-tier table.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -18,6 +23,13 @@ import { Refresh as RefreshIcon, WarningAmber as WarningAmberIcon } from '@mui/i
 interface UsageWindow {
   requests: number
   tokens: number
+  /**
+   * Google searches those requests ran. Absent from an API older than the
+   * count, which renders as no searches line rather than as zero.
+   */
+  searches?: number
+  /** Answered requests recorded without a search count, so `searches` is low. */
+  uncountedRequests?: number
 }
 
 interface SlotUsage {
@@ -111,12 +123,15 @@ function UsageBar({
   used,
   limit,
   adornment,
+  detail,
 }: {
   label: string
   used: number
   limit: number | null
   /** Sits beside the label, for a chip that belongs to this row. */
   adornment?: React.ReactNode
+  /** A second line under the row. */
+  detail?: string
 }) {
   const value = limit ? Math.min(100, (used / limit) * 100) : 0
   return (
@@ -140,6 +155,11 @@ function UsageBar({
           color={barColor(used, limit)}
           sx={{ height: 4, borderRadius: 2 }}
         />
+      )}
+      {detail && (
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25 }}>
+          {detail}
+        </Typography>
       )}
     </Box>
   )
@@ -176,22 +196,30 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
   // Nothing to meter until the role is configured — the card already says so.
   if (!usage?.configured) return null
 
-  // FREE TIER ONLY. This panel's denominators come from the shipped free-tier
-  // table, and its heading says so, so it has nothing to draw against on a paid
-  // project — the bars would read as full while the real budget had barely been
-  // touched, which is the exact misreading the checkbox exists to prevent.
-  //
-  // The cost is real and deliberate: limits Google has ENFORCED against this key
-  // apply whatever the checkbox says, and those counts are hidden here too. They
-  // are still recorded, and the moment the operator says the key is free-tier
-  // they appear.
-  if (!usage.freeTier) return null
+  // Shown on a PAID key too, since some paid plans bill grounding per search and
+  // the search count is the number that answers "what did that cost". It used to
+  // be hidden there for fear of drawing paid usage against free-tier ceilings,
+  // but the server never sends those for a paid key (`resolveModelLimits` applies
+  // the free-tier table only when the operator ticked Free tier): what reaches
+  // this page is limits Google enforced, which are true on any plan, or none —
+  // and then the rows are bare counts.
+  const freeTier = usage.freeTier
 
   // The server already returns exactly the configured keys, deduped — a role
   // with no spares gets one row, and the primary's numbers are the whole story.
   const slots = usage.slots
   const limits = usage.limits
   const paused = slots.filter((s) => s.cooldownUntil)
+  // Requests written before searches were counted; the figure undercounts by
+  // whatever they ran, and saying so beats presenting it as exact.
+  const uncounted = slots.reduce((sum, s) => sum + (s.day.uncountedRequests ?? 0), 0)
+  const searchDetail = (day: UsageWindow): string | undefined =>
+    day.searches == null
+      ? undefined
+      : t('webSearchUsage.searchesDetail', {
+          requests: day.requests.toLocaleString(),
+          searches: day.searches.toLocaleString(),
+        })
 
   return (
     <Box
@@ -206,7 +234,7 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <Typography variant="subtitle2" fontWeight={600}>
-          {t('webSearchUsage.title')}
+          {freeTier ? t('webSearchUsage.title') : t('webSearchUsage.titlePaid')}
         </Typography>
         <Tooltip title={t('webSearchUsage.refresh')}>
           <span style={{ marginInlineStart: 'auto' }}>
@@ -218,14 +246,16 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
       </Box>
 
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-        {t('webSearchUsage.resets', { time: formatTime(usage.dayResetsAt) })}
+        {t(freeTier ? 'webSearchUsage.resets' : 'webSearchUsage.resetsPaid', {
+          time: formatTime(usage.dayResetsAt),
+        })}
       </Typography>
 
       {!limits?.rpd && (
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
           {/* Two different reasons for a bare count, and the operator can only
               act on one of them: they turned the free-tier ceilings off. */}
-          {usage.freeTier
+          {freeTier
             ? t('webSearchUsage.noPublishedLimits')
             : t('webSearchUsage.paidTierNoLimits')}
         </Typography>
@@ -270,6 +300,7 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
           label={slotLabel(slot.slot, t)}
           used={slot.day.requests}
           limit={limits?.rpd ?? null}
+          detail={searchDetail(slot.day)}
           adornment={
             slot.rateLimitedToday > 0 ? (
               <Chip
@@ -309,6 +340,16 @@ export function WebSearchUsagePanel({ role = 'webSearch' }: { role?: string } = 
           {t(LIMIT_SOURCE_KEYS[limits.source])}
         </Typography>
       )}
+
+      {uncounted > 0 && (
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5 }}>
+          {t('webSearchUsage.searchesUncounted', { count: uncounted })}
+        </Typography>
+      )}
+
+      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5 }}>
+        {t('webSearchUsage.searchesNote')}
+      </Typography>
 
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5 }}>
         {t('webSearchUsage.caveat')}

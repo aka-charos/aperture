@@ -55,6 +55,7 @@ import { waitForCallSlot } from '../lib/callPacing.js'
 import { createChildLogger } from '../lib/logger.js'
 import { startStreamStallGuard, type StreamAbortReason } from '../lib/streamStall.js'
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
+import { groundingSearchCount } from '../lib/groundingSearches.js'
 import { budgetSources } from './budget.js'
 import { isBlockedPage } from './blockedPage.js'
 import {
@@ -1534,6 +1535,7 @@ async function writeWithGrounding(
       modelId: keyAttempt.modelId,
     }
     let usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined
+    let searchQueries: number | undefined
 
     for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
       // Same gate and same key as the CRW path, so the two modes cannot pace
@@ -1584,6 +1586,7 @@ async function writeWithGrounding(
         heartbeat.stop()
       }
       usage = response.usage
+      searchQueries = groundingSearchCount(response.providerMetadata)
 
       const grounding = (
         response.providerMetadata?.google as
@@ -1658,12 +1661,13 @@ async function writeWithGrounding(
           slot: keyAttempt.slot,
           status: 'empty',
           ...response.usage,
+          searchQueries,
         })
         await sleep(RETRY_DELAY_MS)
       }
     }
 
-    return { value: result, usage }
+    return { value: result, usage, searchQueries }
   })
 }
 /**

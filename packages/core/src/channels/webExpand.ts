@@ -16,6 +16,7 @@ import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
 import { getLibraryScopeForUser, type LibraryScope } from '../lib/libraryScope.js'
 import { withWebSearchModel, getWebSearchProviderTools } from '../lib/ai-provider.js'
+import { groundingSearchCount } from '../lib/groundingSearches.js'
 import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
 import { parseChannelMediaTypes } from './recommendations.js'
 import type { ChannelMediaType, ChannelRecommendation } from './types.js'
@@ -124,6 +125,8 @@ async function gatherSimilarCandidates(
       })
 
       const { text } = pass1
+      // Pass 2 below runs no search, so pass 1's count is the whole call's.
+      const searchQueries = groundingSearchCount(pass1.providerMetadata)
       const grounding = (
         pass1.providerMetadata?.google as
           | { groundingMetadata?: { webSearchQueries?: string[]; groundingChunks?: unknown[] } }
@@ -139,7 +142,7 @@ async function gatherSimilarCandidates(
         'Channel web expansion: grounding completed'
       )
 
-      if (!text?.trim()) return { value: [], usage: pass1.usage }
+      if (!text?.trim()) return { value: [], usage: pass1.usage, searchQueries }
 
       // Pass 2 — structure into typed candidates (no grounding needed)
       const pass2 = await generateObject({
@@ -159,6 +162,7 @@ async function gatherSimilarCandidates(
           outputTokens: (pass1.usage.outputTokens ?? 0) + (pass2.usage.outputTokens ?? 0),
           totalTokens: (pass1.usage.totalTokens ?? 0) + (pass2.usage.totalTokens ?? 0),
         },
+        searchQueries,
       }
     })
   } catch (err) {

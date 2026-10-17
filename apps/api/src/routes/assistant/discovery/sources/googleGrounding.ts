@@ -33,6 +33,7 @@ import {
   getWebSearchProviderTools,
   createChildLogger,
   recordWebSearchCall,
+  groundingSearchCount,
 } from '@aperture/core'
 import { recordLlmError } from '../../helpers/errors.js'
 import type { WebSearchSource, WebSearchSourceResult } from './types.js'
@@ -91,6 +92,7 @@ export const googleGroundingSource: WebSearchSource = {
       const text = await withWebSearchModel(async (model, keyAttempt) => {
         let text = ''
         let usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined
+        let searchQueries: number | undefined
 
         for (let attempt = 1; attempt <= PASS1_MAX_ATTEMPTS; attempt++) {
           const pass1 = await generateText({
@@ -102,6 +104,7 @@ export const googleGroundingSource: WebSearchSource = {
           })
           text = pass1.text ?? ''
           usage = pass1.usage
+          searchQueries = groundingSearchCount(pass1.providerMetadata)
 
           // Observability: prove grounding actually ran — the search queries Google
           // issued and how many web sources came back (grep "web-source-google").
@@ -154,12 +157,13 @@ export const googleGroundingSource: WebSearchSource = {
               slot: keyAttempt.slot,
               status: 'empty',
               ...pass1.usage,
+              searchQueries,
             })
             await sleep(PASS1_RETRY_DELAY_MS)
           }
         }
 
-        return { value: text, usage }
+        return { value: text, usage, searchQueries }
       })
 
       if (!text.trim()) {

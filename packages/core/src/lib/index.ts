@@ -244,6 +244,8 @@ export {
   type WebSearchUsageSummary,
 } from './webSearchUsage.js'
 
+export { groundingSearchCount } from './groundingSearches.js'
+
 export {
   withInferenceContext,
   getInferenceContext,
