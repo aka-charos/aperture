@@ -200,7 +200,7 @@ export function createRecommendationTools(ctx: ToolContext) {
         // posters — which is what the web-grounded path was already doing
         // better, and the reason making this tool the default for "find me
         // something" was a downgrade rather than an upgrade.
-        const explained = await enrichCardReasons(items, concept)
+        const explained = await enrichCardReasons(items, concept, ctx.userId)
 
         return {
           id: `taste-search-${Date.now()}`,

@@ -390,7 +390,7 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         // bare cards next to fully-explained ones. Order/length are preserved, so the
         // two lists split back out cleanly. Fails open to the original notes.
         onStatus?.('discoveryReasons')
-        for await (const partial of enrichCardReasonsProgressive(combined, queryText)) {
+        for await (const partial of enrichCardReasonsProgressive(combined, queryText, ctx.userId)) {
           cards = partial
           yield build(cards)
         }

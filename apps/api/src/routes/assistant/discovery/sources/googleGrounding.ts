@@ -52,19 +52,28 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
  * thing being searched for is the thing they typed — see the note at the top of
  * this file for why nothing about the viewer belongs here.
  *
- * The search-language sentence exists because that raw request is the only
- * query there is: asked in Greek, Gemini searched in Greek and came back with
- * a fraction of the material the same request found in English, since far less
- * is written about film in Greek. A request ABOUT a country's or a language's
- * cinema is the exception — that is where the local-language pages are the
- * better source — and it ADDS those searches rather than replacing the English
- * ones. Gemini chooses its own queries, so this is an instruction and not a
- * guarantee; `webSearchQueries` in the log line below shows what it did.
+ * The search-language sentences exist because that raw request is the only
+ * query there is, so a request written in Greek was searched in Greek. Results
+ * for Greek requests were reported as noticeably thinner than for the same
+ * request in English — an operator's observation, not a measurement; comparing
+ * `webSearchQueries` and `groundingChunks` (logged below) for one request asked
+ * both ways is what would measure it. A request ABOUT a country's or a
+ * language's cinema is the exception — there the local-language pages are
+ * plausibly the better source — and it ADDS those searches rather than
+ * replacing the English ones.
+ *
+ * The example is a `[country]` placeholder on purpose, plus an explicit line
+ * that the request's own language decides nothing: a named example ("Greek
+ * cinema") invites a model to treat every Greek-language request as being about
+ * Greek cinema, which is the thin search this exists to avoid (F-129's lesson
+ * about models imitating named examples). Gemini chooses its own queries, so
+ * this is an instruction and not a guarantee.
  */
 const GROUNDING_SYSTEM =
   "Using current web information, list up to 12 specific movies or TV series that best answer the user's request. " +
   'Write your web searches in English, whatever language the request is written in. ' +
-  'The one exception: when the request is about the films or series of a particular country or language (for example Greek cinema), also search in that language, alongside the English searches. ' +
+  'The one exception: when the request is about the films or series of a particular country or language (for example "[country] films of the 1970s"), also search in that language, alongside the English searches. ' +
+  'The language the request is written in does not by itself make it about that language\'s films. ' +
   'For EACH title you MUST provide: the exact title, the release year, whether it is a movie or a series, and — most importantly — one or two sentences on WHY it fits this specific request. ' +
   'The "why" is mandatory for every title and must be CONCRETE and SPECIFIC: the shared structural device, the tonal or thematic link, how the filmmaker themselves framed it, the precise thing it has in common. ' +
   'Write it directly, not as hedged reportage — prefer "same fragmented structure where identities blur" over "is often described as similar". No generic praise. A title with no real reason is useless: omit it rather than list it without one. ' +

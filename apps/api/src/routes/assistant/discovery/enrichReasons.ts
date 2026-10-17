@@ -26,6 +26,8 @@ import {
   getChatModelInstance,
   createChildLogger,
   loadAnalysisGrounding,
+  resolveEffectiveAiLanguage,
+  buildAiLanguageInstruction,
   type AnalysisGroundingPart,
 } from '@aperture/core'
 import { recordLlmError } from '../helpers/errors.js'
@@ -67,6 +69,28 @@ async function loadGroundingForItems(items: ContentItem[]): Promise<GroundingMap
 }
 
 const logger = createChildLogger('discovery-reasons')
+
+/**
+ * The language the notes are written in: the viewer's AI language, the one the
+ * chat's own prose already follows (prompts/index.ts).
+ *
+ * Without it the notes followed the request's language only by imitation, and
+ * that stopped holding once the research notes they rewrite came back in
+ * English — the grounding search now runs in English whatever the request was
+ * written in, so a Greek request would hand this pass an English note, a Greek
+ * question and no rule, and the card could keep the English.
+ *
+ * Fails soft to null, which leaves the prompt exactly as it was before this
+ * existed: a missing rule costs consistency, never the notes.
+ */
+async function loadLanguageRule(userId: string): Promise<string | null> {
+  try {
+    return buildAiLanguageInstruction(await resolveEffectiveAiLanguage(userId))
+  } catch (err) {
+    logger.warn({ err }, 'Could not resolve the AI language; reasons follow the request')
+    return null
+  }
+}
 
 /** Keep retries low — this is an enhancement; latency matters more than a retry. */
 const SDK_MAX_RETRIES = 1
@@ -123,7 +147,12 @@ function truncate(text: string, max: number): string {
   return clean.length > max ? `${clean.slice(0, max)}…` : clean
 }
 
-function buildPrompt(queryText: string, items: ContentItem[], grounding: GroundingMap): string {
+function buildPrompt(
+  queryText: string,
+  items: ContentItem[],
+  grounding: GroundingMap,
+  languageRule: string | null
+): string {
   const lines = items.map((item, i) => {
     const parts = [`${i + 1}. ${item.name}`]
     if (item.subtitle) parts.push(`(${item.subtitle})`)
@@ -153,7 +182,12 @@ function buildPrompt(queryText: string, items: ContentItem[], grounding: Groundi
     // inline clauses. The RULES must not drift; the wording is allowed to.
     '- The "what it\'s doing" and "where it sits" clauses are critical writing about the title. Use them to name ONE specific quality and tie it to the request. Do NOT summarize or quote them, and never let one become the whole note.\n' +
     '- From "where it sits", name the tradition, movement or style. NEVER name one specific earlier film or show as this one\'s model: knowing how that one ends can give away how this one ends.\n' +
-    '- Around 25-35 words each. No title, no markdown, no bullet points.\n\n' +
+    '- Around 25-35 words each. No title, no markdown, no bullet points.\n' +
+    // The research notes may be in another language than the reader's (the
+    // grounding search runs in English), so this is stated rather than left to
+    // the request's language.
+    (languageRule ? `- ${languageRule} The research notes may be in another language; translate what you use.\n` : '') +
+    '\n' +
     'Reply with exactly one line per title in the form `<number> | <your sentences>` and nothing else.\n\n' +
     lines.join('\n')
   )
@@ -249,7 +283,8 @@ async function rewriteChunk(
   model: LanguageModel,
   queryText: string,
   chunk: IndexedItem[],
-  grounding: GroundingMap
+  grounding: GroundingMap,
+  languageRule: string | null
 ): Promise<Array<{ index: number; reason: string }>> {
   const { text } = await generateText({
     model,
@@ -258,7 +293,8 @@ async function rewriteChunk(
     prompt: buildPrompt(
       queryText,
       chunk.map((entry) => entry.item),
-      grounding
+      grounding,
+      languageRule
     ),
   })
 
@@ -295,7 +331,8 @@ function chunkBy<T>(list: T[], size: number): T[][] {
  */
 export async function* enrichCardReasonsProgressive(
   items: ContentItem[],
-  queryText: string
+  queryText: string,
+  userId: string
 ): AsyncGenerator<ContentItem[]> {
   if (items.length === 0) return
 
@@ -308,9 +345,12 @@ export async function* enrichCardReasonsProgressive(
   }
 
   // Loaded once for the whole call, before any chunk goes out: both passes and
-  // every concurrent chunk read the same map, and it is one query per media
-  // type rather than one per chunk.
-  const grounding = await loadGroundingForItems(items)
+  // every concurrent chunk read the same map and rule, and it is one query per
+  // media type rather than one per chunk.
+  const [grounding, languageRule] = await Promise.all([
+    loadGroundingForItems(items),
+    loadLanguageRule(userId),
+  ])
 
   const rewritten = new Map<number, string>()
   const applied = () =>
@@ -332,7 +372,7 @@ export async function* enrichCardReasonsProgressive(
     chunkBy(remaining, BATCH_SIZE).forEach((chunk, id) => {
       inFlight.set(
         id,
-        rewriteChunk(model, queryText, chunk, grounding)
+        rewriteChunk(model, queryText, chunk, grounding, languageRule)
           .catch((err) => {
             firstError ??= err
             return [] as RewrittenReason[]
@@ -379,9 +419,10 @@ export async function* enrichCardReasonsProgressive(
  */
 export async function enrichCardReasons(
   items: ContentItem[],
-  queryText: string
+  queryText: string,
+  userId: string
 ): Promise<ContentItem[]> {
   let latest = items
-  for await (const partial of enrichCardReasonsProgressive(items, queryText)) latest = partial
+  for await (const partial of enrichCardReasonsProgressive(items, queryText, userId)) latest = partial
   return latest
 }
