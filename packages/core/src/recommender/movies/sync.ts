@@ -1,5 +1,6 @@
 import { createChildLogger } from '../../lib/logger.js'
 import { mergeWatchHistorySyncRow, watchHistorySyncUpdateSql } from '../watchHistorySyncRows.js'
+import { partitionHistorySyncUsers } from '../historySyncUsers.js'
 import { query, queryOne } from '../../lib/db.js'
 import { getEnabledLibraryIds } from '../../lib/libraryConfig.js'
 import { getMediaServerProvider } from '../../media/index.js'
@@ -1013,10 +1014,12 @@ export async function syncWatchHistoryForAllUsers(
     addLog(jobId, 'info', `👥 Found ${providerUsers.length} user(s) on media server`)
 
     // Get existing users from our database
-    const existingUsers = await query<{ provider_user_id: string }>(
-      'SELECT provider_user_id FROM users WHERE provider_user_id IS NOT NULL'
+    // Read before importing: which accounts the server no longer lists is
+    // decided against these (historySyncUsers.ts).
+    const existingUsers = await query<{ id: string; provider_user_id: string }>(
+      'SELECT id, provider_user_id FROM users WHERE provider_user_id IS NOT NULL'
     )
-    const existingProviderIds = new Set(existingUsers.rows.map(u => u.provider_user_id))
+    const existingProviderIds = new Set(existingUsers.rows.map((u) => u.provider_user_id))
 
     // Import any missing users
     const msConfig = await getMediaServerConfig()
@@ -1051,7 +1054,29 @@ export async function syncWatchHistoryForAllUsers(
       'SELECT id, provider_user_id, username FROM users WHERE provider_user_id IS NOT NULL AND provider_disabled = false'
     )
 
-    const users = result.rows
+    // Accounts deleted on the media server but not yet marked by the user sync
+    // are skipped rather than asked about: the server has no history for them
+    // and answers with an error (Emby: 500).
+    const partition = partitionHistorySyncUsers(
+      result.rows,
+      existingUsers.rows,
+      providerUsers.map((pu) => pu.id)
+    )
+    if (partition.refusal) {
+      addLog(
+        jobId,
+        'warn',
+        `⚠️ Media server user list not trusted (${partition.refusal}); syncing every account`
+      )
+    }
+    for (const gone of partition.skipped) {
+      addLog(
+        jobId,
+        'info',
+        `⏭️ ${gone.username}: no longer on the media server, skipped (the user sync will mark it)`
+      )
+    }
+    const users = partition.sync
     addLog(jobId, 'info', `👥 Syncing watch history for ${users.length} user(s)`)
 
     if (users.length === 0) {

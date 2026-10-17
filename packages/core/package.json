@@ -95,7 +95,7 @@
     "test:translation": "node --import tsx --test src/translation/rules.test.ts src/translation/pending.test.ts src/translation/analysisText.test.ts src/translation/client.test.ts",
     "test:collections": "node --import tsx --test src/tmdb/collectionParts.test.ts src/tmdb/genreNames.test.ts",
     "test:email": "node --import tsx --test src/email/rules.test.ts src/email/settings.test.ts src/email/links.test.ts src/email/strings.test.ts src/email/template.test.ts src/email/images.test.ts src/email/smtp.test.ts",
-    "test:accounts": "node --import tsx --test src/lldap/rules.test.ts src/users/accountDrift.test.ts src/users/providerPresence.test.ts",
+    "test:accounts": "node --import tsx --test src/lldap/rules.test.ts src/users/accountDrift.test.ts src/users/providerPresence.test.ts src/recommender/historySyncUsers.test.ts",
     "test:library-scope": "node --import tsx --test src/lib/libraryScope.test.ts",
     "test:social": "node --import tsx --test src/social/rules.test.ts",
     "test:onboarding": "node --import tsx --test src/onboarding/rules.test.ts",
