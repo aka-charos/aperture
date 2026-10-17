@@ -21,6 +21,20 @@ This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) 
 - Images are published to **`ghcr.io/aka-charos/aperture:dev`** whenever a push to `dev` changes the application (`apps/`, `packages/`, `db/`, `docker/` or the lockfile) and passes lint and typecheck. That tag is built for **amd64 only** — see [ARM hosts](#arm-hosts).
 - Version identity is two fields, not one string: `APP_VERSION` is the upstream lineage (`0.7.8`), `APP_BUILD` is the fork build (`mod.<commits>.g<sha>`). Both appear in the admin console and in `/api/health`.
 
+#### Why GitHub says "668 commits behind"
+
+GitHub's ahead/behind counter compares commit identities, and this fork's history split from upstream's on 2026-01-10. Upstream's work reached `dev` as copies with different hashes, never as merges, so every upstream commit since the split counts as "behind" even when its change is already here. As of 2026-10-17 the counter reads 668 behind: 576 ordinary commits plus 92 merge commits.
+
+Comparing by change instead of by hash (`git cherry -v dev upstream/main`) puts **568 of those 576 already on `dev`**. The real gap is eight commits, all from upstream's v0.7.9 and v0.7.10 releases of 2026-09-18, none merged here:
+
+- a startup warning when the backup client and database server are on different PostgreSQL majors (this fork carries its own version of it)
+- PostgreSQL 17 migration tooling and rewritten backup guidance
+- two fixes to restore progress reporting
+- a CI fix to publish images on release tag pushes
+- the `0.7.9` and `0.7.10` version bumps
+
+Merging `main` into `dev` would zero the counter but conflicts in about 490 files, so upstream changes are brought in by cherry-pick only, and the counter will keep growing as upstream commits. `git cherry` is the number to watch.
+
 **This README is written as a delta against upstream v0.7.8**, in three layers:
 
 - [At a glance](#at-a-glance) — what the fork **added**, what it **enhanced** and what it **fixed**, one line per area.
