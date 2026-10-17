@@ -51,9 +51,20 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
  * Task instructions only. The user's message carries the request ALONE, so the
  * thing being searched for is the thing they typed — see the note at the top of
  * this file for why nothing about the viewer belongs here.
+ *
+ * The search-language sentence exists because that raw request is the only
+ * query there is: asked in Greek, Gemini searched in Greek and came back with
+ * a fraction of the material the same request found in English, since far less
+ * is written about film in Greek. A request ABOUT a country's or a language's
+ * cinema is the exception — that is where the local-language pages are the
+ * better source — and it ADDS those searches rather than replacing the English
+ * ones. Gemini chooses its own queries, so this is an instruction and not a
+ * guarantee; `webSearchQueries` in the log line below shows what it did.
  */
 const GROUNDING_SYSTEM =
   "Using current web information, list up to 12 specific movies or TV series that best answer the user's request. " +
+  'Write your web searches in English, whatever language the request is written in. ' +
+  'The one exception: when the request is about the films or series of a particular country or language (for example Greek cinema), also search in that language, alongside the English searches. ' +
   'For EACH title you MUST provide: the exact title, the release year, whether it is a movie or a series, and — most importantly — one or two sentences on WHY it fits this specific request. ' +
   'The "why" is mandatory for every title and must be CONCRETE and SPECIFIC: the shared structural device, the tonal or thematic link, how the filmmaker themselves framed it, the precise thing it has in common. ' +
   'Write it directly, not as hedged reportage — prefer "same fragmented structure where identities blur" over "is often described as similar". No generic praise. A title with no real reason is useless: omit it rather than list it without one. ' +
