@@ -6,15 +6,15 @@
 
 **Aperture** — self-hosted AI recommendations, discovery and watch tracking for **Emby** and **Jellyfin**.
 
-Aperture syncs your library and everyone's watch history, embeds every title as a vector, builds a taste profile per user, and writes personalized recommendation libraries back into your media server — and, on Emby, rows onto each viewer's home screen. Around that core it has grown into a full companion app: an AI chat assistant that can search the web _and_ your shelf, a discovery engine that files requests and problem reports in Jellyseerr/Overseerr, critic-informed title analyses, a similarity graph, playlists and collections, watch statistics, recommendations shared between connected users, and an admin console for every knob involved.
+Aperture syncs your library and everyone's watch history, embeds every title as a vector, builds a taste profile per user, and reads the result back in the app — and, on Emby, as rows on each viewer's home screen. Around that core it has grown into a full companion app: an AI chat assistant that can search the web _and_ your shelf, a discovery engine that files requests and problem reports in Jellyseerr/Overseerr, critic-informed title analyses (translated into your viewers' languages), a similarity graph, playlists and collections, watch statistics, recommendations passed between connected users, a guided first-run tour and built-in guides, and an admin console for every knob involved.
 
-Works for **movies** and **TV series**, in **15 languages**, and shows each viewer only the libraries their media-server account is allowed to open.
+Works for **movies** and **TV series**, in **14 languages**, and shows each viewer only the libraries their media-server account is allowed to open.
 
 ---
 
 ## About this fork
 
-This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) is a fork of [dgruhin-hrizn/aperture](https://github.com/dgruhin-hrizn/aperture). It is based on upstream **v0.7.8** and carries more than five hundred commits of features and fixes on top. Upstream has since released v0.7.9 and v0.7.10; those releases are **not** merged here.
+This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) is a fork of [dgruhin-hrizn/aperture](https://github.com/dgruhin-hrizn/aperture). It is based on upstream **v0.7.8** and carries more than six hundred commits of features and fixes on top. Upstream has since released v0.7.9 and v0.7.10; those releases are **not** merged here.
 
 - Active development happens on **`dev`**. That is the branch to deploy from.
 - `main` is a stale mirror of upstream v0.7.8 and exists only to make rebases easy.
@@ -27,45 +27,53 @@ This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) 
 - [What this fork changes](#what-this-fork-changes) — the same ground area by area. Each section is marked **new** or **reworked**, and a reworked one opens with what upstream already had.
 - [What this fork fixes](#what-this-fork-fixes) — defects in code inherited from upstream, grouped by area.
 
-What arrived unchanged is under [Inherited from upstream](#inherited-from-upstream). Every commit behind all of this is classified in [docs/fork-divergence.md](docs/fork-divergence.md). Of 511 commits:
+What arrived unchanged is under [Inherited from upstream](#inherited-from-upstream). Every commit behind all of this is classified in [docs/fork-divergence.md](docs/fork-divergence.md), current to 2026-10-17. Of 634 commits:
 
-- **46** add something upstream had no form of.
-- **225** enhance something upstream already had.
-- **81** fix a defect in inherited code, and **45** more fixes ride inside other commits.
-- **100** fix the fork's own work.
+- **56** add something upstream had no form of.
+- **275** enhance something upstream already had.
+- **93** fix a defect in inherited code, and **50** more fixes ride inside other commits.
+- **143** fix the fork's own work.
 - The rest are docs, chores and measurement.
 
 ### At a glance
 
 **Added** — capabilities upstream had no form of.
 
-| Area                  | What the fork added                                                                                                                                                                                                               |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Title analysis**    | An optional critic-informed article per title, written from self-hosted search (fastCRW) or Google grounding, plus a bench that runs several models and prompt versions on byte-identical sources.                                |
-| **Emby home screen**  | Top Picks, each viewer's own picks and playlists they choose, as rows on every viewer's Emby home screen — placed per row type by the admin, with viewer overrides. No duplicate items and no STRM files.                         |
-| **Sharing**           | Admin-paired connections: see who you know watched a title, browse each other's history, recommend a title to someone, and a "Shared with me" inbox.                                                                              |
-| **Watch state**       | Watched ticks and `8/24` episode progress on posters; rating a film the server never saw play asks roughly when you watched it and marks it played.                                                                               |
-| **Requests & issues** | Problem reports filed in Seerr under the reporter's own account, with threaded replies; search-and-request inside the app; a franchise page listing what is owned, missing and announced.                                         |
-| **AI**                | Web Search and Title Analysis roles; LM Studio and Z.AI providers; reasoning-effort and sampling controls in each model's own vocabulary; fallback models and keys; a spend dashboard that measures what calls cost.              |
-| **Recommender**       | Taste twins, reserved slots for stated interests and acclaimed titles, taste clustering, era affinity, an activity gate that skips pointless regenerations, and a job to rebuild every taste profile.                             |
-| **Evaluation**        | An offline retrieval harness — held-out ranking against baselines, nearest-neighbour dumps, every stored embedding set measured — archived and exported as CSV.                                                                   |
-| **Branding & text**   | Rename the instance, mount your own logo and favicon, set brand colours, edit any UI string in-app or via CSV, restrict which languages users may pick, and a Greek locale.                                                       |
-| **Admin & security**  | Read-only "view as user", a deployment-posture panel that checks against live traffic, runtime-editable trusted proxies, a record of every permission change, LLDAP email import, n8n, Tavily and a nightly IMDb ratings refresh. |
+| Area                  | What the fork added                                                                                                                                                                                                                                                                                                                           |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Title analysis**    | An optional critic-informed article per title, written from self-hosted search (fastCRW) or Google grounding, plus a bench that runs several models and prompt versions on byte-identical sources, and an optional model that weeds out documents carrying nothing.                                                                           |
+| **Emby home screen**  | Top Picks, each viewer's own picks and playlists they choose, as rows on every viewer's Emby home screen — placed per row type by the admin, and each viewer switches and places their own on one settings page. No duplicate items and no STRM files.                                                                                        |
+| **Sharing**           | Admin-paired connections: see who you know watched a title, browse each other's history, and recommend a title to someone on **Watch This**, where the Sent tab shows whether they watched it.                                                                                                                                                |
+| **Watch state**       | Watched ticks and `8/24` episode progress on posters; rating a film the server never saw play asks roughly when you watched it and marks it played.                                                                                                                                                                                           |
+| **Requests & issues** | Problem reports filed in Seerr under the reporter's own account, with threaded replies; search-and-request inside the app; a franchise page listing what is owned, missing and announced.                                                                                                                                                     |
+| **AI**                | Web Search and Title Analysis roles; LM Studio and Z.AI providers; reasoning-effort and sampling controls in each model's own vocabulary; fallback models and keys; a spend dashboard that measures what calls cost.                                                                                                                          |
+| **Recommender**       | Taste twins, reserved slots for stated interests and acclaimed titles, taste clustering, era affinity, an activity gate that skips pointless regenerations, and a job to rebuild every taste profile.                                                                                                                                         |
+| **Evaluation**        | An offline retrieval harness — held-out ranking against baselines, nearest-neighbour dumps, every stored embedding set measured — archived and exported as CSV.                                                                                                                                                                               |
+| **Branding & text**   | Rename the instance, mount your own logo and favicon, set brand colours, edit any UI string in-app or via CSV, restrict which languages users may pick, and a Greek locale.                                                                                                                                                                   |
+| **Admin & security**  | Read-only "view as user", a deployment-posture panel that checks against live traffic, runtime-editable trusted proxies, a record of every permission change, an account-drift report across the media server, LLDAP and Aperture, LLDAP email import, an SMTP connection for outgoing email, n8n, Tavily and a nightly IMDb ratings refresh. |
+| **Translation**       | Plot, full synopsis and critic-informed analyses machine-translated into every enabled interface language through any OpenAI-compatible endpoint, shown by default with the original one click away.                                                                                                                                          |
+| **Onboarding & help** | A welcome tour on first sign-in, "show me around" tours per screen, a getting-started list, first-visit tips, and the user and admin guides read inside the app (English, and Greek for the user guide).                                                                                                                                      |
+| **Decision model**    | An optional yes/no model asked whether a recommendation's evidence is a real reason for the pick, benchmarked and labelled blind in the console, plus a shadow check on written explanations. Nothing depends on it.                                                                                                                          |
 
 **Enhanced** — things upstream had, reworked.
 
-| Area                       | What changed                                                                                                                                                                                                                          |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **AI roles & providers**   | Model picker with prices, tool-calling and reasoning badges from live catalogs; real capability detection for OpenRouter and local servers; one provider key shared across roles; provider errors logged in the provider's own words. |
-| **Embeddings**             | A 2560-wide table, a stored-sets panel showing what switching would cost, mean-centred vectors, retrieval modes where a model supports one, and a canonical text that stopped embedding nationality six times.                        |
-| **Recommender**            | MMR diversity, availability-adjusted genre preference, completion-weighted series, match insights on every scored title, explanations written from real data, and an explanations-only rerun.                                         |
-| **Assistant**              | Intent routing with a grounded web search, a taste-profile section on every discovery answer, dock and full page, live status, turns saved by the server, episode search and stored analyses.                                         |
-| **Discovery & requests**   | Candidates embedded and ranked by taste, a tuning panel with measured influence, requests filed as the person who made them, and in-app approve/decline.                                                                              |
-| **Watch stats & history**  | Every figure opens the titles behind it; heatmap and taste-vs-crowd sections; whole-history search; a Watcher Identity written from played titles by each recommendation run.                                                         |
-| **Browse, search, detail** | A searchable country filter, search that ignores accents and punctuation and matches original titles, detail pages that state each fact once, and collections written to Emby as Box Sets.                                            |
-| **Admin console**          | A two-level nav generated from one registry — 8 groups, 45 sections — with a ⌘⇧K palette over sections, individual settings and every job.                                                                                            |
-| **Access**                 | Access as its own switch, library access that follows the media server, permissions decided on the server, scoped API keys, and an assistant permission.                                                                              |
-| **Jobs**                   | Weekly schedules on several weekdays, biweekly runs, cancellation that holds a slot until the work stops, a stall guard on streamed model calls, per-run caps and logs that keep their head.                                          |
+| Area                       | What changed                                                                                                                                                                                                                                                                                                                             |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AI roles & providers**   | Model picker with prices, tool-calling and reasoning badges from live catalogs; real capability detection for OpenRouter and local servers; one provider key shared across roles; provider errors logged in the provider's own words.                                                                                                    |
+| **Embeddings**             | A 2560-wide table, a stored-sets panel showing what switching would cost, mean-centred vectors, retrieval modes where a model supports one, and a canonical text that stopped embedding nationality six times.                                                                                                                           |
+| **Recommender**            | MMR diversity, availability-adjusted genre preference, completion-weighted series, match insights on every scored title, explanations written from real data, an explanations-only rerun, one-click rewrite of a single pick's explanation, and interest slots backed by a tag on the title rather than by how near it sits to a phrase. |
+| **Assistant**              | Intent routing with a grounded web search, a taste-profile section on every discovery answer, dock and full page, live status, turns saved by the server, episode search and stored analyses.                                                                                                                                            |
+| **Discovery & requests**   | Candidates embedded and ranked by taste, a tuning panel with measured influence, requests filed as the person who made them, and in-app approve/decline.                                                                                                                                                                                 |
+| **Watch stats & history**  | Every figure opens the titles behind it; heatmap and taste-vs-crowd sections; whole-history search; a Watcher Identity written from played titles by each recommendation run.                                                                                                                                                            |
+| **Browse, search, detail** | A searchable country filter that matches a title's country of origin, a Browse selection that lives in the URL so Back restores it, search that ignores accents and punctuation and matches original titles, detail pages that state each fact once, and collections written to Emby as Box Sets.                                        |
+| **Dashboard & Watching**   | Titles open in the detail dialog over the page, shows that aired recently appear for viewers who were caught up, upcoming episodes only inside a two-month horizon, bigger posters, and posters that end on a whole poster.                                                                                                              |
+| **Language**               | A flag in the app bar switches the app language, recommendations follow it by default, and the login page has its own flag. The translations editor works one language at a time with untranslated counts.                                                                                                                               |
+| **User settings**          | Four tabs by subject — Recommendations, Display, Account and the Emby home screen — one card layout, and saves that cannot overtake each other.                                                                                                                                                                                          |
+| **Mobile**                 | A layout pass over the shell, detail pages, dashboard, Explore, Top Picks, My Requests and Watch Stats, with touch-sized targets.                                                                                                                                                                                                        |
+| **Admin console**          | A two-level nav generated from one registry — 8 groups, 48 sections — with a ⌘⇧K palette over sections, individual settings and every job, and a Guide button on every section.                                                                                                                                                          |
+| **Access**                 | Access as its own switch, library access that follows the media server, permissions decided on the server, scoped API keys, an assistant permission, and accounts deleted from the media server paused and removable by an admin.                                                                                                        |
+| **Jobs**                   | Weekly schedules on several weekdays, biweekly runs, cancellation that holds a slot until the work stops, a stall guard on streamed model calls, per-run caps and logs that keep their head.                                                                                                                                             |
+| **Legacy library output**  | STRM and symlink libraries are now one switch, off on a new install; switching it off writes nothing, and a removal job clears what was written. Recommendations are read in the app and on the Emby home screen instead.                                                                                                                |
 
 **Fixed** — defects in code inherited from upstream. The worst of them:
 
@@ -116,7 +124,7 @@ Edit the compose file and set:
 - `APP_BASE_URL` — how you reach the app, e.g. `http://192.168.1.100:3456`
 - `SESSION_SECRET` — a random string, 32+ characters
 - `TZ` — your IANA timezone; job schedules run in it
-- Volume paths — the libraries output folder, the backups folder, and your media share (read-only)
+- Volume paths — the backups folder, your media share (read-only), and the libraries output folder (only used if you later switch on the legacy STRM/symlink output)
 
 ### 4. Create the folders
 
@@ -125,7 +133,7 @@ mkdir -p /mnt/user/Media/ApertureLibraries
 mkdir -p /mnt/user/appdata/aperture/backups
 ```
 
-Put `ApertureLibraries` **inside** the media share your server already has mounted, and Emby/Jellyfin will see it with no extra configuration.
+`ApertureLibraries` only matters for the legacy STRM/symlink output, which is off on a new install. If you plan to use it, put it **inside** the media share your server already has mounted, and Emby/Jellyfin will see it with no extra configuration.
 
 ### 5. Start
 
@@ -138,18 +146,17 @@ docker compose -f docker-compose.prod.yml up -d
 Open `http://YOUR_SERVER_IP:3456`. First-run setup is refused from non-local addresses until it completes, so nobody who finds the port before you can claim the admin account.
 
 1. **Restore** (optional) — restore from a backup if you are migrating
-2. **Media server** — connect Emby or Jellyfin
-3. **Source libraries** — pick which libraries to analyse
-4. **File locations** — path mappings for symlinks / STRM
-5. **AI recommendations** — library naming and cover images
-6. **Validate** — verify the output paths are writable and visible to your server
-7. **Users** — choose who gets access and recommendations
-8. **Top Picks** (optional) — global trending libraries
-9. **AI / LLM** — configure the AI roles you want
-10. **Initial jobs** — first sync, with live progress
-11. **Complete** — summary and next steps
+2. **Connect** — connect Emby or Jellyfin
+3. **Libraries** — pick which libraries to analyse
+4. **Users** — choose who gets access and recommendations
+5. **Top Picks** (optional) — one switch for the global trending lists
+6. **AI / LLM** — configure the AI roles you want
+7. **Initial jobs** — first sync, with live progress
+8. **Done** — summary and next steps
 
-Then sign in with your Emby/Jellyfin credentials.
+There are no folder, output-format or mount steps: STRM/symlink libraries are a legacy option that starts **off** on a new install. If you want them, switch them on later under Admin → Recommendations → Output format and set the file locations there. On Emby, recommendations reach viewers as [home screen rows](docs/admin/home-rows.md) instead.
+
+Then sign in with your Emby/Jellyfin credentials. The first sign-in starts a short welcome tour.
 
 ### Updating
 
@@ -193,6 +200,10 @@ Upstream had four AI roles — embeddings, chat, text generation and exploration
 - **Fallback models and fallback API keys** for free-tier work — extra Google keys for grounded web search, and a chain of fallback models (on any provider, local ones included) for title analysis — with call pacing and per-key cooldowns. A spare key answers "this account is out of quota", a spare model answers "this model is gone".
 - **Spend dashboard** beside the cost estimator, measuring what calls actually cost: OpenRouter's billed figure, and Z.AI's computed from its published prices and labelled as an estimate. Unpriced calls are reported as unknown, never as $0.
 - **Readable provider failures** — errors are logged with status, model and the provider's own words instead of the whole prompt, and a Z.AI address missing its API path is named as such rather than reading as a dead key.
+- **OpenRouter flex tier** — read per model from its endpoint listing and offered per role; the Test button sends one real flex request and says what tier served it.
+- **Pacing only where there is a limit** — the call-spacing option is not offered, and not applied, for LM Studio and Ollama.
+- **Keys stay on the server.** The settings pages receive "a key is saved" and a four-character hint, never the key; Test, model discovery and the LM Studio probe use the saved key server-side and only for the address it was saved for, so a test pointed at someone else's server cannot collect it. Secrets inside structured settings no longer appear in logs.
+- **One generator for short AI text** — playlist names, descriptions, preferences and the notes under each pick — with an output ceiling a reasoning model cannot spend entirely on thinking, and answers that arrive after a dialog closed are dropped instead of saved onto the wrong playlist.
 - Sibling key resolution: configure a provider once and every role on that provider reuses it.
 
 ### Embeddings — reworked
@@ -213,14 +224,19 @@ Upstream built one taste vector per viewer, scored candidates on similarity, nov
 
 - **MMR diversity** replaces the genre-coverage sort, which let one Drama close Drama for the rest of the list.
 - **Reserved slots** for things the ranking will never reach on its own: **stated interests**, **taste twins** (the viewer whose history overlaps yours far more than chance), and **acclaimed titles**. Every slot count is admin-visible; there are no hidden shares underneath.
+  - An interest slot is backed by a **fact on the title** — a genre or TMDb keyword that is the interest, contains it, or spells it out in parts — not by how close the title sits to the typed phrase, which measurement showed to be mostly shared wording.
+  - A twin pick shows the shared titles **nearest the pick** rather than the rarest, says how close the pick came on its own score, and names the twin only to someone they are connected to.
 - **Taste clustering** — a profile splits into up to three clusters, so a viewer with two distinct tastes is not averaged into one vector that matches neither.
 - **Era affinity** — decade preference measured against the viewer's own shelf (movies).
 - **Genre preference is availability-adjusted**, not volume-based: someone who hides the horror library no longer reads as horror-averse.
 - **Engagement weighting** by how much of a series was actually finished, so forty abandoned shows stop outvoting five finished ones.
-- **Activity gate** — a scheduled run skips users whose library and history have not changed enough to move a pick; a manual run always runs. A `rebuild-taste-profiles` job applies a change in how taste is computed to everyone at once.
+- **Activity gate** — a scheduled run skips users whose library and history have not changed enough to move a pick; a manual run always runs. Syncs no longer restamp the inputs it reads, and a deletion is seen by counting rows. A `rebuild-taste-profiles` job applies a change in how taste is computed to everyone at once.
+- **Series creators from TMDb** — shows had almost no creator on file, so they now carry TMDb's, in their own column.
+- **Optional decision model** — see [Decision model](#decision-model--new).
 - **One Recommendations switch per account.** Whether someone gets film picks, series picks or both follows from which libraries their media-server account can open, and picks are drawn only from those libraries.
 - **Match insights on every scored title**, not just the twenty that were picked: blended score, preference adjustment, per-term weight shares, variety, and the titles in your own history that support the pick — with a different, honest heading when the pick came from a reserved slot and the ranking is not the reason.
-- **Explanations** are written from real data (plot, keywords, directors, neighbours in your history, and the title's stored analysis where one exists) under a no-invention rule, and can be re-run on their own without re-scoring.
+- **Explanations** are written from real data (plot, keywords, directors, neighbours in your history, and the title's stored analysis where one exists) under a no-invention rule, and can be re-run on their own without re-scoring — or rewritten one at a time from the insights panel (admin).
+- **The AI language follows the app language by default**, so recommendations written in one language do not outlive a switch of the interface to another. A separate AI language remains available.
 - **Admin controls** for preference strength, gate thresholds, slot budgets and candidate pool size, with the pool bounded by the number of items that actually exist.
 
 ### AI assistant — reworked
@@ -258,8 +274,12 @@ Upstream had the discovery engine for content you do not own, requests through *
 
 - An optional **critic-informed article** about a film or show — its context, its form and style, how it was made and how it was received — written from the open web, cached per title and shared by every user.
 - Sources come from self-hosted **fastCRW** (a general search plus a second search restricted to publications that print criticism) or from Google grounding. Pages are cleaned before the model sees them: bot walls, empty scrapes, link walls, pages about some other film and repeat hosts are dropped, and menus and plot sections are cut so the character budget goes on the writing.
+- Each page gets its own time budget, and the general and criticism searches run side by side, so a title no longer pays the slowest page's wait twice.
+- An **optional source judge** (the decision model, off by default) reads a sample from the start and the middle of every retrieved document and drops those that carry nothing — a podcast note with no transcript, a page promoting a filmed interview — with floors that keep it from thinning a retrieval into the copying regime. Every score, and the URL of every dropped page, is printed in the log and the bench report.
 - A thin record is **declined** rather than padded, and a malformed answer is retried or rotated to a fallback model — never stored.
-- Generated on demand from a title's detail page (admins can re-run one), or by the `generate-title-analysis` job, which works through the library with a titles-per-run cap and takes an optional schedule.
+- The prompt is at **version 18**: critics and publications are no longer named in the prose, makers still are, and the opening says where and when a work stands. A staleness floor means a new prompt version no longer retires the whole stored library — only a change that makes older prose unusable does.
+- Generated on demand from a title's detail page (admins can re-run one), or by the `generate-title-analysis` job, which works through the library with a titles-per-run cap and takes an optional schedule. The on-demand request answers at once and the page polls, so a proxy with a short timeout can no longer cut it off while the analysis is still being written.
+- Analyses are **translated** into the enabled interface languages by [synopsis translation](#synopsis-translation--new).
 - **Analysis bench** — run one title through several models, and several prompt versions, on byte-identical retrieved sources; read the answers side by side with counts of known habits; replay a stored run against a new prompt without retrieving again.
 - The assistant reads stored analyses on request, and recommendation reasons draw on them.
 
@@ -269,6 +289,8 @@ Upstream had the discovery engine for content you do not own, requests through *
 - Rows are backed by tags on the **original library items** through Emby's API — no STRM files, no duplicate entries, nothing to rescan. The tag behind a viewer's row is a random token, never derived from who they are.
 - **Placement** per row type — top, bottom, a position, or before/after a named row — with an admin default and a per-viewer override in user settings. Rows move only when they are created or their placement changes, so a viewer's own rearranging in Emby is kept.
 - A playlist or collection joins its owner's home screen from its card, or from the chat's "create a playlist from these" dialog.
+- A fourth row, **recommended by friends**, holds what connections sent through Watch This (off by default).
+- **Each viewer has their own page for it** — the Emby home screen tab of their settings — to switch any row off for themselves, choose where theirs go, see a preview, and read why a row cannot reach them when it cannot.
 - Personal rows go to accounts with access; Top Picks rows go to every account, or optionally only to accounts with access. Anyone who stops qualifying has the rows removed.
 - The `sync-home-sections` job runs daily after Top Picks refresh; a viewer's own changes apply immediately.
 
@@ -282,7 +304,7 @@ Upstream had the discovery engine for content you do not own, requests through *
 
 - An admin **connects** two accounts from the Users page. Connections are mutual, and the other person is visible only while their account has access.
 - Connected viewers see **who they know watched a title** on its detail page, can **browse each other's watch history**, get a **row of each other's recent watches** on the dashboard, and can **recommend a title** to one another.
-- **Shared with me** collects the recommendations sent to you, with a count in the sidebar; a title leaves on its own once you finish it.
+- **Watch This** (`/watch-this`) collects the recommendations sent to you, split into movies and series, with a count in the sidebar; a title leaves on its own once you finish it. Its **Sent** tab shows each title you recommended and whether the other person has watched it, is watching it, or has not started. The page appears in the sidebar only while something has been sent either way.
 - Everything shown from someone else's activity is filtered to the libraries _you_ can open. Admins see every watcher's name; everyone else sees names only for their connections.
 
 ### Watch statistics — reworked
@@ -295,23 +317,63 @@ Upstream had the Watch Stats page — genres, decades, ratings, people, studios 
 
 ### Browse, detail pages and the rest of the UI — reworked
 
-- **Production-country filter** with search, multi-select and AND/OR matching, plus a searchable network filter and reordered content ratings.
+- **Country filter** with search, multi-select and AND/OR matching that matches a title's **country of origin** by default (every co-producer on request), plus a searchable network filter and reordered content ratings. The selection lives in the URL, so Back restores it and the scroll position, and a row expanded from a grid opens the whole row.
+- **Seasons sort and filter** count seasons from the episodes the library actually holds, since Emby leaves a show's season total empty.
 - **Library search** ignores accents and punctuation, matches original titles as well as localized ones, and ranks by how much of your query a title contains.
 - **Detail pages say each thing once** — ratings and awards on the hero line, director and writer beside them, one info card below; the duplicate genre, critic-rating and awards panels are gone.
 - **Series detail** with per-season and per-episode progress and inline episode descriptions.
-- **Person pages** gain a biography and birth/death data from the media server.
+- **Person pages** gain a biography and birth/death data from the media server, group the library's titles by role, and sort by credits; a show's creator is no longer listed as its director.
+- **Studio and network logos** are resolved for networks through a series they credit (TMDb has no network search), and the job says why a logo is missing.
+- **The dashboard** opens every title in the detail dialog over the page, shows a recently aired show to a viewer who was caught up, shows an upcoming episode only inside a two-month horizon, and draws bigger posters.
+- **Poster carousels end on a whole poster**, never a slice of the next, and a mobile layout pass covers the shell, detail pages, Explore, Top Picks, My Requests and Watch Stats.
 - **Shows You Watch** includes series from watch history, with a segmented bar combining progress, availability and what is missing, and Airing/Ended tabs driven by TMDB status.
 - **Watch history** searches the whole history rather than the loaded page, with status filters and real resume bars.
 - **Collections** (new) — channels written to Emby as Box Sets, with a per-user permission to create them. Channels also build from TV series now, with a preview-and-approve step and an AI note on each pick before anything is written.
 - **Cross-media connections** in the Explore graph — films to series and back.
-- **Collapsible sidebar** with a hover flyout, page titles in the app bar instead of 80px of repeated heading, a welcome guide that snoozes instead of nagging, and a resizable assistant dock.
+- **Collapsible sidebar** with a hover flyout, page titles in the app bar instead of 80px of repeated heading, and a resizable assistant dock.
+- **User settings in four tabs named by subject** — Recommendations, Display, Account and Emby home screen — with one card layout throughout.
+
+### Synopsis translation — new
+
+- Machine-translates each title's **plot and full synopsis**, and optionally its **stored film analysis**, into the interface languages enabled on the instance, so a viewer reading Aperture in Greek reads the plot in Greek.
+- It is an integration, not an AI role. Any OpenAI-compatible endpoint works; the default is bilibili's free public Index-Translate service. Two jobs do the work (`translate-title-synopses`, `translate-title-analyses`), both manual until you give them a schedule.
+- The detail page asks for the language it is displayed in and shows the translation by default, with **Show original** beside it. A translation is used only while the text it was made from is unchanged; rewrite a synopsis and the old translation is hidden at once.
+- Each text's own language is read off its alphabet, so a plot the media server already holds in Greek is translated _into_ English for English readers instead of being sent back as "English into Greek".
+- Requests stream, so the endpoint's ten-second wait for a first byte is no longer a limit on length; a rate-limited answer is retried, a failure queues the pair last, and an analysis must come back with the same paragraph count or it is redone section by section.
+
+### Decision model — new
+
+- An **optional, off-by-default second opinion** on why a title was recommended. A small yes/no model (any TypeSafe System One server — for example the Jev or Kev models on OpenRouter, or one you host) is asked, once per ranked pick, whether each watched title beside it is a concrete reason: the same director or creator, a franchise, a shared subject, situation, tone or style. Its answers decide the insights heading and what the explanation writer is told. When it is off, unreachable or slow, the similarity threshold decides exactly as before.
+- **Measured, not trusted.** A benchmark scores the cosine bar, a free credits rule (same director or franchise) and the model on hand-labelled pairs, and the card lists the live pairs the three disagree on to be labelled blind, so the verdict reflects your library rather than someone else's.
+- A **shadow check on the written explanations** (`check-recommendation-explanations`) asks whether an explanation presents a context-only title as the reason, claims an unsupported link or fact, or gives away a plot point. It changes nothing; the results appear on the card.
+- The same integration can be switched on to filter title-analysis sources (see [Title analysis](#title-analysis--new)).
+
+### Onboarding and built-in guides — new
+
+- A **welcome tour** starts by itself the first time an account signs in, pointing at one thing at a time and mentioning only the features that account has. Accounts that existed before it shipped get a one-time offer instead of being forced through it.
+- A **? button** in the app bar offers a tour of the current screen and opens the guide pages for it; individual ? icons and one-line **first-visit tips** do the same for a single control. A **getting-started list** on Home ticks itself off as the account does the things it names, and tips can be brought back from Settings → Display.
+- The **user guide** (`docs/features`) is read inside the app at `/help`, in English and Greek, and the **admin guide** (`docs/admin`) at `/admin/help`. Tour steps, links between pages and every anchor are checked by tests, so a renamed screen cannot leave a tour pointing at nothing.
+- Nothing here is written for an admin viewing the app as another user, and its state lives in its own table so a dismissed tip can never make the activity gate regenerate someone's recommendations.
+
+### Outgoing email — new (the connection only)
+
+- An **SMTP connection** under Admin → Integrations → Outgoing email, with a connection test and a test message. Required STARTTLS is the default, a configured login is always used, and the stored password is sent only to the host it was saved for. **Nothing sends email yet**; the notification features that will use it are still to come.
+- Message bodies are rendered from one structured template into HTML and plain text together, in the **recipient's** language, with images embedded rather than linked and links built only from the admin's public address.
+- A viewer's address and notification opt-in live on the Account tab of their settings.
+
+### Legacy library output — now a switch
+
+- The per-viewer STRM/symlink libraries, the Top Picks library and the channel libraries are **legacy**, replaced by Emby home rows and in-app lists. One switch governs all of it, and **a new install starts with it off**.
+- Switched off, nothing is written and nothing is created, but permissions still apply to what exists: a library its owner may no longer open fully is removed. A manual `remove-legacy-libraries` job deletes the rest, but only things a row proves Aperture made — never a library that merely has a matching name.
+- Admin pages that only configure the legacy output are greyed with a reason, and the job cards say they are blocked.
 
 ### Admin console — rebuilt
 
-- Generated from **one registry**: 8 groups, 45 sections, with the route table, the nav and the search index all derived from the same data, so a section cannot exist in one and not the others.
-- **⌘⇧K search palette** indexing sections, 43 individual settings _and_ all 35 jobs, scored per word so "novelty weight" finds the slider even though neither word is its label.
+- Generated from **one registry**: 8 groups, 48 sections, with the route table, the nav and the search index all derived from the same data, so a section cannot exist in one and not the others.
+- **⌘⇧K search palette** indexing sections, more than fifty individual settings _and_ all 39 jobs, scored per word so "novelty weight" finds the slider even though neither word is its label.
 - **Per-section preconditions** shown as a dimmed row with a reason, rather than an unclickable tab.
 - An error boundary per section, so one broken panel cannot take the console down with it.
+- **A Guide button on every section** opens the matching admin guide pages in a drawer, and the full guide lives at `/admin/help` — the `docs/admin` pages, read inside the app.
 
 It lives at **`/admin`**, reached from the app bar:
 
@@ -319,20 +381,21 @@ It lives at **`/admin`**, reached from the app bar:
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Overview**        | Version, build, health, quick status                                                                                                                                              |
 | **Library**         | Media server, source libraries, file locations, gap analysis                                                                                                                      |
-| **Integrations**    | TMDB, OMDb, MDBList, Trakt, Seerr, LLDAP, n8n, Tavily, fastCRW, JustWatch streaming, ratings refresh                                                                              |
-| **AI**              | Providers and roles, spend dashboard, cost estimate, embeddings, analysis bench                                                                                                   |
+| **Integrations**    | TMDB, OMDb, MDBList, Trakt, Seerr, LLDAP and the account-drift report, outgoing email (SMTP), n8n, Tavily, fastCRW, JustWatch streaming, ratings refresh                          |
+| **AI**              | Providers and roles, spend dashboard, cost estimate, embeddings, decision model, synopsis translation, analysis bench                                                             |
 | **Recommendations** | Algorithm and weights, evaluation, explanations, output format, library naming, Top Picks, Emby home rows, Shows You Watch, discovery tuning, genre strips, channel web expansion |
 | **Appearance**      | Instance branding, theme colours, poster display, language defaults, translations editor                                                                                          |
-| **Access**          | Users (access, feature switches, connections, "view as"), API keys, deployment posture                                                                                            |
+| **Access**          | Users (access, feature switches, connections, "view as", accounts gone from the media server), API keys, deployment posture                                                       |
 | **Ops**             | Jobs, backup, poster repair, logs, database                                                                                                                                       |
 
 ### Branding, languages and text — new
 
-- **Rename the instance** — the name reaches all 14 locales and the browser tab from the first byte.
+- **Rename the instance** — the name reaches every locale and the browser tab from the first byte.
 - **Mount your own logo and favicon** (`BRANDING_DIR`) and set the two brand colours from the UI.
-- **Edit any UI string** in the app or via CSV round-trip, or drop `overrides.<lng>.json` into `I18N_OVERRIDES_DIR` to customize text without rebuilding the image.
+- **Edit any UI string** in the app or via CSV round-trip, or drop `overrides.<lng>.json` into `I18N_OVERRIDES_DIR` to customize text without rebuilding the image. The editor works one language at a time, with an inline column and a live count of what is still untranslated.
 - **Language allowlists** — choose which UI and AI languages users may pick, and the default for each.
-- **Greek (el) added**, bringing the locale count to 15; ar and he render right-to-left.
+- **A language flag in the app bar** switches the app language; the login page has its own, saved to the account at sign-in.
+- **Greek (el) added** and Hebrew removed, leaving 14 locales; Arabic renders right-to-left.
 - **Configurable media-server display name** used throughout the UI, and a separate public URL for user-facing media-server links.
 
 ### Security, access and deployment — reworked
@@ -350,6 +413,10 @@ Upstream had sessions, API keys and per-user feature switches.
 - **Trusted proxies editable at runtime**, applied without a restart.
 - Session hardening (hashed tokens, 30-day absolute lifetime, 7-day idle timeout, immediate revocation on disable), per-account login lockout alongside the IP rate limit, and a cleanup job for both.
 - **Optional LLDAP email import**, with email, login and activity shown on Admin → Users.
+- **Account drift report** — compares the media server, LLDAP and Aperture live and says which accounts exist in one and not another, including Aperture accounts whose media-server account was deleted (which the Users page, being drawn from the media server's list, cannot show). It reports and changes nothing.
+- **Accounts deleted from the media server are paused** by the user sync — no sign-in, no API keys, no background work — and removed only when an admin chooses, after the media server is asked again.
+- **Saved credentials never travel to a typed address**: every Test button sends a stored secret only to the address it was saved for, and secrets are kept out of both the logs and the settings pages' responses.
+- A boot check warns when the backup client and the database server are on different PostgreSQL majors, and the compose files warn where they publish the database to the network.
 - Search engines told to stay away from the instance.
 
 ### Jobs and operations — reworked
@@ -381,6 +448,8 @@ Defects in code inherited from upstream, grouped by area. Each line is something
 - Every viewer saw every enabled library — in browse, search, similar titles, the Explore graph, detail pages and the assistant — whatever their media-server account could open.
   - Recommendations and generated libraries ignored that too, so a pick from a hidden library was playable through the viewer's own generated library.
   - The parental rating applied on only three surfaces, and the series pipeline compared ages against rating values.
+- The AI settings page, the per-provider credential routes, the n8n route and the setup snapshot sent saved API keys and header values to the browser, and structured settings (SMTP and other integration passwords included) were printed in the log on every save. Three Test buttons would send a saved admin credential to whatever server address was typed into the form.
+- An account deleted from the media server kept working: sign-in, API keys and background jobs all carried on, and nothing listed it.
 - The public info endpoint handed the internal media-server address to non-admins, and `/robots.txt` answered with the app shell, which crawlers read as permission to index everything.
 
 ### Data that was lost or never saved
@@ -391,6 +460,7 @@ Defects in code inherited from upstream, grouped by area. Each line is something
 - Leaving a chat mid-turn lost both the question and the answer, and a resumed conversation never saved new turns.
 - A playlist's description never reached the media server, and a channel's free-text preferences were stored but never used.
 - Adding a custom interest had never worked: every add was rejected and the page hid the failure.
+- Two different films sharing a title and year were folded into one library row by the sync, which then flipped between them every pass — so search, pickers and the library showed one of the two, depending on whose library access was asking.
 
 ### Watched, favourited and rated
 
@@ -465,7 +535,7 @@ These arrived with upstream v0.7.8. Several have been reworked since — the rew
 
 ## Jobs
 
-Everything runs as a named job with live progress, a log, cancellation and run history. Schedules are editable in **Admin → Ops → Jobs** — daily, weekly (on as many weekdays as you like), biweekly, every N hours or minutes, or manual. There are 35 in all.
+Everything runs as a named job with live progress, a log, cancellation and run history. Schedules are editable in **Admin → Ops → Jobs** — daily, weekly (on as many weekdays as you like), biweekly, every N hours or minutes, or manual. There are 39 in all.
 
 **Continuous**
 
@@ -503,11 +573,11 @@ Everything runs as a named job with live progress, a log, cancellation and run h
 | `generate-movie-recommendations`, `generate-series-recommendations`             | 04:00   |
 | `refresh-assistant-suggestions`, `refresh-ai-pricing`, `auto-request-top-picks` | 00:00   |
 
-**Manual by default** (`generate-title-analysis` and `refresh-library-gaps` can be given a schedule; the rest are manual only)
+**Manual by default** (`generate-title-analysis`, the two translation jobs and `refresh-library-gaps` can be given a schedule; the rest are manual only)
 
-`full-reset-movie-recommendations` · `full-reset-series-recommendations` · `rebuild-taste-profiles` · `refresh-recommendation-explanations` · `refresh-embedding-centering` · `evaluate-recommender` · `generate-title-analysis` · `refresh-library-gaps`
+`full-reset-movie-recommendations` · `full-reset-series-recommendations` · `rebuild-taste-profiles` · `refresh-recommendation-explanations` · `check-recommendation-explanations` · `refresh-embedding-centering` · `evaluate-recommender` · `generate-title-analysis` · `translate-title-synopses` · `translate-title-analyses` · `remove-legacy-libraries` · `refresh-library-gaps`
 
-> Jobs at the same cadence are staggered by minute offset to avoid contention. `reconcile-discovery-requests` runs ahead of the discovery run so a title declined in Seerr can return the same night, and `sync-home-sections` runs after Top Picks refresh so the home row reads that morning's list. Anything that spends money on model calls polls for cancellation between calls, not just between users.
+> Jobs at the same cadence are staggered by minute offset to avoid contention. `reconcile-discovery-requests` runs ahead of the discovery run so a title declined in Seerr can return the same night, and `sync-home-sections` runs after Top Picks refresh so the home row reads that morning's list. Anything that spends money on model calls polls for cancellation between calls, not just between users. With [legacy library output](#legacy-library-output--now-a-switch) off, `sync-movie-libraries`, `sync-series-libraries` and `refresh-top-picks` still run but write nothing, and their cards say so.
 
 ---
 
@@ -543,6 +613,8 @@ Almost everything is configured in the UI and stored in the database — media s
 
 ### Guides
 
+The user guide (`docs/features`) and the admin guide (`docs/admin`) are also built into the app: the **?** button in the app bar opens the pages for the current screen, `/help` holds the user guide and `/admin/help` the admin guide.
+
 | Guide                                  | Description                                         |
 | -------------------------------------- | --------------------------------------------------- |
 | [Admin Guide](docs/admin-guide.md)     | Setup walkthrough, job management, algorithm tuning |
@@ -573,6 +645,8 @@ Almost everything is configured in the UI and stored in the database — media s
 [Playlists](docs/features/playlists.md) ·
 [Collections](docs/features/collections.md) ·
 [Top Picks](docs/features/top-picks.md) ·
+[Watch This](docs/features/watch-this.md) ·
+[Getting started](docs/features/getting-started.md) ·
 [Franchises](docs/features/franchises.md) ·
 [Person pages](docs/features/person-pages.md) ·
 [Studio pages](docs/features/studio-pages.md) ·
@@ -607,6 +681,7 @@ Almost everything is configured in the UI and stored in the database — media s
 [Trakt](docs/admin/trakt.md) ·
 [Seerr](docs/admin/seerr.md) ·
 [LLDAP](docs/admin/lldap.md) ·
+[Outgoing email](docs/admin/smtp.md) ·
 [n8n](docs/admin/n8n.md) ·
 [Tavily](docs/admin/tavily.md) ·
 [fastCRW](docs/admin/crw.md) ·
@@ -616,6 +691,8 @@ Almost everything is configured in the UI and stored in the database — media s
 **AI** —
 [AI providers](docs/admin/ai-providers.md) ·
 [Embedding models](docs/admin/embedding-models.md) ·
+[Decision model](docs/admin/decision-model.md) ·
+[Synopsis translation](docs/admin/synopsis-translation.md) ·
 [Chat models](docs/admin/chat-models.md) ·
 [Text models](docs/admin/text-models.md) ·
 [AI spend](docs/admin/ai-spend.md) ·
@@ -629,6 +706,7 @@ Almost everything is configured in the UI and stored in the database — media s
 [Output format](docs/admin/output-format.md) ·
 [Library titles](docs/admin/library-titles.md) ·
 [Top Picks](docs/admin/top-picks.md) ·
+[Emby home rows](docs/admin/home-rows.md) ·
 [Shows You Watch](docs/admin/shows-you-watch.md) ·
 [Discovery tuning](docs/admin/discovery-tuning.md) ·
 [Genre strips](docs/admin/genre-strips.md) ·
@@ -701,22 +779,22 @@ After changing an export in `packages/core` or `packages/ui`, rebuild the packag
 The fork-divergence record is kept current with `scripts/fork-commit-bundle.mjs`. Bundle the commits into readable evidence files under the gitignored `.zcode/fork-classify/`:
 
 ```bash
-node scripts/fork-commit-bundle.mjs --diff-cap 0
+node scripts/fork-commit-bundle.mjs --diff-cap 0 --base upstream/dev --range <first-fork-commit>^..HEAD
 ```
 
-Then classify the new commits into a `verdicts-NN.tsv` there, and rebuild the docs:
+The default range, `upstream/dev..dev`, also reaches back through the January commits that predate the record, so name the first fork commit (the first row of `docs/fork-divergence.tsv`) as shown. Then classify the new commits into a `verdicts-NN.tsv` there, and rebuild the docs:
 
 ```bash
 node scripts/fork-commit-bundle.mjs --assemble
 ```
 
-Existing verdicts are read back from `docs/fork-divergence.tsv`, so only the new commits need classifying.
+Existing verdicts are read back from `docs/fork-divergence.tsv` by commit hash, so only the new commits need classifying. If history is ever rewritten the hashes die and the commit links break; the verdicts can be re-keyed to the new hashes by matching each row's date and subject (509 of 511 matched when this was last done).
 
 ---
 
 ## Tech stack
 
-- **Backend** — Node 20, Fastify 5, TypeScript, PostgreSQL + pgvector, raw SQL (no ORM), pino, node-cron
+- **Backend** — Node 20, Fastify 5, TypeScript, PostgreSQL + pgvector, raw SQL (no ORM), pino, node-cron, nodemailer
 - **Frontend** — React 18, Vite 6, MUI 6, react-router 7, i18next, assistant-ui, d3, recharts
 - **AI** — Vercel AI SDK 5 with providers for OpenAI, Anthropic, Google, Groq, DeepSeek, OpenRouter, Ollama and Hugging Face; LM Studio, Z.AI and any other OpenAI-compatible endpoint through the OpenAI-compatible provider
 - **Infrastructure** — Docker, pnpm workspaces, GitHub Actions. `:dev` images are amd64; arm64 is built for `main`, release tags and manual workflow runs
