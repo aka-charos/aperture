@@ -60,7 +60,7 @@ To get the missing episodes, request them from the series' detail page (see [Ser
 
 ## Upcoming Episodes
 
-For series with a scheduled next episode, a countdown chip tells you when:
+For series with a next episode due in the next two months, a countdown chip tells you when (an episode further off isn't shown yet):
 
 - **"Airs today!"** — color-coded, it's imminent
 - **"3 days to go"** — countdown with the weekday and date

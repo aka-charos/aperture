@@ -28,7 +28,8 @@ The **Filters** button (it shows a count when anything is active) opens the full
 |---------|---------|
 | **Scores** | Community rating, Rotten Tomatoes critic score, Metacritic |
 | **Year** | Release-year range |
-| **Library & Audience** | **Watch status** (Any / Watched / Unwatched — watched means you finished playing it; a title you only favourited, or stopped partway through, counts as unwatched), **min/max watchers** (how many distinct users on your server have played it) |
+| **Watch status** | Any / Watched / Unwatched — watched means you finished playing it; a title you only favourited, or stopped partway through, counts as unwatched |
+| **Audience** | **Min/max watchers** — how many distinct users on your server have played it |
 | **Runtime** | Length range (movies) |
 | **Video quality** | Resolution / formats present in your files |
 | **Seasons** | Season-count range (series) |
@@ -39,16 +40,16 @@ The popper header has a **reset icon** that clears everything at once; chips let
 
 ### Country
 
-The **Country** button opens its own popper for **production country**:
+The **Country** button opens its own popper for **production country**, with a search box and a list you can sort **A–Z** or by **Most titles**. Pick one country or several:
 
-- A **Match All / Any** switch — "France AND Japan" versus "France OR Japan"
-- It matches stored country names; nationalities work too ("French", "German"…)
+- **Match** — **Any (OR)** for "France or Japan", **All (AND)** for "France and Japan"
+- **Include secondary countries** — off (the default), a title counts only for the country it comes from: its country of origin, or its first listed production country when that isn't known. On, every co-producing country counts too, so a French–German co-production also shows under Germany
 
-Production country is almost completely populated (unlike language metadata), so it's the reliable way to browse national cinema.
+Production country is almost completely filled in (unlike language), so it's the reliable way to browse national cinema.
 
 ### Franchise / Network
 
-Movies can be narrowed to one **collection** (franchise); series to one **network**. For the collection overview across your whole library, see the [Franchise Tracker](franchises.md).
+Movies can be narrowed to one **collection** (franchise); series to one **network**, picked from a searchable list sorted A–Z or by **Most shows**. For the collection overview across your whole library, see the [Franchise Tracker](franchises.md).
 
 ---
 
@@ -84,7 +85,7 @@ Any combination of filters can be saved as a **preset** from the Presets menu:
 
 ## Reading the Results
 
-**Grid view** — posters with overlays: watched tick, your star rating on hover, episode-progress badge for series, community rating badge.
+**Grid view** — posters with overlays: watched tick, your star rating on hover, episode-progress badge for series, community rating badge. Under each poster, **more** opens the plot; it opens the plots of the whole row at once, so the row stays even.
 
 **List view** — poster beside the details:
 
@@ -94,6 +95,10 @@ Any combination of filters can be saved as a **preset** from the Presets menu:
 - Your rating, inline; series add their **status** (Airing/Ended) and **season count**, plus an **Add to Watching** toggle
 
 Results load infinitely as you scroll, with an end message at the bottom of the match set.
+
+### Coming Back
+
+Your tab, search, filters and sort are kept in the page's address. Open a title and press **Back**, and Browse comes back exactly as you left it, scrolled to where you were. You can also bookmark or share a filtered view by its address.
 
 ---
 

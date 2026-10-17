@@ -50,7 +50,7 @@ A stacked area chart of movies and episodes watched, month by month, **covering 
 
 ## When You Watch
 
-A heatmap of your activity by day and hour — brighter cells are heavier viewing. The **Busiest Day** tile names your record-setting day. These are the only charts that exclude watches you dated roughly (see [About the numbers](#about-the-numbers)).
+A heatmap of your activity by day and hour — brighter cells are heavier viewing. The **Busiest Day** tile names your record-setting day. Like the activity chart, it leaves out watches you dated roughly (see [About the numbers](#about-the-numbers)).
 
 ---
 
@@ -98,7 +98,7 @@ Your most-watched production studios (movies) and TV networks (series), with log
 
 ## Your Taste in Words
 
-Alongside the charts, your [Watcher Identity](user-settings/watcher-identity.md) appears as taste cards for movies and series — a short written account of what kind of viewer your history says you are, naming the titles and patterns behind it. It is rewritten automatically when your taste profile changes (at a recommendation run); the card's button writes it again on demand if it doesn't sound like you. This page is the only place it's shown.
+Alongside the charts, your **Watcher Identity** appears as taste cards for movies and series — a short written account of what kind of viewer your history says you are, naming the titles and patterns behind it. It is rewritten automatically when your taste profile changes (at a recommendation run); the card's button writes it again on demand if it doesn't sound like you. This page is the only place it's shown. It needs a few played titles to work from (about five films, or three shows); below that there is no card.
 
 ---
 
@@ -113,7 +113,7 @@ Alongside the charts, your [Watcher Identity](user-settings/watcher-identity.md)
 ## Using Your Stats
 
 - **Know your taste** — genre and decade charts show what you gravitate toward; the guilty-pleasures chips show where you disagree with the critics.
-- **Feed your recommendations** — your genre weights and franchise affinities in [Watcher Identity](user-settings/watcher-identity.md) are built from this history.
+- **Feed your recommendations** — the genres and franchises in your [Recommendations settings](user-settings/recommendations.md) are found in this history.
 - **Find new content** — drill into an under-watched genre, or follow a favorite actor to their filmography and request what's missing.
 
 ---

@@ -64,7 +64,7 @@ See [Movie Details](movie-detail.md) for the full panel.
 
 ### Input
 
-The pipeline considers your watch history, your ratings, your [Watcher Identity](user-settings/watcher-identity.md) — genre weights, franchise affinities, stated interests — and community/critic ratings. Your watch history is synced immediately before every run, so recently watched titles are excluded properly.
+The pipeline considers your watch history, your ratings, your taste settings — genre weights, franchise affinities, stated interests, the libraries that count (see [Recommendations settings](user-settings/recommendations.md)) — and community/critic ratings. Your watch history is synced immediately before every run, so recently watched titles are excluded properly.
 
 ### Scoring Weights
 
@@ -77,17 +77,17 @@ Each candidate is scored with configurable weights:
 | **Rating** | 20% | Community and critic scores |
 | **Diversity** | 20% | Variety across your final list |
 
-You can customize these (or switch to your own weights entirely) in [AI Algorithm Settings](user-settings/ai-algorithm.md). Only the ratio between them matters — they're normalized automatically.
+You can customize these (or switch to your own weights entirely) under **Advanced** in [Recommendations settings](user-settings/recommendations.md). Only the ratio between them matters — they're normalized automatically.
 
 ### Exclusions
 
 Content is excluded if:
 
-- You've already watched it — played, or progressed at least 5% into it
+- You've already watched it — played, or progressed at least 5% into it (unless you switched on **Suggest titles I have already watched**)
 - It's in a library your admin excluded, or one the media server doesn't let your account open (whether you get movie picks, series picks or both follows from the libraries you can open)
 - You've favorited it — it's still scored for transparency, but never picked (you've already found it)
 
-How **disliked** titles are treated — excluded entirely, or penalized but allowed — is your choice in [AI Algorithm Settings](user-settings/ai-algorithm.md).
+How **disliked** titles are treated — excluded entirely, or penalized but allowed — is your choice under **Titles you rated low** in [Recommendations settings](user-settings/recommendations.md).
 
 ---
 
@@ -103,9 +103,9 @@ Some servers still use the older **AI Picks libraries** ("*YourName*'s AI Picks 
 
 - **Rate more content** — ratings are the strongest taste signal; use the full 1–10 scale
 - **Be honest about dislikes** — low ratings teach the model what to avoid
-- **State your interests** — the Specific Interests card in [Watcher Identity](user-settings/watcher-identity.md) feeds picks directly
+- **State your interests** — the **Your interests** card in [Recommendations settings](user-settings/recommendations.md) feeds picks directly
 - **Tune the weights** — more similarity for comfort, more novelty for discovery
-- **Check your identity** — genre and franchise weights should read like you
+- **Check your taste settings** — the genres and franchises listed should read like you
 
 ---
 

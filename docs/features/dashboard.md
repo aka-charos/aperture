@@ -1,6 +1,6 @@
 # Dashboard
 
-The Dashboard is your home screen: a time-boxed snapshot of your viewing, your AI picks, what's airing next, and what's popular on the server.
+The Dashboard is your home screen: a time-boxed snapshot of your viewing, your AI picks, what's airing next, and what's popular on the server. Any title on it opens in a window over the dashboard, so closing it leaves you where you were.
 
 ## Greeting & Quick Stats
 
@@ -8,10 +8,10 @@ A time-of-day greeting heads the page, above a stats bar covering the **last 30 
 
 | Stat | Description |
 |------|-------------|
-| **Movies Watched** | Movies you've played this month |
-| **Series Watched** | Series you've played this month |
-| **Ratings** | Titles you've rated |
-| **Watch Time** | Cumulative viewing time |
+| **Movies Watched** | Movies you've played in the last 30 days |
+| **Series Watched** | Series you've played in the last 30 days |
+| **Ratings** | Titles you rated, or changed the rating of, in the last 30 days |
+| **Watch Time** | Viewing time in the last 30 days, movies and episodes together |
 
 ---
 
@@ -21,23 +21,29 @@ Two carousels — **Your AI Movie Recommendations** and **Your AI Series Recomme
 
 - **Rank badges** — numbered, matching the order on [My Recommendations](recommendations.md)
 - **Rate from the poster** — hover and pick stars (1–10)
-- **Click any poster** for the detail page and its insights panel
+- **Click any poster** to open the title in a window over the dashboard, with its insights panel; close it and you're back where you were
 
 Empty until your first recommendation run; the empty state says so.
 
-## Recently Watched by Your Connections
+## New & Upcoming Episodes
 
-If an admin has connected your account with someone else's (see [Watch This](watch-this.md)), each connection gets a carousel — **Recently watched by {name}**, "From your connections" — showing what they played lately. A Movie/Series chip marks each title, and only titles from libraries you can open are shown.
+**New & Upcoming Episodes** — "From shows you watch" — pulls from your [Shows You Watch](shows-you-watch.md) list:
 
-## Upcoming Episodes
+- A show with an episode due in the next two months shows it with an **Airing** chip and a countdown (**Today**, **Tomorrow**, **In N days**)
+- A show with nothing upcoming, whose latest episode aired in the last two months, shows that episode with **Aired** and its date, as long as you were caught up when it arrived
+- Under each poster, a small button adds the show to, or removes it from, the shows you watch
 
-**Upcoming Episodes** — "From shows you watch" — pulls from your [Shows You Watch](shows-you-watch.md) list: poster, **Airing** chip, and countdowns (**Today**, **Tomorrow**, **In N days**) for what's next.
+The row is hidden when none of your shows has anything new or upcoming.
 
 ---
 
 ## Top Picks
 
 **Top Pick Movies** and **Top Pick Series** ("Popular movies/TV series across all users") — the same ranking as the [Top Picks](top-picks.md) page, in carousel form.
+
+## Recently Watched by Your Connections
+
+If an admin has connected your account with someone else's (see [Watch This](watch-this.md)), each connection gets a carousel — **Recently watched by {name}**, "From your connections" — showing what they played lately. A Movie/Series chip marks each title, and only titles from libraries you can open are shown.
 
 ---
 

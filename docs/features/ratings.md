@@ -58,14 +58,14 @@ Strong positive evidence: similar titles, genres, people, and franchises rise in
 
 ### Low ratings (1–3)
 
-How dislikes are treated is your choice under [AI Algorithm Settings](user-settings/ai-algorithm.md):
+How dislikes are treated is your choice under **Titles you rated low** in [Recommendations settings](user-settings/recommendations.md#your-picks):
 
 | Mode | Effect |
 |------|--------|
 | **Exclude Completely** (recommended) | Disliked titles never appear in recommendations |
 | **Penalize But Allow** | They're scored down but can still appear if something else fits strongly |
 
-Either way the model learns from what you don't like. The **Your Disliked Content** list in the same tab lets you re-rate or clear any of them.
+Either way the model learns from what you don't like. **Review** on the same card lists them, so you can re-rate or clear any of them.
 
 ### Middle ratings (4–6)
 

@@ -35,9 +35,9 @@ Until an account's library access has been read for the first time, every enable
 
 In their own settings:
 
-- **Watcher Identity**: taste profile tuning, genre and franchise weights, interests, and which libraries shape their taste ([Watcher Identity](../features/user-settings/watcher-identity.md))
-- **AI Algorithm**: their own recommendation weights; your defaults apply until they switch it on ([AI Algorithm](../features/user-settings/ai-algorithm.md))
-- **Preferences**: poster display, language, similarity options, their email address and opt-in (when granted), and their AI library names (legacy output only) ([Preferences](../features/user-settings/preferences.md))
+- **Recommendations**: their taste (interests, genre and franchise weights, which libraries shape it), whether watched titles may come back, how low-rated titles are treated, the explanation (when you allow the override), and, under Advanced, their own scoring weights (your defaults apply until they switch it on) ([Recommendations settings](../features/user-settings/recommendations.md))
+- **Display**: poster rating badges and the similarity graph options ([Display](../features/user-settings/display.md)); their languages are set from the flag in the top bar
+- **Account**: their email address and opt-in (when granted), Trakt, and their AI library names (legacy output only) ([Account](../features/user-settings/account.md))
 - **Emby home screen** (Emby accounts): which [home rows](home-rows.md) they get and where
 
 ## API Keys

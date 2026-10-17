@@ -43,7 +43,7 @@ One edge, one color — the strongest reason wins:
 
 ## Settings
 
-Two preferences live under [Preferences](user-settings/preferences.md) → Similarity Graph:
+Two preferences live under [Display](user-settings/display.md#similarity-graph) → Similarity Graph:
 
 | Setting | Effect |
 |---------|--------|

@@ -27,8 +27,8 @@ The **AI Summaries language** is the language AI-written text is generated in: t
 
 ## Per-User Overrides
 
-Users pick both languages in [Preferences](../features/user-settings/preferences.md) — offered **only the locales you enabled**, cleared field = server default, and the card shows the effective values. A saved user override that you later remove from the allowlist falls back to the server default automatically. Right-to-left locales flip the whole interface direction, not just the text.
+Users pick both languages from the **flag in the top bar** (see [Display](../features/user-settings/display.md#elsewhere)) — offered **only the locales you enabled**; the recommendations language can follow the app language or differ from it, and the flag is hidden when there is nothing to choose. A saved user override that you later remove from the allowlist falls back to the server default automatically. Right-to-left locales flip the whole interface direction, not just the text.
 
 ---
 
-**Related:** [Translations](translations.md) · [Preferences (user doc)](../features/user-settings/preferences.md)
+**Related:** [Translations](translations.md) · [Display (user doc)](../features/user-settings/display.md)

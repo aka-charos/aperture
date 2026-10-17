@@ -18,7 +18,7 @@ Admin console → **Recommendations** → **Explanations** (`/admin/recommendati
 The effective setting for a user resolves as: **global default → your per-user grant → the user's own choice**.
 
 - Grant the override permission in the **AI Override** column of the [Users](user-permissions.md) page or on the user's detail page; without it, the user sees the effective value and can't change it
-- With the permission granted, the user's pick in [Preferences](../features/user-settings/preferences.md) wins
+- With the permission granted, the user's pick (**Explain each pick**, on the Recommendations tab of their settings; see [Recommendations settings](../features/user-settings/recommendations.md#your-picks)) wins
 
 ## What Explanations Cost and When They Appear
 

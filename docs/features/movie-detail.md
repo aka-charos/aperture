@@ -50,9 +50,10 @@ The counts expand into a list of **who** watched and favorited it only for peopl
 If the recommender scored this title for you, the page shows a personal insights panel — headed **Recommended For You** (it made your list) or **How This Fits Your Taste** (it was scored but not picked):
 
 - **How We Calculated Your Match** — the three factors with their weight shares: **Taste Match** (similarity to your history), **Discovery** (how different it is from what you usually watch), and **Quality** (community and critic ratings), blended, then adjusted by your franchise and genre preferences.
-- **Evidence** — "Based on your history with similar movies:" the specific titles from your history that pulled it in, linked.
+- **Why We Think You'll Like This** — "Based on your history with similar movies:" the titles from your history closest to this one, linked. When they're only a loose match, or the pick wasn't chosen by the scores at all, the heading becomes **Closest Titles in Your Library** and says they're shown for context, not as the reason.
 - **Variety In Your List** — how much this pick differs from the others chosen with it; this shapes the *order* of your list, not the match.
-- **Taste twin** — sometimes the reason is a person here whose taste closely overlaps yours; the panel says so and shows the rare titles you've both watched. It names them only if they are one of your connections (see [Watch This](watch-this.md)); otherwise they stay anonymous.
+- **Taste twin** — sometimes the reason is a person here whose taste closely overlaps yours and who watched this. The panel says so, and in the closest-titles row it marks the ones they watched too. It names them only if they are one of your connections (see [Watch This](watch-this.md)); otherwise they stay anonymous.
+- **Interests and acclaim** — a pick can also come from an interest you stated in your [Recommendations settings](user-settings/recommendations.md#your-interests), or from a slot your admin keeps for critically acclaimed titles. The AI explanation says which, and the titles below it are headed **Closest Titles in Your Library**.
 - **AI explanation** — "Why *Aperture* picked this for you", a natural-language paragraph, if your admin enabled it.
 
 ---

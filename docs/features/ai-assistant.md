@@ -103,4 +103,4 @@ A suggestion carousel has a **create-playlist** action: the titles it recommende
 
 ---
 
-**Next:** [Preferences](user-settings/preferences.md)
+**Next:** [Recommendations settings](user-settings/recommendations.md)

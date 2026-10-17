@@ -12,7 +12,7 @@ Until the enrichment job has run, the page is empty and tells you so.
 
 ## Accessing the Tracker
 
-1. Navigate to **Franchise Tracker** (route `/franchises`) — linked from Browse rather than the sidebar
+1. Open `/franchises` — the tracker isn't in the sidebar, so go to it by address (in the in-app guide, the address above is a link)
 2. Or use the **Franchise filter** on [Browse](browse.md) → Movies to jump straight to one franchise's titles
 
 ---
@@ -58,11 +58,11 @@ If TMDb can't be reached, only the films already in your library are listed, and
 
 ## Franchises and Recommendations
 
-Your franchise habits feed your [Watcher Identity](user-settings/watcher-identity.md):
+Your franchise habits feed your recommendations, and you can adjust them in [Recommendations settings](user-settings/recommendations.md#franchises):
 
-- The **Franchise Weights** card lists the franchises detected from your viewing, each with a slider from **Avoid (−1)** through **Neutral (0)** to **Boost (+1)**
-- Deleting a franchise from your profile is the "I'm done with this one" control — it stops modeling it entirely
-- The **Min Franchise Size** and **Min Watched** thresholds decide which franchises are worth modeling at all (e.g. only collections where at least 2 titles exist and you've watched at least 1)
+- The **Franchises** card lists the franchises found in your viewing, each with a slider from **Avoid** through **Neutral** to **Boost**
+- Removing a franchise is the "I'm done with this one" control: it stops counting entirely
+- **Franchise size** and **Watched by you** decide which franchises are listed at all (for example, only collections with at least 2 titles in the library, of which you've watched at least 1)
 
 Completing a franchise is a real signal: rate its entries well and similar collections rise in your recommendations.
 

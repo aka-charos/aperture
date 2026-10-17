@@ -4,6 +4,8 @@ Welcome to Aperture! Aperture is a recommendation and watch-tracking layer on to
 
 Depending on how your administrator configured the server, a few of the features below may be switched off or hidden (each one says so).
 
+Inside Aperture, the **?** button in the top bar opens the pages that describe the screen you're on, and **User guide** in your avatar menu opens this guide.
+
 ---
 
 ## For Administrators
@@ -89,11 +91,11 @@ Find content that isn't in your library yet, and get it in.
 
 ## Personalizing Aperture
 
-User settings live under your avatar menu, in three tabs (four on Emby).
+Your settings open from the avatar menu, in up to four tabs: Recommendations, Display, Account (when it has something on it) and Emby home screen (Emby only). Your language is set from the flag in the top bar.
 
-26. [Preferences](features/user-settings/preferences.md) - Language, poster display, email notifications, Trakt, and the legacy AI library names
-27. [AI Algorithm Weights](features/user-settings/ai-algorithm.md) - Customize how your recommendations are scored
-28. [Watcher Identity](features/user-settings/watcher-identity.md) - Taste profiles: genre and franchise weights, interests
+26. [Recommendations](features/user-settings/recommendations.md) - Your taste (interests, genres, franchises, libraries), what may be recommended, and your own scoring weights
+27. [Display](features/user-settings/display.md) - Poster rating badges and the similarity graph, plus where the language setting lives
+28. [Account](features/user-settings/account.md) - Your email address, Trakt, and the legacy AI library names
 29. [Emby Home Screen](features/user-settings/home-screen.md) - The rows Aperture adds to your Emby home screen, and where they go
 
 ---
@@ -126,6 +128,6 @@ User settings live under your avatar menu, in three tabs (four on Emby).
 | Create a playlist or collection | [Playlists](features/playlists.md) / [Collections](features/collections.md) |
 | Explore similar content visually | [Media Graph](features/explore.md) |
 | See my viewing statistics | [Watch Stats](features/watch-stats.md) |
-| Customize my recommendations | [AI Algorithm](features/user-settings/ai-algorithm.md) |
+| Customize my recommendations | [Recommendations settings](features/user-settings/recommendations.md) |
 | Recommend something to someone | [Watch This](features/watch-this.md) |
 | Change my Emby home screen rows | [Emby Home Screen](features/user-settings/home-screen.md) |

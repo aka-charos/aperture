@@ -24,10 +24,10 @@ Discover also gains three extra sources when you're connected: **Trending**, **P
 
 ### Connection Steps
 
-1. Open **Settings → Preferences** (the Trakt card lives there)
+1. Open your settings from the **avatar** menu and pick **Account** (the Trakt card lives there)
 2. Click **Connect to Trakt**
 3. You'll be redirected to Trakt — log in and authorize Aperture
-4. You're returned to Aperture and confirmed connected
+4. You're returned to the Account tab, which confirms you're connected
 
 ### Once Connected
 

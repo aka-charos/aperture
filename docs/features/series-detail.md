@@ -65,7 +65,7 @@ A strip under the actions shows how the household engages with the series — wa
 
 ## Recommended For You
 
-If the recommender scored this series for you, the insights panel explains the pick — **Recommended For You** or **How This Fits Your Taste**, the **Taste Match / Discovery / Quality** breakdown with weight shares, evidence from your history, the **taste-twin** note (naming them only if they are one of your connections), and the AI explanation if enabled. See [Movie Details](movie-detail.md) for the full tour.
+If the recommender scored this series for you, the insights panel explains the pick — **Recommended For You** or **How This Fits Your Taste**, the **Taste Match / Discovery / Quality** breakdown with weight shares, the closest titles from your history (headed as the reason only when they really are one), the **taste-twin** note (naming them only if they are one of your connections), and the AI explanation if enabled. See [Movie Details](movie-detail.md) for the full tour.
 
 A **Series Analysis** may also be available — see [Title Analysis](title-analysis.md).
 

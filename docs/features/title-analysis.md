@@ -21,6 +21,7 @@ The feature must be configured by an administrator (a dedicated AI model role an
 The section is **collapsed by default** — expand it when you want to read. Inside:
 
 - **Section headings**, in reading order: *Context* (where the work comes from and the tradition it belongs to), *Form and Style*, *Narrative Structure* (series only), *Making* (how it was made and what its makers said they intended), and *Critical Reception* (what critics valued and faulted, and what it went on to influence). Analyses written before prompt version 9 may still show the older *Lineage and Influence*, *Stated Intent*, *Production Context* and *Critical Debate* labels until they are rewritten. The essay's paragraphs are indexed as they are written, so a heading only appears when there is substance under it.
+- If your admin has synopsis translation on with film analyses included, the analysis appears in the language you're reading Aperture in, marked **Machine-translated**, with **Show original** one click away.
 - A **Sources** chip showing how much published writing the analysis is grounded in, with a grade: **Well documented**, **Reviews only**, or **Sparse sources**.
 
 ### Spoiler stance
@@ -35,11 +36,11 @@ The section is always in exactly one of three states:
 
 1. **An analysis exists** — it is rendered.
 2. **Someone asked, and there was nothing to write** — a plain reason is shown instead, e.g. *"There is too little published writing about this title to say anything grounded."* or *"Nothing substantive to report about how this one was made."* An empty result is an answer, not an error.
-3. **Nobody has asked yet** — a **"Write an analysis"** button is offered. While it works you'll see *"Reading what critics wrote…"*.
+3. **Nobody has asked yet** — a **"Write an analysis"** button is offered. While it works you'll see *"Reading what critics wrote…"*. It takes a few minutes; you can leave the page, and the analysis is there when you come back.
 
 ---
 
 ## Rewriting
 
-- **Rewrite this analysis** — reads the sources again and writes the text fresh with the currently configured model. If the existing text was written with an older version of the prompt, the section says so.
+- **Rewrite this analysis** — offered when the analysis was written with an older version of the instructions that is no longer good enough; the section says so. It reads the sources again and writes the text fresh with the currently configured model.
 - **Administrators** additionally get a re-run control showing the source count, how much text was read, the prompt version, and which search mode produced it (self-hosted search or Google grounding).

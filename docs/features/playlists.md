@@ -45,7 +45,7 @@ Refreshing re-runs the same preview, so the server copy never changes without yo
 - **Remove** — per item from the view dialog
 - **Edit settings** — genres, seeds, preferences
 - **Delete** — removes the playlist from Aperture *and* from your media server
-- **Show on my Emby home screen** — on Emby, tick **Also show it on my Emby home screen** and the playlist becomes a row on your home screen after the next home-screen sync (only you see it, and the row isn't kept in playlist order). Your admin has to have playlist rows switched on; see [Emby Home Screen](user-settings/home-screen.md)
+- **Show on my Emby home screen** — on Emby, tick **Also show it on my Emby home screen** and the playlist becomes a row on your home screen straight away, or at the next home-screen sync if Emby can't be reached just then (only you see it, and the row isn't kept in playlist order). Your admin has to have playlist rows switched on; see [Emby Home Screen](user-settings/home-screen.md)
 
 ---
 

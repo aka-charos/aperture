@@ -40,7 +40,7 @@ The same poster beside a row of details. What the row carries depends on the pag
 | **Recommendations** | Match score and **Similarity / Novelty / Rating** bars, reason line, Watch trailer, View on TMDb |
 | **Top Picks** | **Unique viewers**, **play count**, community rating; series add episodes watched and % avg completion |
 | **Discover** | Full metadata (year, runtime, genres), synopsis, match score, request actions |
-| **Watch History** | Plays chip ("3 plays" / "Rewatched"), resume bar with % tooltip, last-watched date, management actions |
+| **Watch History** | Plays chip ("3x", "5+" past five), resume bar with % tooltip, last-watched date, management actions |
 | **Shows You Watch** | **Episode availability bar**, upcoming-episode countdown, source chip |
 
 All list rows keep the poster overlays (watched tick, rating, progress) so nothing is lost in the denser layout.

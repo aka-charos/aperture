@@ -8,7 +8,7 @@ Navigate to **Watch History** in the sidebar (clock icon). The page has two tabs
 
 If an admin has connected you with other people (see [Watch This](watch-this.md)), a **whose history** picker at the top switches to a connection's history. Theirs is read-only, and shows only titles from libraries you can open yourself.
 
-Your history comes from your media server, synced automatically — movies roughly every 2 hours, series hourly, and always right before a recommendation run. Roughly-dated watches (from the rating prompt) appear here too, marked as approximate.
+Your history comes from your media server, synced automatically — movies roughly every 2 hours, series hourly, and always right before a recommendation run. Watches you recorded from the rating prompt (dated roughly) appear here too, like any other watch.
 
 ---
 
@@ -23,7 +23,7 @@ Your history comes from your media server, synced automatically — movies rough
 | Sort | Order |
 |------|-------|
 | **Recent** | Most recently played first (default) |
-| **Plays** | Most-played first |
+| **Most Played** | Most-played first |
 | **A-Z** | Alphabetical |
 
 ---
@@ -32,7 +32,7 @@ Your history comes from your media server, synced automatically — movies rough
 
 ### Movies
 
-- Poster with a **watched tick** and, where applicable, a **plays chip** — "3 plays", capped at 5, then "Rewatched"
+- Poster with a **watched tick** and, where you've played it more than once, a **plays chip** — "3x", then "Rewatched" past five plays ("5+" in list view)
 - **Favorite badge** — the heart, if you've favorited it on the media server
 - **Resume bar** — if you stopped partway, the poster shows how far, with a "% watched" tooltip on hover
 - Title, year, and the last-watched date

@@ -51,4 +51,4 @@ Press **Apply**. Changes reach Emby straight away; if Emby can't be reached, the
 
 ---
 
-**Related:** [Preferences](preferences.md) · [Watch This](../watch-this.md) · [Playlists](../playlists.md)
+**Related:** [Recommendations](recommendations.md) · [Watch This](../watch-this.md) · [Playlists](../playlists.md)

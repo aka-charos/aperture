@@ -18,7 +18,7 @@ These aren't copies: the entries point at your original media files, so nothing 
 
 ## Renaming Your AI Picks Libraries
 
-Under [Preferences](user-settings/preferences.md) → **AI Library Names**, you can rename your two AI Picks libraries (the card is greyed while the libraries are switched off). Renaming replaces the old library with one under the new name. A name already used by another library on the server, such as a regular "Movies" library or someone else's, is refused, and your library is skipped until you choose another. The defaults are templates like "*YourName*'s AI Picks - Movies", and support merge tags — `{{username}}`, `{{type}}`, `{{count}}`, `{{date}}` — if you want the name to carry metadata.
+Under [Account](user-settings/account.md#ai-library-names) → **AI Library Names**, you can rename your two AI Picks libraries (the card is only there while your server still writes these libraries). Renaming replaces the old library with one under the new name. A name already used by another library on the server, such as a regular "Movies" library or someone else's, is refused, and your library is skipped until you choose another. The defaults are templates like "*YourName*'s AI Picks - Movies", and support merge tags — `{{username}}`, `{{type}}`, `{{count}}`, `{{date}}` — if you want the name to carry metadata.
 
 Top Picks library names are configured server-wide by your admin.
 
