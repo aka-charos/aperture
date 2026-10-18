@@ -28,6 +28,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook'
 import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded'
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded'
 import { stepItemKey, stepKey, type TourIcon, type TourId, type TourStep } from './tours'
+import { IconTile } from './IconTile'
 
 const ICONS: Record<TourIcon, typeof AutoAwesomeIcon> = {
   sparkle: AutoAwesomeIcon,
@@ -143,20 +144,9 @@ export const StepCard = forwardRef<HTMLDivElement, CardProps>(function StepCard(
       {props.arrow}
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <Box
-          sx={{
-            width: 40,
-            height: 40,
-            borderRadius: 3,
-            flex: '0 0 auto',
-            display: 'grid',
-            placeItems: 'center',
-            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.16),
-            color: 'primary.light',
-          }}
-        >
-          <Icon sx={{ fontSize: 21 }} />
-        </Box>
+        <IconTile>
+          <Icon />
+        </IconTile>
         <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
           <Typography variant="caption" color="text.secondary" fontWeight={500} aria-hidden="true">
             {progress}
@@ -165,7 +155,10 @@ export const StepCard = forwardRef<HTMLDivElement, CardProps>(function StepCard(
         </Box>
       </Box>
 
-      <Box id={bodyId} aria-live="polite" sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      {/* Not a live region: the card takes focus on every step, and focus on a
+          dialog already reads its name and this description. Both would read
+          the step twice. */}
+      <Box id={bodyId} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
         <Typography id={titleId} component="h2" sx={{ fontSize: 19, fontWeight: 700, lineHeight: 1.3, letterSpacing: '-0.01em' }}>
           {t(stepKey(tour, step.id, 'title'))}
         </Typography>
@@ -264,8 +257,18 @@ function LinkChip({ icon, onClick, children }: { icon: ReactElement; onClick: ()
   )
 }
 
-/** Muted poster tints for the welcome illustration: decoration, not data. */
-const POSTER_TINTS = ['#2b2b35', '#1f2d3a', '#23332a', '#33301f']
+/**
+ * A flat tint over the card's surface: solid, so posters that overlap in the
+ * fan do not show through one another, and from the theme, so a brand colour
+ * change reaches the picture too.
+ */
+function tinted(tint: string, surface: string): string {
+  return `linear-gradient(${tint}, ${tint}), ${surface}`
+}
+
+/** The picture is drawn at this height and scaled down whole on a phone. */
+const ILLUSTRATION_HEIGHT = 220
+const ILLUSTRATION_PHONE_SCALE = 0.68
 
 /**
  * The welcome tour's first card: a picture of what Aperture does (a fan of
@@ -275,11 +278,12 @@ export const WelcomeCard = forwardRef<HTMLDivElement, CardProps & { showKeys: bo
   const { t } = useTranslation()
   const theme = useTheme()
   const { total, titleId, bodyId, rtl } = props
+  const surface = theme.palette.background.paper
   const fan = [
-    { tint: POSTER_TINTS[0], x: -176, r: -14, y: 22 },
-    { tint: POSTER_TINTS[1], x: -92, r: -7, y: 6 },
-    { tint: POSTER_TINTS[3], x: 176, r: 14, y: 22 },
-    { tint: POSTER_TINTS[2], x: 92, r: 7, y: 6 },
+    { tint: alpha(theme.palette.text.primary, 0.08), x: -176, r: -14, y: 22 },
+    { tint: alpha(theme.palette.info.main, 0.22), x: -92, r: -7, y: 6 },
+    { tint: alpha(theme.palette.warning.main, 0.18), x: 176, r: 14, y: 22 },
+    { tint: alpha(theme.palette.success.main, 0.18), x: 92, r: 7, y: 6 },
   ]
   const pill = {
     display: 'inline-flex',
@@ -306,20 +310,31 @@ export const WelcomeCard = forwardRef<HTMLDivElement, CardProps & { showKeys: bo
         onKeyDown={props.onKeyDown}
         sx={{ ...cardSx, width: 'min(560px, calc(100vw - 32px))', borderRadius: 5, overflow: 'hidden' }}
       >
-        {/* The picture */}
+        {/* The picture. On a phone the stage inside is scaled down whole
+            and the frame is given the scaled height, since a transform does
+            not change how much room an element takes. */}
         <Box
           aria-hidden="true"
           sx={{
-            height: { xs: 176, sm: 220 },
+            height: { xs: ILLUSTRATION_HEIGHT * ILLUSTRATION_PHONE_SCALE, sm: ILLUSTRATION_HEIGHT },
             position: 'relative',
             overflow: 'hidden',
             bgcolor: alpha(theme.palette.common.black, 0.25),
             borderBottom: 1,
             borderColor: alpha(theme.palette.text.primary, 0.06),
-            transform: { xs: 'scale(0.8)', sm: 'none' },
-            transformOrigin: 'top center',
           }}
         >
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: ILLUSTRATION_HEIGHT,
+              transform: { xs: `scale(${ILLUSTRATION_PHONE_SCALE})`, sm: 'none' },
+              transformOrigin: 'top center',
+            }}
+          >
           {fan.map((p, i) => (
             <Box
               key={i}
@@ -331,7 +346,7 @@ export const WelcomeCard = forwardRef<HTMLDivElement, CardProps & { showKeys: bo
                 height: 144,
                 ml: '-48px',
                 borderRadius: 2.5,
-                bgcolor: p.tint,
+                background: tinted(p.tint, surface),
                 border: 1,
                 borderColor: alpha(theme.palette.text.primary, 0.06),
                 transform: `translateX(${p.x}px) rotate(${p.r}deg) translateY(${p.y}px)`,
@@ -347,7 +362,7 @@ export const WelcomeCard = forwardRef<HTMLDivElement, CardProps & { showKeys: bo
               height: 168,
               ml: '-56px',
               borderRadius: 3,
-              bgcolor: '#2a2440',
+              background: tinted(alpha(theme.palette.primary.main, 0.3), surface),
               border: 2,
               borderColor: 'primary.main',
               boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
@@ -397,9 +412,10 @@ export const WelcomeCard = forwardRef<HTMLDivElement, CardProps & { showKeys: bo
             }}
           >
             {[0, 1, 2, 3].map((i) => (
-              <StarRoundedIcon key={i} sx={{ fontSize: 16, color: '#fbbf24' }} />
+              <StarRoundedIcon key={i} sx={{ fontSize: 16, color: 'warning.light' }} />
             ))}
             <StarOutlineRoundedIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
+          </Box>
           </Box>
         </Box>
 

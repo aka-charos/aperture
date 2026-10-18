@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
   alpha,
@@ -35,6 +35,23 @@ interface Rect {
 function sameRect(a: Rect | null, b: Rect | null): boolean {
   if (!a || !b) return a === b
   return a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height
+}
+
+/**
+ * A physical side as written for the RTL style plugin. In a right-to-left
+ * language the app's emotion cache runs stylis-plugin-rtl, which swaps every
+ * left and right it is handed; a side that must stay physical (the edge of
+ * the card facing the element) is therefore written as its mirror there, so
+ * the plugin swaps it back. Positions from getBoundingClientRect are physical
+ * too, and go in inline `style`, which the plugin never sees.
+ */
+function physical(side: 'left' | 'right', rtl: boolean): 'left' | 'right' {
+  if (!rtl) return side
+  return side === 'left' ? 'right' : 'left'
+}
+
+function borderWidthKey(side: 'left' | 'right' | 'top' | 'bottom'): string {
+  return `border${side[0].toUpperCase()}${side.slice(1)}Width`
 }
 
 /** A placement flipped for right-to-left: the sidebar is on the right there. */
@@ -226,18 +243,55 @@ export function TourOverlay() {
     }
   }, [rect])
 
-  const virtualAnchor = useMemo(() => {
-    if (!spotlight) return null
-    return {
-      getBoundingClientRect: () =>
-        DOMRect.fromRect({ x: spotlight.left, y: spotlight.top, width: spotlight.width, height: spotlight.height }),
-    }
+  // One anchor object for the whole tour, reading the latest rect, and an
+  // explicit re-position when it moves. A new anchor (or a new modifiers
+  // array) on every render made MUI's Popper tear popper.js down and build it
+  // again on every scroll.
+  const spotlightRef = useRef(spotlight)
+  const popperInstance = useRef<{ forceUpdate: () => void } | null>(null)
+  const setPopperInstance = useCallback((instance: { forceUpdate: () => void } | null) => {
+    popperInstance.current = instance
+  }, [])
+  const virtualAnchor = useMemo(
+    () => ({
+      getBoundingClientRect: () => {
+        const box = spotlightRef.current ?? { left: 0, top: 0, width: 0, height: 0 }
+        return DOMRect.fromRect({ x: box.left, y: box.top, width: box.width, height: box.height })
+      },
+    }),
+    []
+  )
+  useLayoutEffect(() => {
+    spotlightRef.current = spotlight
+    popperInstance.current?.forceUpdate()
   }, [spotlight])
+
+  const zIndex = theme.zIndex.tooltip + 1
+  const popperSx = useMemo(() => {
+    const towardLeft = physical('left', rtl)
+    const towardRight = physical('right', rtl)
+    const edge = -ARROW / 2 - 1
+    return {
+      zIndex: zIndex + 1,
+      '&[data-popper-placement^="right"] .tour-arrow': { [towardLeft]: edge, [borderWidthKey(towardLeft)]: 1, borderBottomWidth: 1 },
+      '&[data-popper-placement^="left"] .tour-arrow': { [towardRight]: edge, borderTopWidth: 1, [borderWidthKey(towardRight)]: 1 },
+      '&[data-popper-placement^="bottom"] .tour-arrow': { top: edge, borderTopWidth: 1, [borderWidthKey(towardLeft)]: 1 },
+      '&[data-popper-placement^="top"] .tour-arrow': { bottom: edge, borderBottomWidth: 1, [borderWidthKey(towardRight)]: 1 },
+    }
+  }, [rtl, zIndex])
+  const modifiers = useMemo(
+    () => [
+      { name: 'offset', options: { offset: [0, 16] } },
+      { name: 'flip', options: { padding: 12 } },
+      { name: 'preventOverflow', options: { padding: 12, altAxis: true } },
+      { name: 'arrow', enabled: Boolean(arrowEl), options: { element: arrowEl, padding: 16 } },
+    ],
+    [arrowEl]
+  )
 
   if (!active || !step || hidden || !settled) return null
 
   const isWelcomeIntro = active.id === 'welcome' && active.index === 0
-  const zIndex = theme.zIndex.tooltip + 1
   const common = {
     tour: active.id,
     step,
@@ -256,7 +310,7 @@ export function TourOverlay() {
 
   // The pointer sits on the card's edge facing the element: the arrow
   // modifier places it along that edge, the placement says which edge.
-  const arrow = virtualAnchor ? (
+  const arrow = spotlight ? (
     <Box
       ref={setArrowEl}
       className="tour-arrow"
@@ -309,12 +363,12 @@ export function TourOverlay() {
         </svg>
         {spotlight && (
           <Box
+            // Physical viewport coordinates, so inline: the RTL style plugin
+            // would turn an sx `left` into `right` and mirror the ring away
+            // from the cut-out, which the SVG mask draws by attribute.
+            style={{ top: spotlight.top, left: spotlight.left, width: spotlight.width, height: spotlight.height }}
             sx={{
               position: 'fixed',
-              top: spotlight.top,
-              left: spotlight.left,
-              width: spotlight.width,
-              height: spotlight.height,
               borderRadius: '10px',
               border: 2,
               borderColor: 'primary.main',
@@ -327,24 +381,14 @@ export function TourOverlay() {
         )}
       </Box>
 
-      {virtualAnchor ? (
+      {spotlight ? (
         <Popper
           open
           anchorEl={virtualAnchor}
+          popperRef={setPopperInstance}
           placement={logicalPlacement(step.placement ?? 'bottom', rtl)}
-          sx={{
-            zIndex: zIndex + 1,
-            '&[data-popper-placement^="right"] .tour-arrow': { left: -ARROW / 2 - 1, borderLeftWidth: 1, borderBottomWidth: 1 },
-            '&[data-popper-placement^="left"] .tour-arrow': { right: -ARROW / 2 - 1, borderTopWidth: 1, borderRightWidth: 1 },
-            '&[data-popper-placement^="bottom"] .tour-arrow': { top: -ARROW / 2 - 1, borderTopWidth: 1, borderLeftWidth: 1 },
-            '&[data-popper-placement^="top"] .tour-arrow': { bottom: -ARROW / 2 - 1, borderBottomWidth: 1, borderRightWidth: 1 },
-          }}
-          modifiers={[
-            { name: 'offset', options: { offset: [0, 16] } },
-            { name: 'flip', options: { padding: 12 } },
-            { name: 'preventOverflow', options: { padding: 12, altAxis: true } },
-            { name: 'arrow', enabled: Boolean(arrowEl), options: { element: arrowEl, padding: 16 } },
-          ]}
+          sx={popperSx}
+          modifiers={modifiers}
         >
           {card}
         </Popper>

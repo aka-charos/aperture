@@ -6,6 +6,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import ExploreOutlinedIcon from '@mui/icons-material/ExploreOutlined'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import { useTour } from '@/hooks/useTour'
+import { Badge, IconTile } from './IconTile'
 
 /** Long enough for the first screen to draw, so the tour does not land on a blank page. */
 const START_DELAY_MS = 900
@@ -87,38 +88,12 @@ export function WelcomeStarter() {
       >
         <Box aria-hidden="true" sx={{ height: 6, bgcolor: 'primary.main' }} />
         <Box sx={{ p: 2.25, display: 'flex', gap: 1.75 }}>
-          <Box
-            sx={{
-              width: 44,
-              height: 44,
-              borderRadius: 3,
-              flex: '0 0 auto',
-              display: 'grid',
-              placeItems: 'center',
-              bgcolor: alpha(theme.palette.primary.main, 0.16),
-              color: 'primary.light',
-            }}
-          >
-            <ExploreOutlinedIcon sx={{ fontSize: 23 }} />
-          </Box>
+          <IconTile>
+            <ExploreOutlinedIcon />
+          </IconTile>
           <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box
-                component="span"
-                sx={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  color: 'primary.light',
-                  bgcolor: alpha(theme.palette.primary.main, 0.2),
-                  px: 0.9,
-                  py: '2px',
-                  borderRadius: 999,
-                }}
-              >
-                {t('onboarding.offer.badge')}
-              </Box>
+              <Badge>{t('onboarding.offer.badge')}</Badge>
               <Typography component="h2" sx={{ fontSize: 15, fontWeight: 700 }}>
                 {t('onboarding.offer.heading')}
               </Typography>

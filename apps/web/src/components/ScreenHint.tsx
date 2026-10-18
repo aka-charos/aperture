@@ -9,6 +9,7 @@ import { useOnboarding } from '@/hooks/useOnboarding'
 import { useUserHelp } from '@/hooks/useUserHelp'
 import { useTour } from '@/hooks/useTour'
 import { isTourId, type TourId } from './tour/tours'
+import { IconTile } from './tour/IconTile'
 
 /**
  * The one-line tip shown the first time someone opens a screen, with the way
@@ -60,20 +61,9 @@ export function ScreenHint() {
         position: 'relative',
       }}
     >
-      <Box
-        sx={{
-          width: 40,
-          height: 40,
-          borderRadius: 3,
-          flex: '0 0 auto',
-          display: 'grid',
-          placeItems: 'center',
-          bgcolor: alpha(theme.palette.primary.main, 0.16),
-          color: 'primary.light',
-        }}
-      >
-        <LightbulbOutlinedIcon sx={{ fontSize: 21 }} />
-      </Box>
+      <IconTile>
+        <LightbulbOutlinedIcon />
+      </IconTile>
       <Box sx={{ flex: '1 1 260px', minWidth: 0, pe: { xs: 4, sm: 0 } }}>
         <Typography sx={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'primary.light' }}>
           {t('onboarding.hint.eyebrow')}

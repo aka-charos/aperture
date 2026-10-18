@@ -44,14 +44,24 @@ const PAGES = new Map<string, string>()
 })(DOCS)
 
 const EN = JSON.parse(readFileSync(resolve(SRC, 'i18n/locales/en/translation.json'), 'utf8')) as Record<string, unknown>
+const EL = JSON.parse(readFileSync(resolve(SRC, 'i18n/locales/el/translation.json'), 'utf8')) as Record<string, unknown>
 
-function hasKey(dotted: string): boolean {
-  let node: unknown = EN
+function keyIn(dict: Record<string, unknown>, dotted: string): boolean {
+  let node: unknown = dict
   for (const part of dotted.split('.')) {
     if (typeof node !== 'object' || node === null) return false
     node = (node as Record<string, unknown>)[part]
   }
   return typeof node === 'string'
+}
+
+/**
+ * The string exists in English AND Greek. Greek is the one translation kept
+ * by hand; every other language falls back to English on purpose, so a key
+ * missing there is fine and a key missing in en or el is not.
+ */
+function hasKey(dotted: string): boolean {
+  return keyIn(EN, dotted) && keyIn(EL, dotted)
 }
 
 /**
@@ -113,10 +123,10 @@ test('every step has its words', () => {
   for (const tour of Object.values(TOURS)) {
     for (const step of tour.steps) {
       for (const part of ['title', 'body'] as const) {
-        assert.ok(hasKey(stepKey(tour.id, step.id, part)), `missing ${stepKey(tour.id, step.id, part)} in en`)
+        assert.ok(hasKey(stepKey(tour.id, step.id, part)), `missing ${stepKey(tour.id, step.id, part)} in en or el`)
       }
       for (const item of step.items ?? []) {
-        assert.ok(hasKey(stepItemKey(tour.id, step.id, item.id)), `missing ${stepItemKey(tour.id, step.id, item.id)} in en`)
+        assert.ok(hasKey(stepItemKey(tour.id, step.id, item.id)), `missing ${stepItemKey(tour.id, step.id, item.id)} in en or el`)
       }
     }
   }
@@ -137,7 +147,7 @@ test('every guide page and heading a step links to exists', () => {
 test('every tour and hint a screen names exists and has its words', () => {
   for (const entry of ROUTE_DOCS) {
     if (entry.tour) assert.ok(isTourId(entry.tour), `${entry.path} names tour "${entry.tour}", which tours.ts does not define`)
-    if (entry.hint) assert.ok(hasKey(`onboarding.hints.${entry.hint}`), `missing onboarding.hints.${entry.hint} in en`)
+    if (entry.hint) assert.ok(hasKey(`onboarding.hints.${entry.hint}`), `missing onboarding.hints.${entry.hint} in en or el`)
   }
 })
 
@@ -219,23 +229,14 @@ test('an anchor maps by position and refuses a heading that no longer lines up',
 })
 
 test('every onboarding string the code names exists in English and Greek', () => {
-  // Greek is the one maintained translation; every other language falls back
-  // to English, so a key missing there is fine and a key missing in en is not.
-  const EL = JSON.parse(readFileSync(resolve(SRC, 'i18n/locales/el/translation.json'), 'utf8')) as Record<string, unknown>
-  const inEl = (dotted: string) => {
-    let node: unknown = EL
-    for (const part of dotted.split('.')) {
-      if (typeof node !== 'object' || node === null) return false
-      node = (node as Record<string, unknown>)[part]
-    }
-    return typeof node === 'string'
-  }
+  // Literal keys only; the ones built from ids (steps, tips, checklist items)
+  // are checked by the tests above, through the same hasKey.
   let count = 0
   for (const [file, source] of SOURCES) {
     for (const m of source.matchAll(/\bt\(\s*'(onboarding\.[A-Za-z0-9_.-]+)'/g)) {
       count++
-      assert.ok(hasKey(m[1]), `${relative(SRC, file)} names ${m[1]}, which en does not have`)
-      assert.ok(inEl(m[1]), `${relative(SRC, file)} names ${m[1]}, which el does not have`)
+      assert.ok(keyIn(EN, m[1]), `${relative(SRC, file)} names ${m[1]}, which en does not have`)
+      assert.ok(keyIn(EL, m[1]), `${relative(SRC, file)} names ${m[1]}, which el does not have`)
     }
   }
   assert.ok(count > 20, `expected the onboarding strings, found ${count}`)

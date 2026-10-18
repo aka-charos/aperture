@@ -13,6 +13,7 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import LiveTvOutlinedIcon from '@mui/icons-material/LiveTvOutlined'
 import { useOnboarding } from '@/hooks/useOnboarding'
+import { Badge, IconTile } from '@/components/tour/IconTile'
 
 /**
  * Where each item takes you, and its picture. The server decides which items
@@ -154,24 +155,9 @@ function ChecklistTile({ item, nextUp }: { item: Item; nextUp: boolean }) {
   const linked = Boolean(meta.path) && !item.done
 
   const iconTile = (
-    <Box
-      sx={{
-        width: 40,
-        height: 40,
-        borderRadius: 3,
-        flex: '0 0 auto',
-        display: 'grid',
-        placeItems: 'center',
-        bgcolor: item.done
-          ? alpha(theme.palette.success.main, 0.14)
-          : nextUp
-            ? 'primary.main'
-            : alpha(theme.palette.text.primary, 0.08),
-        color: item.done ? 'success.light' : nextUp ? 'primary.contrastText' : 'text.primary',
-      }}
-    >
-      <Icon sx={{ fontSize: 21 }} />
-    </Box>
+    <IconTile tone={item.done ? 'success' : nextUp ? 'solid' : 'neutral'}>
+      <Icon />
+    </IconTile>
   )
 
   const body = (
@@ -180,24 +166,7 @@ function ChecklistTile({ item, nextUp }: { item: Item; nextUp: boolean }) {
         <Typography sx={{ fontSize: 14, fontWeight: 600, color: item.done ? 'text.secondary' : 'text.primary' }}>
           {t(`onboarding.checklist.items.${item.id}.title`)}
         </Typography>
-        {nextUp && (
-          <Box
-            component="span"
-            sx={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              color: 'primary.light',
-              bgcolor: alpha(theme.palette.primary.main, 0.18),
-              px: 0.9,
-              py: '2px',
-              borderRadius: 999,
-            }}
-          >
-            {t('onboarding.checklist.nextUp')}
-          </Box>
-        )}
+        {nextUp && <Badge>{t('onboarding.checklist.nextUp')}</Badge>}
         {item.done && <Box component="span" sx={visuallyHidden}>{t('onboarding.checklist.done')}</Box>}
       </Box>
       <Typography sx={{ fontSize: 13, lineHeight: 1.45, color: item.done ? 'text.disabled' : 'text.secondary' }}>
@@ -264,23 +233,11 @@ function ChecklistTile({ item, nextUp }: { item: Item; nextUp: boolean }) {
 
 function StatusBand({ ready, children }: { ready: boolean; children: ReactNode }) {
   const theme = useTheme()
-  const tone = ready ? theme.palette.primary.main : theme.palette.warning.main
   const band = (
     <>
-      <Box
-        sx={{
-          width: 36,
-          height: 36,
-          borderRadius: 2.5,
-          flex: '0 0 auto',
-          display: 'grid',
-          placeItems: 'center',
-          bgcolor: alpha(tone, 0.14),
-          color: ready ? 'primary.light' : 'warning.light',
-        }}
-      >
-        {ready ? <AutoAwesomeIcon sx={{ fontSize: 19 }} /> : <HourglassEmptyRoundedIcon sx={{ fontSize: 19 }} />}
-      </Box>
+      <IconTile tone={ready ? 'primary' : 'warning'}>
+        {ready ? <AutoAwesomeIcon /> : <HourglassEmptyRoundedIcon />}
+      </IconTile>
       <Typography variant="body2" sx={{ flex: 1, color: 'text.primary', lineHeight: 1.5 }}>
         {children}
       </Typography>

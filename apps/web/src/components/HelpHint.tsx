@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { alpha, IconButton, Tooltip } from '@mui/material'
+import { alpha, Box, IconButton, Tooltip } from '@mui/material'
 import QuestionMarkRoundedIcon from '@mui/icons-material/QuestionMarkRounded'
 import { useUserHelp } from '@/hooks/useUserHelp'
 
@@ -32,21 +32,33 @@ export function HelpHint({ doc, anchor, label }: HelpHintProps) {
           event.stopPropagation()
           openHelp([doc], { anchor })
         }}
+        // A 32px button with the 24px circle drawn inside it: room to tap
+        // without the tap area spilling over the heading or chip beside it.
         sx={{
-          width: 24,
-          height: 24,
+          width: 32,
+          height: 32,
           p: 0,
           flex: '0 0 auto',
           color: 'primary.light',
-          border: 1,
-          borderColor: (theme) => alpha(theme.palette.primary.light, 0.45),
-          bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
-          '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.24) },
-          // Drawn small beside a heading, but tapped at a full 44px.
-          '&::after': { content: '""', position: 'absolute', inset: -10 },
+          '&:hover': { bgcolor: 'transparent' },
+          '&:hover .help-hint-dot': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.24) },
         }}
       >
-        <QuestionMarkRoundedIcon sx={{ fontSize: 15 }} />
+        <Box
+          className="help-hint-dot"
+          sx={{
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
+            display: 'grid',
+            placeItems: 'center',
+            border: 1,
+            borderColor: (theme) => alpha(theme.palette.primary.light, 0.45),
+            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+          }}
+        >
+          <QuestionMarkRoundedIcon sx={{ fontSize: 15 }} />
+        </Box>
       </IconButton>
     </Tooltip>
   )
