@@ -21,8 +21,6 @@ interface DashboardRecommendation {
   posterUrl: string | null
   genres: string[]
   matchScore: number | null
-  /** The pick's place on My Recommendations. Absent on an older server. */
-  rank?: number | null
 }
 
 interface DashboardTopPick {

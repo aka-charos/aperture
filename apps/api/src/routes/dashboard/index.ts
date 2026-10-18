@@ -34,12 +34,6 @@ interface DashboardRecommendation {
   posterUrl: string | null
   genres: string[]
   matchScore: number | null
-  /**
-   * The pick's place on My Recommendations (selected_rank), not its position
-   * here: a pick from a library the viewer can no longer open is dropped
-   * below, and counting positions would renumber everything after it.
-   */
-  rank: number | null
   /** Movie only */
   runtimeMinutes?: number | null
   /** Series only */
@@ -200,7 +194,6 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           genres: string[]
           final_score: number | null
           runtime_minutes: number | null
-          selected_rank: number | null
         }>(
           `
           SELECT
@@ -210,8 +203,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             m.poster_url,
             m.genres,
             rc.final_score,
-            m.runtime_minutes,
-            rc.selected_rank
+            m.runtime_minutes
           FROM recommendation_candidates rc
           JOIN movies m ON m.id = rc.movie_id
           WHERE rc.run_id = (
@@ -237,7 +229,6 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           final_score: number | null
           total_seasons: number | null
           total_episodes: number | null
-          selected_rank: number | null
         }>(
           `
           SELECT
@@ -248,8 +239,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             s.genres,
             rc.final_score,
             s.total_seasons,
-            s.total_episodes,
-            rc.selected_rank
+            s.total_episodes
           FROM recommendation_candidates rc
           JOIN series s ON s.id = rc.series_id
           WHERE rc.run_id = (
@@ -433,8 +423,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         year: r.year,
         posterUrl: r.poster_url,
         genres: r.genres || [],
-        matchScore: r.final_score ? Math.round(r.final_score * 100) : null,
-        rank: r.selected_rank != null ? Number(r.selected_rank) : null,
+        matchScore: r.final_score != null ? Math.round(Number(r.final_score) * 100) : null,
         runtimeMinutes: r.runtime_minutes,
       }))
       const seriesRecs = seriesRecsResult.rows.filter((r) => visibleSeries.has(r.series_id)).map((r) => ({
@@ -444,8 +433,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         year: r.year,
         posterUrl: r.poster_url,
         genres: r.genres || [],
-        matchScore: r.final_score ? Math.round(r.final_score * 100) : null,
-        rank: r.selected_rank != null ? Number(r.selected_rank) : null,
+        matchScore: r.final_score != null ? Math.round(Number(r.final_score) * 100) : null,
         totalSeasons: r.total_seasons,
         totalEpisodes: r.total_episodes,
       }))

@@ -57,12 +57,11 @@ function DashboardContent() {
 
   const greeting = getGreeting(t)
 
-  // Numbers are the API's ranks (the order on My Recommendations), so a pick
-  // dropped from a library the viewer can no longer open does not renumber
-  // the rest; an older server sends none, and position stands in.
+  // Numbered by position, exactly as My Recommendations numbers them, so a
+  // title has the same number on both pages and a row never shows a gap.
   const movieRecs = (data?.recommendations || []).filter((item) => item.type === 'movie')
   const seriesRecs = (data?.recommendations || []).filter((item) => item.type === 'series')
-  const ranked = (items: typeof movieRecs) => items.map((item, index) => ({ ...item, rank: item.rank ?? index + 1 }))
+  const ranked = (items: typeof movieRecs) => items.map((item, index) => ({ ...item, rank: index + 1 }))
 
   return (
     <Box>

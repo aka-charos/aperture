@@ -39,7 +39,6 @@ export const dashboardSchemas = {
       posterUrl: { type: 'string', nullable: true },
       genres: { type: 'array', items: { type: 'string' } },
       matchScore: { type: 'integer', nullable: true, description: 'Match score as percentage' },
-      rank: { type: 'integer', nullable: true, description: "The pick's place on My Recommendations (selected_rank)" },
       runtimeMinutes: { type: 'integer', nullable: true, description: 'Movie runtime in minutes' },
       totalSeasons: { type: 'integer', nullable: true, description: 'Series season count' },
       totalEpisodes: { type: 'integer', nullable: true, description: 'Series episode count' },

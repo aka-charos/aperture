@@ -82,7 +82,7 @@ export function MediaCarousel({
       year={item.year}
       posterUrl={item.posterUrl}
       genres={item.genres}
-      score={showScore ? (item.matchScore ? item.matchScore / 100 : null) : undefined}
+      score={showScore ? (item.matchScore != null ? item.matchScore / 100 : null) : undefined}
       showScore={showScore && item.matchScore != null}
       userRating={getRating(item.type, item.id)}
       watched={isWatched(item.type, item.id)}
