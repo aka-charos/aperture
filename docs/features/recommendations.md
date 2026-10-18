@@ -109,4 +109,4 @@ Some servers still use the older **AI Picks libraries** ("*YourName*'s AI Picks 
 
 ---
 
-**Next:** [Top Picks](top-picks.md)
+**Next:** [Most Watched Lately](top-picks.md)

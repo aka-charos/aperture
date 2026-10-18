@@ -1,6 +1,6 @@
 # Emby Home Screen
 
-On Emby, Aperture can add rows to your own **Emby home screen**: your recommendations, the server's Top Picks, what your connections recommended to you, and playlists you choose. The **Emby home screen** tab of your settings is where you see those rows, switch any of them off, and decide where they go.
+On Emby, Aperture can add rows to your own **Emby home screen**: your recommendations, the server's Most Watched Lately lists, what your connections recommended to you, and playlists you choose. The **Emby home screen** tab of your settings is where you see those rows, switch any of them off, and decide where they go.
 
 ## Accessing
 
@@ -20,7 +20,7 @@ Titles inside a row are sorted by a field your admin chose (random, by title, re
 
 | Row | What's in it |
 |-----|--------------|
-| **Top Picks: Movies** / **Top Picks: Series** | The most popular titles on the server right now; the same list for everyone (see [Top Picks](../top-picks.md)) |
+| **Most Watched Lately: Movies** / **Most Watched Lately: Series** | The most watched titles on the server right now; the same list for everyone (see [Most Watched Lately](../top-picks.md)) |
 | **Movie recommendations** / **Series recommendations** | Your own picks, from your latest recommendation run (see [My Recommendations](../recommendations.md)) |
 | **Recommended by friends** | Titles your connections sent you on [Watch This](../watch-this.md); a title leaves when you finish or dismiss it |
 | **Generated playlists** | Each playlist or collection you generated, or playlist you made from assistant suggestions, that you switched on becomes a row of its own |

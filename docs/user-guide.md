@@ -54,7 +54,7 @@ Explore and navigate your media collection.
 Personalized picks, powered by AI.
 
 15. [My Recommendations](features/recommendations.md) - Your personal movie and series recommendations
-16. [Top Picks](features/top-picks.md) - The most popular titles across all users of your server
+16. [Most Watched Lately](features/top-picks.md) - The most watched titles across all users of your server
 
 ---
 
@@ -121,7 +121,7 @@ Your settings open from the avatar menu, in up to four tabs: Recommendations, Di
 | Find something to watch | [My Recommendations](features/recommendations.md) or [Discover](features/discovery.md) |
 | Ask in your own words | [AI Assistant (Encore)](features/ai-assistant.md) |
 | Rate content | [Ratings](features/ratings.md) |
-| See what's popular on this server | [Top Picks](features/top-picks.md) |
+| See what's popular on this server | [Most Watched Lately](features/top-picks.md) |
 | Track shows I'm watching | [Shows You Watch](features/shows-you-watch.md) |
 | Request a missing film or series | [Discover](features/discovery.md) or [My Requests](features/my-requests.md) |
 | Report a problem with a title | [My Requests](features/my-requests.md) |

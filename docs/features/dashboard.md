@@ -37,9 +37,9 @@ The row is hidden when none of your shows has anything new or upcoming.
 
 ---
 
-## Top Picks
+## Most Watched Lately
 
-**Top Pick Movies** and **Top Pick Series** ("Popular movies/TV series across all users") — the same ranking as the [Top Picks](top-picks.md) page, in carousel form.
+**Most Watched Movies Lately** and **Most Watched Series Lately** ("Popular movies/TV series across all users") — the same ranking as the [Most Watched Lately](top-picks.md) page, in carousel form.
 
 ## Recently Watched by Your Connections
 

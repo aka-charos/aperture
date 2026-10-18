@@ -10,7 +10,7 @@ Most catalog pages offer two display modes — **Grid View** (posters) and **Lis
 | **Browse — Series** | ✓ | ✓ | |
 | **Browse — People** | ✓ | ✓ | **List** |
 | **Recommendations** | ✓ | ✓ | |
-| **Top Picks** | ✓ | ✓ | |
+| **Most Watched Lately** | ✓ | ✓ | |
 | **Discover** | ✓ | ✓ | |
 | **Watch History** | ✓ | ✓ | |
 | **Shows You Watch** | ✓ | ✓ | |
@@ -27,7 +27,7 @@ Posters with overlays, tuned per page:
 
 - Your **star rating** on hover, and the **watched tick** everywhere
 - **Episode-progress badge** ("8/24") for series you're partway through
-- **Rank badges** on Recommendations and Top Picks; **viewer chips** on Top Picks; **source badges** and **request status** on Discover
+- **Rank badges** on Recommendations and Most Watched Lately; **viewer chips** on Most Watched Lately; **source badges** and **request status** on Discover
 - Hover reveals extras where a page has them (resume bar in Watch History, countdowns in Shows You Watch)
 
 ## List View
@@ -38,7 +38,7 @@ The same poster beside a row of details. What the row carries depends on the pag
 |------|--------------|
 | **Browse** | Year, community rating, genre chips, two-line overview, your rating inline; series add Airing/Ended status, season count, and an **Add to Watching** toggle |
 | **Recommendations** | Match score and **Similarity / Novelty / Rating** bars, reason line, Watch trailer, View on TMDb |
-| **Top Picks** | **Unique viewers**, **play count**, community rating; series add episodes watched and % avg completion |
+| **Most Watched Lately** | **Unique viewers**, **play count**, community rating; series add episodes watched and % avg completion |
 | **Discover** | Full metadata (year, runtime, genres), synopsis, match score, request actions |
 | **Watch History** | Plays chip ("3x", "5+" past five), resume bar with % tooltip, last-watched date, management actions |
 | **Shows You Watch** | **Episode availability bar**, upcoming-episode countdown, source chip |

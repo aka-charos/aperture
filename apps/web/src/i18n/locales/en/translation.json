@@ -4260,7 +4260,7 @@
     "discovery": "Discover",
     "browse": "Browse",
     "stats": "Watch Stats",
-    "top-picks": "Top Picks",
+    "top-picks": "Most Watched Lately",
     "watching": "Shows You Watch",
     "my-requests": "My Requests",
     "franchises": "Franchises",
@@ -4492,10 +4492,10 @@
     "airedOn": "Aired {{date}}",
     "subtitleFromWatching": "From shows you watch",
     "emptyUpcoming": "No upcoming episodes",
-    "topPickMovies": "Top Pick Movies",
+    "topPickMovies": "Most Watched Movies Lately",
     "subtitlePopularMovies": "Popular movies across all users",
     "emptyTrendingMovies": "No trending movies yet",
-    "topPickSeries": "Top Pick Series",
+    "topPickSeries": "Most Watched Series Lately",
     "subtitlePopularSeries": "Popular TV series across all users",
     "emptyTrendingSeries": "No trending series yet",
     "carouselEmpty": "No items to display",
@@ -6364,7 +6364,7 @@
           "title": "More for you",
           "body": "A few more places worth a look:",
           "items": {
-            "topPicks": "Top Picks: what's popular on your server right now",
+            "topPicks": "Most Watched Lately: what people on your server have been watching",
             "watching": "Shows You Watch: new and upcoming episodes of the series you follow",
             "discover": "Discover: titles you don't have yet that suit your taste, ready to request",
             "watchThis": "Watch This: titles people you're connected with recommend to you",
@@ -6392,7 +6392,7 @@
         },
         "rows": {
           "title": "Rows picked for you",
-          "body": "Your latest recommendations come first, then Top Picks and your shows. Click a poster to open it, or the stars to rate it."
+          "body": "Your latest recommendations come first, then Most Watched Lately and your shows. Click a poster to open it, or the stars to rate it."
         }
       },
       "browse": {

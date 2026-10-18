@@ -36,7 +36,7 @@ const RECS: DesiredRow = {
 const TOP_MOVIES: DesiredRow = {
   kind: 'top-picks-movies',
   tagId: '902',
-  name: 'Top Picks: Movies',
+  name: 'Most Watched Lately: Movies',
   itemTypes: ['Movie'],
   sortBy: 'CommunityRating',
 }
