@@ -970,6 +970,10 @@
       "title": "Analysis bench",
       "blurb": "Run one film through several models on identical sources and read them side by side."
     },
+    "offsiteAnalysis": {
+      "title": "Offsite analysis",
+      "blurb": "Prepare film analysis prompts here, run them on another machine, and import the answers."
+    },
     "synopsisTranslation": {
       "title": "Synopsis translation",
       "blurb": "Machine-translate plots into the interface languages"
@@ -6177,6 +6181,82 @@
     "replayFailed": "Could not start the replay.",
     "promptVersionShort": "prompt v{{version}}",
     "replayTag": "replay"
+  },
+  "offsiteAnalysis": {
+    "intro": "Build the analysis prompts for a batch of titles on this server, run them with a model on another machine (LM Studio on a laptop, for example), then import the answers. Every answer is checked and stored exactly like one written here. While a batch is open, its titles are held back from the Generate Title Analysis job for {{days}} days, so nothing is analysed twice.",
+    "stepPrepare": "1. Prepare a batch",
+    "prepareHint": "Picks the next pending titles in the order the job uses, current recommendations first, and fetches their sources. This takes a minute or so per title; you can download what is ready at any point.",
+    "countLabel": "Titles",
+    "countHelp": "1 to {{max}}",
+    "movies": "Movies",
+    "series": "Series",
+    "prepare": "Prepare batch",
+    "onePreparing": "A batch is being prepared. Only one is prepared at a time.",
+    "prepareFailed": "Could not start the batch.",
+    "actionFailed": "That did not work.",
+    "stepRun": "2. Run it on the other machine",
+    "runHint": "Download the batch file (from the batch below) and the runner script, and put both in one folder on the other machine.",
+    "runStepNode": "Install Node.js 18 or newer (on a Mac: brew install node).",
+    "runStepContext": "In LM Studio, load the model with a context length of at least 32,768. A prompt is about 20,000 tokens and the answer can reach the output ceiling; the default context is much smaller.",
+    "runStepServer": "Start LM Studio's local server (Developer tab, Start server). The runner uses http://localhost:1234/v1 unless you pass --base-url.",
+    "runStepCommand": "In a terminal in that folder, run the command below. Leave out --model to see the models the server lists, and add --limit 2 for a quick test first.",
+    "runStepResume": "Each answer is saved as soon as its title finishes, to a .results.jsonl file next to the batch. Stopping is safe: run the same command again and it carries on, retrying any title that failed.",
+    "downloadRunner": "Download runner script",
+    "stepImport": "3. Import the results",
+    "importHint": "Upload the .results.jsonl file. Each answer goes through the same checks as an analysis written here; an answer the checks reject stays in the batch so you can run it again.",
+    "importButton": "Choose results file",
+    "importFailed": "Could not import that file.",
+    "importNothing": "The file held no results.",
+    "badLines": "{{count}} line(s) were not results and were skipped (lines {{lines}}).",
+    "outcome": {
+      "stored": "Stored",
+      "declined": "Declined (sources too thin)",
+      "rejected": "Rejected",
+      "runnerError": "Failed on the other machine",
+      "superseded": "Already analysed another way",
+      "duplicate": "Already imported",
+      "notExported": "Not in the batch file",
+      "stale": "Prompt version too old",
+      "gone": "No longer in the library",
+      "unknown": "Not found"
+    },
+    "batches": "Batches",
+    "noBatches": "No batches yet.",
+    "status": {
+      "preparing": "Preparing",
+      "open": "Open",
+      "closed": "Released",
+      "expired": "Expired"
+    },
+    "batchMeta": "Prompt {{version}} · {{requested}} titles asked for",
+    "preparingProgress": "{{done}} of {{requested}} prepared",
+    "count": {
+      "inFile": "{{count}} to run",
+      "stored": "{{count}} stored",
+      "declined": "{{count}} declined",
+      "rejected": "{{count}} rejected",
+      "skipped": "{{count}} skipped",
+      "retrievalFailed": "{{count}} with no sources"
+    },
+    "reservedUntil": "Titles held until {{date}}",
+    "released": "Titles released to the library job",
+    "lastImport": "last import {{date}}",
+    "download": "Download batch ({{count}})",
+    "stop": "Stop",
+    "titles": "Titles",
+    "release": "Release titles",
+    "delete": "Delete",
+    "confirmDelete": "Delete this batch? Analyses already imported stay, but answers for this batch can no longer be imported.",
+    "confirmRelease": "Release this batch's unanswered titles back to the Generate Title Analysis job? Answers can still be imported afterwards.",
+    "itemStatus": {
+      "pending": "Fetching sources",
+      "ready": "In the file",
+      "rejected": "Rejected",
+      "stored": "Stored",
+      "declined": "Declined",
+      "skipped": "Skipped",
+      "retrieval_failed": "Sources failed"
+    }
   },
   "sharedWithMe": {
     "title": "Watch This!",

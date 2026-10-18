@@ -513,6 +513,28 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     ],
   },
   {
+    // Beside the bench because it is built from the same idea: retrieve and
+    // build the prompt here, run the model somewhere else.
+    id: 'offsite-analysis',
+    group: 'ai',
+    segment: 'offsite-analysis',
+    titleKey: 'adminNav.offsiteAnalysis.title',
+    blurbKey: 'adminNav.offsiteAnalysis.blurb',
+    docs: ['offsite-analysis'],
+    aliases: [
+      'offsite',
+      'export',
+      'import',
+      'batch',
+      'lm studio',
+      'macbook',
+      'title analysis',
+      'film analysis',
+      'jsonl',
+      'runner',
+    ],
+  },
+  {
     id: 'evaluation',
     group: 'recommendations',
     segment: 'evaluation',

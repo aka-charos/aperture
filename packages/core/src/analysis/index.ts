@@ -73,6 +73,28 @@ export {
 } from './compare.js'
 
 export {
+  startOffsiteBatch,
+  stopOffsiteBatch,
+  listOffsiteBatches,
+  getOffsiteBatch,
+  exportOffsiteBatch,
+  closeOffsiteBatch,
+  deleteOffsiteBatch,
+  importOffsiteResults,
+  OFFSITE_BATCH_DEFAULT_SIZE,
+  OFFSITE_BATCH_MAX_SIZE,
+  OFFSITE_RESERVATION_DAYS,
+  type OffsiteBatchSummary,
+  type OffsiteBatchView,
+  type OffsiteBatchItem,
+  type OffsiteImportSummary,
+} from './offsite.js'
+
+export { OFFSITE_FORMAT, type OffsiteImportOutcome } from './offsiteFormat.js'
+
+export { OFFSITE_RUNNER_FILE_NAME, OFFSITE_RUNNER_SCRIPT } from './offsiteRunner.js'
+
+export {
   renderComparisonReport,
   type ComparisonEntry,
   type ComparisonReport,

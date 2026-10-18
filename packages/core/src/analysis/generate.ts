@@ -780,8 +780,11 @@ export interface WriteResult {
  * Reasoning tags come off first because they are unambiguous; everything else
  * is decided by the markers the prompt asked for, never by inspecting the prose
  * and guessing.
+ *
+ * Exported for the offsite import (./offsite.ts), which reads answers written
+ * on another machine and must hold them to exactly this contract.
  */
-function readAnalysis(
+export function readAnalysis(
   raw: string,
   finishReason: string | undefined,
   structure: { mediaType: 'movie' | 'series'; promptVersion?: number }
@@ -1888,6 +1891,63 @@ export async function analyseTitle(
     )
   }
 
+  return storeAnalysisOutcome({
+    mediaType,
+    mediaId,
+    title: subject.title,
+    mode,
+    text,
+    mapText,
+    grade,
+    modelId,
+    evidence,
+    foundSources,
+    sourceCount,
+    retrievedChars,
+    promptVersion: ANALYSIS_PROMPT_VERSION,
+    promptVariant,
+  })
+}
+
+/** An answer that read as an answer, with what it needs to be judged and stored. */
+export interface AnalysisOutcomeToStore {
+  mediaType: 'movie' | 'series'
+  mediaId: string
+  title: string
+  mode: RetrievalMode
+  text: string
+  mapText: string | null
+  grade: SourceGrade | null
+  modelId: string
+  /** What the floor judges the answer against. */
+  evidence: RetrievalEvidence
+  /** What the panel lists as the sources, kept only for a stored analysis. */
+  foundSources: AnalysisSourceRef[]
+  sourceCount: number
+  retrievedChars: number | null
+  /**
+   * The prompt version the model was ASKED under. The library job passes the
+   * current one; an offsite import passes the batch's, which may be older by
+   * the time the answers come back — and the map's vocabulary and the stored
+   * row must both name what was actually asked.
+   */
+  promptVersion: number
+  promptVariant: string | null
+}
+
+/**
+ * Judge an answer against its evidence and write the row: the one way a title
+ * analysis reaches `title_analysis`.
+ *
+ * Split out of `analyseTitle` so the offsite import (./offsite.ts) stores
+ * through exactly the same floor, map check and insert. Two copies of this
+ * would be two definitions of "an answer worth keeping", and they would drift.
+ * Callers have already refused an answer that broke the output contract — that
+ * check differs (the library job throws and retries, an import reports it), the
+ * judgement after it does not.
+ */
+export async function storeAnalysisOutcome(o: AnalysisOutcomeToStore): Promise<StoredAnalysis> {
+  const { mediaType, mediaId, mode, text, mapText, grade, modelId, evidence } = o
   const decision = decideAnalysisFloor({ text, grade, evidence })
 
   const analysis = decision.store ? text : null
@@ -1901,6 +1961,7 @@ export async function analyseTitle(
     ? parseParagraphMap(mapText, {
         paragraphCount: splitAnalysisParagraphs(text).length,
         mediaType,
+        promptVersion: o.promptVersion,
       })
     : null
 
@@ -1915,7 +1976,7 @@ export async function analyseTitle(
       {
         mediaType,
         mediaId,
-        title: subject.title,
+        title: o.title,
         modelId,
         paragraphs: splitAnalysisParagraphs(text).length,
         mapText,
@@ -1927,19 +1988,19 @@ export async function analyseTitle(
   // Provenance is stored for what we KEPT only: a declined row renders as
   // "we looked and there was nothing worth writing", and listing the pages that
   // produced nothing would invite a reader to go and check them.
-  const storedSources = decision.store ? foundSources : []
+  const storedSources = decision.store ? o.foundSources : []
 
   if (!decision.store) {
     logger.info(
       {
         mediaType,
         mediaId,
-        title: subject.title,
+        title: o.title,
         mode,
         reason: declineReason,
         grade,
-        sourceCount,
-        retrievedChars,
+        sourceCount: o.sourceCount,
+        retrievedChars: o.retrievedChars,
         domains: evidence.mode === 'crw' ? evidence.sources.map((s) => s.domain) : undefined,
         textChars: text.length,
       },
@@ -1975,8 +2036,8 @@ export async function analyseTitle(
       declineReason,
       JSON.stringify(storedSources),
       grade,
-      sourceCount,
-      retrievedChars,
+      o.sourceCount,
+      o.retrievedChars,
       modelId,
       mode,
       // NULL, not '[]'. "The model wrote no usable map" and "the map says this
@@ -1984,11 +2045,11 @@ export async function analyseTitle(
       // true here -- an empty array would tell a later reader the questions
       // were checked and found unanswered.
       paragraphMap ? JSON.stringify(paragraphMap) : null,
-      ANALYSIS_PROMPT_VERSION,
+      o.promptVersion,
       // What actually wrote it, never what was configured: a stored id this
       // build cannot use resolved to null above, and the version's own prompt
       // wrote the row.
-      promptVariant,
+      o.promptVariant,
     ]
   )
 
@@ -2006,7 +2067,7 @@ export async function analyseTitle(
     {
       mediaType,
       mediaId,
-      title: subject.title,
+      title: o.title,
       mode,
       modelId,
       stored: decision.store ? 'analysis' : 'decline',
@@ -2014,9 +2075,9 @@ export async function analyseTitle(
       chars: analysis?.length ?? 0,
       mapped: paragraphMap?.length ?? null,
       grade,
-      sourceCount,
-      promptVersion: ANALYSIS_PROMPT_VERSION,
-      promptVariant,
+      sourceCount: o.sourceCount,
+      promptVersion: o.promptVersion,
+      promptVariant: o.promptVariant,
     },
     'Title analysis stored'
   )
@@ -2028,13 +2089,13 @@ export async function analyseTitle(
     declineReason,
     sources: storedSources,
     sourceGrade: grade,
-    sourceCount,
-    retrievedChars,
+    sourceCount: o.sourceCount,
+    retrievedChars: o.retrievedChars,
     model: modelId,
     retrievalMode: mode,
     paragraphMap,
-    promptVersion: ANALYSIS_PROMPT_VERSION,
-    promptVariant,
+    promptVersion: o.promptVersion,
+    promptVariant: o.promptVariant,
     analyzedAt: new Date().toISOString(),
   }
 }

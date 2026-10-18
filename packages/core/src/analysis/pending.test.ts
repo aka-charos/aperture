@@ -6,6 +6,7 @@ import {
   analysisPriorityOrderSql,
   isAnalysisStale,
   needsAnalysisSql,
+  offsiteReservationJoinSql,
   pendingAnalysisFromSql,
 } from './pending.js'
 import { ANALYSIS_PROMPT_VERSION, ANALYSIS_STALE_BELOW } from './prompt.js'
@@ -163,4 +164,18 @@ test('promoting 18 did not retire the version-17 library', () => {
   assert.equal(ANALYSIS_STALE_BELOW, 17, 'and 17 is still worth keeping')
   assert.equal(isAnalysisStale(17), false, 'so the batch job leaves a v17 row alone')
   assert.equal(isAnalysisStale(16), true, 'while 16 and below stay stale')
+})
+
+test('a title held by an open offsite batch is not pending, in the count and the selection alike', () => {
+  // Its prompt is already out on another machine. Picking it up here would pay
+  // for the same analysis twice. Both queries carry the join and the clause,
+  // which the shared-core test above also guarantees.
+  for (const sql of [
+    pendingAnalysisFromSql('movie', '$1'),
+    pendingAnalysisFromSql('movie', '$1', { withPicks: true }),
+  ]) {
+    assert.match(flat(sql), /LEFT JOIN analysis_offsite_reservations offsite_res ON offsite_res\.media_id = m\.id AND offsite_res\.media_type = 'movie'/)
+    assert.match(outerWhere(sql), /offsite_res\.media_id IS NULL/)
+  }
+  assert.match(flat(offsiteReservationJoinSql('series', 'm')), /media_type = 'series'/)
 })

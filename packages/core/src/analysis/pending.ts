@@ -161,6 +161,30 @@ export function pendingAnalysisFromSql(
   const aliases = options.aliases ?? DEFAULT_ALIASES
   const picks = options.withPicks ? `\n    ${selectedPicksJoinSql(mediaType, aliases.media)}` : ''
   return `FROM ${MEDIA_TABLE[mediaType]} ${aliases.media}
-    ${analysisJoinSql(mediaType, aliases)}${picks}
-    WHERE ${needsAnalysisSql(versionParam, aliases)}`
+    ${analysisJoinSql(mediaType, aliases)}
+    ${offsiteReservationJoinSql(mediaType, aliases.media)}${picks}
+    WHERE ${needsAnalysisSql(versionParam, aliases)}
+      AND ${OFFSITE_RESERVATION_ALIAS}.media_id IS NULL`
+}
+
+const OFFSITE_RESERVATION_ALIAS = 'offsite_res'
+
+/**
+ * Titles held by an open offsite batch (./offsite.ts) are not pending here.
+ *
+ * Their prompts are already built and out on another machine; the library job
+ * picking one up would pay for the same analysis twice, and the next batch
+ * exporting it again would do the same. The view decides what "held" means
+ * (batch open and unexpired, answer not yet in), so this join and the batch
+ * page cannot disagree about it.
+ *
+ * A LEFT JOIN with `IS NULL` rather than `NOT EXISTS (… WHERE …)`, for the same
+ * reason media_type sits in the join condition: the count and the selection are
+ * compared on their outer WHERE, and a subquery's own WHERE would be the one a
+ * reader (and the test) finds last.
+ */
+export function offsiteReservationJoinSql(mediaType: 'movie' | 'series', mediaAlias: string): string {
+  return `LEFT JOIN analysis_offsite_reservations ${OFFSITE_RESERVATION_ALIAS}
+              ON ${OFFSITE_RESERVATION_ALIAS}.media_id = ${mediaAlias}.id
+             AND ${OFFSITE_RESERVATION_ALIAS}.media_type = '${mediaType}'`
 }

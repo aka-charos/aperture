@@ -242,6 +242,7 @@ All admin documentation files:
 - [admin/ai-spend.md](admin/ai-spend.md)
 - [admin/cost-estimate.md](admin/cost-estimate.md)
 - [admin/analysis-bench.md](admin/analysis-bench.md)
+- [admin/offsite-analysis.md](admin/offsite-analysis.md)
 
 ### Appearance
 - [admin/branding.md](admin/branding.md)

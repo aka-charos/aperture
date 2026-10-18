@@ -7,6 +7,7 @@ import BadgeIcon from '@mui/icons-material/Badge'
 import CalculateIcon from '@mui/icons-material/Calculate'
 import CategoryIcon from '@mui/icons-material/Category'
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows'
+import ImportExportIcon from '@mui/icons-material/ImportExport'
 import ContactMailIcon from '@mui/icons-material/ContactMail'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import DnsIcon from '@mui/icons-material/Dns'
@@ -237,6 +238,10 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
   'analysis-bench': {
     icon: <CompareArrowsIcon />,
     Component: lazy(() => import('@/pages/admin/routes/AnalysisBenchRoute')),
+  },
+  'offsite-analysis': {
+    icon: <ImportExportIcon />,
+    Component: lazy(() => import('@/pages/admin/routes/OffsiteAnalysisRoute')),
   },
   evaluation: {
     icon: <ScienceIcon />,
