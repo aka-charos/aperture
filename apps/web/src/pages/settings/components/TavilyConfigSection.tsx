@@ -23,6 +23,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import SaveIcon from '@mui/icons-material/Save'
 import SyncIcon from '@mui/icons-material/Sync'
+import { TavilyUsageReadout } from './TavilyUsageReadout'
 
 type SearchDepth = 'basic' | 'advanced'
 type Topic = 'general' | 'news'
@@ -53,6 +54,9 @@ export function TavilyConfigSection() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
+  // Bumped after a save (the key may have changed) and after a test (it spent
+  // credits), so the credits readout is read again rather than left stale.
+  const [usageVersion, setUsageVersion] = useState(0)
 
   // Form state
   const [enabled, setEnabled] = useState(false)
@@ -127,6 +131,7 @@ export function TavilyConfigSection() {
       if (response.ok) {
         const data = await response.json()
         applyConfig(data.config)
+        setUsageVersion((v) => v + 1)
         setSuccess(t('settingsTavily.saved'))
         setTimeout(() => setSuccess(null), 3000)
       } else {
@@ -164,6 +169,7 @@ export function TavilyConfigSection() {
       setTestResult({ success: false, message: t('settingsTavily.errConnect') })
     } finally {
       setTesting(false)
+      setUsageVersion((v) => v + 1)
     }
   }
 
@@ -223,6 +229,9 @@ export function TavilyConfigSection() {
             {t('settingsTavily.learnMoreLink')}
           </Link>
         </Typography>
+
+        {/* Only the SAVED key is read, so nothing shows before one is saved. */}
+        {configured && <TavilyUsageReadout key={usageVersion} />}
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>

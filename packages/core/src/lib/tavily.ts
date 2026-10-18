@@ -17,6 +17,7 @@
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
 import { parseApiError, logApiError, hasRecentSimilarError } from '../errors/index.js'
+import { parseTavilyUsage, type TavilyUsage } from './tavilyUsage.js'
 
 const logger = createChildLogger('tavily')
 
@@ -64,6 +65,7 @@ export const DEFAULT_TAVILY_CONFIG: TavilyConfig = {
 
 const SETTING_KEY = 'tavily_integration'
 const TAVILY_ENDPOINT = 'https://api.tavily.com/search'
+const TAVILY_USAGE_ENDPOINT = 'https://api.tavily.com/usage'
 const TAVILY_TIMEOUT_MS = 15000
 
 function clampMaxResults(n: number): number {
@@ -230,6 +232,40 @@ export async function tavilySearch(
     results,
     responseTime: json.response_time,
   }
+}
+
+/**
+ * Credits used and the caps, for this key and for the account's plan, this
+ * billing cycle — read live from Tavily's `GET /usage` for the settings card.
+ *
+ * Throws {@link TavilyError} on a missing key, a non-2xx answer or a network
+ * failure, carrying Tavily's own words. Deliberately NOT recorded to
+ * `api_errors`: an admin opened a card and reads the failure right there, and a
+ * search failing is what that panel is for.
+ */
+export async function getTavilyUsage(apiKey: string): Promise<TavilyUsage> {
+  if (!apiKey?.trim()) throw new TavilyError('Tavily API key is not set', 401)
+
+  let response: Response
+  try {
+    response = await fetch(TAVILY_USAGE_ENDPOINT, {
+      headers: { Authorization: `Bearer ${apiKey.trim()}` },
+      signal: AbortSignal.timeout(TAVILY_TIMEOUT_MS),
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    throw new TavilyError(`Tavily usage request failed: ${message}`)
+  }
+
+  if (!response.ok) {
+    const bodyText = await response.text().catch(() => '')
+    throw new TavilyError(
+      `Tavily returned ${response.status}: ${bodyText.slice(0, 200)}`,
+      response.status
+    )
+  }
+
+  return parseTavilyUsage(await response.json().catch(() => null))
 }
 
 /** Record a Tavily failure (HTTP or network) to the api_errors sink (deduped). Never throws. */

@@ -4840,7 +4840,19 @@
     "errSave": "Failed to save configuration",
     "errConnect": "Could not connect to server",
     "maxContentChars": "Max characters per result",
-    "maxContentCharsHelper": "Truncate each result snippet to this many characters (100–8000)"
+    "maxContentCharsHelper": "Truncate each result snippet to this many characters (100–8000)",
+    "creditsTitle": "Μονάδες (credits) αυτού του κύκλου χρέωσης",
+    "creditsRefresh": "Ανανέωση",
+    "creditsKey": "Αυτό το κλειδί",
+    "creditsPlan": "Πρόγραμμα",
+    "creditsPlanNamed": "Πρόγραμμα: {{plan}}",
+    "creditsPayg": "Χρέωση ανά χρήση",
+    "creditsNoLimit": "{{used}} σε χρήση · δεν αναφέρθηκε όριο",
+    "creditsNotReported": "δεν αναφέρθηκε",
+    "creditsEmpty": "Το Tavily απάντησε χωρίς στοιχεία χρήσης.",
+    "creditsNoKey": "Δεν υπάρχει αποθηκευμένο κλειδί API.",
+    "creditsError": "Δεν ήταν δυνατή η ανάγνωση των μονάδων από το Tavily: {{message}}",
+    "creditsNote": "Διαβάζεται απευθείας από το Tavily κάθε φορά που ανοίγει αυτή η κάρτα, μετά από αποθήκευση και μετά από δοκιμή."
   },
   "webSearchUsage": {
     "title": "Free tier usage",

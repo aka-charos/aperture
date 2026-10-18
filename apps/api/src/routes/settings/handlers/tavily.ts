@@ -5,12 +5,15 @@
  * - GET  /api/settings/tavily      - Get Tavily config (API key masked)
  * - PUT  /api/settings/tavily      - Update Tavily config (partial merge)
  * - POST /api/settings/tavily/test - Test the API key + params with a sample search
+ * - GET  /api/settings/tavily/usage - Credits used and caps this billing cycle (live)
  */
 import type { FastifyInstance } from 'fastify'
 import {
   getTavilyConfig,
   setTavilyConfig,
   tavilySearch,
+  getTavilyUsage,
+  TavilyError,
   type TavilyConfig,
   type TavilySearchDepth,
   type TavilyTopic,
@@ -138,6 +141,37 @@ export function registerTavilyHandlers(fastify: FastifyInstance) {
       } catch (err) {
         fastify.log.error({ err }, 'Failed to update Tavily config')
         return reply.status(500).send({ error: 'Failed to update Tavily configuration' })
+      }
+    }
+  )
+
+  /**
+   * GET /api/settings/tavily/usage
+   *
+   * Credits used and the caps for the saved key and for the account's plan,
+   * this billing cycle, read live from Tavily's own `GET /usage` — nothing
+   * stores it, so the card always shows Tavily's current answer. Only the
+   * SAVED key is used, and only ever sent to api.tavily.com.
+   *
+   * `configured: false` when no key is saved, which the card renders as
+   * nothing rather than as an error. A Tavily refusal (a bad key answers 401)
+   * comes back as 502 with Tavily's own words.
+   */
+  fastify.get(
+    '/api/settings/tavily/usage',
+    { preHandler: requireAdmin, schema: { tags: ['settings'] } },
+    async (_request, reply) => {
+      try {
+        const current = await getTavilyConfig()
+        if (!current.apiKey.trim()) return reply.send({ configured: false })
+        const usage = await getTavilyUsage(current.apiKey)
+        return reply.send({ configured: true, usage })
+      } catch (err) {
+        if (err instanceof TavilyError) {
+          return reply.status(502).send({ error: err.message })
+        }
+        fastify.log.error({ err }, 'Failed to read Tavily usage')
+        return reply.status(500).send({ error: 'Failed to read Tavily usage' })
       }
     }
   )

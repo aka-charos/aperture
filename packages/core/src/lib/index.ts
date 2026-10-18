@@ -16,6 +16,7 @@ export {
   setTavilyConfig,
   isTavilyEnabled,
   tavilySearch,
+  getTavilyUsage,
   TavilyError,
   DEFAULT_TAVILY_CONFIG,
   type TavilyConfig,
@@ -26,6 +27,7 @@ export {
   type TavilyTopic,
   type TavilyTimeRange,
 } from './tavily.js'
+export { parseTavilyUsage, type TavilyUsage, type TavilyCreditFigures } from './tavilyUsage.js'
 
 // fastCRW — self-hosted search + scrape, the retrieval half of title analysis
 export {

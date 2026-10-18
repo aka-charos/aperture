@@ -2812,7 +2812,19 @@
     "testSuccess": "Success — Tavily returned {{count}} results.",
     "testFailed": "Tavily test failed",
     "errSave": "Failed to save configuration",
-    "errConnect": "Could not connect to server"
+    "errConnect": "Could not connect to server",
+    "creditsTitle": "Credits this billing cycle",
+    "creditsRefresh": "Refresh",
+    "creditsKey": "This key",
+    "creditsPlan": "Plan",
+    "creditsPlanNamed": "Plan: {{plan}}",
+    "creditsPayg": "Pay as you go",
+    "creditsNoLimit": "{{used}} used · no limit reported",
+    "creditsNotReported": "not reported",
+    "creditsEmpty": "Tavily answered without any usage figures.",
+    "creditsNoKey": "No API key is saved.",
+    "creditsError": "Could not read credits from Tavily: {{message}}",
+    "creditsNote": "Read live from Tavily each time this card opens, after a save and after a test."
   },
   "settingsCrw": {
     "title": "Retrieval Service (fastCRW)",
