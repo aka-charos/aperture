@@ -49,7 +49,7 @@ const logger = createChildLogger('title-analysis-job')
 export const DEFAULT_MAX_TITLES_PER_RUN = 200
 
 /** How many pending rows to fetch at a time. Small — priority order shifts. */
-const SELECT_BATCH = 25
+export const SELECT_BATCH = 25
 
 /**
  * Consecutive failures that mean the fault is systemic, not the titles.
@@ -72,7 +72,7 @@ const SELECT_BATCH = 25
  * in a row is a system, not a coincidence, and the right move is to stop and
  * say which one broke rather than to keep asking 195 more times.
  */
-const CONSECUTIVE_FAILURE_LIMIT = 5
+export const CONSECUTIVE_FAILURE_LIMIT = 5
 
 export interface AnalysisJobOptions {
   /** Maximum titles this run may attempt. */

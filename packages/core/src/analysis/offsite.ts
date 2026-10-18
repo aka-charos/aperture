@@ -30,10 +30,11 @@
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getCrwConfig } from '../lib/crw.js'
-import { getGenerationParamsForRole } from '../lib/ai-provider.js'
+import { isUuid } from '../social/rules.js'
 import { getRetrievalMode } from './mode.js'
 import { getAnalysisPromptVariant } from './promptSetting.js'
-import { loadAnalysisSubject, selectPendingTitles } from './titles.js'
+import { selectPendingTitles } from './titles.js'
+import { CONSECUTIVE_FAILURE_LIMIT, SELECT_BATCH } from './job.js'
 import {
   readAnalysis,
   retrieveSources,
@@ -59,22 +60,17 @@ export const OFFSITE_BATCH_MAX_SIZE = 500
 /** How long an open batch holds its titles away from the library job. */
 export const OFFSITE_RESERVATION_DAYS = 14
 
-/** Titles fetched from the pending selection at a time; small, as in ./job.ts. */
-const SELECT_BATCH = 25
-
 /**
- * Retrieval failures in a row that mean the retrieval service is down, not the
- * titles. Same number and reasoning as ./job.ts's limit: an outage fails every
- * title in milliseconds, and a batch should stop and say so rather than walk
- * the whole library recording the same failure.
+ * Batches being prepared in this process, and the ones asked to stop.
+ *
+ * `claiming` covers the gap between the one-at-a-time check and the INSERT
+ * that puts the new id in `preparing`: that gap has several awaits in it, and
+ * two starts arriving together would otherwise both pass the check and race
+ * each other for the same pending titles.
  */
-const CONSECUTIVE_FAILURE_LIMIT = 5
-
-/** Batches being prepared in this process, and the ones asked to stop. */
 const preparing = new Set<string>()
 const stopRequested = new Set<string>()
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+let claiming = false
 
 interface BatchRow {
   id: string
@@ -85,19 +81,10 @@ interface BatchRow {
   prompt_version: number
   prompt_variant: string | null
   max_output_tokens: number | null
-  temperature: string | null
-  top_p: string | null
   created_at: Date
   prepared_at: Date | null
   expires_at: Date
   last_import_at: Date | null
-}
-
-/** pg returns NUMERIC as text; null stays null rather than becoming 0. */
-function numeric(value: string | number | null): number | null {
-  if (value == null) return null
-  const n = typeof value === 'number' ? value : Number.parseFloat(value)
-  return Number.isFinite(n) ? n : null
 }
 
 export interface StartOffsiteBatchOptions {
@@ -115,60 +102,64 @@ export interface StartOffsiteBatchOptions {
  * the retrieval service, which serialises its searches anyway.
  */
 export async function startOffsiteBatch(options: StartOffsiteBatchOptions): Promise<string> {
-  await recoverInterruptedBatches()
-
-  const mode = await getRetrievalMode()
-  if (mode !== 'crw') {
-    throw new Error(
-      'Offsite analysis needs retrieval mode "crw". Under grounding the model searches for itself, so there is no prompt to send to another machine.'
-    )
-  }
-  if (preparing.size > 0) {
-    throw new Error('A batch is already being prepared. Wait for it to finish, or stop it.')
-  }
-
-  const count = Math.trunc(options.count)
-  if (!Number.isFinite(count) || count < 1 || count > OFFSITE_BATCH_MAX_SIZE) {
+  // Validated before anything is claimed, so a bad request never holds the slot.
+  if (!Number.isInteger(options.count) || options.count < 1 || options.count > OFFSITE_BATCH_MAX_SIZE) {
     throw new Error(`A batch holds between 1 and ${OFFSITE_BATCH_MAX_SIZE} titles.`)
   }
+  const count = options.count
   const mediaTypes = (['movie', 'series'] as const).filter((t) => options.mediaTypes.includes(t))
   if (mediaTypes.length === 0) throw new Error('Pick movies, series, or both.')
 
-  // Everything the file promises the other machine is resolved ONCE, here, and
-  // stored on the batch: the prompt is built under these, and the import files
-  // the answers under them however the settings move in between.
-  const promptVariant = await getAnalysisPromptVariant()
-  const crwConfig = await getCrwConfig()
-  const sampling = await getGenerationParamsForRole('titleAnalysis')
-  const maxOutputTokens =
-    crwConfig.analysisMaxOutputTokens > 0 ? crwConfig.analysisMaxOutputTokens : null
+  // Checked and claimed with no await in between, which is what makes it one at a time.
+  if (claiming || preparing.size > 0) {
+    throw new Error('A batch is already being prepared. Wait for it to finish, or stop it.')
+  }
+  claiming = true
+  try {
+    await ensureRecovered()
 
-  const row = await queryOne<{ id: string }>(
-    `INSERT INTO analysis_offsite_batches
-       (status, requested, media_types, prompt_version, prompt_variant, max_output_tokens,
-        temperature, top_p, created_by, expires_at)
-     VALUES ('preparing', $1, $2, $3, $4, $5, $6, $7, $8, NOW() + make_interval(days => $9))
-     RETURNING id`,
-    [
-      count,
-      mediaTypes,
-      ANALYSIS_PROMPT_VERSION,
-      promptVariant,
-      maxOutputTokens,
-      sampling.temperature ?? null,
-      sampling.topP ?? null,
-      options.userId ?? null,
-      OFFSITE_RESERVATION_DAYS,
-    ]
-  )
-  if (!row) throw new Error('Could not create the batch.')
+    const mode = await getRetrievalMode()
+    if (mode !== 'crw') {
+      throw new Error(
+        'Offsite analysis needs retrieval mode "crw". Under grounding the model searches for itself, so there is no prompt to send to another machine.'
+      )
+    }
 
-  preparing.add(row.id)
-  // Not awaited: the caller answers 202 and the page polls.
-  void prepareBatch(row.id, count, mediaTypes, promptVariant).catch((err) => {
-    logger.error({ err, batchId: row.id }, 'Offsite batch preparation threw outside its own handler')
-  })
-  return row.id
+    // Everything the file promises the other machine is resolved ONCE, here, and
+    // stored on the batch: the prompt is built under these, and the import files
+    // the answers under them however the settings move in between.
+    const promptVariant = await getAnalysisPromptVariant()
+    const crwConfig = await getCrwConfig()
+    const maxOutputTokens =
+      crwConfig.analysisMaxOutputTokens > 0 ? crwConfig.analysisMaxOutputTokens : null
+
+    const row = await queryOne<{ id: string }>(
+      `INSERT INTO analysis_offsite_batches
+         (status, requested, media_types, prompt_version, prompt_variant, max_output_tokens,
+          created_by, expires_at)
+       VALUES ('preparing', $1, $2, $3, $4, $5, $6, NOW() + make_interval(days => $7::int))
+       RETURNING id`,
+      [
+        count,
+        mediaTypes,
+        ANALYSIS_PROMPT_VERSION,
+        promptVariant,
+        maxOutputTokens,
+        options.userId ?? null,
+        OFFSITE_RESERVATION_DAYS,
+      ]
+    )
+    if (!row) throw new Error('Could not create the batch.')
+
+    preparing.add(row.id)
+    // Not awaited: the caller answers 202 and the page polls.
+    void prepareBatch(row.id, count, mediaTypes, promptVariant).catch((err) => {
+      logger.error({ err, batchId: row.id }, 'Offsite batch preparation threw outside its own handler')
+    })
+    return row.id
+  } finally {
+    claiming = false
+  }
 }
 
 /** Ask a preparing batch to stop after the title in hand. */
@@ -187,6 +178,7 @@ async function prepareBatch(
   const shouldStop = () => stopRequested.has(batchId)
   let position = 0
   let prepared = 0
+  let failed = 0
   let consecutiveFailures = 0
   let error: string | null = null
 
@@ -263,6 +255,7 @@ async function prepareBatch(
             )
             logger.warn({ err, batchId, title: title.subject.title }, 'Offsite retrieval failed')
             if (shouldStop()) break outer
+            failed++
             consecutiveFailures++
             if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
               error =
@@ -277,7 +270,12 @@ async function prepareBatch(
 
     if (shouldStop() && !error) error = `Stopped with ${prepared} of ${requested} prepared.`
     else if (!error && prepared < requested) {
-      error = `Only ${prepared} title(s) were pending.`
+      // A failed retrieval releases its title, so the pending set can run out
+      // with failures among it; "only N were pending" would then be false.
+      error =
+        failed > 0
+          ? `Prepared ${prepared} of ${requested}: ${failed} title(s) could not be retrieved, and no more titles were pending.`
+          : `Only ${prepared} title(s) were pending.`
     }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err)
@@ -295,19 +293,35 @@ async function prepareBatch(
 }
 
 /**
- * A batch left `preparing` by a restart is finished as `ready` with what it
- * had, and a title caught mid-retrieval is released. Run lazily on every read
- * rather than at boot, the bench's choice, so nothing has to remember to call it.
+ * Batches left `preparing` by a restart are finished as `ready` with what they
+ * had, and a title caught mid-retrieval is released.
+ *
+ * ONCE PER PROCESS, before anything here reads or starts a batch: at that point
+ * nothing in this process can be preparing, so every `preparing` row is from a
+ * previous one. Run on every read instead, it was a write on each 5-second poll
+ * and it could catch a batch whose INSERT had committed while its id was not
+ * yet in `preparing`, marking a live batch interrupted.
  */
+let recovered: Promise<void> | null = null
+
+function ensureRecovered(): Promise<void> {
+  if (!recovered) {
+    recovered = recoverInterruptedBatches().catch((err) => {
+      // Retried on the next call rather than remembered as done.
+      recovered = null
+      throw err
+    })
+  }
+  return recovered
+}
+
 async function recoverInterruptedBatches(): Promise<void> {
-  const ids = [...preparing]
   const stale = await query<{ id: string }>(
     `UPDATE analysis_offsite_batches
         SET status = 'ready', prepared_at = NOW(),
             error = 'Preparation was interrupted (the server restarted). The prompts already built are kept.'
-      WHERE status = 'preparing' AND NOT (id = ANY($1::uuid[]))
-      RETURNING id`,
-    [ids]
+      WHERE status = 'preparing'
+      RETURNING id`
   )
   if (stale.rows.length === 0) return
   await query(
@@ -338,8 +352,6 @@ export interface OffsiteBatchSummary {
   promptVersion: number
   promptVariant: string | null
   maxOutputTokens: number | null
-  temperature: number | null
-  topP: number | null
   createdAt: string
   preparedAt: string | null
   expiresAt: string
@@ -391,8 +403,6 @@ function toSummary(row: BatchRow, counts: Record<string, number>): OffsiteBatchS
     promptVersion: row.prompt_version,
     promptVariant: row.prompt_variant,
     maxOutputTokens: row.max_output_tokens,
-    temperature: numeric(row.temperature),
-    topP: numeric(row.top_p),
     createdAt: row.created_at.toISOString(),
     preparedAt: row.prepared_at?.toISOString() ?? null,
     expiresAt: row.expires_at.toISOString(),
@@ -421,7 +431,7 @@ async function countsFor(batchIds: string[]): Promise<Map<string, Record<string,
 }
 
 export async function listOffsiteBatches(limit = 25): Promise<OffsiteBatchSummary[]> {
-  await recoverInterruptedBatches()
+  await ensureRecovered()
   const rows = await query<BatchRow>(
     `SELECT * FROM analysis_offsite_batches ORDER BY created_at DESC LIMIT $1`,
     [limit]
@@ -431,8 +441,8 @@ export async function listOffsiteBatches(limit = 25): Promise<OffsiteBatchSummar
 }
 
 export async function getOffsiteBatch(batchId: string): Promise<OffsiteBatchView | null> {
-  if (!UUID.test(batchId)) return null
-  await recoverInterruptedBatches()
+  if (!isUuid(batchId)) return null
+  await ensureRecovered()
   const row = await queryOne<BatchRow>(`SELECT * FROM analysis_offsite_batches WHERE id = $1`, [batchId])
   if (!row) return null
   const counts = await countsFor([row.id])
@@ -482,7 +492,7 @@ export async function getOffsiteBatch(batchId: string): Promise<OffsiteBatchView
 export async function exportOffsiteBatch(
   batchId: string
 ): Promise<{ fileName: string; body: string; count: number } | null> {
-  if (!UUID.test(batchId)) return null
+  if (!isUuid(batchId)) return null
   const row = await queryOne<BatchRow>(`SELECT * FROM analysis_offsite_batches WHERE id = $1`, [batchId])
   if (!row) return null
   const items = await query<{
@@ -490,9 +500,10 @@ export async function exportOffsiteBatch(
     media_type: 'movie' | 'series'
     title: string
     year: number | null
+    attempt: number
     prompt: string
   }>(
-    `SELECT id, media_type, title, year, prompt
+    `SELECT id, media_type, title, year, attempt, prompt
        FROM analysis_offsite_items
       WHERE batch_id = $1 AND status IN ('ready', 'rejected') AND prompt IS NOT NULL
       ORDER BY position ASC`,
@@ -504,14 +515,13 @@ export async function exportOffsiteBatch(
       mediaType: i.media_type,
       title: i.title,
       year: i.year,
+      attempt: i.attempt,
       prompt: i.prompt,
     })),
     {
       promptVersion: row.prompt_version,
       promptVariant: row.prompt_variant,
       maxOutputTokens: row.max_output_tokens,
-      temperature: numeric(row.temperature),
-      topP: numeric(row.top_p),
     }
   )
   return { fileName: exportFileName(row.id), body, count: items.rows.length }
@@ -522,7 +532,7 @@ export async function exportOffsiteBatch(
  * stay, so an answer that arrives later can still be imported.
  */
 export async function closeOffsiteBatch(batchId: string): Promise<boolean> {
-  if (!UUID.test(batchId)) return false
+  if (!isUuid(batchId)) return false
   if (preparing.has(batchId)) throw new Error('Stop the batch before closing it.')
   const result = await query(
     `UPDATE analysis_offsite_batches SET status = 'closed' WHERE id = $1 AND status <> 'preparing'`,
@@ -533,7 +543,7 @@ export async function closeOffsiteBatch(batchId: string): Promise<boolean> {
 
 /** Delete a batch and its prompts. Analyses already imported stay in the library. */
 export async function deleteOffsiteBatch(batchId: string): Promise<boolean> {
-  if (!UUID.test(batchId)) return false
+  if (!isUuid(batchId)) return false
   if (preparing.has(batchId)) throw new Error('Stop the batch before deleting it.')
   const result = await query(`DELETE FROM analysis_offsite_batches WHERE id = $1`, [batchId])
   return (result.rowCount ?? 0) > 0
@@ -561,6 +571,7 @@ interface ImportItemRow {
   media_id: string
   title: string
   status: string
+  attempt: number
   sources: AnalysisSourceRef[] | null
   evidence: RetrievedSource[] | null
   source_count: number | null
@@ -570,6 +581,7 @@ interface ImportItemRow {
   max_output_tokens: number | null
   batch_created_at: Date
   analyzed_at: Date | null
+  title_exists: boolean
 }
 
 /**
@@ -592,22 +604,30 @@ export async function importOffsiteResults(jsonl: string): Promise<OffsiteImport
     runnerError: 0,
     superseded: 0,
     duplicate: 0,
+    olderAttempt: 0,
     notExported: 0,
     stale: 0,
     unknown: 0,
     gone: 0,
+    importFailed: 0,
   } satisfies Record<OffsiteImportOutcome, number>
   const lines: OffsiteImportLine[] = []
   const touchedBatches = new Set<string>()
 
-  const ids = parsed.results.map((r) => r.customId).filter((id) => UUID.test(id))
+  const ids = parsed.results.map((r) => r.customId).filter((id) => isUuid(id))
   const rows = ids.length
     ? await query<ImportItemRow>(
-        `SELECT i.id, i.batch_id, i.media_type, i.media_id, i.title, i.status, i.sources, i.evidence,
+        `SELECT i.id, i.batch_id, i.media_type, i.media_id, i.title, i.status, i.attempt, i.sources, i.evidence,
                 i.source_count, i.retrieved_chars,
                 b.prompt_version, b.prompt_variant, b.max_output_tokens,
                 b.created_at AS batch_created_at,
-                ta.analyzed_at
+                ta.analyzed_at,
+                -- Whether the title is still in the library, read here once rather
+                -- than per answer: a deleted title would leave an orphan row.
+                CASE WHEN i.media_type = 'movie'
+                     THEN EXISTS (SELECT 1 FROM movies m WHERE m.id = i.media_id)
+                     ELSE EXISTS (SELECT 1 FROM series s WHERE s.id = i.media_id)
+                END AS title_exists
            FROM analysis_offsite_items i
            JOIN analysis_offsite_batches b ON b.id = i.batch_id
            LEFT JOIN title_analysis ta
@@ -624,7 +644,7 @@ export async function importOffsiteResults(jsonl: string): Promise<OffsiteImport
   }
 
   for (const result of parsed.results) {
-    const item = UUID.test(result.customId) ? byId.get(result.customId) : undefined
+    const item = isUuid(result.customId) ? byId.get(result.customId) : undefined
     if (!item) {
       record({ customId: result.customId, title: null, outcome: 'unknown', detail: null })
       continue
@@ -638,6 +658,8 @@ export async function importOffsiteResults(jsonl: string): Promise<OffsiteImport
         analysedAt: item.analyzed_at,
         batchCreatedAt: item.batch_created_at,
         resultKind: result.kind,
+        resultAttempt: result.attempt,
+        itemAttempt: item.attempt,
       })
 
       if (check.action === 'skip') {
@@ -661,7 +683,7 @@ export async function importOffsiteResults(jsonl: string): Promise<OffsiteImport
 
       // A title deleted since the batch was made: storing would leave an orphan
       // row nothing can reach.
-      if (!(await loadAnalysisSubject(item.media_type, item.media_id))) {
+      if (!item.title_exists) {
         record({ customId: result.customId, title: item.title, outcome: 'gone', detail: null })
         continue
       }
@@ -680,7 +702,9 @@ export async function importOffsiteResults(jsonl: string): Promise<OffsiteImport
           outputTokens: result.outputTokens ?? undefined,
         })
         await query(
-          `UPDATE analysis_offsite_items SET status = 'rejected', error = $2, model = $3 WHERE id = $1`,
+          `UPDATE analysis_offsite_items
+            SET status = 'rejected', error = $2, model = $3, attempt = attempt + 1
+          WHERE id = $1`,
           [item.id, detail, modelId]
         )
         touchedBatches.add(item.batch_id)
@@ -720,11 +744,16 @@ export async function importOffsiteResults(jsonl: string): Promise<OffsiteImport
         detail: stored.declineReason,
       })
     } catch (err) {
-      // A database fault on one line must not lose the rest of the file. Filed
-      // as a rejection so the title stays in the batch and can be imported again.
+      // A database fault on one line must not lose the rest of the file. The
+      // item keeps its status and attempt, so importing the same file again
+      // judges this answer again; the reason is recorded on it if the database
+      // will take it.
       const detail = err instanceof Error ? err.message : String(err)
       logger.error({ err, customId: result.customId }, 'Offsite import of one answer failed')
-      record({ customId: result.customId, title: item.title, outcome: 'rejected', detail })
+      await query(`UPDATE analysis_offsite_items SET error = $2 WHERE id = $1`, [item.id, detail]).catch(
+        () => undefined
+      )
+      record({ customId: result.customId, title: item.title, outcome: 'importFailed', detail })
     }
   }
 

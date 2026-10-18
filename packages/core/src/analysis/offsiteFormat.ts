@@ -28,6 +28,13 @@ export interface OffsiteExportItem {
   mediaType: 'movie' | 'series'
   title: string
   year: number | null
+  /**
+   * How many answers for this title the import has rejected. The runner keys
+   * its resume on (id, attempt), so a rejected title is run again on the next
+   * pass instead of being skipped because the results file already holds an
+   * answer for its id.
+   */
+  attempt: number
   prompt: string
 }
 
@@ -36,14 +43,13 @@ export interface OffsiteExportSettings {
   promptVariant: string | null
   /** Null means no ceiling. */
   maxOutputTokens: number | null
-  temperature: number | null
-  topP: number | null
 }
 
 /** One exported line, without its trailing newline. */
 export function buildExportLine(item: OffsiteExportItem, settings: OffsiteExportSettings): string {
   return JSON.stringify({
     custom_id: item.id,
+    attempt: item.attempt,
     format: OFFSITE_FORMAT,
     media_type: item.mediaType,
     title: item.title,
@@ -51,8 +57,6 @@ export function buildExportLine(item: OffsiteExportItem, settings: OffsiteExport
     prompt_version: settings.promptVersion,
     prompt_variant: settings.promptVariant,
     max_tokens: settings.maxOutputTokens,
-    temperature: settings.temperature,
-    top_p: settings.topP,
     prompt: item.prompt,
   })
 }
@@ -66,13 +70,15 @@ export type OffsiteResult =
   | {
       kind: 'answer'
       customId: string
+      /** The attempt the runner answered; 0 when a line does not say. */
+      attempt: number
       model: string | null
       text: string
       /** Normalised to the OpenAI spelling, which the response checks read. */
       finishReason: string | null
       outputTokens: number | null
     }
-  | { kind: 'error'; customId: string; error: string }
+  | { kind: 'error'; customId: string; attempt: number; error: string }
 
 export interface ParsedOffsiteResults {
   /** One per custom_id, in the order each id first appeared. */
@@ -98,15 +104,20 @@ function readTokens(usage: unknown): number | null {
   return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : null
 }
 
+function readAttempt(value: unknown): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : 0
+}
+
 /**
  * Read a results file.
  *
  * Tolerant of what a resumed run leaves behind: blank lines, a half-written
- * last line from a killed process, and the same id twice (an error from the
- * first attempt, an answer from the rerun). For a repeated id the LATER line
- * wins, except that an answer is never replaced by an error — a runner skips
- * ids it has answered, so an error after an answer can only be a file stitched
- * together by hand, and the answer is the line worth keeping.
+ * last line from a killed process, and the same id more than once. For a
+ * repeated id the NEWEST ATTEMPT wins (a rejected answer, then the rerun's
+ * answer to the next attempt); within one attempt the later line wins, except
+ * that an answer is never replaced by an error — a runner skips what it has
+ * answered, so an error after an answer can only be a file stitched together by
+ * hand, and the answer is the line worth keeping.
  */
 export function parseOffsiteResults(jsonl: string): ParsedOffsiteResults {
   const byId = new Map<string, OffsiteResult>()
@@ -132,26 +143,31 @@ export function parseOffsiteResults(jsonl: string): ParsedOffsiteResults {
       badLines.push(index + 1)
       return
     }
+    const attempt = readAttempt(r.attempt)
 
     let result: OffsiteResult
     if (typeof r.text === 'string') {
       result = {
         kind: 'answer',
         customId,
+        attempt,
         model: typeof r.model === 'string' && r.model.trim() ? r.model.trim() : null,
         text: r.text,
         finishReason: normaliseFinishReason(r.finish_reason),
         outputTokens: readTokens(r.usage),
       }
     } else if (typeof r.error === 'string' && r.error.trim()) {
-      result = { kind: 'error', customId, error: r.error.trim() }
+      result = { kind: 'error', customId, attempt, error: r.error.trim() }
     } else {
       badLines.push(index + 1)
       return
     }
 
     const previous = byId.get(customId)
-    if (previous?.kind === 'answer' && result.kind === 'error') return
+    if (previous) {
+      if (previous.attempt > attempt) return
+      if (previous.attempt === attempt && previous.kind === 'answer' && result.kind === 'error') return
+    }
     // A replaced entry keeps its FIRST position: set() on an existing key does
     // not move it in a Map's order.
     byId.set(customId, result)
@@ -174,6 +190,8 @@ export type OffsiteImportOutcome =
   | 'superseded'
   /** This title's answer was already imported. */
   | 'duplicate'
+  /** An answer to an earlier attempt, already judged and rejected; the rerun is what counts. */
+  | 'olderAttempt'
   /** The id names a title that never made it into the file (its retrieval failed). */
   | 'notExported'
   /** The batch was built under a prompt older than the staleness floor. */
@@ -182,6 +200,8 @@ export type OffsiteImportOutcome =
   | 'unknown'
   /** The title has left the library since the batch was made. */
   | 'gone'
+  /** Saving it failed (a database fault). Nothing changed; import the file again. */
+  | 'importFailed'
 
 /**
  * What to do with one result BEFORE reading its text — every reason an answer
@@ -199,12 +219,21 @@ export function importPrecheck(input: {
   analysedAt: Date | null
   batchCreatedAt: Date
   resultKind: OffsiteResult['kind']
+  /** The attempt the answer was written for, and the one the item is on now. */
+  resultAttempt: number
+  itemAttempt: number
 }): { action: 'read' } | { action: 'skip'; outcome: OffsiteImportOutcome } {
   if (['stored', 'declined', 'skipped'].includes(input.itemStatus)) {
     return { action: 'skip', outcome: 'duplicate' }
   }
   if (input.itemStatus !== 'ready' && input.itemStatus !== 'rejected') {
     return { action: 'skip', outcome: 'notExported' }
+  }
+  // Already judged: that answer was rejected and the item moved on. Judging it
+  // again would only reject it again, and could overwrite the rejection of
+  // the newer attempt with an older reason.
+  if (input.resultAttempt < input.itemAttempt) {
+    return { action: 'skip', outcome: 'olderAttempt' }
   }
   // Stored under a version below the floor, the row would be stale the moment
   // it was written and the library job would queue the title straight back.

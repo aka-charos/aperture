@@ -14,19 +14,18 @@ const settings = {
   promptVersion: 18,
   promptVariant: null,
   maxOutputTokens: 8000,
-  temperature: null,
-  topP: null,
 }
 
 test('an exported line carries everything a runner needs, and the format', () => {
   const line = JSON.parse(
     buildExportLine(
-      { id: 'abc', mediaType: 'movie', title: 'Suspiria', year: 1977, prompt: 'P' },
+      { id: 'abc', mediaType: 'movie', title: 'Suspiria', year: 1977, attempt: 2, prompt: 'P' },
       settings
     )
   )
   assert.deepEqual(line, {
     custom_id: 'abc',
+    attempt: 2,
     format: OFFSITE_FORMAT,
     media_type: 'movie',
     title: 'Suspiria',
@@ -34,8 +33,6 @@ test('an exported line carries everything a runner needs, and the format', () =>
     prompt_version: 18,
     prompt_variant: null,
     max_tokens: 8000,
-    temperature: null,
-    top_p: null,
     prompt: 'P',
   })
 })
@@ -43,8 +40,8 @@ test('an exported line carries everything a runner needs, and the format', () =>
 test('the file is one line per title, newline-terminated, and survives newlines in a prompt', () => {
   const file = buildExportFile(
     [
-      { id: 'a', mediaType: 'movie', title: 'A', year: null, prompt: 'line one\nline two' },
-      { id: 'b', mediaType: 'series', title: 'B', year: 2001, prompt: 'x' },
+      { id: 'a', mediaType: 'movie', title: 'A', year: null, attempt: 0, prompt: 'line one\nline two' },
+      { id: 'b', mediaType: 'series', title: 'B', year: 2001, attempt: 0, prompt: 'x' },
     ],
     settings
   )
@@ -66,8 +63,8 @@ test('results: answers and errors are read, blank and broken lines are reported,
   const parsed = parseOffsiteResults(file)
   assert.deepEqual(parsed.badLines, [4, 5, 6])
   assert.deepEqual(parsed.results, [
-    { kind: 'answer', customId: 'a', model: 'qwen', text: 'ANSWER', finishReason: 'stop', outputTokens: 12 },
-    { kind: 'error', customId: 'b', error: 'HTTP 500: boom' },
+    { kind: 'answer', customId: 'a', attempt: 0, model: 'qwen', text: 'ANSWER', finishReason: 'stop', outputTokens: 12 },
+    { kind: 'error', customId: 'b', attempt: 0, error: 'HTTP 500: boom' },
   ])
 })
 
@@ -113,6 +110,8 @@ const base = {
   analysedAt: null,
   batchCreatedAt: new Date('2026-10-01T00:00:00Z'),
   resultKind: 'answer' as const,
+  resultAttempt: 0,
+  itemAttempt: 0,
 }
 
 test('precheck: a ready or rejected item with a fresh batch is read', () => {
@@ -156,4 +155,39 @@ test('precheck: a runner error is recorded, never read as an answer', () => {
 
 test('the file name names the batch', () => {
   assert.equal(exportFileName('7f3c1a2b-0000-0000-0000-000000000000'), 'aperture-analysis-7f3c1a2b.jsonl')
+})
+
+test('results: the newest attempt for an id wins, in either order', () => {
+  // The rerun's answer to attempt 1 must replace the rejected answer to
+  // attempt 0, and a stale attempt-0 line read after it must not win back.
+  const rerunLast = parseOffsiteResults(
+    [
+      JSON.stringify({ custom_id: 'a', attempt: 0, text: 'old' }),
+      JSON.stringify({ custom_id: 'a', attempt: 1, error: 'boom' }),
+    ].join('\n')
+  ).results
+  assert.deepEqual(rerunLast.map((r) => [r.kind, r.attempt]), [['error', 1]])
+
+  const staleLast = parseOffsiteResults(
+    [
+      JSON.stringify({ custom_id: 'a', attempt: 1, text: 'new' }),
+      JSON.stringify({ custom_id: 'a', attempt: 0, text: 'old' }),
+    ].join('\n')
+  ).results
+  assert.equal(staleLast[0].kind === 'answer' && staleLast[0].text, 'new')
+})
+
+test('results: a line with no attempt is attempt 0', () => {
+  const [r] = parseOffsiteResults(JSON.stringify({ custom_id: 'a', text: 'x', attempt: -3 })).results
+  assert.equal(r.attempt, 0)
+})
+
+test('precheck: an answer to an attempt the import already rejected is not judged again', () => {
+  assert.deepEqual(
+    importPrecheck({ ...base, itemStatus: 'rejected', resultAttempt: 0, itemAttempt: 1 }),
+    { action: 'skip', outcome: 'olderAttempt' }
+  )
+  assert.deepEqual(importPrecheck({ ...base, itemStatus: 'rejected', resultAttempt: 1, itemAttempt: 1 }), {
+    action: 'read',
+  })
 })

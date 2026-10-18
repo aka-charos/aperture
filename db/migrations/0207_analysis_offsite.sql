@@ -30,12 +30,12 @@ CREATE TABLE IF NOT EXISTS analysis_offsite_batches (
   prompt_version INTEGER NOT NULL,
   prompt_variant TEXT,
 
-  -- The Title Analysis role's limits at export time, written into the file so
-  -- the other machine runs under the same ceiling. NULL max_output_tokens means
-  -- no ceiling (the setting's 0).
+  -- The Title Analysis role's output ceiling at export time, written into the
+  -- file so the other machine runs under the same one. NULL means no ceiling
+  -- (the setting's 0). Sampling settings are deliberately NOT carried: they are
+  -- OpenRouter-only and a local run is sent none (F-123), so the runner sends
+  -- none either unless told to.
   max_output_tokens INTEGER,
-  temperature NUMERIC,
-  top_p NUMERIC,
 
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -67,6 +67,12 @@ CREATE TABLE IF NOT EXISTS analysis_offsite_items (
   -- stored | declined | skipped (analysed another way meanwhile)
   status TEXT NOT NULL DEFAULT 'pending',
   error TEXT,
+  -- How many answers for this title have been rejected. Written into the file
+  -- and echoed back by the runner, which keys its resume on (id, attempt): a
+  -- rejected title then reads as unanswered on the next run instead of being
+  -- skipped forever, and a re-imported answer to an older attempt is
+  -- recognised rather than judged again.
+  attempt INTEGER NOT NULL DEFAULT 0,
 
   -- The prompt, and what the floor needs to judge the answer against it.
   -- Cleared once an answer is stored or declined.

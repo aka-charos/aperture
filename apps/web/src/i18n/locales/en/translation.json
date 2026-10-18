@@ -6218,7 +6218,9 @@
       "notExported": "Not in the batch file",
       "stale": "Prompt version too old",
       "gone": "No longer in the library",
-      "unknown": "Not found"
+      "unknown": "Not found",
+      "olderAttempt": "An earlier attempt, already judged",
+      "importFailed": "Could not be saved; import the file again"
     },
     "batches": "Batches",
     "noBatches": "No batches yet.",

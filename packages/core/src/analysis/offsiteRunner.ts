@@ -55,7 +55,7 @@ const USAGE = [
   '  --limit <n>            Only run the first n unanswered titles, for a test.',
   '  --stall-seconds <n>    Give up on a request after this long with no data (default: 600).',
   '  --max-tokens <n|none>  Override the batch\'s output ceiling.',
-  '  --temperature <n|none> Override the batch\'s temperature.',
+  '  --temperature <n>      Send a temperature. None is sent by default, as for a local model in Aperture.',
   '  --help                 Show this.',
 ].join('\n')
 
@@ -99,7 +99,7 @@ function parseArgs(argv) {
         case '--limit': opts.limit = positiveInt(arg, value); break
         case '--stall-seconds': opts.stallSeconds = positiveInt(arg, value); break
         case '--max-tokens': opts.maxTokens = value === 'none' ? null : positiveInt(arg, value); break
-        case '--temperature': opts.temperature = value === 'none' ? null : number(arg, value); break
+        case '--temperature': opts.temperature = number(arg, value); break
       }
       continue
     }
@@ -123,7 +123,7 @@ function positiveInt(flag, value) {
 
 function number(flag, value) {
   const n = Number(value)
-  if (!Number.isFinite(n)) fail(flag + ' must be a number, or none.')
+  if (!Number.isFinite(n)) fail(flag + ' must be a number.')
   return n
 }
 
@@ -155,7 +155,14 @@ function readBatch(file) {
   return items
 }
 
-// Titles already answered. An error line does not count: a rerun tries it again.
+// A batch line and a result line name the same answer when both id and attempt match.
+function answerKey(row) {
+  return row.custom_id + '#' + (Number.isInteger(row.attempt) ? row.attempt : 0)
+}
+
+// Titles already answered, by (id, attempt). An error line does not count: a rerun
+// tries it again. Neither does an answer to an older attempt: Aperture rejected it
+// and the batch file now carries the next attempt, which must run.
 function readAnswered(file) {
   const done = new Set()
   if (!fs.existsSync(file)) return done
@@ -163,7 +170,7 @@ function readAnswered(file) {
     if (!line.trim()) continue
     try {
       const row = JSON.parse(line)
-      if (typeof row.custom_id === 'string' && typeof row.text === 'string') done.add(row.custom_id)
+      if (typeof row.custom_id === 'string' && typeof row.text === 'string') done.add(answerKey(row))
     } catch {
       // A half-written last line from a killed run. Its title is simply run again.
     }
@@ -240,10 +247,8 @@ function complete(opts, item, onProgress) {
     stream_options: { include_usage: true },
   }
   const maxTokens = opts.maxTokens !== undefined ? opts.maxTokens : item.max_tokens
-  const temperature = opts.temperature !== undefined ? opts.temperature : item.temperature
+  if (opts.temperature !== undefined) body.temperature = opts.temperature
   if (maxTokens != null) body.max_tokens = maxTokens
-  if (temperature != null) body.temperature = temperature
-  if (opts.temperature === undefined && item.top_p != null) body.top_p = item.top_p
 
   return new Promise((resolve, reject) => {
     let settled = false
@@ -375,7 +380,7 @@ async function main() {
   }
 
   const answered = readAnswered(opts.out)
-  let queue = items.filter((item) => !answered.has(item.custom_id))
+  let queue = items.filter((item) => !answered.has(answerKey(item)))
   if (opts.limit) queue = queue.slice(0, opts.limit)
 
   console.log('Batch: ' + items.length + ' title(s), ' + answered.size + ' already answered in ' + opts.out)
@@ -427,6 +432,7 @@ async function main() {
         const ms = Date.now() - started
         fs.appendFileSync(opts.out, JSON.stringify({
           custom_id: item.custom_id,
+          attempt: item.attempt || 0,
           title: item.title,
           model: answer.model || opts.model,
           text: answer.text,
@@ -446,6 +452,7 @@ async function main() {
         const reason = err && err.message ? err.message : String(err)
         fs.appendFileSync(opts.out, JSON.stringify({
           custom_id: item.custom_id,
+          attempt: item.attempt || 0,
           title: item.title,
           model: opts.model,
           error: reason,

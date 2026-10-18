@@ -49,13 +49,13 @@ Released or expired batches can still be imported. If a title was analysed anoth
 | `--limit <n>` | all | Run only the first n unanswered titles |
 | `--stall-seconds <n>` | 600 | Give up on a request after this long with no data |
 | `--max-tokens <n\|none>` | the batch's | Override the output ceiling |
-| `--temperature <n\|none>` | the batch's | Override the temperature |
+| `--temperature <n>` | none sent | Send a temperature. Aperture sends none to a local model, so neither does the runner unless asked ||none>` | the batch's | Override the temperature |
 
-The batch carries the **Title Analysis** role's output ceiling and sampling settings, so the other machine runs under the same limits as a run here.
+The batch carries the **Title Analysis** role's output ceiling, so the other machine runs under the same limit as a run here. Its sampling settings are not carried: they apply to OpenRouter only, and a local model in Aperture is sent none.
 
 ### Stopping and resuming
 
-Every answer is written the moment its title finishes. Press Ctrl+C at any time: only the title in progress is lost. Run the same command again and it skips titles the results file already answers, and retries any that failed. You can also import a partial results file and keep going.
+Every answer is written the moment its title finishes. Press Ctrl+C at any time: only the title in progress is lost. Run the same command again and it skips titles the results file already answers, and retries any that failed. A title Aperture rejected on import comes back in the next download as a new attempt, and the same command runs it again. You can also import a partial results file and keep going.
 
 Requests are **streamed**, so a slow model is never cut off by a timeout on the request as a whole; the runner only gives up on a server that sends nothing at all for `--stall-seconds`.
 
@@ -65,7 +65,9 @@ Requests are **streamed**, so a slow model is never cut off by a timeout on the 
 |---------|---------|
 | **Stored** | The analysis is in the library |
 | **Declined (sources too thin)** | Read fine, and the source floor declined it, exactly as a run here would |
-| **Rejected** | The answer broke the output format (no paragraph map, cut off at the ceiling, a preamble instead of an answer). The title stays in the batch: download it again and rerun it, perhaps with another model or a larger context |
+| **Rejected** | The answer broke the output format (no paragraph map, cut off at the ceiling, a preamble instead of an answer). The title stays in the batch as its next attempt: download the batch again and run the same command, and the runner sends it again (perhaps choose another model or a larger context first) |
+| **An earlier attempt, already judged** | An answer to an attempt that was already rejected; only the rerun counts |
+| **Could not be saved** | A database error while storing it. Nothing changed; import the same file again |
 | **Failed on the other machine** | The runner wrote an error instead of an answer. It stays in the batch, and a rerun retries it |
 | **Already analysed another way** | Something else analysed the title after the batch was made |
 | **Already imported** | That answer was imported before |
@@ -78,13 +80,13 @@ A normal run retries a model that breaks the format and then falls back to the n
 **The batch file** is JSON Lines, one title per line:
 
 ```json
-{"custom_id":"…","format":"aperture-analysis-offsite/1","media_type":"movie","title":"Suspiria","year":1977,"prompt_version":18,"prompt_variant":null,"max_tokens":8000,"temperature":null,"top_p":null,"prompt":"…"}
+{"custom_id":"…","attempt":0,"format":"aperture-analysis-offsite/1","media_type":"movie","title":"Suspiria","year":1977,"prompt_version":18,"prompt_variant":null,"max_tokens":8000,"prompt":"…"}
 ```
 
 **The results file** is one line per title:
 
 ```json
-{"custom_id":"…","model":"qwen3-30b-a3b","text":"…the model's raw reply…","finish_reason":"stop","usage":{"completion_tokens":1290},"elapsed_ms":84210}
+{"custom_id":"…","attempt":0,"model":"qwen3-30b-a3b","text":"…the model's raw reply…","finish_reason":"stop","usage":{"completion_tokens":1290},"elapsed_ms":84210}
 ```
 
-or `{"custom_id":"…","error":"…"}` when no answer came back. `text` is the raw reply, reasoning blocks included: Aperture strips them on import. Any tool can write this file; the runner is just the easy way.
+or `{"custom_id":"…","attempt":0,"error":"…"}` when no answer came back. `attempt` is copied from the batch line: it counts how many answers for that title were rejected, and a runner resumes by id and attempt, so a rejected title runs again. `text` is the raw reply, reasoning blocks included: Aperture strips them on import. Any tool can write this file; the runner is just the easy way.

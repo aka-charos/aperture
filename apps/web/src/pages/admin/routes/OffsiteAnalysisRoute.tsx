@@ -93,6 +93,8 @@ type ImportOutcome =
   | 'stale'
   | 'unknown'
   | 'gone'
+  | 'olderAttempt'
+  | 'importFailed'
 
 interface ImportSummary {
   counts: Record<ImportOutcome, number>
@@ -105,9 +107,11 @@ const OUTCOME_ORDER: ImportOutcome[] = [
   'stored',
   'declined',
   'rejected',
+  'importFailed',
   'runnerError',
   'superseded',
   'duplicate',
+  'olderAttempt',
   'notExported',
   'stale',
   'gone',
@@ -117,18 +121,23 @@ const OUTCOME_ORDER: ImportOutcome[] = [
 const OUTCOME_COLOR: Partial<Record<ImportOutcome, 'success' | 'warning' | 'error'>> = {
   stored: 'success',
   rejected: 'error',
+  importFailed: 'error',
   runnerError: 'warning',
 }
 
-const COMMAND_EXAMPLE = 'node run-offsite-analysis.mjs aperture-analysis-xxxxxxxx.jsonl --model <model id>'
+/** The command shown on the page; the runner's file name is the server's, never a copy. */
+const commandExample = (runnerFileName: string) =>
+  `node ${runnerFileName} <batch file>.jsonl --model <model id>`
 
 export default function OffsiteAnalysisRoute() {
   const { t, i18n } = useTranslation()
 
   const [batches, setBatches] = useState<BatchSummary[]>([])
-  const [limits, setLimits] = useState<Limits>({ defaultSize: 100, maxSize: 500, reservationDays: 14 })
-  const [runnerFileName, setRunnerFileName] = useState('run-offsite-analysis.mjs')
-  const [count, setCount] = useState('100')
+  // Decided by the server and null until it answers: the limits and the runner's
+  // name are core constants, and a copy here would drift the first time one moved.
+  const [limits, setLimits] = useState<Limits | null>(null)
+  const [runnerFileName, setRunnerFileName] = useState<string | null>(null)
+  const [count, setCount] = useState('')
   const [movies, setMovies] = useState(true)
   const [series, setSeries] = useState(true)
   const [starting, setStarting] = useState(false)
@@ -166,8 +175,8 @@ export default function OffsiteAnalysisRoute() {
   // field has already been edited.
   const countTouched = useRef(false)
   useEffect(() => {
-    if (!countTouched.current) setCount(String(limits.defaultSize))
-  }, [limits.defaultSize])
+    if (limits && !countTouched.current) setCount(String(limits.defaultSize))
+  }, [limits])
 
   // Poll while something is preparing; stop once nothing is.
   const anyPreparing = batches.some((b) => b.status === 'preparing')
@@ -260,13 +269,16 @@ export default function OffsiteAnalysisRoute() {
   }
 
   const countNumber = Number(count)
-  const countValid = Number.isInteger(countNumber) && countNumber >= 1 && countNumber <= limits.maxSize
+  const countValid =
+    limits != null && Number.isInteger(countNumber) && countNumber >= 1 && countNumber <= limits.maxSize
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <Typography variant="body2" color="text.secondary">
-        {t('offsiteAnalysis.intro', { days: limits.reservationDays })}
-      </Typography>
+      {limits && (
+        <Typography variant="body2" color="text.secondary">
+          {t('offsiteAnalysis.intro', { days: limits.reservationDays })}
+        </Typography>
+      )}
 
       {error && (
         <Alert severity="error" onClose={() => setError(null)}>
@@ -292,9 +304,9 @@ export default function OffsiteAnalysisRoute() {
               countTouched.current = true
               setCount(event.target.value)
             }}
-            error={!countValid}
-            helperText={t('offsiteAnalysis.countHelp', { max: limits.maxSize })}
-            inputProps={{ min: 1, max: limits.maxSize }}
+            error={limits != null && !countValid}
+            helperText={limits ? t('offsiteAnalysis.countHelp', { max: limits.maxSize }) : ' '}
+            inputProps={{ min: 1, max: limits?.maxSize }}
             sx={{ width: { sm: 180 } }}
           />
           <FormControlLabel
@@ -353,7 +365,7 @@ export default function OffsiteAnalysisRoute() {
                 whiteSpace: 'pre',
               }}
             >
-              {COMMAND_EXAMPLE}
+              {runnerFileName ? commandExample(runnerFileName) : ''}
             </Box>
           </li>
           <li>
@@ -365,7 +377,8 @@ export default function OffsiteAnalysisRoute() {
           startIcon={<DownloadIcon />}
           component="a"
           href="/api/analysis-offsite/runner"
-          download={runnerFileName}
+          download={runnerFileName ?? undefined}
+          disabled={!runnerFileName}
         >
           {t('offsiteAnalysis.downloadRunner')}
         </Button>

@@ -80,7 +80,7 @@ function fakeServer(seen: Seen[]) {
   })
 }
 
-function workdir(prompts: string[], maxTokens: number | null = 8000) {
+function workdir(prompts: string[], maxTokens: number | null = 8000, attempt = 0) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'offsite-runner-'))
   const script = path.join(dir, OFFSITE_RUNNER_FILE_NAME)
   fs.writeFileSync(script, OFFSITE_RUNNER_SCRIPT)
@@ -88,8 +88,8 @@ function workdir(prompts: string[], maxTokens: number | null = 8000) {
   fs.writeFileSync(
     batch,
     buildExportFile(
-      prompts.map((prompt, i) => ({ id: 'id-' + i, mediaType: 'movie', title: 'T' + i, year: 2000 + i, prompt })),
-      { promptVersion: 18, promptVariant: null, maxOutputTokens: maxTokens, temperature: 0.3, topP: null }
+      prompts.map((prompt, i) => ({ id: 'id-' + i, mediaType: 'movie', title: 'T' + i, year: 2000 + i, attempt, prompt })),
+      { promptVersion: 18, promptVariant: null, maxOutputTokens: maxTokens }
     )
   )
   return { dir, script, batch, out: path.join(dir, 'batch.results.jsonl') }
@@ -119,12 +119,13 @@ test('runs a batch: streamed answers and failures land in a results file the imp
     const result = await run(w.script, [w.batch, '--model', 'test-model', '--base-url', baseUrl])
     assert.equal(result.code, 0, result.stderr + result.stdout)
 
-    // What was sent: the batch's ceiling and temperature, streamed, as one user message.
+    // What was sent: the batch's ceiling, streamed, as one user message, and no
+    // sampling settings (a local model in Aperture is sent none).
     assert.equal(seen.length, 3)
     assert.equal(seen[0].body.stream, true)
     assert.equal(seen[0].body.model, 'test-model')
     assert.equal(seen[0].body.max_tokens, 8000)
-    assert.equal(seen[0].body.temperature, 0.3)
+    assert.equal('temperature' in seen[0].body, false)
     assert.equal('top_p' in seen[0].body, false)
 
     const parsed = parseOffsiteResults(fs.readFileSync(w.out, 'utf8'))
@@ -214,4 +215,41 @@ test('an unreachable server is named as such, with what to check', { timeout: 30
   assert.equal(result.code, 1)
   assert.match(result.stderr, /Could not reach/)
   assert.match(result.stderr, /Start server/)
+})
+
+test('a title the import rejected runs again: the new batch carries the next attempt', { timeout: 30000 }, async () => {
+  const seen: Seen[] = []
+  const { server, baseUrl } = await fakeServer(seen)
+  try {
+    // First pass answers attempt 0.
+    const w = workdir(['only title'])
+    await run(w.script, [w.batch, '--model', 'test-model', '--base-url', baseUrl])
+    assert.equal(seen.length, 1)
+    const first = parseOffsiteResults(fs.readFileSync(w.out, 'utf8')).results[0]
+    assert.equal(first.attempt, 0)
+
+    // Aperture rejected it, so the re-downloaded batch carries attempt 1. The
+    // same command, same results file, must send it again rather than skip it.
+    const again = workdir(['only title'], 8000, 1)
+    fs.copyFileSync(again.batch, w.batch)
+    seen.length = 0
+    await run(w.script, [w.batch, '--model', 'test-model', '--base-url', baseUrl])
+    assert.equal(seen.length, 1)
+    const latest = parseOffsiteResults(fs.readFileSync(w.out, 'utf8')).results[0]
+    assert.equal(latest.attempt, 1)
+  } finally {
+    server.close()
+  }
+})
+
+test('--temperature is sent only when asked for', { timeout: 30000 }, async () => {
+  const seen: Seen[] = []
+  const { server, baseUrl } = await fakeServer(seen)
+  try {
+    const w = workdir(['a'])
+    await run(w.script, [w.batch, '--model', 'test-model', '--base-url', baseUrl, '--temperature', '0.4'])
+    assert.equal(seen[0].body.temperature, 0.4)
+  } finally {
+    server.close()
+  }
 })
