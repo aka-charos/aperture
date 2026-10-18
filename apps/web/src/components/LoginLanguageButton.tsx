@@ -35,8 +35,8 @@ export function LoginLanguageButton({ options, value, onChange }: LoginLanguageB
           onClick={(e) => setAnchorEl(e.currentTarget)}
           aria-label={tooltip}
           sx={{
-            width: 44,
-            height: 44,
+            width: 38,
+            height: 38,
             border: '1px solid',
             borderColor: alpha(theme.palette.common.white, 0.14),
             backgroundColor: alpha(theme.palette.common.black, 0.26),

@@ -214,19 +214,6 @@ export function LoginPage() {
         }}
       />
 
-      {languageOptions.length > 1 && (
-        <Box sx={{ position: 'absolute', top: 16, insetInlineEnd: 16, zIndex: 2 }}>
-          <LoginLanguageButton
-            options={languageOptions}
-            value={currentLanguage}
-            onChange={(code) => {
-              setPickedLanguage(code)
-              void applyEffectiveUiLanguage(code)
-            }}
-          />
-        </Box>
-      )}
-
       <Card
         sx={{
           position: 'relative',
@@ -241,6 +228,21 @@ export function LoginPage() {
           boxShadow: `0 24px 80px ${alpha(theme.palette.common.black, 0.52)}`,
         }}
       >
+        {/* In the card's own corner, beside the form it applies to: the
+            screen corner was a long way from where the eye is. The heading
+            below is centred, so the corner is free. */}
+        {languageOptions.length > 1 && (
+          <Box sx={{ position: 'absolute', top: 12, insetInlineEnd: 12, zIndex: 1 }}>
+            <LoginLanguageButton
+              options={languageOptions}
+              value={currentLanguage}
+              onChange={(code) => {
+                setPickedLanguage(code)
+                void applyEffectiveUiLanguage(code)
+              }}
+            />
+          </Box>
+        )}
         <CardContent sx={{ p: { xs: 3, sm: 4.5 } }}>
           <Box textAlign="center" mb={4.5}>
             <Box
