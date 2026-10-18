@@ -96,9 +96,13 @@ export function useMediaDetail(
   const [insights, setInsights] = useState<RecommendationInsights | null>(null)
   const [mediaServer, setMediaServer] = useState<MediaServerInfo | null>(null)
   const [watchStatus, setWatchStatus] = useState<WatchStatus | null>(null)
-  const [userRating, setUserRating] = useState<number | null>(null)
   const [ratingLoading, setRatingLoading] = useState(false)
-  const { setRating: setSharedRating } = useUserRatings()
+  // The viewer's rating comes from the shared ratings map, which the provider
+  // loads once for the whole app and updates on every write. Fetching it again
+  // here was a second copy that could disagree, and a late answer could
+  // overwrite a rating the viewer had just set on this page.
+  const { getRating: getSharedRating, setRating: setSharedRating } = useUserRatings()
+  const userRating = id ? getSharedRating(mediaType, id) : null
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [watchStats, setWatchStats] = useState<WatchStats | null>(null)
@@ -110,101 +114,30 @@ export function useMediaDetail(
   const [seasons, setSeasons] = useState<Record<number, Episode[]>>({})
   const [seasonAvailability, setSeasonAvailability] = useState<SeasonAvailability[]>([])
 
+  // The page used to await each of its requests in turn — media, then similar
+  // titles, then watch stats, then the viewer's own data — and hold one spinner
+  // over all of it. Similar titles is a vector search that takes seconds, so
+  // every title page sat blank for that long and only then started the rest.
+  // Now the page appears as soon as the title itself is in, and each request
+  // fills its own part of it whenever it lands.
+  //
+  // Two effects, split by what each answer depends on. Only the title itself
+  // (its translated synopsis) depends on the display language; the rest
+  // depends on the title and the viewer. Kept in one effect, a language switch
+  // threw away and re-ran the similar-titles search for an identical answer.
+  //
+  // `cancelled` in each matters more than it did: with the spinner gone early,
+  // a late answer for the title just left would land on the one now open (the
+  // modal swaps titles in place).
   useEffect(() => {
     if (!id) return
 
-    // The page used to await each of these in turn — media, then similar
-    // titles, then watch stats, then the viewer's own data — and hold one
-    // spinner over all of it. Similar titles is a vector search that takes
-    // seconds, so every title page sat blank for that long and only then
-    // started the rest. Now the page appears as soon as the title itself is in,
-    // and each request fills its own part of it whenever it lands.
-    //
-    // `cancelled` matters more than it did: with the spinner gone early, a
-    // late answer for the title just left would land on the one now open (the
-    // modal swaps titles in place).
     let cancelled = false
     const live = () => !cancelled
+    const base = mediaType === 'movie' ? `/api/movies/${id}` : `/api/series/${id}`
 
     setLoading(true)
     setError(null)
-    // Last title's answers must not show under this one while its own load.
-    setSimilar([])
-    setSimilarLoading(true)
-    setWatchStats(null)
-    setInsights(null)
-    setWatchStatus(null)
-    setUserRating(null)
-
-    const getJson = async <T,>(url: string): Promise<T | null> => {
-      const response = await fetch(url, { credentials: 'include' })
-      return response.ok ? ((await response.json()) as T) : null
-    }
-
-    const base = mediaType === 'movie' ? `/api/movies/${id}` : `/api/series/${id}`
-
-    // Everything below depends only on the id, so it starts with the title
-    // rather than after it. Each part fails on its own and leaves its section
-    // empty, as each did before.
-    getJson<{ similar?: SimilarItem[] }>(`${base}/similar?limit=${DEFAULT_SIMILAR_MEDIA_LIMIT}`)
-      .then((data) => {
-        if (live() && data) setSimilar(data.similar || [])
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (live()) setSimilarLoading(false)
-      })
-
-    getJson<WatchStats>(`${base}/watch-stats`)
-      .then((data) => {
-        if (live() && data) setWatchStats(data)
-      })
-      .catch(() => {})
-
-    if (userId) {
-      getJson<RecommendationInsights>(`/api/recommendations/${userId}/${mediaType}/${id}/insights`)
-        .then((data) => {
-          if (live() && data) setInsights(data)
-        })
-        .catch(() => {})
-
-      if (mediaType === 'movie') {
-        // Watch state for THIS film.
-        //
-        // This used to fetch the whole history with pageSize=1000 and scan it
-        // for the movie, but the list route caps pageSize at 100 — so it saw
-        // the first hundred titles alphabetically and answered "not watched"
-        // for everything past them. On a 244-film history that is most of it,
-        // and the page offered to Mark Watched films the viewer had finished
-        // while the poster grids ticked them correctly.
-        getJson<{ watched?: boolean; playCount?: number; lastWatched?: string | null }>(
-          `/api/users/${userId}/watch-history/movies/${id}`
-        )
-          .then((watchData) => {
-            if (!live() || !watchData) return
-            setWatchStatus({
-              isWatched: watchData.watched === true,
-              playCount: watchData.playCount ?? 0,
-              lastWatched: watchData.lastWatched ?? null,
-            })
-          })
-          .catch(() => {})
-
-        getJson<{ rating?: number | null }>(`/api/ratings/movie/${id}`)
-          .then((ratingData) => {
-            if (live() && ratingData) setUserRating(ratingData.rating ?? null)
-          })
-          .catch(() => {})
-      } else {
-        getJson<{ ratings?: { series_id: string; rating: number }[] }>('/api/ratings')
-          .then((ratingsData) => {
-            if (!live() || !ratingsData) return
-            const seriesRating = ratingsData.ratings?.find((r) => r.series_id === id)
-            setUserRating(seriesRating?.rating || null)
-          })
-          .catch(() => {})
-      }
-    }
 
     const fetchMedia = async () => {
       try {
@@ -256,7 +189,82 @@ export function useMediaDetail(
     return () => {
       cancelled = true
     }
-  }, [mediaType, id, userId, displayLanguage])
+  }, [mediaType, id, displayLanguage])
+
+  // Everything else on the page: independent of the language, so it starts
+  // with the title rather than after it and survives a language switch. Each
+  // part fails on its own and leaves its section empty, as each did before.
+  // The viewer's rating is not fetched here — it is read from the shared
+  // ratings map (see `userRating` above).
+  useEffect(() => {
+    if (!id) return
+
+    let cancelled = false
+    const live = () => !cancelled
+    const base = mediaType === 'movie' ? `/api/movies/${id}` : `/api/series/${id}`
+
+    // Last title's answers must not show under this one while its own load.
+    setSimilar([])
+    setSimilarLoading(true)
+    setWatchStats(null)
+    setInsights(null)
+    setWatchStatus(null)
+
+    const getJson = async <T,>(url: string): Promise<T | null> => {
+      const response = await fetch(url, { credentials: 'include' })
+      return response.ok ? ((await response.json()) as T) : null
+    }
+
+    getJson<{ similar?: SimilarItem[] }>(`${base}/similar?limit=${DEFAULT_SIMILAR_MEDIA_LIMIT}`)
+      .then((data) => {
+        if (live() && data) setSimilar(data.similar || [])
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (live()) setSimilarLoading(false)
+      })
+
+    getJson<WatchStats>(`${base}/watch-stats`)
+      .then((data) => {
+        if (live() && data) setWatchStats(data)
+      })
+      .catch(() => {})
+
+    if (userId) {
+      getJson<RecommendationInsights>(`/api/recommendations/${userId}/${mediaType}/${id}/insights`)
+        .then((data) => {
+          if (live() && data) setInsights(data)
+        })
+        .catch(() => {})
+
+      if (mediaType === 'movie') {
+        // Watch state for THIS film.
+        //
+        // This used to fetch the whole history with pageSize=1000 and scan it
+        // for the movie, but the list route caps pageSize at 100 — so it saw
+        // the first hundred titles alphabetically and answered "not watched"
+        // for everything past them. On a 244-film history that is most of it,
+        // and the page offered to Mark Watched films the viewer had finished
+        // while the poster grids ticked them correctly.
+        getJson<{ watched?: boolean; playCount?: number; lastWatched?: string | null }>(
+          `/api/users/${userId}/watch-history/movies/${id}`
+        )
+          .then((watchData) => {
+            if (!live() || !watchData) return
+            setWatchStatus({
+              isWatched: watchData.watched === true,
+              playCount: watchData.playCount ?? 0,
+              lastWatched: watchData.lastWatched ?? null,
+            })
+          })
+          .catch(() => {})
+      }
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [mediaType, id, userId])
 
   // Favorite status lives on the media server, not in our DB — fetched separately.
   useEffect(() => {
@@ -373,7 +381,6 @@ export function useMediaDetail(
       try {
         const next = rating === null || rating === 0 ? null : rating
         await setSharedRating(mediaType, id, next)
-        setUserRating(next)
       } catch (err) {
         console.error('Failed to update rating:', err)
       } finally {
