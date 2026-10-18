@@ -25,7 +25,7 @@ pnpm monorepo, ESM everywhere, no ORM (raw SQL via `pg`):
 - **`apps/api`** (`@aperture/api`) — thin Fastify HTTP layer (port 3456): routing, auth, job orchestration. Handlers call core functions; `src/lib/db.ts`, `lib/logger.ts`, `config/env.ts` are pure re-export shims of core.
 - **`apps/web`** (`@aperture/web`) — Vite + React 18 SPA (dev port 3457, proxies `/api` → 3456). MUI 6, react-router 7, i18next (14 locales), d3, recharts. No central API client: raw `fetch('/api/...', { credentials: 'include' })` everywhere.
 - **`packages/ui`** (`@aperture/ui`) — shared React components (MoviePoster, StarRating, BaseCarousel, RankBadge, StatusCard, TrailerModal, `getProxiedImageUrl`). Web aliases it to `src/` for hot reload; typecheck/build use `dist/`.
-- **`db/migrations/`** — numbered SQL (`0001`–`0207`; `0129` is used twice, tolerated since the runner tracks filenames). Postgres + pgvector.
+- **`db/migrations/`** — numbered SQL (`0001`–`0208`; `0129` is used twice, tolerated since the runner tracks filenames). Postgres + pgvector.
 
 ## Commands
 

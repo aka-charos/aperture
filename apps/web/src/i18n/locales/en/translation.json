@@ -27,7 +27,7 @@
     "dashboard": "Dashboard",
     "recommendations": "Recommendations",
     "showsYouWatch": "Shows You Watch",
-    "topPicks": "Top Picks",
+    "topPicks": "Most Watched Lately",
     "playlists": "Playlists",
     "collections": "Collections",
     "explore": "Media Graph",
@@ -2153,7 +2153,7 @@
         "feature-off": "Home screen rows are switched off for this server.",
         "no-access": "Your account cannot receive this row.",
         "admin-off": "Your admin has switched this row off for everyone.",
-        "top-picks-off": "Top Picks is switched off on this server.",
+        "top-picks-off": "Most Watched Lately is switched off on this server.",
         "recommendations-off": "Recommendations are switched off for your account.",
         "no-library": "You have no library of this kind, so there is nothing to recommend."
       },
@@ -2167,8 +2167,8 @@
         "arriving_other": "Will appear on your home screen as “{{name}}” · {{count}} titles"
       },
       "empty": {
-        "top-picks-movies": "The Top Picks list has nothing in it right now, so Emby shows no row.",
-        "top-picks-series": "The Top Picks list has nothing in it right now, so Emby shows no row.",
+        "top-picks-movies": "The Most Watched Lately list has nothing in it right now, so Emby shows no row.",
+        "top-picks-series": "The Most Watched Lately list has nothing in it right now, so Emby shows no row.",
         "recs-movies": "No movie recommendations yet. The row appears after your next recommendation run.",
         "recs-series": "No series recommendations yet. The row appears after your next recommendation run.",
         "friends": "Nothing from your connections right now. When one of them recommends you a title, it appears here.",
@@ -3227,8 +3227,8 @@
       "before": "Before {{name}}"
     },
     "features": {
-      "top-picks-movies": "Top Picks: Movies",
-      "top-picks-series": "Top Picks: Series",
+      "top-picks-movies": "Most Watched Lately: Movies",
+      "top-picks-series": "Most Watched Lately: Series",
       "recs-movies": "Movie recommendations",
       "recs-series": "Series recommendations",
       "friends": "Recommended by friends",
@@ -5000,9 +5000,9 @@
     "emptySeriesOther": "No series in {{name}}'s history that you can open."
   },
   "topPicksPage": {
-    "pageTitle": "Top Picks",
-    "pageTitleMovies": "Top Pick Movies",
-    "pageTitleSeries": "Top Pick Series",
+    "pageTitle": "Most Watched Lately",
+    "pageTitleMovies": "Most Watched Movies Lately",
+    "pageTitleSeries": "Most Watched Series Lately",
     "subtitleMovies": "Most popular movies on your server",
     "subtitleSeries": "Most popular TV series on your server",
     "inLastDays": " in the last {{count}} days",
