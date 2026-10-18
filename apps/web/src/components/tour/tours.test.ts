@@ -218,6 +218,29 @@ test('an anchor maps by position and refuses a heading that no longer lines up',
   assert.equal(translatedAnchor(english, [{ slug: 'α', depth: 2 }, { slug: 'β', depth: 3 }], 'missing'), undefined)
 })
 
+test('every onboarding string the code names exists in English and Greek', () => {
+  // Greek is the one maintained translation; every other language falls back
+  // to English, so a key missing there is fine and a key missing in en is not.
+  const EL = JSON.parse(readFileSync(resolve(SRC, 'i18n/locales/el/translation.json'), 'utf8')) as Record<string, unknown>
+  const inEl = (dotted: string) => {
+    let node: unknown = EL
+    for (const part of dotted.split('.')) {
+      if (typeof node !== 'object' || node === null) return false
+      node = (node as Record<string, unknown>)[part]
+    }
+    return typeof node === 'string'
+  }
+  let count = 0
+  for (const [file, source] of SOURCES) {
+    for (const m of source.matchAll(/\bt\(\s*'(onboarding\.[A-Za-z0-9_.-]+)'/g)) {
+      count++
+      assert.ok(hasKey(m[1]), `${relative(SRC, file)} names ${m[1]}, which en does not have`)
+      assert.ok(inEl(m[1]), `${relative(SRC, file)} names ${m[1]}, which el does not have`)
+    }
+  }
+  assert.ok(count > 20, `expected the onboarding strings, found ${count}`)
+})
+
 const NOBODY: TourAudience = { capabilities: {}, features: {} }
 const EVERYTHING: TourAudience = {
   capabilities: { assistant: true, discover: true, social: true, collections: true },

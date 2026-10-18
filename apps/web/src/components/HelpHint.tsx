@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { IconButton, Tooltip } from '@mui/material'
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
+import { alpha, IconButton, Tooltip } from '@mui/material'
+import QuestionMarkRoundedIcon from '@mui/icons-material/QuestionMarkRounded'
 import { useUserHelp } from '@/hooks/useUserHelp'
 
 interface HelpHintProps {
@@ -32,9 +32,21 @@ export function HelpHint({ doc, anchor, label }: HelpHintProps) {
           event.stopPropagation()
           openHelp([doc], { anchor })
         }}
-        sx={{ p: 0.25, color: 'text.secondary' }}
+        sx={{
+          width: 24,
+          height: 24,
+          p: 0,
+          flex: '0 0 auto',
+          color: 'primary.light',
+          border: 1,
+          borderColor: (theme) => alpha(theme.palette.primary.light, 0.45),
+          bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+          '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.24) },
+          // Drawn small beside a heading, but tapped at a full 44px.
+          '&::after': { content: '""', position: 'absolute', inset: -10 },
+        }}
       >
-        <HelpOutlineIcon sx={{ fontSize: 16 }} />
+        <QuestionMarkRoundedIcon sx={{ fontSize: 15 }} />
       </IconButton>
     </Tooltip>
   )

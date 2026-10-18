@@ -1,29 +1,29 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
 import {
+  alpha,
   Box,
-  Button,
-  Paper,
   Popper,
   Portal,
-  Typography,
   Unstable_TrapFocus as FocusTrap,
   useMediaQuery,
   useTheme,
 } from '@mui/material'
-import MenuBookIcon from '@mui/icons-material/MenuBook'
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { useUserHelp } from '@/hooks/useUserHelp'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import { useTour } from '@/hooks/useTour'
-import { stepItemKey, stepKey, type TourPlacement } from './tours'
+import { type TourPlacement } from './tours'
+import { CARD_SURFACE, StepCard, WelcomeCard } from './TourCard'
 import { findTourAnchor } from './anchors'
 
 /** Space between the element and the edge of the light around it. */
 const SPOTLIGHT_PADDING = 6
 /** How long a step waits for its element to appear (a lazy section, a new route) before showing centred. */
 const ANCHOR_WAIT_MS = 1200
+/** The page behind the tour. */
+const DIM = 'rgba(6,6,10,0.72)'
+/** Size of the pointer from the card toward the element. */
+const ARROW = 14
 
 interface Rect {
   top: number
@@ -55,13 +55,15 @@ function logicalPlacement(placement: TourPlacement, rtl: boolean): TourPlacement
  * them, and comes back on the same step when they close.
  */
 export function TourOverlay() {
-  const { t } = useTranslation()
   const theme = useTheme()
   const location = useLocation()
   const { active, next, back, skip } = useTour()
   const { openHelp, isOpen: helpOpen } = useUserHelp()
   const { showRecommenderExplainer, explainerOpen } = useOnboarding()
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+  // Keyboard hints only where there is likely a keyboard.
+  const finePointer = useMediaQuery('(hover: hover) and (pointer: fine)')
+  const [arrowEl, setArrowEl] = useState<HTMLElement | null>(null)
   const rtl = theme.direction === 'rtl'
   const titleId = useId()
   const bodyId = useId()
@@ -234,90 +236,51 @@ export function TourOverlay() {
 
   if (!active || !step || hidden || !settled) return null
 
-  const isFirst = active.index === 0
-  const isLast = active.index === active.steps.length - 1
-  const isWelcomeIntro = active.id === 'welcome' && isFirst
+  const isWelcomeIntro = active.id === 'welcome' && active.index === 0
   const zIndex = theme.zIndex.tooltip + 1
+  const common = {
+    tour: active.id,
+    step,
+    index: active.index,
+    total: active.steps.length,
+    titleId,
+    bodyId,
+    rtl,
+    onKeyDown,
+    onNext: next,
+    onBack: back,
+    onSkip: skip,
+    onReadMore: step.doc ? () => openHelp([step.doc!.slug], { anchor: step.doc!.anchor }) : undefined,
+    onExplainer: step.action === 'recommenderExplainer' ? showRecommenderExplainer : undefined,
+  }
 
-  const card = (
+  // The pointer sits on the card's edge facing the element: the arrow
+  // modifier places it along that edge, the placement says which edge.
+  const arrow = virtualAnchor ? (
+    <Box
+      ref={setArrowEl}
+      className="tour-arrow"
+      aria-hidden="true"
+      sx={{
+        position: 'absolute',
+        width: ARROW,
+        height: ARROW,
+        bgcolor: CARD_SURFACE,
+        borderStyle: 'solid',
+        borderWidth: 0,
+        borderColor: alpha(theme.palette.text.primary, 0.1),
+        transform: 'rotate(45deg)',
+      }}
+    />
+  ) : undefined
+
+  const card = isWelcomeIntro ? (
     <FocusTrap open isEnabled={() => true}>
-      <Paper
-        ref={cardRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={bodyId}
-        onKeyDown={onKeyDown}
-        elevation={8}
-        sx={{
-          p: 2.5,
-          width: 'min(380px, calc(100vw - 32px))',
-          borderRadius: 2,
-          outline: 'none',
-          border: 1,
-          borderColor: 'divider',
-        }}
-      >
-        {!isWelcomeIntro && (
-          <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 0.5 }}>
-            {t('onboarding.tour.progress', { current: active.index + 1, total: active.steps.length })}
-          </Typography>
-        )}
-        <Typography id={titleId} variant="h6" fontWeight={700} sx={{ mb: 1, lineHeight: 1.3 }}>
-          {t(stepKey(active.id, step.id, 'title'))}
-        </Typography>
-        <Box id={bodyId} aria-live="polite">
-          <Typography variant="body2" color="text.secondary">
-            {t(stepKey(active.id, step.id, 'body'))}
-          </Typography>
-          {step.items && (
-            <Box component="ul" sx={{ m: 0, mt: 1, pl: 2.5, '& li': { mb: 0.5 } }}>
-              {step.items.map((item) => (
-                <li key={item.id}>
-                  <Typography variant="body2" color="text.secondary">
-                    {t(stepItemKey(active.id, step.id, item.id))}
-                  </Typography>
-                </li>
-              ))}
-            </Box>
-          )}
-        </Box>
-
-        {(step.doc || step.action) && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
-            {step.action === 'recommenderExplainer' && (
-              <Button size="small" startIcon={<AutoAwesomeIcon fontSize="small" />} onClick={showRecommenderExplainer}>
-                {t('onboarding.tour.howPicksAreMade')}
-              </Button>
-            )}
-            {step.doc && (
-              <Button
-                size="small"
-                startIcon={<MenuBookIcon fontSize="small" />}
-                onClick={() => openHelp([step.doc!.slug], { anchor: step.doc!.anchor })}
-              >
-                {t('onboarding.tour.readMore')}
-              </Button>
-            )}
-          </Box>
-        )}
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
-          <Button size="small" color="inherit" onClick={skip} sx={{ color: 'text.secondary' }}>
-            {isWelcomeIntro ? t('onboarding.tour.later') : isLast ? t('onboarding.tour.close') : t('onboarding.tour.skip')}
-          </Button>
-          <Box sx={{ flex: 1 }} />
-          {!isFirst && (
-            <Button size="small" onClick={back}>
-              {t('onboarding.tour.back')}
-            </Button>
-          )}
-          <Button size="small" variant="contained" onClick={next}>
-            {isWelcomeIntro ? t('onboarding.tour.start') : isLast ? t('onboarding.tour.done') : t('onboarding.tour.next')}
-          </Button>
-        </Box>
-      </Paper>
+      <WelcomeCard ref={cardRef} {...common} showKeys={finePointer} />
+    </FocusTrap>
+  ) : (
+    <FocusTrap open isEnabled={() => true}>
+      <StepCard ref={cardRef} {...common} arrow={arrow} />
     </FocusTrap>
   )
 
@@ -342,7 +305,7 @@ export function TourOverlay() {
               )}
             </mask>
           </defs>
-          <rect width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask={`url(#${maskId})`} />
+          <rect width="100%" height="100%" fill={DIM} mask={`url(#${maskId})`} />
         </svg>
         {spotlight && (
           <Box
@@ -355,7 +318,10 @@ export function TourOverlay() {
               borderRadius: '10px',
               border: 2,
               borderColor: 'primary.main',
+              // A soft halo, so the eye finds the element before the card.
+              boxShadow: `0 0 0 6px ${alpha(theme.palette.primary.main, 0.25)}, 0 0 32px ${alpha(theme.palette.primary.main, 0.35)}`,
               pointerEvents: 'none',
+              transition: reducedMotion ? 'none' : 'top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease',
             }}
           />
         )}
@@ -366,11 +332,18 @@ export function TourOverlay() {
           open
           anchorEl={virtualAnchor}
           placement={logicalPlacement(step.placement ?? 'bottom', rtl)}
-          sx={{ zIndex: zIndex + 1 }}
+          sx={{
+            zIndex: zIndex + 1,
+            '&[data-popper-placement^="right"] .tour-arrow': { left: -ARROW / 2 - 1, borderLeftWidth: 1, borderBottomWidth: 1 },
+            '&[data-popper-placement^="left"] .tour-arrow': { right: -ARROW / 2 - 1, borderTopWidth: 1, borderRightWidth: 1 },
+            '&[data-popper-placement^="bottom"] .tour-arrow': { top: -ARROW / 2 - 1, borderTopWidth: 1, borderLeftWidth: 1 },
+            '&[data-popper-placement^="top"] .tour-arrow': { bottom: -ARROW / 2 - 1, borderBottomWidth: 1, borderRightWidth: 1 },
+          }}
           modifiers={[
-            { name: 'offset', options: { offset: [0, 14] } },
+            { name: 'offset', options: { offset: [0, 16] } },
             { name: 'flip', options: { padding: 12 } },
             { name: 'preventOverflow', options: { padding: 12, altAxis: true } },
+            { name: 'arrow', enabled: Boolean(arrowEl), options: { element: arrowEl, padding: 16 } },
           ]}
         >
           {card}

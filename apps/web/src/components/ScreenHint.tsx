@@ -1,15 +1,14 @@
 import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Box, Button, IconButton, Paper, Typography } from '@mui/material'
-import CloseIcon from '@mui/icons-material/Close'
+import { alpha, Box, Button, IconButton, Paper, Typography, useTheme } from '@mui/material'
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
 import ExploreOutlinedIcon from '@mui/icons-material/ExploreOutlined'
-import MenuBookIcon from '@mui/icons-material/MenuBook'
 import { hintForLocation, tourForLocation } from '@/pages/guide/routeDocs'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import { useUserHelp } from '@/hooks/useUserHelp'
 import { useTour } from '@/hooks/useTour'
-import { isTourId } from './tour/tours'
+import { isTourId, type TourId } from './tour/tours'
 
 /**
  * The one-line tip shown the first time someone opens a screen, with the way
@@ -22,6 +21,7 @@ import { isTourId } from './tour/tours'
  */
 export function ScreenHint() {
   const { t } = useTranslation()
+  const theme = useTheme()
   const location = useLocation()
   const { summary, record, canSave, offerSnoozed } = useOnboarding()
   const { active, startTour } = useTour()
@@ -38,52 +38,90 @@ export function ScreenHint() {
   if (summary.state.hintsDismissed?.includes(hint)) return null
 
   const dismiss = () => record({ hintsDismissed: [hint] })
+  const showTour = Boolean(tour && isTourId(tour))
 
   return (
     <Paper
-      variant="outlined"
       role="note"
+      aria-label={t('onboarding.hint.eyebrow')}
       sx={{
-        mb: 2,
-        px: 2,
-        py: 1.25,
+        mb: 2.5,
+        p: { xs: 1.75, sm: 1.5 },
+        ps: { sm: 2 },
         display: 'flex',
         alignItems: { xs: 'flex-start', sm: 'center' },
-        flexDirection: { xs: 'column', sm: 'row' },
-        gap: { xs: 1, sm: 1.5 },
-        borderColor: 'primary.main',
-        bgcolor: (theme) => (theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
+        flexWrap: { xs: 'wrap', sm: 'nowrap' },
+        gap: { xs: 1.5, sm: 2 },
+        borderRadius: 3.5,
+        backgroundImage: 'none',
+        bgcolor: alpha(theme.palette.primary.main, 0.06),
+        border: 1,
+        borderColor: alpha(theme.palette.primary.main, 0.35),
         position: 'relative',
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, flex: 1, minWidth: 0, pe: { xs: 4, sm: 0 } }}>
-        <LightbulbOutlinedIcon color="primary" fontSize="small" sx={{ mt: '2px' }} />
-        <Typography variant="body2">{t(`onboarding.hints.${hint}`)}</Typography>
+      <Box
+        sx={{
+          width: 40,
+          height: 40,
+          borderRadius: 3,
+          flex: '0 0 auto',
+          display: 'grid',
+          placeItems: 'center',
+          bgcolor: alpha(theme.palette.primary.main, 0.16),
+          color: 'primary.light',
+        }}
+      >
+        <LightbulbOutlinedIcon sx={{ fontSize: 21 }} />
       </Box>
-      <Box sx={{ display: 'flex', gap: 1, flexShrink: 0, ms: { xs: 4, sm: 0 } }}>
-        {tour && isTourId(tour) && (
+      <Box sx={{ flex: '1 1 260px', minWidth: 0, pe: { xs: 4, sm: 0 } }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'primary.light' }}>
+          {t('onboarding.hint.eyebrow')}
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'text.primary', lineHeight: 1.5 }}>
+          {t(`onboarding.hints.${hint}`)}
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1, flexShrink: 0, ms: { xs: 7, sm: 0 } }}>
+        {showTour && (
           <Button
+            variant="contained"
+            disableElevation
             size="small"
-            startIcon={<ExploreOutlinedIcon fontSize="small" />}
+            startIcon={<ExploreOutlinedIcon />}
             onClick={() => {
               dismiss()
-              startTour(tour)
+              startTour(tour as TourId)
             }}
+            sx={{ minHeight: 40, borderRadius: 2.5, px: 1.75, fontWeight: 600, whiteSpace: 'nowrap' }}
           >
             {t('onboarding.tour.showMeAround')}
           </Button>
         )}
-        <Button size="small" color="inherit" startIcon={<MenuBookIcon fontSize="small" />} onClick={() => openHelp(undefined, { offerScreenTour: true })}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          size="small"
+          onClick={() => openHelp(undefined, { offerScreenTour: true })}
+          sx={{ minHeight: 40, borderRadius: 2.5, px: 1.5, whiteSpace: 'nowrap', borderColor: alpha(theme.palette.text.primary, 0.14) }}
+        >
           {t('onboarding.tour.readMore')}
         </Button>
       </Box>
       <IconButton
-        size="small"
         aria-label={t('onboarding.hint.dismiss')}
         onClick={dismiss}
-        sx={{ position: { xs: 'absolute', sm: 'static' }, top: 6, insetInlineEnd: 6 }}
+        sx={{
+          width: 40,
+          height: 40,
+          color: 'text.secondary',
+          position: { xs: 'absolute', sm: 'static' },
+          top: 8,
+          insetInlineEnd: 8,
+          flex: '0 0 auto',
+        }}
       >
-        <CloseIcon fontSize="small" />
+        <CloseRoundedIcon fontSize="small" />
       </IconButton>
     </Paper>
   )

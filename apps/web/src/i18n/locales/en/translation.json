@@ -6311,14 +6311,17 @@
       "takeTour": "Take the tour"
     },
     "hint": {
-      "dismiss": "Don't show this again"
+      "dismiss": "Don't show this again",
+      "eyebrow": "Tip"
     },
     "offer": {
       "title": "New: a quick tour",
       "body": "See where everything is in {{appName}} in about a minute.",
       "take": "Take the tour",
       "decline": "No thanks",
-      "later": "Not now"
+      "later": "Not now",
+      "badge": "New",
+      "heading": "A quick tour"
     },
     "tour": {
       "progress": "Step {{current}} of {{total}}",
@@ -6331,13 +6334,15 @@
       "back": "Back",
       "readMore": "Read more",
       "howPicksAreMade": "How picks are made",
-      "showMeAround": "Show me around"
+      "showMeAround": "Show me around",
+      "keysMove": "to move",
+      "keysClose": "to close"
     },
     "tours": {
       "welcome": {
         "intro": {
           "title": "Welcome to {{appName}}",
-          "body": "{{appName}} works alongside your media server. It learns from what you watch and rate, and suggests what to watch next. This quick tour shows you where everything is. It takes about a minute."
+          "body": "{{appName}} works alongside your media server. It learns from what you watch and rate, and suggests what to watch next. Here's where everything is."
         },
         "recommendations": {
           "title": "Your recommendations",
@@ -6488,7 +6493,7 @@
       "subtitle": "A few things that make your recommendations yours.",
       "dismiss": "Hide this list",
       "progress": "{{done}} of {{total}} done",
-      "counted": "{{progress}} of {{goal}}",
+      "counted": "{{progress}} of {{goal}} so far",
       "items": {
         "watch": {
           "title": "Watch something",
@@ -6519,13 +6524,24 @@
         "ready": "Your recommendations are ready.",
         "pending": "Your first recommendations are on their way. They are made at the next scheduled update, so check back later.",
         "off": "Recommendations are switched off for your account."
-      }
+      },
+      "hide": "Hide",
+      "nextUp": "Next up",
+      "done": "Done"
     },
     "settings": {
       "title": "Tour and tips",
       "description": "Take the welcome tour again, or bring back the tips you've closed and the getting-started list on Home.",
       "reset": "Show tips again",
       "resetDone": "Tips are back"
+    },
+    "welcome": {
+      "eyebrow": "A one-minute tour",
+      "pills": {
+        "ratings": "Learns from your ratings",
+        "minute": "About a minute",
+        "skip": "Skip whenever you like"
+      }
     }
   }
 }

@@ -30,6 +30,30 @@ export type TourAction = 'recommenderExplainer'
 
 export type TourPlacement = 'top' | 'bottom' | 'left' | 'right'
 
+/** The picture on a step's card; `TourOverlay` maps each to an icon. */
+export type TourIcon =
+  | 'sparkle'
+  | 'star'
+  | 'search'
+  | 'chat'
+  | 'compass'
+  | 'help'
+  | 'person'
+  | 'checklist'
+  | 'stats'
+  | 'rows'
+  | 'tabs'
+  | 'filter'
+  | 'grid'
+  | 'film'
+  | 'play'
+  | 'article'
+  | 'graph'
+  | 'tune'
+  | 'playlist'
+  | 'heart'
+  | 'refresh'
+
 export interface TourListItem {
   /** `onboarding.tours.<tour>.<step>.items.<id>` */
   id: string
@@ -39,6 +63,7 @@ export interface TourListItem {
 
 export interface TourStep {
   id: string
+  icon: TourIcon
   /** The `data-tour` value of the element this step points at. */
   anchor?: string
   /** Shown only when the server grants this capability. */
@@ -61,18 +86,20 @@ export const TOURS: Record<TourId, Tour> = {
   welcome: {
     id: 'welcome',
     steps: [
-      { id: 'intro' },
+      { id: 'intro', icon: 'sparkle' },
       {
         id: 'recommendations',
+        icon: 'sparkle',
         anchor: 'nav-recommendations',
         placement: 'right',
         action: 'recommenderExplainer',
         doc: { slug: 'recommendations' },
       },
-      { id: 'rating', doc: { slug: 'ratings' } },
-      { id: 'search', anchor: 'app-search', placement: 'bottom', doc: { slug: 'global-search' } },
+      { id: 'rating', icon: 'star', doc: { slug: 'ratings' } },
+      { id: 'search', icon: 'search', anchor: 'app-search', placement: 'bottom', doc: { slug: 'global-search' } },
       {
         id: 'assistant',
+        icon: 'chat',
         anchor: 'nav-assistant',
         placement: 'right',
         capability: 'assistant',
@@ -80,6 +107,7 @@ export const TOURS: Record<TourId, Tour> = {
       },
       {
         id: 'more',
+        icon: 'compass',
         items: [
           { id: 'topPicks' },
           { id: 'watching', feature: 'watching' },
@@ -89,59 +117,59 @@ export const TOURS: Record<TourId, Tour> = {
           { id: 'explore' },
         ],
       },
-      { id: 'help', anchor: 'app-help', placement: 'bottom' },
-      { id: 'menu', anchor: 'app-user-menu', placement: 'bottom' },
+      { id: 'help', icon: 'help', anchor: 'app-help', placement: 'bottom' },
+      { id: 'menu', icon: 'person', anchor: 'app-user-menu', placement: 'bottom' },
     ],
   },
   home: {
     id: 'home',
     steps: [
-      { id: 'checklist', anchor: 'home-checklist', placement: 'bottom' },
-      { id: 'stats', anchor: 'home-stats', placement: 'bottom', doc: { slug: 'dashboard' } },
-      { id: 'rows', anchor: 'home-rows', placement: 'top', doc: { slug: 'dashboard' } },
+      { id: 'checklist', icon: 'checklist', anchor: 'home-checklist', placement: 'bottom' },
+      { id: 'stats', icon: 'stats', anchor: 'home-stats', placement: 'bottom', doc: { slug: 'dashboard' } },
+      { id: 'rows', icon: 'rows', anchor: 'home-rows', placement: 'top', doc: { slug: 'dashboard' } },
     ],
   },
   browse: {
     id: 'browse',
     steps: [
-      { id: 'tabs', anchor: 'browse-tabs', placement: 'bottom' },
-      { id: 'filters', anchor: 'browse-filters', placement: 'bottom', doc: { slug: 'browse' } },
-      { id: 'view', anchor: 'browse-view', placement: 'bottom', doc: { slug: 'grid-list-views' } },
-      { id: 'open', anchor: 'browse-results', placement: 'top' },
+      { id: 'tabs', icon: 'tabs', anchor: 'browse-tabs', placement: 'bottom' },
+      { id: 'filters', icon: 'filter', anchor: 'browse-filters', placement: 'bottom', doc: { slug: 'browse' } },
+      { id: 'view', icon: 'grid', anchor: 'browse-view', placement: 'bottom', doc: { slug: 'grid-list-views' } },
+      { id: 'open', icon: 'star', anchor: 'browse-results', placement: 'top' },
     ],
   },
   title: {
     id: 'title',
     steps: [
-      { id: 'hero', anchor: 'title-hero', placement: 'bottom' },
-      { id: 'actions', anchor: 'title-actions', placement: 'bottom', doc: { slug: 'ratings' } },
-      { id: 'insights', anchor: 'title-insights', placement: 'top', doc: { slug: 'recommendations' } },
-      { id: 'analysis', anchor: 'title-analysis', placement: 'top', doc: { slug: 'title-analysis' } },
-      { id: 'similar', anchor: 'title-similar', placement: 'top', doc: { slug: 'similarity-graphs' } },
+      { id: 'hero', icon: 'film', anchor: 'title-hero', placement: 'bottom' },
+      { id: 'actions', icon: 'play', anchor: 'title-actions', placement: 'bottom', doc: { slug: 'ratings' } },
+      { id: 'insights', icon: 'sparkle', anchor: 'title-insights', placement: 'top', doc: { slug: 'recommendations' } },
+      { id: 'analysis', icon: 'article', anchor: 'title-analysis', placement: 'top', doc: { slug: 'title-analysis' } },
+      { id: 'similar', icon: 'graph', anchor: 'title-similar', placement: 'top', doc: { slug: 'similarity-graphs' } },
     ],
   },
   recommendations: {
     id: 'recommendations',
     steps: [
-      { id: 'list', anchor: 'recs-results', placement: 'top' },
-      { id: 'why', action: 'recommenderExplainer', doc: { slug: 'recommendations' } },
-      { id: 'teach', doc: { slug: 'user-settings/recommendations' } },
+      { id: 'list', icon: 'rows', anchor: 'recs-results', placement: 'top' },
+      { id: 'why', icon: 'help', action: 'recommenderExplainer', doc: { slug: 'recommendations' } },
+      { id: 'teach', icon: 'tune', doc: { slug: 'user-settings/recommendations' } },
     ],
   },
   explore: {
     id: 'explore',
     steps: [
-      { id: 'graph', anchor: 'explore-graph', placement: 'top', doc: { slug: 'explore' } },
-      { id: 'controls', anchor: 'explore-controls', placement: 'bottom' },
-      { id: 'playlist', doc: { slug: 'playlists' } },
+      { id: 'graph', icon: 'graph', anchor: 'explore-graph', placement: 'top', doc: { slug: 'explore' } },
+      { id: 'controls', icon: 'search', anchor: 'explore-controls', placement: 'bottom' },
+      { id: 'playlist', icon: 'playlist', doc: { slug: 'playlists' } },
     ],
   },
   'settings-recommendations': {
     id: 'settings-recommendations',
     steps: [
-      { id: 'interests', anchor: 'settings-interests', placement: 'bottom', doc: { slug: 'user-settings/recommendations' } },
-      { id: 'weights', anchor: 'settings-weights', placement: 'top' },
-      { id: 'rescan', doc: { slug: 'user-settings/recommendations' } },
+      { id: 'interests', icon: 'heart', anchor: 'settings-interests', placement: 'bottom', doc: { slug: 'user-settings/recommendations' } },
+      { id: 'weights', icon: 'tune', anchor: 'settings-weights', placement: 'top' },
+      { id: 'rescan', icon: 'refresh', doc: { slug: 'user-settings/recommendations' } },
     ],
   },
 }

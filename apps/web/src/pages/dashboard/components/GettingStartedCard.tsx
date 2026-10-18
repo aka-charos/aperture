@@ -1,50 +1,48 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, type ReactNode } from 'react'
+import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import {
-  Box,
-  IconButton,
-  LinearProgress,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Paper,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
-import CloseIcon from '@mui/icons-material/Close'
+import { alpha, Box, Button, CircularProgress, Paper, Typography, useTheme } from '@mui/material'
+import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
-import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty'
-import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import HourglassEmptyRoundedIcon from '@mui/icons-material/HourglassEmptyRounded'
+import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded'
+import MovieOutlinedIcon from '@mui/icons-material/MovieOutlined'
+import StarRoundedIcon from '@mui/icons-material/StarRounded'
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
+import LiveTvOutlinedIcon from '@mui/icons-material/LiveTvOutlined'
 import { useOnboarding } from '@/hooks/useOnboarding'
 
 /**
- * Where each item takes you. The server decides which items exist and which
- * are done (`/api/onboarding`); this only knows where in the app each is
- * done. An item with no destination (watching something happens on the media
- * server) is not a link.
+ * Where each item takes you, and its picture. The server decides which items
+ * exist and which are done (`/api/onboarding`); this only knows where in the
+ * app each is done. An item with no destination (watching something happens
+ * on the media server) is not a link.
  */
-const ITEM_PATHS: Record<string, string | undefined> = {
-  watch: undefined,
-  rate: '/browse',
-  interest: '/settings?tab=recommendations',
-  why: '/recommendations',
-  assistant: '/assistant',
-  watching: '/watching',
+const ITEMS: Record<string, { path?: string; icon: typeof MovieOutlinedIcon }> = {
+  watch: { icon: MovieOutlinedIcon },
+  rate: { path: '/browse', icon: StarRoundedIcon },
+  interest: { path: '/settings?tab=recommendations', icon: FavoriteBorderIcon },
+  why: { path: '/recommendations', icon: AutoAwesomeIcon },
+  assistant: { path: '/assistant', icon: ChatBubbleOutlineIcon },
+  watching: { path: '/watching', icon: LiveTvOutlinedIcon },
 }
+
+type Item = { id: string; done: boolean; progress?: number; goal?: number }
 
 /**
  * The getting-started checklist at the top of Home: what teaches the
  * recommender about you, ticked off from your own record, and whether your
  * first picks exist yet — the answer to "why is my Recommendations page
- * empty?" for a new account. Gone once everything is done, or when closed.
+ * empty?" for a new account. Gone once everything is done, or when hidden.
+ *
+ * The first item left that has somewhere to go is drawn as "next up", so the
+ * card says what to do rather than only what is missing.
  */
 export function GettingStartedCard() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+  const theme = useTheme()
   const { summary, record, refresh } = useOnboarding()
 
   // Coming back to Home after rating something is when the list should move.
@@ -58,103 +56,264 @@ export function GettingStartedCard() {
 
   const done = checklist.items.filter((item) => item.done).length
   const total = checklist.items.length
+  const nextUp = checklist.items.find((item) => !item.done && ITEMS[item.id]?.path)?.id
+  const progressLabel = t('onboarding.checklist.progress', { done, total })
+  const track = alpha(theme.palette.text.primary, 0.1)
 
   return (
-    <Paper variant="outlined" data-tour="home-checklist" sx={{ mb: 4, p: { xs: 2, sm: 2.5 }, borderRadius: 2 }}>
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+    <Paper
+      component="section"
+      aria-labelledby="getting-started-title"
+      data-tour="home-checklist"
+      sx={{
+        mb: 4,
+        p: { xs: 2, sm: 3.5 },
+        borderRadius: 4.5,
+        backgroundImage: 'none',
+        border: 1,
+        borderColor: alpha(theme.palette.text.primary, 0.08),
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2.75,
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2.5 } }}>
+        {/* Progress ring */}
+        <Box role="img" aria-label={progressLabel} sx={{ position: 'relative', width: 72, height: 72, flex: '0 0 auto' }}>
+          <CircularProgress variant="determinate" value={100} size={72} thickness={5} sx={{ color: track, position: 'absolute', inset: 0 }} />
+          <CircularProgress
+            variant="determinate"
+            value={total > 0 ? (done / total) * 100 : 0}
+            size={72}
+            thickness={5}
+            sx={{ position: 'absolute', inset: 0, '& .MuiCircularProgress-circle': { strokeLinecap: 'round' } }}
+          />
+          <Box aria-hidden="true" sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
+            <Typography component="span" sx={{ fontSize: 17, fontWeight: 700 }}>
+              {done}
+              <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500, fontSize: 13 }}>
+                /{total}
+              </Box>
+            </Typography>
+          </Box>
+        </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h6" fontWeight={700}>
+          <Typography id="getting-started-title" component="h2" sx={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em' }}>
             {t('onboarding.checklist.title')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {t('onboarding.checklist.subtitle')}
           </Typography>
         </Box>
-        <Tooltip title={t('onboarding.checklist.dismiss')}>
-          <IconButton
-            size="small"
-            aria-label={t('onboarding.checklist.dismiss')}
-            onClick={() => record({ checklistDismissed: true })}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        <Button
+          variant="outlined"
+          color="inherit"
+          startIcon={<CloseRoundedIcon />}
+          aria-label={t('onboarding.checklist.dismiss')}
+          onClick={() => record({ checklistDismissed: true })}
+          sx={{ minHeight: 44, borderRadius: 2.5, color: 'text.secondary', borderColor: alpha(theme.palette.text.primary, 0.12), flex: '0 0 auto' }}
+        >
+          {t('onboarding.checklist.hide')}
+        </Button>
       </Box>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 1.5 }}>
-        <LinearProgress
-          variant="determinate"
-          value={total > 0 ? (done / total) * 100 : 0}
-          sx={{ flex: 1, height: 6, borderRadius: 3 }}
-          aria-label={t('onboarding.checklist.progress', { done, total })}
-        />
-        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-          {t('onboarding.checklist.progress', { done, total })}
-        </Typography>
-      </Box>
-
-      {/* Two columns from md: six short lines in one column read as a form. */}
-      <List
-        dense
-        disablePadding
-        sx={{ mt: 1, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, columnGap: 2 }}
+      <Box
+        component="ul"
+        sx={{
+          m: 0,
+          p: 0,
+          listStyle: 'none',
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' },
+          gap: 1.75,
+        }}
       >
-        {checklist.items.map((item) => {
-          const path = ITEM_PATHS[item.id]
-          const label = t(`onboarding.checklist.items.${item.id}.title`)
-          const detail =
-            item.goal != null && !item.done
-              ? t('onboarding.checklist.counted', { progress: item.progress ?? 0, goal: item.goal })
-              : t(`onboarding.checklist.items.${item.id}.detail`)
-          return (
-            <ListItemButton
-              key={item.id}
-              disabled={!path}
-              onClick={path ? () => navigate(path) : undefined}
-              sx={{ borderRadius: 1, px: 1, '&.Mui-disabled': { opacity: 1 } }}
-            >
-              <ListItemIcon sx={{ minWidth: 34 }}>
-                {item.done ? (
-                  <CheckCircleIcon color="success" fontSize="small" />
-                ) : (
-                  <RadioButtonUncheckedIcon color="disabled" fontSize="small" />
-                )}
-              </ListItemIcon>
-              <ListItemText
-                primary={label}
-                secondary={detail}
-                primaryTypographyProps={{
-                  sx: { textDecoration: item.done ? 'line-through' : 'none', color: item.done ? 'text.secondary' : 'text.primary' },
-                }}
-              />
-              {path && !item.done && <ChevronRightIcon fontSize="small" color="action" sx={{ transform: (theme) => (theme.direction === 'rtl' ? 'scaleX(-1)' : 'none') }} />}
-            </ListItemButton>
-          )
-        })}
-      </List>
+        {checklist.items.map((item) => (
+          <Box component="li" key={item.id} sx={{ display: 'flex' }}>
+            <ChecklistTile item={item} nextUp={item.id === nextUp} />
+          </Box>
+        ))}
+      </Box>
 
       {checklist.recommendations !== 'off' && (
-        <Box
-          sx={{
-            mt: 1.5,
-            pt: 1.5,
-            borderTop: 1,
-            borderColor: 'divider',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-          }}
-        >
-          {checklist.recommendations === 'ready' ? (
-            <AutoAwesomeIcon color="primary" fontSize="small" />
-          ) : (
-            <HourglassEmptyIcon color="action" fontSize="small" />
-          )}
-          <Typography variant="body2" color="text.secondary">
-            {t(`onboarding.checklist.recommendations.${checklist.recommendations}`)}
-          </Typography>
-        </Box>
+        <StatusBand ready={checklist.recommendations === 'ready'}>
+          {t(`onboarding.checklist.recommendations.${checklist.recommendations}`)}
+        </StatusBand>
       )}
     </Paper>
   )
+}
+
+function ChecklistTile({ item, nextUp }: { item: Item; nextUp: boolean }) {
+  const { t } = useTranslation()
+  const theme = useTheme()
+  const rtl = theme.direction === 'rtl'
+  const meta = ITEMS[item.id] ?? { icon: AutoAwesomeIcon }
+  const Icon = item.done ? CheckRoundedIcon : meta.icon
+  const counted = item.goal != null && !item.done
+  const linked = Boolean(meta.path) && !item.done
+
+  const iconTile = (
+    <Box
+      sx={{
+        width: 40,
+        height: 40,
+        borderRadius: 3,
+        flex: '0 0 auto',
+        display: 'grid',
+        placeItems: 'center',
+        bgcolor: item.done
+          ? alpha(theme.palette.success.main, 0.14)
+          : nextUp
+            ? 'primary.main'
+            : alpha(theme.palette.text.primary, 0.08),
+        color: item.done ? 'success.light' : nextUp ? 'primary.contrastText' : 'text.primary',
+      }}
+    >
+      <Icon sx={{ fontSize: 21 }} />
+    </Box>
+  )
+
+  const body = (
+    <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+        <Typography sx={{ fontSize: 14, fontWeight: 600, color: item.done ? 'text.secondary' : 'text.primary' }}>
+          {t(`onboarding.checklist.items.${item.id}.title`)}
+        </Typography>
+        {nextUp && (
+          <Box
+            component="span"
+            sx={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              color: 'primary.light',
+              bgcolor: alpha(theme.palette.primary.main, 0.18),
+              px: 0.9,
+              py: '2px',
+              borderRadius: 999,
+            }}
+          >
+            {t('onboarding.checklist.nextUp')}
+          </Box>
+        )}
+        {item.done && <Box component="span" sx={visuallyHidden}>{t('onboarding.checklist.done')}</Box>}
+      </Box>
+      <Typography sx={{ fontSize: 13, lineHeight: 1.45, color: item.done ? 'text.disabled' : 'text.secondary' }}>
+        {counted
+          ? t('onboarding.checklist.counted', { progress: item.progress ?? 0, goal: item.goal })
+          : t(`onboarding.checklist.items.${item.id}.detail`)}
+      </Typography>
+      {counted && (
+        <Box aria-hidden="true" sx={{ display: 'grid', gridTemplateColumns: `repeat(${item.goal}, minmax(0, 1fr))`, gap: 0.5, mt: 0.5 }}>
+          {Array.from({ length: item.goal ?? 0 }, (_, i) => (
+            <Box
+              key={i}
+              sx={{ height: 4, borderRadius: 2, bgcolor: i < (item.progress ?? 0) ? 'primary.main' : alpha(theme.palette.text.primary, 0.12) }}
+            />
+          ))}
+        </Box>
+      )}
+    </Box>
+  )
+
+  const tileSx = {
+    flex: 1,
+    display: 'flex',
+    gap: 1.75,
+    p: 2,
+    borderRadius: 3.5,
+    textAlign: 'start' as const,
+    color: 'inherit',
+    textDecoration: 'none',
+    bgcolor: item.done
+      ? alpha(theme.palette.text.primary, 0.02)
+      : nextUp
+        ? alpha(theme.palette.primary.main, 0.08)
+        : alpha(theme.palette.text.primary, 0.04),
+    border: nextUp ? 1.5 : 1,
+    borderColor: nextUp ? 'primary.main' : alpha(theme.palette.text.primary, item.done ? 0.05 : 0.08),
+    transition: 'background-color 0.15s, border-color 0.15s',
+  }
+
+  if (!linked) return <Box sx={tileSx}>{iconTile}{body}</Box>
+
+  return (
+    <Box
+      component={RouterLink}
+      to={meta.path!}
+      sx={{
+        ...tileSx,
+        '&:hover': {
+          bgcolor: nextUp ? alpha(theme.palette.primary.main, 0.12) : alpha(theme.palette.text.primary, 0.07),
+          borderColor: nextUp ? 'primary.light' : alpha(theme.palette.text.primary, 0.16),
+        },
+        '&:focus-visible': { outline: `2px solid ${theme.palette.primary.light}`, outlineOffset: 2 },
+      }}
+    >
+      {iconTile}
+      {body}
+      <ChevronRightRoundedIcon
+        aria-hidden="true"
+        sx={{ alignSelf: 'center', flex: '0 0 auto', color: nextUp ? 'primary.light' : 'text.disabled', transform: rtl ? 'scaleX(-1)' : 'none' }}
+      />
+    </Box>
+  )
+}
+
+function StatusBand({ ready, children }: { ready: boolean; children: ReactNode }) {
+  const theme = useTheme()
+  const tone = ready ? theme.palette.primary.main : theme.palette.warning.main
+  const band = (
+    <>
+      <Box
+        sx={{
+          width: 36,
+          height: 36,
+          borderRadius: 2.5,
+          flex: '0 0 auto',
+          display: 'grid',
+          placeItems: 'center',
+          bgcolor: alpha(tone, 0.14),
+          color: ready ? 'primary.light' : 'warning.light',
+        }}
+      >
+        {ready ? <AutoAwesomeIcon sx={{ fontSize: 19 }} /> : <HourglassEmptyRoundedIcon sx={{ fontSize: 19 }} />}
+      </Box>
+      <Typography variant="body2" sx={{ flex: 1, color: 'text.primary', lineHeight: 1.5 }}>
+        {children}
+      </Typography>
+    </>
+  )
+  const sx = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 1.75,
+    px: 2,
+    py: 1.75,
+    borderRadius: 3,
+    border: '1px dashed',
+    borderColor: alpha(theme.palette.text.primary, 0.14),
+    bgcolor: alpha(theme.palette.common.black, 0.15),
+    color: 'inherit',
+    textDecoration: 'none',
+  }
+  return ready ? (
+    <Box component={RouterLink} to="/recommendations" sx={{ ...sx, '&:hover': { borderColor: 'primary.main' } }}>
+      {band}
+    </Box>
+  ) : (
+    <Box sx={sx}>{band}</Box>
+  )
+}
+
+const visuallyHidden = {
+  position: 'absolute' as const,
+  // Strings: in sx a bare 1 means 100%.
+  width: '1px',
+  height: '1px',
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap' as const,
 }

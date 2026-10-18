@@ -33,7 +33,7 @@ A **Getting started** card at the top of [Home](dashboard.md) lists the things t
 
 Each item ticks itself off, and clicking one takes you where it's done. Under the list, a line says whether your first recommendations are ready yet. A brand-new account has none until the next scheduled update has run, which is why My Recommendations can be empty on your first day.
 
-The card goes away once everything is done, or when you close it with ×.
+The next thing to do is marked **Next up**. The card goes away once everything is done, or when you press **Hide**.
 
 ## First-Visit Tips
 
