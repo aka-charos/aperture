@@ -23,9 +23,6 @@ interface DashboardRecommendation {
   matchScore: number | null
   /** The pick's place on My Recommendations. Absent on an older server. */
   rank?: number | null
-  /** Why it was picked (first pick of each kind only); null when none was written or explanations are off. Absent on an older server. */
-  explanation?: string | null
-  runtimeMinutes?: number | null
 }
 
 interface DashboardTopPick {

@@ -15,8 +15,6 @@ import {
 } from './components'
 import { PageHeading } from '@/components/PageHeading'
 import { GettingStartedCard } from './components/GettingStartedCard'
-import { FeaturedPick } from './components/FeaturedPick'
-import { useOpenMedia } from '@/hooks/useOpenMedia'
 import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
 
 export function DashboardPage() {
@@ -58,16 +56,13 @@ function DashboardContent() {
   const episodeShows = [...upcomingShows, ...recentlyAiredShows]
 
   const greeting = getGreeting(t)
-  const openMedia = useOpenMedia()
 
-  // The first recommendation of each kind is featured above the rows, so each
-  // row starts at its second pick. Numbers are the API's ranks (the order on
-  // My Recommendations); an older server sends none, and position stands in.
+  // Numbers are the API's ranks (the order on My Recommendations), so a pick
+  // dropped from a library the viewer can no longer open does not renumber
+  // the rest; an older server sends none, and position stands in.
   const movieRecs = (data?.recommendations || []).filter((item) => item.type === 'movie')
   const seriesRecs = (data?.recommendations || []).filter((item) => item.type === 'series')
-  const featured = [movieRecs[0], seriesRecs[0]].filter((item): item is NonNullable<typeof item> => Boolean(item))
-  const ranked = (items: typeof movieRecs) =>
-    items.slice(1).map((item, index) => ({ ...item, rank: item.rank ?? index + 2 }))
+  const ranked = (items: typeof movieRecs) => items.map((item, index) => ({ ...item, rank: item.rank ?? index + 1 }))
 
   return (
     <Box>
@@ -97,9 +92,6 @@ function DashboardContent() {
         />
       </Box>
 
-      {/* The top pick of each kind, led by its poster */}
-      <FeaturedPick picks={featured} loading={loading} onOpen={(item) => openMedia(item.type, item.id)} />
-
       {/* Your AI Movie Recommendations */}
       <Box sx={{ mb: 4 }} data-tour="home-rows">
         <MediaCarousel
@@ -109,9 +101,7 @@ function DashboardContent() {
           loading={loading}
           showScore
           showRank
-          // With a single pick it is the featured one, and the row has nothing
-          // to add: say nothing rather than "no recommendations".
-          emptyMessage={movieRecs.length > 0 ? '' : t('dashboard.emptyMovieRecs')}
+          emptyMessage={t('dashboard.emptyMovieRecs')}
         />
       </Box>
 
@@ -124,7 +114,7 @@ function DashboardContent() {
           loading={loading}
           showScore
           showRank
-          emptyMessage={seriesRecs.length > 0 ? '' : t('dashboard.emptySeriesRecs')}
+          emptyMessage={t('dashboard.emptySeriesRecs')}
           // Recommendations are shows to try, not shows being followed yet.
           hideWatchingToggle
         />
