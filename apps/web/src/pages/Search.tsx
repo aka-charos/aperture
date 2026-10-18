@@ -314,7 +314,7 @@ export function SearchPage() {
                   <MenuItem value="">{t('browse.labels.allGenres')}</MenuItem>
                   {filters.genres.map((g) => (
                     <MenuItem key={g.name} value={g.name}>
-                      {genreLabel(t, g.name)} ({g.count})
+                      {genreLabel(g.name)} ({g.count})
                     </MenuItem>
                   ))}
                 </Select>

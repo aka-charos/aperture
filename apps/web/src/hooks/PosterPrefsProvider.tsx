@@ -16,7 +16,8 @@ import { useTranslation } from 'react-i18next'
 import { LocalizedTextContext, PosterDisplaySettingsContext } from '@aperture/ui'
 import { PosterPrefsContext } from './poster-prefs-context'
 import { POSTER_PREFS_CACHE_KEY } from '@/lib/clientCaches'
-import { genreLabel } from '@/lib/genreLabel'
+import { genreLabel, loadTmdbGenreNames } from '@/lib/genreLabel'
+import { useAuth } from './useAuth'
 import { createTitleTranslationStore } from '@/lib/titleTranslations'
 
 const STORAGE_KEY = POSTER_PREFS_CACHE_KEY
@@ -69,7 +70,16 @@ export function PosterPrefsProvider({ children }: { children: ReactNode }) {
   const displayLanguage = i18n.resolvedLanguage ?? i18n.language
   useEffect(() => {
     titleTranslations.setLanguage(displayLanguage)
+    void loadTmdbGenreNames(displayLanguage)
   }, [titleTranslations, displayLanguage])
+  // Answers are per viewer (only titles they may open are answered), so a
+  // different account starts from nothing. Assumption reloads the page and
+  // sign-out unmounts this provider; this covers anything that does neither.
+  const { user } = useAuth()
+  const viewerId = user?.id
+  useEffect(() => {
+    titleTranslations.reset()
+  }, [titleTranslations, viewerId])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -129,7 +139,9 @@ export function PosterPrefsProvider({ children }: { children: ReactNode }) {
       watchedLabel: t('mediaPoster.watched'),
       episodeProgressLabel: (watched: number, total: number) =>
         t('mediaPoster.episodeProgress', { watched, total }),
-      genreLabel: (genre: string) => genreLabel(t, genre),
+      // A fresh function per language or string load (`t` changes then), so a
+      // poster that memoizes its labels on it re-labels.
+      genreLabel: (genre: string) => genreLabel(genre),
       watchingLabels: {
         add: t('mediaDetail.hero.addToWatching'),
         watching: t('mediaDetail.hero.watching'),

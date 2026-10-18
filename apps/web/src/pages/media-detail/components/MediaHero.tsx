@@ -705,7 +705,7 @@ export function MediaHero({
                 const unexplored = unexploredGenres.has(genre)
                 const chip = (
                   <Chip
-                    label={genreLabel(t, genre)}
+                    label={genreLabel(genre)}
                     size="small"
                     variant={unexplored ? 'outlined' : 'filled'}
                     icon={

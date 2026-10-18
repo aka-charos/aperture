@@ -4,18 +4,26 @@
  * Every card on a page asks for its own title (`useLocalizedOverview` in
  * @aperture/ui); the asks made in one tick are gathered and sent as a few
  * GET /api/title-translations/overviews requests, the same one-lookup-per-page
- * shape as watch status. Answers are kept per language for the life of the
- * tab, "no translation" included, so paging back and forth asks nothing twice.
+ * shape as watch status. Answers are kept for the tab, "no translation"
+ * included, so paging back and forth asks nothing twice.
  *
- * In memory only: a translation is a fact about a title and a language, not
- * about the viewer, and the server answers only titles the viewer may open.
+ * Forgetting is done by bumping the epoch, never by re-queuing what was known:
+ * the cards still mounted ask again on their own, so a language change costs
+ * one lookup for what is on screen, not for every title the tab ever showed.
  */
 import type { LocalizedTextStore, TitleRef } from '@aperture/ui'
 
-/** Ids per media type per request; the route refuses more. */
-const BATCH_SIZE = 100
+/**
+ * Ids per request, both media types together. A uuid parameter is ~44
+ * characters, so 60 keeps the request line near 2.7 KB — well inside the 8 KB
+ * a default nginx in front of the app accepts.
+ */
+const BATCH_SIZE = 60
 /** How long asks are gathered before a request goes out. */
 const GATHER_MS = 25
+/** A failed lookup is retried this many times in a row, further apart each time. */
+const MAX_RETRIES = 3
+const RETRY_BASE_MS = 5_000
 
 interface OverviewsResponse {
   movies?: Record<string, string>
@@ -24,33 +32,74 @@ interface OverviewsResponse {
 
 const keyOf = (ref: TitleRef) => `${ref.mediaType}:${ref.id}`
 
-export function createTitleTranslationStore(): LocalizedTextStore & {
+export type TitleTranslationStore = LocalizedTextStore & {
+  /** The language the page is displayed in; a change forgets every answer. */
   setLanguage(language: string): void
-} {
+  /** Forget every answer (a different viewer). */
+  reset(): void
+}
+
+export function createTitleTranslationStore(): TitleTranslationStore {
   let language = ''
-  // undefined = never asked; null = asked, no translation.
+  let epoch = 0
+  // A key present: answered (null = no translation). Absent: never asked, or
+  // forgotten after a failure so the card asks again.
   let answers = new Map<string, string | null>()
   const queued = new Map<string, TitleRef>()
+  const inFlight = new Set<string>()
   const listeners = new Set<() => void>()
   let timer: ReturnType<typeof setTimeout> | null = null
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+  let failures = 0
+  // The epoch at the last forget, so a response from before it is dropped even
+  // when the language came back to the same value.
+  let epochAtForget = 0
 
   const notify = () => listeners.forEach((listener) => listener())
 
-  async function send(lang: string, refs: TitleRef[]) {
+  function forget() {
+    answers = new Map()
+    queued.clear()
+    inFlight.clear()
+    if (retryTimer) clearTimeout(retryTimer)
+    retryTimer = null
+    failures = 0
+    epoch += 1
+    epochAtForget = epoch
+    notify()
+  }
+
+  function scheduleRetry() {
+    if (failures > MAX_RETRIES || retryTimer) return
+    retryTimer = setTimeout(() => {
+      retryTimer = null
+      epoch += 1
+      notify()
+    }, RETRY_BASE_MS * failures)
+  }
+
+  async function send(lang: string, round: number, refs: TitleRef[]) {
     const params = new URLSearchParams({ lang })
     for (const ref of refs) params.append(ref.mediaType, ref.id)
-    let body: OverviewsResponse = {}
+    let body: OverviewsResponse | null = null
     try {
       const response = await fetch(`/api/title-translations/overviews?${params}`, {
         credentials: 'include',
       })
       if (response.ok) body = (await response.json()) as OverviewsResponse
     } catch {
-      // A failed lookup leaves the originals showing; it is not worth an error.
+      // Handled below as a failed lookup.
     }
-    // The language changed while this was in flight: these answers are for a
-    // page nobody is looking at any more.
-    if (lang !== language) return
+    // Forgotten while in flight (a new language or viewer): nobody wants these.
+    if (lang !== language || round !== epochAtForget) return
+    for (const ref of refs) inFlight.delete(keyOf(ref))
+    if (!body) {
+      // Not remembered as "no translation": the cards ask again on retry.
+      failures += 1
+      scheduleRetry()
+      return
+    }
+    failures = 0
     for (const ref of refs) {
       const text = (ref.mediaType === 'movie' ? body.movies : body.series)?.[ref.id]
       answers.set(keyOf(ref), text ?? null)
@@ -61,12 +110,10 @@ export function createTitleTranslationStore(): LocalizedTextStore & {
   function flush() {
     timer = null
     if (!language) return
-    const movies: TitleRef[] = []
-    const series: TitleRef[] = []
-    for (const ref of queued.values()) (ref.mediaType === 'movie' ? movies : series).push(ref)
+    const refs = [...queued.values()]
     queued.clear()
-    while (movies.length > 0 || series.length > 0) {
-      void send(language, [...movies.splice(0, BATCH_SIZE), ...series.splice(0, BATCH_SIZE)])
+    for (let i = 0; i < refs.length; i += BATCH_SIZE) {
+      void send(language, epochAtForget, refs.slice(i, i + BATCH_SIZE))
     }
   }
 
@@ -75,13 +122,17 @@ export function createTitleTranslationStore(): LocalizedTextStore & {
       return answers.get(keyOf(ref)) ?? undefined
     },
     request(ref) {
+      // Before the language is known nothing is asked; setting it bumps the
+      // epoch and the cards ask again.
+      if (!language) return
       const key = keyOf(ref)
-      if (answers.has(key) || queued.has(key)) return
-      // Marked as asked at once, so the cards rendering in this same tick do
-      // not queue the title again while the request is out.
-      answers.set(key, null)
+      if (answers.has(key) || queued.has(key) || inFlight.has(key)) return
       queued.set(key, ref)
+      inFlight.add(key)
       if (!timer) timer = setTimeout(flush, GATHER_MS)
+    },
+    epoch() {
+      return epoch
     },
     subscribe(listener) {
       listeners.add(listener)
@@ -91,25 +142,11 @@ export function createTitleTranslationStore(): LocalizedTextStore & {
     },
     setLanguage(next) {
       if (next === language) return
-      const wasSet = language !== ''
       language = next
-      if (!wasSet) {
-        // Asks made before the language was known are sent now.
-        if (queued.size > 0 && !timer) timer = setTimeout(flush, GATHER_MS)
-        return
-      }
-      // A new language: forget every answer and ask again for whatever is on
-      // screen, which re-requests itself when the cards re-render.
-      const pending = [...answers.keys()]
-      answers = new Map()
-      queued.clear()
-      for (const key of pending) {
-        const [mediaType, id] = key.split(':') as [TitleRef['mediaType'], string]
-        answers.set(key, null)
-        queued.set(key, { mediaType, id })
-      }
-      if (queued.size > 0 && !timer) timer = setTimeout(flush, GATHER_MS)
-      notify()
+      forget()
+    },
+    reset() {
+      forget()
     },
   }
 }

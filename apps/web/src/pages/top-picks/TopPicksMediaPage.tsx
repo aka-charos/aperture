@@ -27,6 +27,7 @@ import { useWatchStatus } from '../../hooks/useWatchStatus'
 import { useWatching } from '../../hooks/useWatching'
 import { PageHeading } from '@/components/PageHeading'
 import { genreLabel } from '@/lib/genreLabel'
+import { LocalizedOverview } from '@/components/LocalizedOverview'
 
 type TopPicksMediaType = 'movie' | 'series'
 type ViewMode = 'grid' | 'list'
@@ -316,7 +317,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                     )}
                   </Box>
                   <Typography variant="body2" color="text.secondary" mb={1}>
-                    {item.year} {item.genres?.length > 0 && `• ${item.genres.slice(0, 3).map((g) => genreLabel(t, g)).join(', ')}`}
+                    {item.year} {item.genres?.length > 0 && `• ${item.genres.slice(0, 3).map((g) => genreLabel(g)).join(', ')}`}
                   </Typography>
                   <Typography
                     variant="body2"
@@ -328,7 +329,11 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                       overflow: 'hidden',
                     }}
                   >
-                    {item.overview || t('common.noDescription')}
+                    <LocalizedOverview
+                      titleRef={{ mediaType: item.mediaType, id: item.id }}
+                      text={item.overview}
+                      fallback={t('common.noDescription')}
+                    />
                   </Typography>
                 </Box>
 

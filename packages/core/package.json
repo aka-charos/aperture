@@ -93,7 +93,7 @@
     "test:local-models": "node --import tsx --test src/lib/localModelDiscovery.test.ts src/lib/lmstudioChat.test.ts",
     "test:inference": "node --import tsx --test src/lib/usageFetch.test.ts src/lib/zai-usage.test.ts",
     "test:translation": "node --import tsx --test src/translation/rules.test.ts src/translation/pending.test.ts src/translation/analysisText.test.ts src/translation/client.test.ts",
-    "test:collections": "node --import tsx --test src/tmdb/collectionParts.test.ts",
+    "test:collections": "node --import tsx --test src/tmdb/collectionParts.test.ts src/tmdb/genreNames.test.ts",
     "test:email": "node --import tsx --test src/email/rules.test.ts src/email/settings.test.ts src/email/links.test.ts src/email/strings.test.ts src/email/template.test.ts src/email/images.test.ts src/email/smtp.test.ts",
     "test:accounts": "node --import tsx --test src/lldap/rules.test.ts src/users/accountDrift.test.ts src/users/providerPresence.test.ts",
     "test:library-scope": "node --import tsx --test src/lib/libraryScope.test.ts",

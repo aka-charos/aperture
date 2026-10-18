@@ -57,6 +57,7 @@ import { useOnboarding } from '@/hooks/useOnboarding'
 import { PageHeading } from '@/components/PageHeading'
 import { formatRuntime } from '@/pages/media-detail/hooks'
 import { genreLabel } from '@/lib/genreLabel'
+import { LocalizedOverview } from '@/components/LocalizedOverview'
 
 interface MovieRecommendation {
   movie_id: string
@@ -754,7 +755,7 @@ export function MyRecommendationsPage() {
                         {item.genres?.slice(0, isMobile ? 2 : 3).map((genre) => (
                           <Chip
                             key={genre}
-                            label={genreLabel(t, genre)}
+                            label={genreLabel(genre)}
                             size="small"
                             variant="outlined"
                             sx={{
@@ -778,7 +779,11 @@ export function MyRecommendationsPage() {
                           fontSize: { xs: '0.75rem', md: '0.875rem' },
                         }}
                       >
-                        {item.overview || t('common.noDescription')}
+                        <LocalizedOverview
+                          titleRef={{ mediaType: type, id }}
+                          text={item.overview}
+                          fallback={t('common.noDescription')}
+                        />
                       </Typography>
 
                       {/* Desktop: trailer + TMDb */}

@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from 'react'
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Box, Typography, Paper, Chip, Skeleton, Tooltip, IconButton, Link, Button, useMediaQuery } from '@mui/material'
 import { alpha, useTheme } from '@mui/material/styles'
 import Star from '@mui/icons-material/Star'
@@ -243,7 +243,8 @@ export function MoviePoster({
   const theme = useTheme()
   const { hideLibraryRatingBadge, watchingLabels, genreLabel } = usePosterDisplaySettings()
   const overview = useLocalizedOverview(titleRef, originalOverview)
-  const genres = rawGenres?.map(genreLabel)
+  // Not per render: hover and rating state re-render the card constantly.
+  const genres = useMemo(() => rawGenres?.map((g) => genreLabel(g)), [rawGenres, genreLabel])
   const dimensions = sizeConfig[size]
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {

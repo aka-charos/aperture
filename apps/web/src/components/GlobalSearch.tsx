@@ -381,7 +381,7 @@ export function GlobalSearch() {
                           <Box>
                             {result.genres && result.genres.length > 0 && (
                               <Typography variant="caption" color="text.secondary">
-                                {result.genres.slice(0, 3).map((g) => genreLabel(t, g)).join(' • ')}
+                                {result.genres.slice(0, 3).map((g) => genreLabel(g)).join(' • ')}
                               </Typography>
                             )}
                             <Box display="flex" flexWrap="wrap" gap={1} mt={0.5}>

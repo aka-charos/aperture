@@ -924,6 +924,7 @@ export {
   getMovieEnrichmentByTmdbId,
   getMovieGenresList,
   getTVGenresList,
+  getLocalizedGenreNames,
   getTmdbConfigurationCountries,
   // Series functions
   getTVDetails,

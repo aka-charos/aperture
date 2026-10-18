@@ -20,6 +20,12 @@ export interface LocalizedTextStore {
   overview(ref: TitleRef): string | undefined
   /** Ask for a title's translation. Repeated asks for one title cost nothing. */
   request(ref: TitleRef): void
+  /**
+   * Bumped when the store forgets answers (a new language, a failed lookup
+   * worth retrying). Cards ask again when it moves, so only the titles still
+   * on screen are re-requested.
+   */
+  epoch(): number
   subscribe(listener: () => void): () => void
 }
 
@@ -42,16 +48,18 @@ export function useLocalizedOverview(
   const id = ref?.id
   const wanted = !!store && !!mediaType && !!id && !!original
 
-  useEffect(() => {
-    if (wanted) store!.request({ mediaType: mediaType!, id: id! })
-  }, [wanted, store, mediaType, id])
-
   const subscribe = useCallback(
     (listener: () => void) => (store ? store.subscribe(listener) : noSubscription()),
     [store]
   )
+  const epoch = useSyncExternalStore(subscribe, () => (store ? store.epoch() : 0))
   const translated = useSyncExternalStore(subscribe, () =>
     wanted ? store!.overview({ mediaType: mediaType!, id: id! }) : undefined
   )
+
+  useEffect(() => {
+    if (wanted) store!.request({ mediaType: mediaType!, id: id! })
+  }, [wanted, store, mediaType, id, epoch])
+
   return translated ?? original
 }

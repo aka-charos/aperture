@@ -169,34 +169,40 @@ export async function resolveLocalizedSynopsis(
 }
 
 /**
- * The translated overview of each of `ids`, for a poster grid: id → text, with
- * a title that has no current translation simply absent (the card then shows
- * its original). Same language rule and same NEVER-THROWS contract as
+ * The translated overviews of the cards on a page: id → text per media type,
+ * with a title that has no current translation simply absent (the card then
+ * shows its original). Same language rule and same NEVER-THROWS contract as
  * {@link resolveLocalizedSynopsis} — a grid must not fail over an optional
- * caption — and `ids` must already be validated uuids the viewer may see.
+ * caption — and the ids must already be validated uuids the viewer may see.
  */
 export async function resolveLocalizedOverviews(
-  mediaType: 'movie' | 'series',
-  ids: readonly string[],
+  ids: { movie: readonly string[]; series: readonly string[] },
   requested: string | null | undefined,
   userId: string
-): Promise<{ language: AppLocaleCode | null; overviews: Record<string, string> }> {
-  if (ids.length === 0) return { language: null, overviews: {} }
+): Promise<{ movies: Record<string, string>; series: Record<string, string> }> {
+  const result = { movies: {} as Record<string, string>, series: {} as Record<string, string> }
+  if (ids.movie.length === 0 && ids.series.length === 0) return result
   try {
     const config = await getTranslationConfig()
     const language = isValidAppLocale(requested) ? requested : await resolveEffectiveUiLanguage(userId)
-    const rows = await query<{ media_id: string; translated_text: string }>(
-      currentOverviewTranslationsSql(mediaType),
-      [ids, language, config.sourceLanguage]
-    )
-    const overviews: Record<string, string> = {}
-    for (const row of rows.rows) {
-      if (row.translated_text) overviews[row.media_id] = row.translated_text
+    const read = async (mediaType: 'movie' | 'series', list: readonly string[], into: Record<string, string>) => {
+      if (list.length === 0) return
+      const rows = await query<{ media_id: string; translated_text: string }>(
+        currentOverviewTranslationsSql(mediaType),
+        [list, language, config.sourceLanguage]
+      )
+      for (const row of rows.rows) {
+        if (row.translated_text) into[row.media_id] = row.translated_text
+      }
     }
-    return { language, overviews }
+    await Promise.all([read('movie', ids.movie, result.movies), read('series', ids.series, result.series)])
+    return result
   } catch (err) {
-    logger.warn({ err, mediaType, count: ids.length }, 'Could not read overview translations; showing the originals')
-    return { language: null, overviews: {} }
+    logger.warn(
+      { err, movies: ids.movie.length, series: ids.series.length },
+      'Could not read overview translations; showing the originals'
+    )
+    return { movies: {}, series: {} }
   }
 }
 

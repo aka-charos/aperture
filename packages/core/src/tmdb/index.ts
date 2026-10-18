@@ -53,7 +53,7 @@ export {
   getMovieEnrichmentByTmdbId,
 } from './movies.js'
 
-export { getMovieGenresList, getTVGenresList } from './genres.js'
+export { getMovieGenresList, getTVGenresList, getLocalizedGenreNames } from './genres.js'
 
 // Series functions
 export {

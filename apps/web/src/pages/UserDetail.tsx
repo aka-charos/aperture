@@ -973,7 +973,7 @@ function WatchHistoryTab({ userId }: { userId: string }) {
                           )}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {item.year} • {item.genres?.slice(0, 2).map((g) => genreLabel(t, g)).join(', ')}
+                          {item.year} • {item.genres?.slice(0, 2).map((g) => genreLabel(g)).join(', ')}
                         </Typography>
                       </Box>
                     </Box>

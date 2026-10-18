@@ -165,7 +165,7 @@ export function SeriesPage() {
             <MenuItem value="">{t('browse.series.allGenres')}</MenuItem>
             {genres.map((g) => (
               <MenuItem key={g} value={g}>
-                {genreLabel(t, g)}
+                {genreLabel(g)}
               </MenuItem>
             ))}
           </Select>

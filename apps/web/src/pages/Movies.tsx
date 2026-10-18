@@ -165,7 +165,7 @@ export function MoviesPage() {
             <MenuItem value="">{t('browse.movies.allGenres')}</MenuItem>
             {genres.map((g) => (
               <MenuItem key={g} value={g}>
-                {genreLabel(t, g)}
+                {genreLabel(g)}
               </MenuItem>
             ))}
           </Select>

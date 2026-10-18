@@ -174,7 +174,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
               {data.genres.map((genre) => (
                 <Chip
                   key={genre}
-                  label={genreLabel(t, genre)}
+                  label={genreLabel(genre)}
                   size="small"
                   sx={{
                     height: 22,

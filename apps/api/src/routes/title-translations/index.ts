@@ -1,5 +1,6 @@
 /**
- * Translated overviews for the cards on a page, in one request.
+ * Translated text for the cards on a page: overviews in one batched request,
+ * and the names genres print under.
  *
  * The detail page reads a title's translated synopsis off its own route; the
  * poster grids are fed by a dozen list endpoints, and putting the translation
@@ -12,10 +13,10 @@
  */
 import type { FastifyPluginAsync } from 'fastify'
 import { requireAuth, type SessionUser } from '../../plugins/auth.js'
-import { resolveLocalizedOverviews } from '@aperture/core'
+import { appLocaleToTmdbLanguage, getLocalizedGenreNames, resolveLocalizedOverviews } from '@aperture/core'
 import { idsInScope } from '../../lib/viewerScope.js'
 
-/** Per media type; the client batches below this. */
+/** Per media type. The client sends fewer per request, to keep the URL short. */
 const MAX_IDS = 100
 
 interface OverviewsQuery {
@@ -53,7 +54,6 @@ const titleTranslationRoutes: FastifyPluginAsync = async (fastify) => {
           200: {
             type: 'object',
             properties: {
-              language: { type: ['string', 'null'] },
               movies: { type: 'object', additionalProperties: { type: 'string' } },
               series: { type: 'object', additionalProperties: { type: 'string' } },
             },
@@ -63,20 +63,48 @@ const titleTranslationRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       const user = request.user as SessionUser
-      const { lang } = request.query
-      const movieIds = [...(await idsInScope(request, 'movies', request.query.movie ?? []))]
-      const seriesIds = [...(await idsInScope(request, 'series', request.query.series ?? []))]
-
-      const [movies, series] = await Promise.all([
-        resolveLocalizedOverviews('movie', movieIds, lang, user.id),
-        resolveLocalizedOverviews('series', seriesIds, lang, user.id),
+      const [movie, series] = await Promise.all([
+        idsInScope(request, 'movies', request.query.movie ?? []),
+        idsInScope(request, 'series', request.query.series ?? []),
       ])
+      const overviews = await resolveLocalizedOverviews(
+        { movie: [...movie], series: [...series] },
+        request.query.lang,
+        user.id
+      )
+      return reply.send(overviews)
+    }
+  )
 
-      return reply.send({
-        language: movies.language ?? series.language,
-        movies: movies.overviews,
-        series: series.overviews,
-      })
+  /**
+   * GET /api/title-translations/genres?lang=el
+   * English genre name → its name in that language, from TMDb's own genre
+   * lists. Empty when TMDb is not configured or the language is English; the
+   * client then prints its own strings or the stored names.
+   */
+  fastify.get<{ Querystring: { lang?: string } }>(
+    '/api/title-translations/genres',
+    {
+      preHandler: requireAuth,
+      schema: {
+        tags: ['movies', 'series'],
+        description: 'Display names of the stored (English) genre names in the given language.',
+        querystring: {
+          type: 'object',
+          properties: { lang: { type: 'string', maxLength: 10 } },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: { names: { type: 'object', additionalProperties: { type: 'string' } } },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const language = appLocaleToTmdbLanguage(request.query.lang)
+      if (language === 'en-US') return reply.send({ names: {} })
+      return reply.send({ names: await getLocalizedGenreNames(language) })
     }
   )
 }
