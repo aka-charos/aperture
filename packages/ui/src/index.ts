@@ -15,6 +15,12 @@ export {
   defaultPosterDisplaySettings,
   type PosterDisplaySettings,
 } from './posterDisplaySettings.js'
+export {
+  LocalizedTextContext,
+  useLocalizedOverview,
+  type LocalizedTextStore,
+  type TitleRef,
+} from './localizedText.js'
 
 // Carousel
 export {

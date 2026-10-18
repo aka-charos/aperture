@@ -23,8 +23,9 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline'
-import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating } from '@aperture/ui'
+import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating, useLocalizedOverview } from '@aperture/ui'
 import { formatWatchHistoryRelativeDate, formatWatchHistoryExactDate } from '@/lib/formatWatchHistoryRelativeDate'
+import { useGenreLabel } from '@/lib/genreLabel'
 
 interface MovieWatchHistoryItem {
   movie_id: string
@@ -57,6 +58,8 @@ export function WatchHistoryMovieListItem({
   onMarkUnwatched,
 }: WatchHistoryMovieListItemProps) {
   const { t } = useTranslation()
+  const genreLabel = useGenreLabel()
+  const overview = useLocalizedOverview({ mediaType: 'movie', id: movie.movie_id }, movie.overview)
   const navigate = useNavigate()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -237,7 +240,7 @@ export function WatchHistoryMovieListItem({
               {movie.genres?.slice(0, isMobile ? 2 : 4).map((genre) => (
                 <Chip
                   key={genre}
-                  label={genre}
+                  label={genreLabel(genre)}
                   size="small"
                   variant="outlined"
                   sx={{
@@ -260,7 +263,7 @@ export function WatchHistoryMovieListItem({
                 fontSize: { xs: '0.75rem', md: '0.875rem' },
               }}
             >
-              {movie.overview || t('common.noDescription')}
+              {overview || t('common.noDescription')}
             </Typography>
 
             {/* Mobile: Inline actions */}

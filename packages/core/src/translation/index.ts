@@ -50,6 +50,7 @@ export {
   clearTranslations,
   getTranslationStatus,
   resolveLocalizedAnalysis,
+  resolveLocalizedOverviews,
   resolveLocalizedSynopsis,
   type LocalizedAnalysis,
   type LocalizedSynopsis,

@@ -8,6 +8,7 @@ import HubOutlined from '@mui/icons-material/HubOutlined'
 import { StarRating } from './StarRating.js'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from './imageUtils.js'
 import { usePosterDisplaySettings } from './posterDisplaySettings.js'
+import { useLocalizedOverview, type TitleRef } from './localizedText.js'
 import { WatchedBadge } from './poster-overlays/WatchedBadge.js'
 import { EpisodeProgressBadge } from './poster-overlays/EpisodeProgressBadge.js'
 
@@ -29,6 +30,12 @@ export interface MoviePosterProps {
   score?: number | null
   genres?: string[]
   overview?: string | null
+  /**
+   * The library title this card shows. With it the card prints the overview's
+   * translation into the page's language when one exists; without it (a TMDb
+   * card that is not in the library) the overview is printed as given.
+   */
+  titleRef?: TitleRef
   onClick?: () => void
   size?: 'small' | 'medium' | 'large'
   /** Show the personalized match score badge (for recommendations only) */
@@ -200,8 +207,9 @@ export function MoviePoster({
   userRating,
   onRate,
   score,
-  genres,
-  overview,
+  genres: rawGenres,
+  overview: originalOverview,
+  titleRef,
   onClick,
   size = 'medium',
   showScore = false,
@@ -233,7 +241,9 @@ export function MoviePoster({
   const [imageError, setImageError] = useState(false)
   const [isOffRatio, setIsOffRatio] = useState(false)
   const theme = useTheme()
-  const { hideLibraryRatingBadge, watchingLabels } = usePosterDisplaySettings()
+  const { hideLibraryRatingBadge, watchingLabels, genreLabel } = usePosterDisplaySettings()
+  const overview = useLocalizedOverview(titleRef, originalOverview)
+  const genres = rawGenres?.map(genreLabel)
   const dimensions = sizeConfig[size]
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {

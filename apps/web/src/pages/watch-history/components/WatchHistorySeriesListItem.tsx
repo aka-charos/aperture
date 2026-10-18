@@ -23,8 +23,9 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating } from '@aperture/ui'
+import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating, useLocalizedOverview } from '@aperture/ui'
 import { formatWatchHistoryRelativeDate, formatWatchHistoryExactDate } from '@/lib/formatWatchHistoryRelativeDate'
+import { useGenreLabel } from '@/lib/genreLabel'
 
 interface SeriesWatchHistoryItem {
   series_id: string
@@ -57,6 +58,8 @@ export function WatchHistorySeriesListItem({
   onMarkUnwatched,
 }: WatchHistorySeriesListItemProps) {
   const { t } = useTranslation()
+  const genreLabel = useGenreLabel()
+  const overview = useLocalizedOverview({ mediaType: 'series', id: series.series_id }, series.overview)
   const navigate = useNavigate()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -215,7 +218,7 @@ export function WatchHistorySeriesListItem({
               {series.genres?.slice(0, isMobile ? 2 : 4).map((genre) => (
                 <Chip
                   key={genre}
-                  label={genre}
+                  label={genreLabel(genre)}
                   size="small"
                   variant="outlined"
                   sx={{
@@ -238,7 +241,7 @@ export function WatchHistorySeriesListItem({
                 fontSize: { xs: '0.75rem', md: '0.875rem' },
               }}
             >
-              {series.overview || t('common.noDescription')}
+              {overview || t('common.noDescription')}
             </Typography>
 
             {/* Mobile: Inline actions */}

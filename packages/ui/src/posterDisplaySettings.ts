@@ -21,6 +21,12 @@ export interface PosterDisplaySettings {
    * i18n placeholder syntax in a package that has no i18n.
    */
   episodeProgressLabel: (watched: number, total: number) => string
+  /**
+   * The display name of a genre. Genres are stored as the English names the
+   * media server sends and stay that way everywhere data is compared; only
+   * what the card prints is translated.
+   */
+  genreLabel: (genre: string) => string
   /** Text and tooltips for the series watching toggle under the genre line. */
   watchingLabels: {
     add: string
@@ -34,6 +40,7 @@ export const defaultPosterDisplaySettings: PosterDisplaySettings = {
   hideLibraryRatingBadge: false,
   watchedLabel: 'Watched',
   episodeProgressLabel: (watched, total) => `${watched} of ${total} episodes watched`,
+  genreLabel: (genre) => genre,
   watchingLabels: {
     add: 'Add to Watching',
     watching: 'Watching',

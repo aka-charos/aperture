@@ -16,6 +16,7 @@ import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
 import { gradients, extraColors } from '@/theme'
 import { chatText } from '../density'
 import type { ContentDetailData } from './types'
+import { genreLabel } from '@/lib/genreLabel'
 
 interface ContentDetailProps {
   data: ContentDetailData
@@ -173,7 +174,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
               {data.genres.map((genre) => (
                 <Chip
                   key={genre}
-                  label={genre}
+                  label={genreLabel(t, genre)}
                   size="small"
                   sx={{
                     height: 22,

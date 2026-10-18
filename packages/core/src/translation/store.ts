@@ -10,6 +10,7 @@ import { getSystemLanguageDefaults } from '../settings/systemSettings.js'
 import { getTranslationConfig } from './client.js'
 import {
   currentAnalysisTranslationSql,
+  currentOverviewTranslationsSql,
   currentTranslationsSql,
   pendingAnalysisTranslationsFromSql,
   pendingTranslationsFromSql,
@@ -164,6 +165,38 @@ export async function resolveLocalizedSynopsis(
   } catch (err) {
     logger.warn({ err, mediaType, mediaId }, 'Could not read synopsis translations; showing the original')
     return null
+  }
+}
+
+/**
+ * The translated overview of each of `ids`, for a poster grid: id → text, with
+ * a title that has no current translation simply absent (the card then shows
+ * its original). Same language rule and same NEVER-THROWS contract as
+ * {@link resolveLocalizedSynopsis} — a grid must not fail over an optional
+ * caption — and `ids` must already be validated uuids the viewer may see.
+ */
+export async function resolveLocalizedOverviews(
+  mediaType: 'movie' | 'series',
+  ids: readonly string[],
+  requested: string | null | undefined,
+  userId: string
+): Promise<{ language: AppLocaleCode | null; overviews: Record<string, string> }> {
+  if (ids.length === 0) return { language: null, overviews: {} }
+  try {
+    const config = await getTranslationConfig()
+    const language = isValidAppLocale(requested) ? requested : await resolveEffectiveUiLanguage(userId)
+    const rows = await query<{ media_id: string; translated_text: string }>(
+      currentOverviewTranslationsSql(mediaType),
+      [ids, language, config.sourceLanguage]
+    )
+    const overviews: Record<string, string> = {}
+    for (const row of rows.rows) {
+      if (row.translated_text) overviews[row.media_id] = row.translated_text
+    }
+    return { language, overviews }
+  } catch (err) {
+    logger.warn({ err, mediaType, count: ids.length }, 'Could not read overview translations; showing the originals')
+    return { language: null, overviews: {} }
   }
 }
 

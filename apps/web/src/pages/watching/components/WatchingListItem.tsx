@@ -32,10 +32,12 @@ import {
   StarRating,
   WatchedBadge,
   EpisodeProgressBadge,
+  useLocalizedOverview,
 } from '@aperture/ui'
 import { EpisodeAvailabilityBar } from './EpisodeAvailabilityBar'
 import type { WatchingSeries, UpcomingEpisode } from '../hooks/useWatchingData'
 import { palette } from '@/theme'
+import { useGenreLabel } from '@/lib/genreLabel'
 
 interface WatchingListItemProps {
   series: WatchingSeries
@@ -91,6 +93,8 @@ export function WatchingListItem({
   onRemove,
 }: WatchingListItemProps) {
   const { t, i18n } = useTranslation()
+  const genreLabel = useGenreLabel()
+  const overview = useLocalizedOverview({ mediaType: 'series', id: series.seriesId }, series.overview)
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const navigate = useNavigate()
@@ -315,7 +319,7 @@ export function WatchingListItem({
             {series.genres.slice(0, isMobile ? 2 : 4).map((genre) => (
               <Chip
                 key={genre}
-                label={genre}
+                label={genreLabel(genre)}
                 size="small"
                 sx={{
                   height: { xs: 18, md: 22 },
@@ -330,7 +334,7 @@ export function WatchingListItem({
         )}
 
         {/* Overview */}
-        {series.overview && (
+        {overview && (
           <Typography
             variant="body2"
             color="text.secondary"
@@ -344,7 +348,7 @@ export function WatchingListItem({
               fontSize: { xs: '0.75rem', md: '0.875rem' },
             }}
           >
-            {series.overview}
+            {overview}
           </Typography>
         )}
 

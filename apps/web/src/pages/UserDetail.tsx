@@ -38,6 +38,7 @@ import FavoriteIcon from '@mui/icons-material/Favorite'
 import EmailIcon from '@mui/icons-material/Email'
 import { MoviePoster, getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { genreLabel } from '@/lib/genreLabel'
 
 interface User {
   id: string
@@ -886,6 +887,7 @@ function WatchHistoryTab({ userId }: { userId: string }) {
                   genres={item.genres}
                   rating={item.community_rating}
                   overview={item.overview}
+                  titleRef={{ mediaType: 'movie', id: item.movie_id }}
                   responsive
                   onClick={() => navigate(`/movies/${item.movie_id}`)}
                 />
@@ -971,7 +973,7 @@ function WatchHistoryTab({ userId }: { userId: string }) {
                           )}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {item.year} • {item.genres?.slice(0, 2).join(', ')}
+                          {item.year} • {item.genres?.slice(0, 2).map((g) => genreLabel(t, g)).join(', ')}
                         </Typography>
                       </Box>
                     </Box>

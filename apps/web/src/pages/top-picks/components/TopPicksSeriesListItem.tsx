@@ -28,7 +28,9 @@ import {
   EpisodeProgressBadge,
   getProxiedImageUrl,
   FALLBACK_POSTER_URL,
+  useLocalizedOverview,
 } from '@aperture/ui'
+import { useGenreLabel } from '@/lib/genreLabel'
 
 interface PopularSeries {
   seriesId: string
@@ -65,6 +67,8 @@ export function TopPicksSeriesListItem({
   onRate,
 }: TopPicksSeriesListItemProps) {
   const { t } = useTranslation()
+  const genreLabel = useGenreLabel()
+  const overview = useLocalizedOverview({ mediaType: 'series', id: series.seriesId }, series.overview)
   const navigate = useNavigate()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -211,7 +215,7 @@ export function TopPicksSeriesListItem({
               {series.genres.slice(0, isMobile ? 2 : 4).map((genre) => (
                 <Chip
                   key={genre}
-                  label={genre}
+                  label={genreLabel(genre)}
                   size="small"
                   variant="outlined"
                   sx={{
@@ -234,7 +238,7 @@ export function TopPicksSeriesListItem({
                 fontSize: { xs: '0.75rem', md: '0.875rem' },
               }}
             >
-              {series.overview || t('common.noDescription')}
+              {overview || t('common.noDescription')}
             </Typography>
 
             {/* Mobile: Inline actions */}

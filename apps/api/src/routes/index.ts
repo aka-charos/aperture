@@ -29,6 +29,7 @@ import similarityRoutes from './similarity/index.js'
 import graphPlaylistRoutes from './graphPlaylists/index.js'
 import favoritesRoutes from './favorites/index.js'
 import watchStatusRoutes from './watch-status/index.js'
+import titleTranslationRoutes from './title-translations/index.js'
 import onboardingRoutes from './onboarding/index.js'
 import socialRoutes from './social/index.js'
 import discoveryRoutes from './discovery/index.js'
@@ -130,6 +131,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
   // Register favorites routes (mark suggestions as media-server favorites)
   await fastify.register(favoritesRoutes)
   await fastify.register(watchStatusRoutes)
+  await fastify.register(titleTranslationRoutes)
 
   // Welcome tour, getting-started checklist, first-visit hints
   await fastify.register(onboardingRoutes)

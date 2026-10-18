@@ -569,6 +569,7 @@ export function MyWatchHistoryPage() {
                           genres={item.genres}
                           rating={item.community_rating}
                           overview={item.overview}
+                          titleRef={{ mediaType: 'movie', id: item.movie_id }}
                           userRating={getRating('movie', item.movie_id)}
                           onRate={(rating) => setRating('movie', item.movie_id, rating)}
                           responsive
@@ -762,6 +763,7 @@ export function MyWatchHistoryPage() {
                             genres={item.genres}
                             rating={item.community_rating}
                             overview={item.overview}
+                            titleRef={{ mediaType: 'series', id: item.series_id }}
                             userRating={getRating('series', item.series_id)}
                             onRate={(rating) => setRating('series', item.series_id, rating)}
                             responsive

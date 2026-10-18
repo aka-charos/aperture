@@ -13,9 +13,11 @@
 
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { PosterDisplaySettingsContext } from '@aperture/ui'
+import { LocalizedTextContext, PosterDisplaySettingsContext } from '@aperture/ui'
 import { PosterPrefsContext } from './poster-prefs-context'
 import { POSTER_PREFS_CACHE_KEY } from '@/lib/clientCaches'
+import { genreLabel } from '@/lib/genreLabel'
+import { createTitleTranslationStore } from '@/lib/titleTranslations'
 
 const STORAGE_KEY = POSTER_PREFS_CACHE_KEY
 
@@ -59,8 +61,15 @@ function resolveEffective(prefs: CachedPrefs): boolean {
 }
 
 export function PosterPrefsProvider({ children }: { children: ReactNode }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [prefs, setPrefs] = useState<CachedPrefs>(readCache)
+  // One store for the tab: the translated overviews every poster card shows,
+  // asked for in the language the page is displayed in.
+  const [titleTranslations] = useState(createTitleTranslationStore)
+  const displayLanguage = i18n.resolvedLanguage ?? i18n.language
+  useEffect(() => {
+    titleTranslations.setLanguage(displayLanguage)
+  }, [titleTranslations, displayLanguage])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -120,6 +129,7 @@ export function PosterPrefsProvider({ children }: { children: ReactNode }) {
       watchedLabel: t('mediaPoster.watched'),
       episodeProgressLabel: (watched: number, total: number) =>
         t('mediaPoster.episodeProgress', { watched, total }),
+      genreLabel: (genre: string) => genreLabel(t, genre),
       watchingLabels: {
         add: t('mediaDetail.hero.addToWatching'),
         watching: t('mediaDetail.hero.watching'),
@@ -144,7 +154,7 @@ export function PosterPrefsProvider({ children }: { children: ReactNode }) {
           rating preference does: @aperture/ui has no i18n, and one home beats
           the same t() call threaded through twenty poster call sites. */}
       <PosterDisplaySettingsContext.Provider value={posterDisplaySettings}>
-        {children}
+        <LocalizedTextContext.Provider value={titleTranslations}>{children}</LocalizedTextContext.Provider>
       </PosterDisplaySettingsContext.Provider>
     </PosterPrefsContext.Provider>
   )

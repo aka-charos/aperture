@@ -56,6 +56,7 @@ import { useViewMode } from '@/hooks/useViewMode'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import { PageHeading } from '@/components/PageHeading'
 import { formatRuntime } from '@/pages/media-detail/hooks'
+import { genreLabel } from '@/lib/genreLabel'
 
 interface MovieRecommendation {
   movie_id: string
@@ -562,6 +563,7 @@ export function MyRecommendationsPage() {
                     genres={item.genres}
                     rating={item.community_rating}
                     overview={item.overview}
+                    titleRef={{ mediaType: type, id }}
                     score={rec.final_score}
                     showScore
                     hideRating
@@ -752,7 +754,7 @@ export function MyRecommendationsPage() {
                         {item.genres?.slice(0, isMobile ? 2 : 3).map((genre) => (
                           <Chip
                             key={genre}
-                            label={genre}
+                            label={genreLabel(t, genre)}
                             size="small"
                             variant="outlined"
                             sx={{

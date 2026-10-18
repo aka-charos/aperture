@@ -85,6 +85,7 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
         posterUrl={series.posterUrl}
         genres={series.genres}
         overview={series.overview}
+        titleRef={{ mediaType: 'series', id: series.seriesId }}
         userRating={getRating('series', series.seriesId)}
         watched={isWatched('series', series.seriesId)}
         episodeProgress={getEpisodeProgress('series', series.seriesId)}

@@ -270,6 +270,7 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
                     rating={show.community_rating}
                     genres={show.genres}
                     overview={show.overview}
+                    titleRef={{ mediaType: 'series', id: show.id }}
                     overviewBelow={{
                       expanded: plots.isExpanded(show.id),
                       onToggle: () => plots.toggle(show.id),

@@ -153,6 +153,7 @@ export function WatchingCarousel({
             rating={item.communityRating}
             genres={item.genres}
             overview={item.overview}
+            titleRef={{ mediaType: 'series', id: item.seriesId }}
             userRating={getRating('series', item.seriesId)}
             watched={isWatched('series', item.seriesId)}
             episodeProgress={getEpisodeProgress('series', item.seriesId)}

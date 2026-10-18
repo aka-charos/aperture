@@ -33,6 +33,7 @@ import { useUserRatings } from '../hooks/useUserRatings'
 import { useWatchStatus } from '../hooks/useWatchStatus'
 import { useWatching } from '../hooks/useWatching'
 import { PageHeading } from '@/components/PageHeading'
+import { genreLabel } from '@/lib/genreLabel'
 
 interface SearchResult {
   id: string
@@ -313,7 +314,7 @@ export function SearchPage() {
                   <MenuItem value="">{t('browse.labels.allGenres')}</MenuItem>
                   {filters.genres.map((g) => (
                     <MenuItem key={g.name} value={g.name}>
-                      {g.name} ({g.count})
+                      {genreLabel(t, g.name)} ({g.count})
                     </MenuItem>
                   ))}
                 </Select>
@@ -485,6 +486,7 @@ export function SearchPage() {
                   rating={result.community_rating}
                   genres={result.genres}
                   overview={result.overview}
+                  titleRef={{ mediaType: result.type, id: result.id }}
                   userRating={getRating(result.type, result.id)}
                   watched={isWatched(result.type, result.id)}
                   episodeProgress={getEpisodeProgress(result.type, result.id)}

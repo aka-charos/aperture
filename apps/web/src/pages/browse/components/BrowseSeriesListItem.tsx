@@ -24,7 +24,9 @@ import {
   StarRating,
   WatchedBadge,
   EpisodeProgressBadge,
+  useLocalizedOverview,
 } from '@aperture/ui'
+import { useGenreLabel } from '@/lib/genreLabel'
 
 interface Series {
   id: string
@@ -63,6 +65,8 @@ export function BrowseSeriesListItem({
   onClick,
 }: BrowseSeriesListItemProps) {
   const { t } = useTranslation()
+  const genreLabel = useGenreLabel()
+  const overview = useLocalizedOverview({ mediaType: 'series', id: series.id }, series.overview)
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
@@ -249,7 +253,7 @@ export function BrowseSeriesListItem({
             {series.genres.slice(0, isMobile ? 2 : 4).map((genre) => (
               <Chip
                 key={genre}
-                label={genre}
+                label={genreLabel(genre)}
                 size="small"
                 variant="outlined"
                 sx={{ 
@@ -273,7 +277,7 @@ export function BrowseSeriesListItem({
               fontSize: { xs: '0.75rem', md: '0.875rem' },
             }}
           >
-            {series.overview || t('browse.listItem.noDescription')}
+            {overview || t('browse.listItem.noDescription')}
           </Typography>
 
           {/* Mobile: Inline actions */}

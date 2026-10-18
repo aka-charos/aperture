@@ -187,6 +187,7 @@ export function TopPicksPage() {
               genres={movie.genres}
               rating={movie.communityRating}
               overview={movie.overview}
+              titleRef={{ mediaType: 'movie', id: movie.movieId }}
               userRating={getRating('movie', movie.movieId)}
               watched={isWatched('movie', movie.movieId)}
               onRate={(rating) => handleRateMovie(movie.movieId, rating)}
@@ -244,6 +245,7 @@ export function TopPicksPage() {
               genres={show.genres}
               rating={show.communityRating}
               overview={show.overview}
+              titleRef={{ mediaType: 'series', id: show.seriesId }}
               userRating={getRating('series', show.seriesId)}
               watched={isWatched('series', show.seriesId)}
               episodeProgress={getEpisodeProgress('series', show.seriesId)}

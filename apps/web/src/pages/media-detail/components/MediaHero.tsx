@@ -62,6 +62,7 @@ import {
   WatchedBadge,
   EpisodeProgressBadge,
 } from '@aperture/ui'
+import { genreLabel } from '@/lib/genreLabel'
 
 // The "open in <server>" CTA is branded like the app it opens, not the instance's own
 // theme — these are the media servers' own colors, not admin-configurable.
@@ -704,7 +705,7 @@ export function MediaHero({
                 const unexplored = unexploredGenres.has(genre)
                 const chip = (
                   <Chip
-                    label={genre}
+                    label={genreLabel(t, genre)}
                     size="small"
                     variant={unexplored ? 'outlined' : 'filled'}
                     icon={

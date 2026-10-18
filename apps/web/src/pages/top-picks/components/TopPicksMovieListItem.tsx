@@ -20,7 +20,8 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import PeopleIcon from '@mui/icons-material/People'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import { RankBadge, StarRating, WatchedBadge, getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
+import { RankBadge, StarRating, WatchedBadge, getProxiedImageUrl, FALLBACK_POSTER_URL, useLocalizedOverview } from '@aperture/ui'
+import { useGenreLabel } from '@/lib/genreLabel'
 
 interface PopularMovie {
   movieId: string
@@ -50,6 +51,8 @@ export function TopPicksMovieListItem({
   onRate,
 }: TopPicksMovieListItemProps) {
   const { t } = useTranslation()
+  const genreLabel = useGenreLabel()
+  const overview = useLocalizedOverview({ mediaType: 'movie', id: movie.movieId }, movie.overview)
   const navigate = useNavigate()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
@@ -161,7 +164,7 @@ export function TopPicksMovieListItem({
               {movie.genres.slice(0, isMobile ? 2 : 4).map((genre) => (
                 <Chip
                   key={genre}
-                  label={genre}
+                  label={genreLabel(genre)}
                   size="small"
                   variant="outlined"
                   sx={{
@@ -184,7 +187,7 @@ export function TopPicksMovieListItem({
                 fontSize: { xs: '0.75rem', md: '0.875rem' },
               }}
             >
-              {movie.overview || t('common.noDescription')}
+              {overview || t('common.noDescription')}
             </Typography>
 
             {/* Mobile: Inline actions */}

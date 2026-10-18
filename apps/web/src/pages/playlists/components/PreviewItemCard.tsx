@@ -18,6 +18,7 @@ import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import { getProxiedImageUrl } from '@aperture/ui'
 import type { PreviewItem } from '../types'
+import { useGenreLabel } from '@/lib/genreLabel'
 
 /** Meta rail width; the poster fills it at a 2:3 poster ratio. Matches the chat card. */
 const RAIL_WIDTH = 84
@@ -50,6 +51,7 @@ export function PreviewItemCard({
   pt,
 }: PreviewItemCardProps) {
   const theme = useTheme()
+  const genreLabel = useGenreLabel()
   return (
     <Paper
       sx={{
@@ -111,7 +113,7 @@ export function PreviewItemCard({
             variant="caption"
             sx={{ color: '#71717a', fontSize: 10, lineHeight: 1.35, ...clampLines(2) }}
           >
-            {item.genres.join(', ')}
+            {item.genres.map((g) => genreLabel(g)).join(', ')}
           </Typography>
         )}
       </Box>

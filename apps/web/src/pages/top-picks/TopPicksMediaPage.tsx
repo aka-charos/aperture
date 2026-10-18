@@ -26,6 +26,7 @@ import { useUserRatings } from '../../hooks/useUserRatings'
 import { useWatchStatus } from '../../hooks/useWatchStatus'
 import { useWatching } from '../../hooks/useWatching'
 import { PageHeading } from '@/components/PageHeading'
+import { genreLabel } from '@/lib/genreLabel'
 
 type TopPicksMediaType = 'movie' | 'series'
 type ViewMode = 'grid' | 'list'
@@ -230,6 +231,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                   genres={item.genres}
                   rating={item.communityRating}
                   overview={item.overview}
+                  titleRef={{ mediaType: item.mediaType, id: item.id }}
                   userRating={getRating(item.mediaType, item.id)}
                   watched={isWatched(item.mediaType, item.id)}
                   episodeProgress={getEpisodeProgress(item.mediaType, item.id)}
@@ -314,7 +316,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                     )}
                   </Box>
                   <Typography variant="body2" color="text.secondary" mb={1}>
-                    {item.year} {item.genres?.length > 0 && `• ${item.genres.slice(0, 3).join(', ')}`}
+                    {item.year} {item.genres?.length > 0 && `• ${item.genres.slice(0, 3).map((g) => genreLabel(t, g)).join(', ')}`}
                   </Typography>
                   <Typography
                     variant="body2"

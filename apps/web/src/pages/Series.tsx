@@ -23,6 +23,7 @@ import { useUserRatings } from '../hooks/useUserRatings'
 import { useWatchStatus } from '../hooks/useWatchStatus'
 import { useWatching } from '../hooks/useWatching'
 import { PageHeading } from '@/components/PageHeading'
+import { genreLabel } from '@/lib/genreLabel'
 
 interface Series {
   id: string
@@ -164,7 +165,7 @@ export function SeriesPage() {
             <MenuItem value="">{t('browse.series.allGenres')}</MenuItem>
             {genres.map((g) => (
               <MenuItem key={g} value={g}>
-                {g}
+                {genreLabel(t, g)}
               </MenuItem>
             ))}
           </Select>
@@ -269,6 +270,7 @@ export function SeriesPage() {
                   rating={show.community_rating}
                   genres={show.genres}
                   overview={show.overview}
+                  titleRef={{ mediaType: 'series', id: show.id }}
                   userRating={getRating('series', show.id)}
                   watched={isWatched('series', show.id)}
                   episodeProgress={getEpisodeProgress('series', show.id)}

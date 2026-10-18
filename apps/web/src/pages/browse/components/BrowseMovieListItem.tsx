@@ -16,7 +16,8 @@ import {
 import StarIcon from '@mui/icons-material/Star'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating, WatchedBadge } from '@aperture/ui'
+import { getProxiedImageUrl, FALLBACK_POSTER_URL, StarRating, WatchedBadge, useLocalizedOverview } from '@aperture/ui'
+import { useGenreLabel } from '@/lib/genreLabel'
 
 interface Movie {
   id: string
@@ -45,6 +46,8 @@ export function BrowseMovieListItem({
   onClick,
 }: BrowseMovieListItemProps) {
   const { t } = useTranslation()
+  const genreLabel = useGenreLabel()
+  const overview = useLocalizedOverview({ mediaType: 'movie', id: movie.id }, movie.overview)
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
@@ -160,7 +163,7 @@ export function BrowseMovieListItem({
             {movie.genres.slice(0, isMobile ? 2 : 4).map((genre) => (
               <Chip
                 key={genre}
-                label={genre}
+                label={genreLabel(genre)}
                 size="small"
                 variant="outlined"
                 sx={{
@@ -184,7 +187,7 @@ export function BrowseMovieListItem({
               fontSize: { xs: '0.75rem', md: '0.875rem' },
             }}
           >
-            {movie.overview || t('browse.listItem.noDescription')}
+            {overview || t('browse.listItem.noDescription')}
           </Typography>
 
           {/* Mobile: Inline actions */}

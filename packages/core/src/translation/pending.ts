@@ -223,6 +223,27 @@ export function currentTranslationsSql(mediaType: 'movie' | 'series'): string {
              AND tt.language <> ${textLanguageSql(src, '$3')}`
 }
 
+/**
+ * The current overview translations of MANY titles into one language — what a
+ * poster grid shows on each card. The same three tests as
+ * {@link currentTranslationsSql} (the stored text is of the overview the title
+ * carries now, and never "into" the language it is already written in), over
+ * the overview alone, since a card never shows the long synopsis. `$1` is a
+ * uuid array, `$2` the language, `$3` the configured source language.
+ */
+export function currentOverviewTranslationsSql(mediaType: 'movie' | 'series'): string {
+  const src = sourceTextSql('overview')
+  return `SELECT tt.media_id, tt.translated_text
+            FROM title_translations tt
+            JOIN ${MEDIA_TABLE[mediaType]} m ON m.id = tt.media_id
+           WHERE tt.media_type = '${mediaType}'
+             AND tt.media_id = ANY($1::uuid[])
+             AND tt.language = $2
+             AND tt.field = 'overview'
+             AND tt.source_hash = md5(${src})
+             AND tt.language <> ${textLanguageSql(src, '$3')}`
+}
+
 // ---------------------------------------------------------------- film analyses
 
 /**

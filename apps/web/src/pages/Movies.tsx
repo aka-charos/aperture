@@ -22,6 +22,7 @@ import { MoviePoster } from '@aperture/ui'
 import { useUserRatings } from '../hooks/useUserRatings'
 import { useWatchStatus } from '../hooks/useWatchStatus'
 import { PageHeading } from '@/components/PageHeading'
+import { genreLabel } from '@/lib/genreLabel'
 
 interface Movie {
   id: string
@@ -164,7 +165,7 @@ export function MoviesPage() {
             <MenuItem value="">{t('browse.movies.allGenres')}</MenuItem>
             {genres.map((g) => (
               <MenuItem key={g} value={g}>
-                {g}
+                {genreLabel(t, g)}
               </MenuItem>
             ))}
           </Select>
@@ -271,6 +272,7 @@ export function MoviesPage() {
                   rating={movie.community_rating}
                   genres={movie.genres}
                   overview={movie.overview}
+                  titleRef={{ mediaType: 'movie', id: movie.id }}
                   userRating={getRating('movie', movie.id)}
                   watched={isWatched('movie', movie.id)}
                   onRate={(rating) => handleRate(movie.id, rating)}

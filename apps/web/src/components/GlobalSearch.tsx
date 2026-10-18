@@ -29,6 +29,7 @@ import TvIcon from '@mui/icons-material/Tv'
 import CloseIcon from '@mui/icons-material/Close'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { matchSearchShortcut } from '@/lib/searchShortcut'
+import { genreLabel } from '@/lib/genreLabel'
 
 interface SearchResult {
   id: string
@@ -380,7 +381,7 @@ export function GlobalSearch() {
                           <Box>
                             {result.genres && result.genres.length > 0 && (
                               <Typography variant="caption" color="text.secondary">
-                                {result.genres.slice(0, 3).join(' • ')}
+                                {result.genres.slice(0, 3).map((g) => genreLabel(t, g)).join(' • ')}
                               </Typography>
                             )}
                             <Box display="flex" flexWrap="wrap" gap={1} mt={0.5}>

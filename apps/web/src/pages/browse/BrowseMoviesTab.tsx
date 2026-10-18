@@ -281,6 +281,7 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
                     rating={movie.community_rating}
                     genres={movie.genres}
                     overview={movie.overview}
+                    titleRef={{ mediaType: 'movie', id: movie.id }}
                     overviewBelow={{
                       expanded: plots.isExpanded(movie.id),
                       onToggle: () => plots.toggle(movie.id),

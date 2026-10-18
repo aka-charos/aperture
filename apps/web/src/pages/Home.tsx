@@ -324,6 +324,7 @@ export function HomePage() {
                     genres={isRec ? movie.genres : (item as WatchHistoryItem).genres}
                     rating={isRec ? undefined : (item as WatchHistoryItem).community_rating}
                     overview={isRec ? movie.overview : (item as WatchHistoryItem).overview}
+                    titleRef={{ mediaType: 'movie', id: movieId }}
                     score={isRec ? (item as Recommendation).final_score : undefined}
                     showScore={isRec}
                     hideRating={isRec}
