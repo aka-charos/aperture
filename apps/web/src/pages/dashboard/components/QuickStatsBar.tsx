@@ -22,6 +22,15 @@ interface QuickStatsBarProps {
   loading?: boolean
 }
 
+/**
+ * The bar sizes itself off its OWN width, not the window's: the page pane is
+ * the window minus the sidebar and the docked assistant, so a window
+ * breakpoint can promise room the pane does not have, and a one-line strip
+ * of no-wrap text then runs off the edge and is clipped. Measured from the
+ * strip's content: four figures, the period and the link need about 900px.
+ */
+const WIDE = '@container stats (min-width: 900px)'
+
 interface StatProps {
   icon: React.ReactNode
   label: string
@@ -31,8 +40,8 @@ interface StatProps {
 }
 
 /**
- * One figure: a tinted icon, the number, its label. On a phone each sits in
- * its own small card in a 2×2 grid; from `md` the four share one strip.
+ * One figure: a tinted icon, the number, its label. Narrow, each sits in its
+ * own small card in a 2×2 grid; wide, the four share one strip.
  */
 function Stat({ icon, label, value, color, loading }: StatProps) {
   return (
@@ -43,13 +52,13 @@ function Stat({ icon, label, value, color, loading }: StatProps) {
         alignItems: 'center',
         gap: 1,
         minWidth: 0,
-        px: { xs: 1.25, md: 1.5 },
-        py: { xs: 1, md: 0.75 },
-        pl: { md: 0.75 },
-        borderRadius: { xs: 3, md: 999 },
-        bgcolor: { xs: 'background.paper', md: 'transparent' },
-        border: { xs: 1, md: 0 },
+        px: 1.25,
+        py: 1,
+        borderRadius: 3,
+        bgcolor: 'background.paper',
+        border: 1,
         borderColor: 'divider',
+        [WIDE]: { px: 1.5, py: 0.75, borderRadius: 999, bgcolor: 'transparent', border: 0 },
       }}
     >
       <Box
@@ -102,98 +111,119 @@ export function QuickStatsBar({
   const { t } = useTranslation()
   const theme = useTheme()
   const windowLabel = windowDays != null ? t('dashboard.statsWindow', { count: windowDays }) : null
-  const moreLink = (
-    <MuiLink
-      component={RouterLink}
-      to="/stats"
-      underline="none"
-      sx={{
-        flexShrink: 0,
-        fontSize: 13,
-        fontWeight: 600,
-        whiteSpace: 'nowrap',
-        px: { md: 1.5 },
-        py: { md: 0.75 },
-        borderRadius: 999,
-        bgcolor: { md: alpha(theme.palette.primary.main, 0.16) },
-        color: { xs: 'primary.light', md: 'primary.light' },
-        '&:hover': { bgcolor: { md: alpha(theme.palette.primary.main, 0.26) } },
-      }}
-    >
-      {t('dashboard.statsMoreDetails')}
-    </MuiLink>
-  )
 
   // The bar states the period it covers, because four bare numbers do not say
   // whether they mean this month or all the years on the server — and the link
-  // is where the all-time figures went. From `md` it is one strip: the four
+  // is where the all-time figures went. Wide, it is one strip: the four
   // figures, then the period and the link, so it costs one line of the page.
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Box
-        role="list"
-        aria-label={windowLabel ?? undefined}
-        sx={{
-          display: { xs: 'grid', md: 'flex' },
-          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  // Narrow, the figures are a 2×2 grid with the period and the link under it.
+  const period = (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+        gap: 2,
+        [WIDE]: {
           alignItems: 'center',
-          gap: { xs: 1, md: 0.5 },
-          alignSelf: { md: 'flex-start' },
-          maxWidth: '100%',
-          p: { md: 0.75 },
+          justifyContent: 'flex-start',
+          gap: 1.25,
+          ps: 1.25,
+          borderInlineStart: `1px solid ${theme.palette.divider}`,
+        },
+      }}
+    >
+      {windowLabel ? (
+        <Typography variant="caption" color="text.secondary" noWrap>
+          {windowLabel}
+        </Typography>
+      ) : (
+        <span />
+      )}
+      <MuiLink
+        component={RouterLink}
+        to="/stats"
+        underline="none"
+        sx={{
+          flexShrink: 0,
+          fontSize: 13,
+          fontWeight: 600,
+          whiteSpace: 'nowrap',
+          color: 'primary.light',
           borderRadius: 999,
-          bgcolor: { md: 'background.paper' },
-          border: { md: 1 },
-          borderColor: { md: 'divider' },
+          [WIDE]: {
+            px: 1.5,
+            py: 0.75,
+            bgcolor: alpha(theme.palette.primary.main, 0.16),
+            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.26) },
+          },
         }}
       >
-        <Stat
-          icon={<MovieIcon />}
-          label={t('dashboard.statMoviesWatched')}
-          value={moviesWatched.toLocaleString()}
-          color={theme.palette.primary.main}
-          loading={loading}
-        />
-        <Stat
-          icon={<TvIcon />}
-          label={t('dashboard.statSeriesWatched')}
-          value={seriesWatched.toLocaleString()}
-          color={theme.palette.secondary.main}
-          loading={loading}
-        />
-        <Stat
-          icon={<FavoriteIcon />}
-          label={t('dashboard.statRatings')}
-          value={ratingsCount.toLocaleString()}
-          color="#ec4899"
-          loading={loading}
-        />
-        <Stat
-          icon={<AccessTimeIcon />}
-          label={t('dashboard.statWatchTime')}
-          value={formatWatchTime(watchTimeMinutes, t)}
-          color="#10b981"
-          loading={loading}
-        />
-        <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1.25, ps: 1, ms: 0.5, borderInlineStart: 1, borderColor: 'divider' }}>
-          {windowLabel && (
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {windowLabel}
-            </Typography>
-          )}
-          {moreLink}
+        {t('dashboard.statsMoreDetails')}
+      </MuiLink>
+    </Box>
+  )
+
+  return (
+    <Box sx={{ containerType: 'inline-size', containerName: 'stats' }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+          [WIDE]: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 0.5,
+            width: 'fit-content',
+            p: 0.75,
+            borderRadius: 999,
+            bgcolor: 'background.paper',
+            border: 1,
+            borderColor: 'divider',
+          },
+        }}
+      >
+        <Box
+          role="list"
+          aria-label={windowLabel ?? undefined}
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: 1,
+            [WIDE]: { display: 'flex', alignItems: 'center', gap: 0.5 },
+          }}
+        >
+          <Stat
+            icon={<MovieIcon />}
+            label={t('dashboard.statMoviesWatched')}
+            value={moviesWatched.toLocaleString()}
+            color={theme.palette.primary.main}
+            loading={loading}
+          />
+          <Stat
+            icon={<TvIcon />}
+            label={t('dashboard.statSeriesWatched')}
+            value={seriesWatched.toLocaleString()}
+            color={theme.palette.secondary.main}
+            loading={loading}
+          />
+          <Stat
+            icon={<FavoriteIcon />}
+            label={t('dashboard.statRatings')}
+            value={ratingsCount.toLocaleString()}
+            color="#ec4899"
+            loading={loading}
+          />
+          <Stat
+            icon={<AccessTimeIcon />}
+            label={t('dashboard.statWatchTime')}
+            value={formatWatchTime(watchTimeMinutes, t)}
+            color="#10b981"
+            loading={loading}
+          />
         </Box>
-      </Box>
-      {/* On a phone the period and the link sit under the grid. */}
-      <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'space-between', alignItems: 'baseline', gap: 2 }}>
-        {windowLabel ? (
-          <Typography variant="caption" color="text.secondary">
-            {windowLabel}
-          </Typography>
-        ) : (
-          <span />
-        )}
-        {moreLink}
+        {period}
       </Box>
     </Box>
   )

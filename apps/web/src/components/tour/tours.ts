@@ -125,6 +125,7 @@ export const TOURS: Record<TourId, Tour> = {
     id: 'home',
     steps: [
       { id: 'checklist', icon: 'checklist', anchor: 'home-checklist', placement: 'bottom' },
+      { id: 'featured', icon: 'sparkle', anchor: 'home-featured', placement: 'bottom', doc: { slug: 'dashboard' } },
       { id: 'stats', icon: 'stats', anchor: 'home-stats', placement: 'bottom', doc: { slug: 'dashboard' } },
       { id: 'rows', icon: 'rows', anchor: 'home-rows', placement: 'top', doc: { slug: 'dashboard' } },
     ],

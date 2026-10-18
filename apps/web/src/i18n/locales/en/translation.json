@@ -6396,13 +6396,17 @@
           "title": "Getting started",
           "body": "A few things that teach {{appName}} about you. Each one ticks itself off once it's done."
         },
+        "featured": {
+          "title": "Your top picks",
+          "body": "The best match of each kind, with why it was picked. The small posters switch between your top movie and your top series."
+        },
         "stats": {
           "title": "Your numbers at a glance",
           "body": "What you've watched and rated lately. Watch Stats has the full picture."
         },
         "rows": {
           "title": "Rows picked for you",
-          "body": "Your latest recommendations come first, then Most Watched Lately and your shows. Click a poster to open it, or the stars to rate it."
+          "body": "The rest of your recommendations, your new episodes and what is played most on the server. Click a poster to open it, or the stars to rate it."
         }
       },
       "browse": {

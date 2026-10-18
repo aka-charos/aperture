@@ -35,9 +35,17 @@ interface DashboardRecommendation {
   genres: string[]
   matchScore: number | null
   /**
-   * Why it was picked, as written for this viewer. Null when the run wrote
-   * none or the viewer's effective AI-explanation setting is off — the same
-   * gate the insights panel applies (core getEffectiveAiExplanationSetting).
+   * The pick's place on My Recommendations (selected_rank), not its position
+   * here: a pick from a library the viewer can no longer open is dropped
+   * below, and counting positions would renumber everything after it.
+   */
+  rank: number | null
+  /**
+   * Why it was picked, as written for this viewer — sent for the first pick
+   * of each kind only, which is all Home shows (the featured pick). Null when
+   * the run wrote none or the viewer's effective AI-explanation setting is
+   * off: the gate every surface showing one applies (core
+   * getEffectiveAiExplanationSetting).
    */
   explanation: string | null
   /** Movie only */
@@ -201,6 +209,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           final_score: number | null
           runtime_minutes: number | null
           ai_explanation: string | null
+          selected_rank: number | null
         }>(
           `
           SELECT
@@ -211,7 +220,8 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             m.genres,
             rc.final_score,
             m.runtime_minutes,
-            rc.ai_explanation
+            rc.ai_explanation,
+            rc.selected_rank
           FROM recommendation_candidates rc
           JOIN movies m ON m.id = rc.movie_id
           WHERE rc.run_id = (
@@ -238,6 +248,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           total_seasons: number | null
           total_episodes: number | null
           ai_explanation: string | null
+          selected_rank: number | null
         }>(
           `
           SELECT
@@ -249,7 +260,8 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             rc.final_score,
             s.total_seasons,
             s.total_episodes,
-            rc.ai_explanation
+            rc.ai_explanation,
+            rc.selected_rank
           FROM recommendation_candidates rc
           JOIN series s ON s.id = rc.series_id
           WHERE rc.run_id = (
@@ -433,7 +445,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
       const explanationOf = (text: string | null) => (showExplanations && text?.trim() ? text.trim() : null)
 
       // Build recommendations (interleave movies and series)
-      const movieRecs = movieRecsResult.rows.filter((r) => visibleMovies.has(r.movie_id)).map((r) => ({
+      const movieRecs = movieRecsResult.rows.filter((r) => visibleMovies.has(r.movie_id)).map((r, i) => ({
         id: r.movie_id,
         type: 'movie' as const,
         title: r.title,
@@ -441,10 +453,11 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         posterUrl: r.poster_url,
         genres: r.genres || [],
         matchScore: r.final_score ? Math.round(r.final_score * 100) : null,
-        explanation: explanationOf(r.ai_explanation),
+        rank: r.selected_rank != null ? Number(r.selected_rank) : null,
+        explanation: i === 0 ? explanationOf(r.ai_explanation) : null,
         runtimeMinutes: r.runtime_minutes,
       }))
-      const seriesRecs = seriesRecsResult.rows.filter((r) => visibleSeries.has(r.series_id)).map((r) => ({
+      const seriesRecs = seriesRecsResult.rows.filter((r) => visibleSeries.has(r.series_id)).map((r, i) => ({
         id: r.series_id,
         type: 'series' as const,
         title: r.title,
@@ -452,7 +465,8 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         posterUrl: r.poster_url,
         genres: r.genres || [],
         matchScore: r.final_score ? Math.round(r.final_score * 100) : null,
-        explanation: explanationOf(r.ai_explanation),
+        rank: r.selected_rank != null ? Number(r.selected_rank) : null,
+        explanation: i === 0 ? explanationOf(r.ai_explanation) : null,
         totalSeasons: r.total_seasons,
         totalEpisodes: r.total_episodes,
       }))

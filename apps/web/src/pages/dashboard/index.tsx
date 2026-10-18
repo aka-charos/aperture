@@ -61,12 +61,13 @@ function DashboardContent() {
   const openMedia = useOpenMedia()
 
   // The first recommendation of each kind is featured above the rows, so each
-  // row starts at its second pick, numbered as it ranks (2, 3, …).
+  // row starts at its second pick. Numbers are the API's ranks (the order on
+  // My Recommendations); an older server sends none, and position stands in.
   const movieRecs = (data?.recommendations || []).filter((item) => item.type === 'movie')
   const seriesRecs = (data?.recommendations || []).filter((item) => item.type === 'series')
   const featured = [movieRecs[0], seriesRecs[0]].filter((item): item is NonNullable<typeof item> => Boolean(item))
   const ranked = (items: typeof movieRecs) =>
-    items.slice(1).map((item, index) => ({ ...item, rank: index + 2 }))
+    items.slice(1).map((item, index) => ({ ...item, rank: item.rank ?? index + 2 }))
 
   return (
     <Box>
@@ -97,7 +98,7 @@ function DashboardContent() {
       </Box>
 
       {/* The top pick of each kind, led by its poster */}
-      {!loading && <FeaturedPick picks={featured} onOpen={(item) => openMedia(item.type, item.id)} />}
+      <FeaturedPick picks={featured} loading={loading} onOpen={(item) => openMedia(item.type, item.id)} />
 
       {/* Your AI Movie Recommendations */}
       <Box sx={{ mb: 4 }} data-tour="home-rows">
