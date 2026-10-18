@@ -81,6 +81,8 @@ interface CrwPublicConfig {
   sourceBudgetChars: number
   analysisMaxOutputTokens: number
   searchEngines?: string[]
+  /** Absent on an older API; read as on, which is what the server does. */
+  assistantSearch?: boolean
   retrievalMode: RetrievalMode
 }
 
@@ -110,6 +112,7 @@ export function CrwConfigSection() {
 
   const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>('crw')
   const [enabled, setEnabled] = useState(false)
+  const [assistantSearch, setAssistantSearch] = useState(true)
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
@@ -134,6 +137,7 @@ export function CrwConfigSection() {
     setConfig(c)
     setRetrievalMode(c.retrievalMode ?? 'crw')
     setEnabled(!!c.enabled)
+    setAssistantSearch(c.assistantSearch !== false)
     setBaseUrl(c.baseUrl ?? '')
     setApiKey('')
     setMaxResults(String(c.maxResults ?? 6))
@@ -237,6 +241,7 @@ export function CrwConfigSection() {
     // 60 is the service's own ceiling: it refuses a larger per-page budget.
     pageTimeoutMs: clampInt(pageTimeoutSeconds, 5, 60, 45) * 1000,
     searchEngines: orderedEngines(engineSlots),
+    assistantSearch,
   })
 
   const handleSave = async () => {
@@ -418,6 +423,27 @@ export function CrwConfigSection() {
               />
             }
             label={t('settingsCrw.enabledLabel')}
+          />
+
+          <FormControlLabel
+            id="crw-assistant-search"
+            control={
+              <Switch
+                checked={assistantSearch}
+                onChange={(e) => {
+                  setAssistantSearch(e.target.checked)
+                  markChanged()
+                }}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2">{t('settingsCrw.assistantSearchLabel')}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {t('settingsCrw.assistantSearchHelp')}
+                </Typography>
+              </Box>
+            }
           />
 
           <TextField

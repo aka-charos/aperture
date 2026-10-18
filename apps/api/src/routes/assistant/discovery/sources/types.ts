@@ -3,7 +3,8 @@
  *
  * A source turns a free-text request into grounded web material (text, plus
  * optional structured references). Two kinds exist today: the Google grounding
- * role (an LLM that searches and suggests) and Tavily (a pure search API). The
+ * role (an LLM that searches and suggests), and search APIs that return pages
+ * or snippets — Tavily and the self-hosted fastCRW. The
  * orchestrator runs every enabled source, combines their text, and feeds the
  * combination into ONE structuring pass — so sources compose (extra grounding),
  * fall back for one another, and let the model synthesize across all of them.
@@ -22,7 +23,7 @@ export interface WebSearchSourceReference {
 }
 
 export interface WebSearchSourceResult {
-  /** Stable source id ('google' | 'tavily' | …) for logging + labeling. */
+  /** Stable source id ('google' | 'tavily' | 'fastcrw' | …) for logging + labeling. */
   source: string
   /** Grounded material: LLM suggestions (Google) or answer + snippets (Tavily). */
   text: string

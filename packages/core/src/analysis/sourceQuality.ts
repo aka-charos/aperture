@@ -289,10 +289,15 @@ export function isOffTopic(text: string, filmNames: readonly string[]): boolean 
  *
  * `filmNames` enables the relevance test; omitting them skips it, which is what
  * every caller that does not know the title should do.
+ *
+ * `failOpen` (default true) is analysis's rule. The assistant's fastCRW source
+ * passes false: it runs beside other sources, so a set of worthless pages
+ * should contribute nothing rather than everything.
  */
 export function dropLowValueSources<T extends QualitySource>(
   sources: readonly T[],
-  filmNames: readonly string[] = []
+  filmNames: readonly string[] = [],
+  options: { failOpen?: boolean } = {}
 ): { kept: T[]; dropped: DroppedSource[] } {
   const dropped: DroppedSource[] = []
   const kept = sources.filter((source) => {
@@ -326,6 +331,6 @@ export function dropLowValueSources<T extends QualitySource>(
   // Fails open: see the header. A retrieval made entirely of listed domains is
   // a fact about how little has been written about the title, and the floor is
   // what should say so.
-  if (kept.length === 0) return { kept: [...sources], dropped: [] }
+  if (kept.length === 0 && options.failOpen !== false) return { kept: [...sources], dropped: [] }
   return { kept, dropped }
 }

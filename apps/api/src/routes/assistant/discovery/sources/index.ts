@@ -9,13 +9,14 @@ import { createChildLogger } from '@aperture/core'
 import type { WebSearchSource, WebSearchSourceResult } from './types.js'
 import { googleGroundingSource } from './googleGrounding.js'
 import { tavilySource } from './tavily.js'
+import { crwSource } from './crw.js'
 
 export * from './types.js'
 
 const logger = createChildLogger('web-sources')
 
 /** All registered web-search sources. Order = the order material is combined in. */
-const ALL_SOURCES: WebSearchSource[] = [googleGroundingSource, tavilySource]
+const ALL_SOURCES: WebSearchSource[] = [googleGroundingSource, tavilySource, crwSource]
 
 /**
  * Gather grounded material from every enabled source, concurrently. Each source

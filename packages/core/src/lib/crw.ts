@@ -220,6 +220,14 @@ export interface CrwConfig {
    * opposite of a fallback.
    */
   searchEngines: CrwSearchEngine[]
+  /**
+   * Whether the assistant's web search also asks fastCRW, beside Google
+   * grounding and Tavily (`lib/crwChatSearch.ts`). ON whenever the integration
+   * is enabled: absent reads as true, only an explicit `false` leaves it out.
+   * The switch exists because CRW serializes searches on one browser tab, so an
+   * operator running library-wide analysis may not want chat queued behind it.
+   */
+  assistantSearch: boolean
 }
 
 export const DEFAULT_CRW_CONFIG: CrwConfig = {
@@ -248,6 +256,7 @@ export const DEFAULT_CRW_CONFIG: CrwConfig = {
   // Google first because its results are the best of the three when it is not
   // walling the client, and the fallbacks cost nothing on a run where it works.
   searchEngines: ['google', 'duckduckgo', 'bing'],
+  assistantSearch: true,
 }
 
 const SETTING_KEY = 'crw_integration'
@@ -401,6 +410,9 @@ function sanitize(config: Partial<CrwConfig>): CrwConfig {
       config.analysisMaxOutputTokens ?? DEFAULT_CRW_CONFIG.analysisMaxOutputTokens
     ),
     searchEngines: sanitizeSearchEngines(config.searchEngines),
+    // Absent ≠ false: a config saved before the switch existed keeps the
+    // default (on). Only an explicit false turns it off.
+    assistantSearch: config.assistantSearch !== false,
   }
 }
 

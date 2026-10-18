@@ -54,6 +54,16 @@ export {
   type CrwSearchResponse,
   type CrwSearchResultItem,
 } from './crw.js'
+export {
+  searchCrwForChat,
+  prepareChatPages,
+  trimPageText,
+  CHAT_CRW_MAX_PAGES,
+  CHAT_CRW_PAGE_TIMEOUT_MS,
+  CHAT_CRW_REQUEST_TIMEOUT_MS,
+  CHAT_CRW_PAGE_CHARS,
+  type ChatSearchPage,
+} from './crwChatSearch.js'
 
 export {
   getPool,

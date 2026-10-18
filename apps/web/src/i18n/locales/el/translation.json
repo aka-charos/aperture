@@ -5090,6 +5090,8 @@
     "chipEnabled": "Enabled",
     "chipDisabled": "Configured, off",
     "enabledLabel": "Use the retrieval service",
+    "assistantSearchLabel": "Χρήση στην αναζήτηση ιστού του βοηθού",
+    "assistantSearchHelp": "Όταν η υπηρεσία είναι ενεργή, ο βοηθός την ψάχνει επίσης για προτάσεις, δίπλα στη Google και στο Tavily: μία μηχανή, έως 5 σελίδες, το πολύ περίπου 25 δευτερόλεπτα ανά αίτημα. Απενεργοποιήστε το για να μείνει μόνο για την ανάλυση τίτλων· οι αναζητήσεις μπαίνουν σε ουρά στην υπηρεσία, οπότε μια εργασία ανάλυσης που τρέχει μπορεί να καθυστερήσει τη συνομιλία.",
     "baseUrlLabel": "Service URL",
     "baseUrlHelp": "The service root, no path. fastCRW usually runs in its own Compose project, so its container name will not resolve from here — use the published host port (http://host.docker.internal:3000 on Docker Desktop) unless both stacks share a network. Never localhost.",
     "apiKeyLabel": "API key (optional)",

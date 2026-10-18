@@ -79,6 +79,14 @@ The cascade self-heals: **five consecutive empty answers park an engine at the b
 
 The `generate-title-analysis` job (manual by default, schedulable, with a configurable titles-per-run limit) refuses to start when the mode isn't ready. Per title: engines are tried in health order, the first with results wins, and the criticism search runs beside it. Before anything reaches the prompt, pages that are bot walls, empty fetches, listings with no prose, pages that never name the title, and repeats of a page already kept are dropped, at most one page per site is kept, and navigation menus and plot sections are stripped from what is left. Optionally, the [decision model](decision-model.md#weeding-title-analysis-sources) then drops pages that carry no writing about the title. The remaining text is budgeted to the configured character cap. The retrieval mode and the sources are recorded per analysis so results are comparable. A grounded call that returns **zero** grounding citations is thrown away — the model answered from memory, which is exactly what this feature exists to prevent.
 
+## The Assistant's Web Search
+
+When the service is enabled, the assistant also searches it for recommendations, beside Google and [Tavily](tavily.md). The switch **Use in the assistant's web search** on the card (on by default) leaves it out of the chat without turning it off for title analysis.
+
+The chat asks for much less than an analysis does: one engine (the first that isn't parked, with no cascade), up to 5 pages, 15 seconds per page and about 25 seconds for the whole search. Bot walls and pages with no real text are dropped, menus are stripped, and each page is trimmed before it is combined with the other sources. If nothing worth keeping comes back, the chat carries on with the other sources.
+
+Searches queue on the service, so while a title analysis job is running a chat search can wait behind it and run out of time. Turn the switch off if that matters more than the extra source.
+
 Failures land in the [API errors](api-errors.md) panel under the fastCRW provider.
 
 ---

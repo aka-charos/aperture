@@ -45,6 +45,8 @@ interface CrwUpdateBody {
    * order is preference, not parallelism.
    */
   searchEngines?: string[]
+  /** Whether the assistant's web search also asks fastCRW. See CrwConfig.assistantSearch. */
+  assistantSearch?: boolean
   /**
    * Where title analysis gets its sources. Lives on this endpoint rather than
    * its own because it decides whether anything else on this card is used at
@@ -67,6 +69,7 @@ interface PublicCrwConfig {
   sourceBudgetChars: number
   analysisMaxOutputTokens: number
   searchEngines: CrwSearchEngine[]
+  assistantSearch: boolean
 }
 
 function validateConfig(config: CrwConfig): string | null {
@@ -179,6 +182,7 @@ function toPublicConfig(config: CrwConfig): PublicCrwConfig {
     sourceBudgetChars: config.sourceBudgetChars,
     analysisMaxOutputTokens: config.analysisMaxOutputTokens,
     searchEngines: config.searchEngines,
+    assistantSearch: config.assistantSearch,
   }
 }
 
@@ -241,6 +245,8 @@ export function registerCrwHandlers(fastify: FastifyInstance) {
           searchEngines: body.searchEngines
             ? sanitizeSearchEngines(body.searchEngines)
             : current.searchEngines,
+          assistantSearch:
+            typeof body.assistantSearch === 'boolean' ? body.assistantSearch : current.assistantSearch,
         }
 
         const validationError = validateConfig(newConfig)

@@ -2835,6 +2835,8 @@
     "chipEnabled": "Enabled",
     "chipDisabled": "Configured, off",
     "enabledLabel": "Use the retrieval service",
+    "assistantSearchLabel": "Use in the assistant's web search",
+    "assistantSearchHelp": "When the service is on, the assistant also searches it for recommendations, beside Google and Tavily: one engine, up to 5 pages, at most about 25 seconds per request. Turn this off to keep it for title analysis only; searches queue on the service, so a running analysis job can slow the chat.",
     "baseUrlLabel": "Service URL",
     "baseUrlHelp": "The service root, no path. fastCRW usually runs in its own Compose project, so its container name will not resolve from here — use the published host port (http://host.docker.internal:3000 on Docker Desktop) unless both stacks share a network. Never localhost.",
     "apiKeyLabel": "API key (optional)",
