@@ -3936,7 +3936,17 @@
     "statsWindow": "Last {{count}} days",
     "statsMoreDetails": "More details",
     "recentlyWatchedBy": "Πρόσφατες προβολές: {{name}}",
-    "subtitleFromConnections": "Από τις συνδέσεις σας"
+    "subtitleFromConnections": "Από τις συνδέσεις σας",
+    "featured": {
+      "movie": "Η κορυφαία πρότασή σας σε ταινίες",
+      "series": "Η κορυφαία πρότασή σας σε σειρές",
+      "match": "{{score}}% ταίριασμα",
+      "open": "Λεπτομέρειες",
+      "show": "Εμφάνιση: {{title}}",
+      "runtimeHm": "{{hours}} ώρ. {{mins}} λ.",
+      "runtimeM": "{{mins}} λ."
+    },
+    "rankLabel": "Θέση {{rank}}"
   },
   "algorithmSettings": {
     "weightSimilarity": "Ομοιότητα",

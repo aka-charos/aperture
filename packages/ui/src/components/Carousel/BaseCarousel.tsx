@@ -78,6 +78,38 @@ function RightArrow() {
   )
 }
 
+/**
+ * A row's title with its subtitle on the same line, the subtitle muted. Two
+ * stacked lines spent a line of every row on a sentence that is a gloss on the
+ * title; on a narrow screen the subtitle wraps under it on its own.
+ */
+function RowHeading({ title, subtitle }: { title: ReactNode; subtitle?: ReactNode }) {
+  return (
+    <Box sx={{ minWidth: 0, display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0.25 }}>
+      <Typography component="h2" variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.3 }}>
+        {title}
+      </Typography>
+      {subtitle && (
+        <Typography variant="body2" color="text.secondary">
+          {subtitle}
+        </Typography>
+      )}
+    </Box>
+  )
+}
+
+/** Round, outlined arrows; a disabled one fades rather than vanishing. */
+function arrowSx(enabled: boolean) {
+  return {
+    width: 36,
+    height: 36,
+    border: 1,
+    borderColor: 'divider',
+    opacity: enabled ? 1 : 0.35,
+    bgcolor: enabled ? 'action.hover' : 'transparent',
+  }
+}
+
 export function BaseCarousel({
   title,
   subtitle,
@@ -138,9 +170,9 @@ export function BaseCarousel({
     const count = fit ? fit.count : skeletonCount
     return (
       <Box ref={rowRef}>
-        <Typography variant="h6" fontWeight={600} mb={2}>
-          {title}
-        </Typography>
+        <Box sx={{ mb: 2 }}>
+          <RowHeading title={title} subtitle={subtitle} />
+        </Box>
         <Box sx={{ display: 'flex', gap: GAP_UNITS, overflow: 'hidden' }}>
           {Array.from({ length: count }).map((_, i) => (
             <Box key={i} sx={{ flexShrink: 0 }}>
@@ -161,9 +193,9 @@ export function BaseCarousel({
 
     return (
       <Box>
-        <Typography variant="h6" fontWeight={600} mb={2}>
-          {title}
-        </Typography>
+        <Box sx={{ mb: 2 }}>
+          <RowHeading title={title} subtitle={subtitle} />
+        </Box>
         <Box
           sx={{
             py: 4,
@@ -183,23 +215,14 @@ export function BaseCarousel({
   return (
     <Box ref={rowRef}>
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 2 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h6" fontWeight={600}>
-            {title}
-          </Typography>
-          {subtitle && (
-            <Typography variant="caption" color="text.secondary">
-              {subtitle}
-            </Typography>
-          )}
-        </Box>
-        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 2 }}>
+        <RowHeading title={title} subtitle={subtitle} />
+        <Box sx={{ display: 'flex', gap: 0.75, flexShrink: 0 }}>
           <IconButton
             size="small"
             onClick={() => scroll('left')}
             disabled={!canScrollLeft}
-            sx={{ opacity: canScrollLeft ? 1 : 0.3 }}
+            sx={arrowSx(canScrollLeft)}
           >
             <LeftArrow />
           </IconButton>
@@ -207,7 +230,7 @@ export function BaseCarousel({
             size="small"
             onClick={() => scroll('right')}
             disabled={!canScrollRight}
-            sx={{ opacity: canScrollRight ? 1 : 0.3 }}
+            sx={arrowSx(canScrollRight)}
           >
             <RightArrow />
           </IconButton>

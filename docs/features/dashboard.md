@@ -4,7 +4,7 @@ The Dashboard is your home screen: a time-boxed snapshot of your viewing, your A
 
 ## Greeting & Quick Stats
 
-A time-of-day greeting heads the page, above a stats bar covering the **last 30 days** (it says so, and links **More details** to [Watch Stats](watch-stats.md) for the all-time view):
+A time-of-day greeting heads the page, above one line of stats covering the **last 30 days** (it says so, and links **More details** to [Watch Stats](watch-stats.md) for the all-time view). On a phone the four figures sit in a 2×2 grid:
 
 | Stat | Description |
 |------|-------------|
@@ -17,9 +17,11 @@ A time-of-day greeting heads the page, above a stats bar covering the **last 30 
 
 ## Your AI Picks
 
-Two carousels — **Your AI Movie Recommendations** and **Your AI Series Recommendations** ("Personalized picks based on your taste"):
+Your **top movie pick** and **top series pick** are featured first, in a panel led by the poster: the match, the year, genres and running time, and the explanation of why it was picked (when AI explanations are on for you). The small posters under it switch between the two, and **Details** opens the title.
 
-- **Rank badges** — numbered, matching the order on [My Recommendations](recommendations.md)
+Then two rows — **Your AI Movie Recommendations** and **Your AI Series Recommendations** ("Personalized picks based on your taste") — starting at each list's second pick:
+
+- **Rank and match under each poster** — the number matches the order on [My Recommendations](recommendations.md), and a bar shows the match. They sit under the poster rather than on it, so the poster's own art and any badges your server draws on it stay uncovered
 - **Rate from the poster** — hover and pick stars (1–10)
 - **Click any poster** to open the title in a window over the dashboard, with its insights panel; close it and you're back where you were
 
@@ -39,7 +41,7 @@ The row is hidden when none of your shows has anything new or upcoming.
 
 ## Most Watched Lately
 
-**Most Watched Movies Lately** and **Most Watched Series Lately** ("Popular movies/TV series across all users") — the same ranking as the [Most Watched Lately](top-picks.md) page, in carousel form.
+**Most Watched Movies Lately** and **Most Watched Series Lately** ("Popular movies/TV series across all users") — the same ranking as the [Most Watched Lately](top-picks.md) page, in carousel form, with each title's place under its poster.
 
 ## Recently Watched by Your Connections
 

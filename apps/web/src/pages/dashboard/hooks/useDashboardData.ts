@@ -21,6 +21,9 @@ interface DashboardRecommendation {
   posterUrl: string | null
   genres: string[]
   matchScore: number | null
+  /** Why it was picked; null when none was written or explanations are off for this viewer. Absent on an older server. */
+  explanation?: string | null
+  runtimeMinutes?: number | null
 }
 
 interface DashboardTopPick {

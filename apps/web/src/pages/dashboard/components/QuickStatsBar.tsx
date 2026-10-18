@@ -1,4 +1,4 @@
-import { Box, Card, Typography, Skeleton, Link as MuiLink } from '@mui/material'
+import { alpha, Box, Typography, Skeleton, Link as MuiLink } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -22,7 +22,7 @@ interface QuickStatsBarProps {
   loading?: boolean
 }
 
-interface StatCardProps {
+interface StatProps {
   icon: React.ReactNode
   label: string
   value: string | number
@@ -30,54 +30,56 @@ interface StatCardProps {
   loading?: boolean
 }
 
-function StatCard({ icon, label, value, color, loading }: StatCardProps) {
+/**
+ * One figure: a tinted icon, the number, its label. On a phone each sits in
+ * its own small card in a 2×2 grid; from `md` the four share one strip.
+ */
+function Stat({ icon, label, value, color, loading }: StatProps) {
   return (
-    <Card
+    <Box
+      role="listitem"
       sx={{
-        flex: { xs: '1 1 calc(50% - 8px)', sm: 1 },
-        minWidth: { xs: 0, sm: 140 },
-        p: { xs: 1.5, sm: 2 },
         display: 'flex',
         alignItems: 'center',
-        gap: 1.5,
-        backgroundColor: 'background.paper',
-        border: '1px solid',
+        gap: 1,
+        minWidth: 0,
+        px: { xs: 1.25, md: 1.5 },
+        py: { xs: 1, md: 0.75 },
+        pl: { md: 0.75 },
+        borderRadius: { xs: 3, md: 999 },
+        bgcolor: { xs: 'background.paper', md: 'transparent' },
+        border: { xs: 1, md: 0 },
         borderColor: 'divider',
-        borderRadius: 2,
       }}
     >
       <Box
         sx={{
-          width: 44,
-          height: 44,
-          borderRadius: 2,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: `${color}20`,
-          color: color,
+          width: 28,
+          height: 28,
+          flex: '0 0 auto',
+          borderRadius: '50%',
+          display: 'grid',
+          placeItems: 'center',
+          backgroundColor: alpha(color, 0.2),
+          color,
+          '& svg': { fontSize: 16 },
         }}
       >
         {icon}
       </Box>
-      <Box>
-        {loading ? (
-          <>
-            <Skeleton width={60} height={28} />
-            <Skeleton width={80} height={16} />
-          </>
-        ) : (
-          <>
-            <Typography variant="h6" fontWeight={700} lineHeight={1.2}>
-              {value}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {label}
-            </Typography>
-          </>
-        )}
-      </Box>
-    </Card>
+      {loading ? (
+        <Skeleton width={90} height={22} />
+      ) : (
+        <>
+          <Typography component="span" sx={{ fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap' }}>
+            {value}
+          </Typography>
+          <Typography component="span" variant="body2" color="text.secondary" noWrap>
+            {label}
+          </Typography>
+        </>
+      )}
+    </Box>
   )
 }
 
@@ -99,79 +101,99 @@ export function QuickStatsBar({
 }: QuickStatsBarProps) {
   const { t } = useTranslation()
   const theme = useTheme()
+  const windowLabel = windowDays != null ? t('dashboard.statsWindow', { count: windowDays }) : null
+  const moreLink = (
+    <MuiLink
+      component={RouterLink}
+      to="/stats"
+      underline="none"
+      sx={{
+        flexShrink: 0,
+        fontSize: 13,
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+        px: { md: 1.5 },
+        py: { md: 0.75 },
+        borderRadius: 999,
+        bgcolor: { md: alpha(theme.palette.primary.main, 0.16) },
+        color: { xs: 'primary.light', md: 'primary.light' },
+        '&:hover': { bgcolor: { md: alpha(theme.palette.primary.main, 0.26) } },
+      }}
+    >
+      {t('dashboard.statsMoreDetails')}
+    </MuiLink>
+  )
+
+  // The bar states the period it covers, because four bare numbers do not say
+  // whether they mean this month or all the years on the server — and the link
+  // is where the all-time figures went. From `md` it is one strip: the four
+  // figures, then the period and the link, so it costs one line of the page.
   return (
-    <Box>
-      {/* The bar states the period it covers, because four bare numbers do
-          not say whether they mean this month or all the years on the
-          server — and the link is where the all-time figures went. */}
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       <Box
+        role="list"
+        aria-label={windowLabel ?? undefined}
         sx={{
-          display: 'flex',
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
-          gap: 2,
-          mb: 1,
+          display: { xs: 'grid', md: 'flex' },
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          alignItems: 'center',
+          gap: { xs: 1, md: 0.5 },
+          alignSelf: { md: 'flex-start' },
+          maxWidth: '100%',
+          p: { md: 0.75 },
+          borderRadius: 999,
+          bgcolor: { md: 'background.paper' },
+          border: { md: 1 },
+          borderColor: { md: 'divider' },
         }}
       >
-        {windowDays != null ? (
-          <Typography variant="caption" color="text.secondary">
-            {t('dashboard.statsWindow', { count: windowDays })}
-          </Typography>
-        ) : (
-          <span />
-        )}
-        <MuiLink
-          component={RouterLink}
-          to="/stats"
-          variant="caption"
-          underline="hover"
-          sx={{ flexShrink: 0 }}
-        >
-          {t('dashboard.statsMoreDetails')}
-        </MuiLink>
-      </Box>
-      <Box
-        sx={{
-          display: 'flex',
-          gap: 2,
-          flexWrap: { xs: 'wrap', sm: 'nowrap' },
-          overflowX: { xs: 'visible', sm: 'auto' },
-          pb: 1,
-          '&::-webkit-scrollbar': { height: 6 },
-          '&::-webkit-scrollbar-thumb': {
-            backgroundColor: 'divider',
-            borderRadius: 3,
-          },
-        }}
-      >
-        <StatCard
+        <Stat
           icon={<MovieIcon />}
           label={t('dashboard.statMoviesWatched')}
           value={moviesWatched.toLocaleString()}
           color={theme.palette.primary.main}
           loading={loading}
         />
-        <StatCard
+        <Stat
           icon={<TvIcon />}
           label={t('dashboard.statSeriesWatched')}
           value={seriesWatched.toLocaleString()}
           color={theme.palette.secondary.main}
           loading={loading}
         />
-        <StatCard
+        <Stat
           icon={<FavoriteIcon />}
           label={t('dashboard.statRatings')}
           value={ratingsCount.toLocaleString()}
           color="#ec4899"
           loading={loading}
         />
-        <StatCard
+        <Stat
           icon={<AccessTimeIcon />}
           label={t('dashboard.statWatchTime')}
           value={formatWatchTime(watchTimeMinutes, t)}
           color="#10b981"
           loading={loading}
         />
+        <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1.25, ps: 1, ms: 0.5, borderInlineStart: 1, borderColor: 'divider' }}>
+          {windowLabel && (
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {windowLabel}
+            </Typography>
+          )}
+          {moreLink}
+        </Box>
+      </Box>
+      {/* On a phone the period and the link sit under the grid. */}
+      <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'space-between', alignItems: 'baseline', gap: 2 }}>
+        {windowLabel ? (
+          <Typography variant="caption" color="text.secondary">
+            {windowLabel}
+          </Typography>
+        ) : (
+          <span />
+        )}
+        {moreLink}
       </Box>
     </Box>
   )

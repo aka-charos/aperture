@@ -4538,7 +4538,17 @@
     "typeMovie": "Movie",
     "typeSeries": "Series",
     "recentlyWatchedBy": "Recently watched by {{name}}",
-    "subtitleFromConnections": "From your connections"
+    "subtitleFromConnections": "From your connections",
+    "featured": {
+      "movie": "Your top movie pick",
+      "series": "Your top series pick",
+      "match": "{{score}}% match",
+      "open": "Details",
+      "show": "Show {{title}}",
+      "runtimeHm": "{{hours}}h {{mins}}m",
+      "runtimeM": "{{mins}}m"
+    },
+    "rankLabel": "Number {{rank}}"
   },
   "playlists": {
     "pageTitle": "Playlists",

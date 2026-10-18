@@ -34,6 +34,12 @@ interface DashboardRecommendation {
   posterUrl: string | null
   genres: string[]
   matchScore: number | null
+  /**
+   * Why it was picked, as written for this viewer. Null when the run wrote
+   * none or the viewer's effective AI-explanation setting is off — the same
+   * gate the insights panel applies (core getEffectiveAiExplanationSetting).
+   */
+  explanation: string | null
   /** Movie only */
   runtimeMinutes?: number | null
   /** Series only */
@@ -194,6 +200,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           genres: string[]
           final_score: number | null
           runtime_minutes: number | null
+          ai_explanation: string | null
         }>(
           `
           SELECT
@@ -203,7 +210,8 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             m.poster_url,
             m.genres,
             rc.final_score,
-            m.runtime_minutes
+            m.runtime_minutes,
+            rc.ai_explanation
           FROM recommendation_candidates rc
           JOIN movies m ON m.id = rc.movie_id
           WHERE rc.run_id = (
@@ -229,6 +237,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           final_score: number | null
           total_seasons: number | null
           total_episodes: number | null
+          ai_explanation: string | null
         }>(
           `
           SELECT
@@ -239,7 +248,8 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             s.genres,
             rc.final_score,
             s.total_seasons,
-            s.total_episodes
+            s.total_episodes,
+            rc.ai_explanation
           FROM recommendation_candidates rc
           JOIN series s ON s.id = rc.series_id
           WHERE rc.run_id = (
@@ -415,6 +425,13 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         ]),
       ])
 
+      // The featured pick on Home shows its written explanation. Withheld
+      // unless the viewer's effective setting allows it, the gate every other
+      // surface showing one applies.
+      const { getEffectiveAiExplanationSetting } = await import('@aperture/core')
+      const showExplanations = await getEffectiveAiExplanationSetting(user.id).catch(() => false)
+      const explanationOf = (text: string | null) => (showExplanations && text?.trim() ? text.trim() : null)
+
       // Build recommendations (interleave movies and series)
       const movieRecs = movieRecsResult.rows.filter((r) => visibleMovies.has(r.movie_id)).map((r) => ({
         id: r.movie_id,
@@ -424,6 +441,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         posterUrl: r.poster_url,
         genres: r.genres || [],
         matchScore: r.final_score ? Math.round(r.final_score * 100) : null,
+        explanation: explanationOf(r.ai_explanation),
         runtimeMinutes: r.runtime_minutes,
       }))
       const seriesRecs = seriesRecsResult.rows.filter((r) => visibleSeries.has(r.series_id)).map((r) => ({
@@ -434,6 +452,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         posterUrl: r.poster_url,
         genres: r.genres || [],
         matchScore: r.final_score ? Math.round(r.final_score * 100) : null,
+        explanation: explanationOf(r.ai_explanation),
         totalSeasons: r.total_seasons,
         totalEpisodes: r.total_episodes,
       }))
