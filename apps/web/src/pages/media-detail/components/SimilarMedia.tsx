@@ -15,6 +15,7 @@ import {
   Alert,
   Chip,
   Stack,
+  Skeleton,
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { MoviePoster } from '@aperture/ui'
@@ -87,6 +88,8 @@ interface SimilarMediaProps {
   mediaId?: string
   mediaTitle?: string
   similar: SimilarItem[]
+  /** The list is still being searched; draws placeholder posters in its place. */
+  loading?: boolean
   /** Show the picked item without routing (set when this list is inside a dialog). */
   onOpenMedia?: (mediaType: MediaType, id: string) => void
 }
@@ -96,6 +99,7 @@ export function SimilarMedia({
   mediaId,
   mediaTitle,
   similar,
+  loading = false,
   onOpenMedia,
 }: SimilarMediaProps) {
   const { t } = useTranslation()
@@ -257,6 +261,14 @@ export function SimilarMedia({
             gap: 2,
           }}
         >
+          {loading &&
+            similar.length === 0 &&
+            Array.from({ length: DEFAULT_SIMILAR_MEDIA_LIMIT }, (_, i) => (
+              <Box key={i}>
+                <Skeleton variant="rounded" sx={{ width: '100%', height: 'auto', aspectRatio: '2 / 3' }} />
+                <Skeleton variant="text" sx={{ mt: 1, width: '80%' }} />
+              </Box>
+            ))}
           {similar.map((item) => (
             <Box key={item.id}>
               <MoviePoster

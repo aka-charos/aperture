@@ -47,6 +47,8 @@ export interface UseMediaDetailReturn {
   media: Media | null
   mediaType: MediaType
   similar: SimilarItem[]
+  /** True while the similar-titles search is still running (it is the slowest part of the page). */
+  similarLoading: boolean
   insights: RecommendationInsights | null
   mediaServer: MediaServerInfo | null
   watchStatus: WatchStatus | null
@@ -90,6 +92,7 @@ export function useMediaDetail(
   const displayLanguage = i18n.resolvedLanguage ?? i18n.language
   const [media, setMedia] = useState<Media | null>(null)
   const [similar, setSimilar] = useState<SimilarItem[]>([])
+  const [similarLoading, setSimilarLoading] = useState(true)
   const [insights, setInsights] = useState<RecommendationInsights | null>(null)
   const [mediaServer, setMediaServer] = useState<MediaServerInfo | null>(null)
   const [watchStatus, setWatchStatus] = useState<WatchStatus | null>(null)
@@ -108,169 +111,151 @@ export function useMediaDetail(
   const [seasonAvailability, setSeasonAvailability] = useState<SeasonAvailability[]>([])
 
   useEffect(() => {
+    if (!id) return
+
+    // The page used to await each of these in turn — media, then similar
+    // titles, then watch stats, then the viewer's own data — and hold one
+    // spinner over all of it. Similar titles is a vector search that takes
+    // seconds, so every title page sat blank for that long and only then
+    // started the rest. Now the page appears as soon as the title itself is in,
+    // and each request fills its own part of it whenever it lands.
+    //
+    // `cancelled` matters more than it did: with the spinner gone early, a
+    // late answer for the title just left would land on the one now open (the
+    // modal swaps titles in place).
+    let cancelled = false
+    const live = () => !cancelled
+
+    setLoading(true)
+    setError(null)
+    // Last title's answers must not show under this one while its own load.
+    setSimilar([])
+    setSimilarLoading(true)
+    setWatchStats(null)
+    setInsights(null)
+    setWatchStatus(null)
+    setUserRating(null)
+
+    const getJson = async <T,>(url: string): Promise<T | null> => {
+      const response = await fetch(url, { credentials: 'include' })
+      return response.ok ? ((await response.json()) as T) : null
+    }
+
+    const base = mediaType === 'movie' ? `/api/movies/${id}` : `/api/series/${id}`
+
+    // Everything below depends only on the id, so it starts with the title
+    // rather than after it. Each part fails on its own and leaves its section
+    // empty, as each did before.
+    getJson<{ similar?: SimilarItem[] }>(`${base}/similar?limit=${DEFAULT_SIMILAR_MEDIA_LIMIT}`)
+      .then((data) => {
+        if (live() && data) setSimilar(data.similar || [])
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (live()) setSimilarLoading(false)
+      })
+
+    getJson<WatchStats>(`${base}/watch-stats`)
+      .then((data) => {
+        if (live() && data) setWatchStats(data)
+      })
+      .catch(() => {})
+
+    if (userId) {
+      getJson<RecommendationInsights>(`/api/recommendations/${userId}/${mediaType}/${id}/insights`)
+        .then((data) => {
+          if (live() && data) setInsights(data)
+        })
+        .catch(() => {})
+
+      if (mediaType === 'movie') {
+        // Watch state for THIS film.
+        //
+        // This used to fetch the whole history with pageSize=1000 and scan it
+        // for the movie, but the list route caps pageSize at 100 — so it saw
+        // the first hundred titles alphabetically and answered "not watched"
+        // for everything past them. On a 244-film history that is most of it,
+        // and the page offered to Mark Watched films the viewer had finished
+        // while the poster grids ticked them correctly.
+        getJson<{ watched?: boolean; playCount?: number; lastWatched?: string | null }>(
+          `/api/users/${userId}/watch-history/movies/${id}`
+        )
+          .then((watchData) => {
+            if (!live() || !watchData) return
+            setWatchStatus({
+              isWatched: watchData.watched === true,
+              playCount: watchData.playCount ?? 0,
+              lastWatched: watchData.lastWatched ?? null,
+            })
+          })
+          .catch(() => {})
+
+        getJson<{ rating?: number | null }>(`/api/ratings/movie/${id}`)
+          .then((ratingData) => {
+            if (live() && ratingData) setUserRating(ratingData.rating ?? null)
+          })
+          .catch(() => {})
+      } else {
+        getJson<{ ratings?: { series_id: string; rating: number }[] }>('/api/ratings')
+          .then((ratingsData) => {
+            if (!live() || !ratingsData) return
+            const seriesRating = ratingsData.ratings?.find((r) => r.series_id === id)
+            setUserRating(seriesRating?.rating || null)
+          })
+          .catch(() => {})
+      }
+    }
+
     const fetchMedia = async () => {
-      if (!id) return
-
-      setLoading(true)
-      setError(null)
-
       try {
         // The language the page is displayed in rides along, so the server can
         // attach a machine translation of the synopsis in that language
         // (`localized_synopsis`) — only the client knows which one it rendered.
         const lang = encodeURIComponent(displayLanguage)
-        const endpoint =
-          mediaType === 'movie' ? `/api/movies/${id}?lang=${lang}` : `/api/series/${id}?lang=${lang}`
 
-        // Fetch media and media server info in parallel
         const fetchPromises: Promise<Response>[] = [
-          fetch(endpoint, { credentials: 'include' }),
+          fetch(`${base}?lang=${lang}`, { credentials: 'include' }),
           fetch('/api/settings/media-server', { credentials: 'include' }),
         ]
-
-        // For series, also fetch episodes
         if (mediaType === 'series') {
           fetchPromises.push(fetch(`/api/series/${id}/episodes`, { credentials: 'include' }))
         }
 
-        const responses = await Promise.all(fetchPromises)
-        const [mediaResponse, mediaServerResponse, episodesResponse] = responses
+        const [mediaResponse, mediaServerResponse, episodesResponse] = await Promise.all(fetchPromises)
+        if (!live()) return
 
-        // Process media server info
         if (mediaServerResponse.ok) {
           const mediaServerData = await mediaServerResponse.json()
-          setMediaServer(mediaServerData)
+          if (live()) setMediaServer(mediaServerData)
         }
 
-        if (mediaResponse.ok) {
-          const data = await mediaResponse.json()
-          // Add type to the media object
-          const mediaWithType = { ...data, type: mediaType } as Media
-          setMedia(mediaWithType)
+        if (!mediaResponse.ok) {
+          if (live()) setError(`${mediaType === 'movie' ? 'Movie' : 'Series'} not found`)
+          return
+        }
 
-          // Process episodes for series
-          if (mediaType === 'series' && episodesResponse?.ok) {
-            const episodesData = await episodesResponse.json()
-            setSeasons(episodesData.seasons || {})
-            setSeasonAvailability(episodesData.seasonAvailability || [])
-          }
+        const data = await mediaResponse.json()
+        if (!live()) return
+        setMedia({ ...data, type: mediaType } as Media)
 
-          // Fetch similar items (same default count as graph neighbors)
-          const similarEndpoint =
-            mediaType === 'movie'
-              ? `/api/movies/${id}/similar?limit=${DEFAULT_SIMILAR_MEDIA_LIMIT}`
-              : `/api/series/${id}/similar?limit=${DEFAULT_SIMILAR_MEDIA_LIMIT}`
-
-          const similarResponse = await fetch(similarEndpoint, { credentials: 'include' })
-          if (similarResponse.ok) {
-            const similarData = await similarResponse.json()
-            setSimilar(similarData.similar || [])
-          }
-
-          // Fetch watch stats (how many users watched)
-          const watchStatsEndpoint =
-            mediaType === 'movie'
-              ? `/api/movies/${id}/watch-stats`
-              : `/api/series/${id}/watch-stats`
-          
-          const watchStatsResponse = await fetch(watchStatsEndpoint, { credentials: 'include' })
-          if (watchStatsResponse.ok) {
-            const statsData = await watchStatsResponse.json()
-            setWatchStats(statsData)
-          }
-
-          // Fetch user-specific data
-          if (userId) {
-            const userFetchPromises: Promise<Response>[] = []
-
-            // Insights endpoint (media-type specific)
-            const insightsUrl =
-              mediaType === 'movie'
-                ? `/api/recommendations/${userId}/movie/${id}/insights`
-                : `/api/recommendations/${userId}/series/${id}/insights`
-            userFetchPromises.push(
-              fetch(insightsUrl, { credentials: 'include' })
-            )
-
-            // Movie-specific: watch state for THIS film.
-            //
-            // This used to fetch the whole history with pageSize=1000 and scan
-            // it for the movie, but the list route caps pageSize at 100 — so it
-            // saw the first hundred titles alphabetically and answered "not
-            // watched" for everything past them. On a 244-film history that is
-            // most of it, and the page offered to Mark Watched films the viewer
-            // had finished while the poster grids ticked them correctly.
-            if (mediaType === 'movie') {
-              userFetchPromises.push(
-                fetch(`/api/users/${userId}/watch-history/movies/${id}`, {
-                  credentials: 'include',
-                })
-              )
-            }
-
-            // Rating endpoint (shared but different for movies/series)
-            userFetchPromises.push(
-              fetch(
-                mediaType === 'movie' ? `/api/ratings/movie/${id}` : '/api/ratings',
-                { credentials: 'include' }
-              )
-            )
-
-            const userResponses = await Promise.all(userFetchPromises)
-
-            if (mediaType === 'movie') {
-              const [insightsResponse, watchHistoryResponse, ratingResponse] = userResponses
-
-              if (insightsResponse.ok) {
-                const insightsData = await insightsResponse.json()
-                setInsights(insightsData)
-              }
-
-              if (watchHistoryResponse.ok) {
-                const watchData = (await watchHistoryResponse.json()) as {
-                  watched?: boolean
-                  playCount?: number
-                  lastWatched?: string | null
-                }
-                setWatchStatus({
-                  isWatched: watchData.watched === true,
-                  playCount: watchData.playCount ?? 0,
-                  lastWatched: watchData.lastWatched ?? null,
-                })
-              }
-
-              if (ratingResponse.ok) {
-                const ratingData = await ratingResponse.json()
-                setUserRating(ratingData.rating)
-              }
-            } else {
-              const [insightsResponse, ratingResponse] = userResponses
-
-              if (insightsResponse.ok) {
-                const insightsData = await insightsResponse.json()
-                setInsights(insightsData)
-              }
-
-              if (ratingResponse.ok) {
-                const ratingsData = await ratingResponse.json()
-                const seriesRating = ratingsData.ratings?.find(
-                  (r: { series_id: string }) => r.series_id === id
-                )
-                setUserRating(seriesRating?.rating || null)
-              }
-            }
-          }
-        } else {
-          setError(`${mediaType === 'movie' ? 'Movie' : 'Series'} not found`)
+        if (mediaType === 'series' && episodesResponse?.ok) {
+          const episodesData = await episodesResponse.json()
+          if (!live()) return
+          setSeasons(episodesData.seasons || {})
+          setSeasonAvailability(episodesData.seasonAvailability || [])
         }
       } catch {
-        setError('Could not connect to server')
+        if (live()) setError('Could not connect to server')
       } finally {
-        setLoading(false)
+        if (live()) setLoading(false)
       }
     }
 
     fetchMedia()
+
+    return () => {
+      cancelled = true
+    }
   }, [mediaType, id, userId, displayLanguage])
 
   // Favorite status lives on the media server, not in our DB — fetched separately.
@@ -424,6 +409,7 @@ export function useMediaDetail(
     media,
     mediaType,
     similar,
+    similarLoading,
     insights,
     refreshExplanation,
     mediaServer,

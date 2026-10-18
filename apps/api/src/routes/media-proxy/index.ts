@@ -8,6 +8,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import { getMediaServerConfig } from '@aperture/core'
 import { mediaProxySchemas } from './schemas.js'
 import { requireAuth } from '../../plugins/auth.js'
+import { withDefaultImageSize } from './imageSize.js'
 
 const mediaProxyRoutes: FastifyPluginAsync = async (fastify) => {
   // Register schemas
@@ -51,10 +52,13 @@ const mediaProxyRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Build the full URL to the media server
-    // Preserve any query parameters from the original request
-    const queryString = request.url.includes('?') 
-      ? request.url.substring(request.url.indexOf('?')) 
+    // Preserve any query parameters from the original request, adding a width
+    // when the caller named none, or the server sends the original file
+    // (imageSize.ts).
+    const rawQuery = request.url.includes('?')
+      ? request.url.substring(request.url.indexOf('?'))
       : ''
+    const queryString = withDefaultImageSize(imagePath, rawQuery)
     const imageUrl = `${config.baseUrl}/${imagePath}${queryString}`
 
     try {

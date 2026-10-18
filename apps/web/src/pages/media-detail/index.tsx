@@ -64,6 +64,7 @@ export function MediaDetailPage({
   const {
     media,
     similar,
+    similarLoading,
     insights,
     mediaServer,
     watchStatus,
@@ -235,6 +236,7 @@ export function MediaDetailPage({
               mediaId={id}
               mediaTitle={media.title}
               similar={similar}
+              loading={similarLoading}
               onOpenMedia={onOpenMedia}
             />
           </Grid>
