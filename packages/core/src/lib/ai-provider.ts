@@ -1730,13 +1730,19 @@ export interface WebSearchUsageTokens {
 export interface WebSearchCallOutcome<T> {
   value: T
   usage?: WebSearchUsageTokens
-  /**
-   * Google searches the call ran, from `groundingSearchCount`. A request is
-   * often several searches and some plans bill per search, so the meter
-   * records it beside the request; omitted, the row stores "not recorded".
-   */
-  searchQueries?: number
 }
+
+/**
+ * How a {@link withGroundingModel} callback reports the Google searches its
+ * request ran (`groundingSearchCount`): call it as soon as the response is in.
+ * A REPORT, not a return value, so the count survives a failure that comes
+ * AFTER the searching — channel web expansion grounds in pass 1 and can then
+ * throw in pass 2, and those searches were billed either way. Last call wins,
+ * so a callback that retries inside one attempt reports the final request's
+ * count (its own retries meter themselves). Never called: the row stores
+ * "not recorded".
+ */
+export type NoteSearches = (count: number) => void
 
 /**
  * Run a Web Search generation, moving to the fallback API key if the first one
@@ -1752,7 +1758,7 @@ export interface WebSearchCallOutcome<T> {
  */
 export async function withGroundingModel<T>(
   role: AIFunction,
-  run: (model: LanguageModel, attempt: WebSearchAttempt) => Promise<WebSearchCallOutcome<T>>
+  run: (model: LanguageModel, attempt: WebSearchAttempt, noteSearches: NoteSearches) => Promise<WebSearchCallOutcome<T>>
 ): Promise<T> {
   const attempts = await getGroundingAttempts(role)
   if (attempts.length === 0) {
@@ -1763,8 +1769,12 @@ export async function withGroundingModel<T>(
 
   let lastQuotaError: unknown
   for (const attempt of attempts) {
+    let searchQueries: number | undefined
+    const noteSearches: NoteSearches = (count) => {
+      searchQueries = count
+    }
     try {
-      const outcome = await run(attempt.model, attempt)
+      const outcome = await run(attempt.model, attempt, noteSearches)
       clearSlotCooldown(role, attempt.slot)
       await recordWebSearchCall({
         role,
@@ -1773,7 +1783,7 @@ export async function withGroundingModel<T>(
         slot: attempt.slot,
         status: 'ok',
         ...outcome.usage,
-        searchQueries: outcome.searchQueries,
+        searchQueries,
       })
       return outcome.value
     } catch (err) {
@@ -1784,6 +1794,8 @@ export async function withGroundingModel<T>(
         model: attempt.modelId,
         slot: attempt.slot,
         status: quota.isQuota ? 'rate_limited' : 'error',
+        // Searches a request ran before failing were still billed.
+        searchQueries,
       })
 
       if (!quota.isQuota) throw err
@@ -1807,7 +1819,7 @@ export async function withGroundingModel<T>(
 
 /** {@link withGroundingModel} for the Web Search role. */
 export async function withWebSearchModel<T>(
-  run: (model: LanguageModel, attempt: WebSearchAttempt) => Promise<WebSearchCallOutcome<T>>
+  run: (model: LanguageModel, attempt: WebSearchAttempt, noteSearches: NoteSearches) => Promise<WebSearchCallOutcome<T>>
 ): Promise<T> {
   return withGroundingModel('webSearch', run)
 }

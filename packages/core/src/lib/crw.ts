@@ -494,6 +494,13 @@ export interface CrwSearchParams {
    * on the request.
    */
   engine?: CrwSearchEngine
+  /**
+   * `false` keeps a TIMEOUT out of `api_errors` (other failures are still
+   * recorded). For the assistant's short-capped search, where a timeout
+   * usually means the search queued behind an analysis job on CRW's one
+   * browser tab — logging that as an outage would read as the service down.
+   */
+  recordTimeouts?: boolean
 }
 
 /** Hostname without `www.`, or '' when the URL is unusable. */
@@ -714,7 +721,11 @@ export async function crwSearch(
     // admin panel, which is the single most likely fault for a self-hosted
     // dependency.
     const message = err instanceof Error ? err.message : String(err)
-    await recordCrwError(0, `Network/timeout: ${message}`)
+    // `AbortSignal.timeout` rejects with a DOMException named TimeoutError.
+    const timedOut = (err as { name?: string } | null)?.name === 'TimeoutError'
+    if (!(timedOut && params.recordTimeouts === false)) {
+      await recordCrwError(0, `Network/timeout: ${message}`)
+    }
     throw new CrwError(`Retrieval request failed: ${message}`, 0)
   }
 

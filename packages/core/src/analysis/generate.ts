@@ -1526,7 +1526,7 @@ async function writeWithGrounding(
   const reasoningEffort = await getReasoningEffortFor('titleAnalysis')
   const samplingParams = await getGenerationParamsForRole('titleAnalysis')
 
-  return withGroundingModel('titleAnalysis', async (model, keyAttempt) => {
+  return withGroundingModel('titleAnalysis', async (model, keyAttempt, noteSearches) => {
     let result: WriteResult = {
       text: '',
       mapText: null,
@@ -1587,6 +1587,7 @@ async function writeWithGrounding(
       }
       usage = response.usage
       searchQueries = groundingSearchCount(response.providerMetadata)
+      noteSearches(searchQueries)
 
       const grounding = (
         response.providerMetadata?.google as
@@ -1667,7 +1668,7 @@ async function writeWithGrounding(
       }
     }
 
-    return { value: result, usage, searchQueries }
+    return { value: result, usage }
   })
 }
 /**

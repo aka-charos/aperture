@@ -107,7 +107,7 @@ async function gatherSimilarCandidates(
     // Both passes run on the same key, and both count against its quota, so the
     // whole thing sits inside withWebSearchModel: a 429 on either pass restarts
     // on the fallback key rather than losing the expansion entirely.
-    return await withWebSearchModel<WebCandidate[]>(async (model) => {
+    return await withWebSearchModel<WebCandidate[]>(async (model, _attempt, noteSearches) => {
       // Pass 1 — grounded similar-title suggestions per seed
       const pass1 = await generateText({
         model,
@@ -125,8 +125,9 @@ async function gatherSimilarCandidates(
       })
 
       const { text } = pass1
-      // Pass 2 below runs no search, so pass 1's count is the whole call's.
-      const searchQueries = groundingSearchCount(pass1.providerMetadata)
+      // Reported now, before pass 2: pass 2 runs no search, so this is the
+      // whole call's count, and a pass 2 failure must not lose it.
+      noteSearches(groundingSearchCount(pass1.providerMetadata))
       const grounding = (
         pass1.providerMetadata?.google as
           | { groundingMetadata?: { webSearchQueries?: string[]; groundingChunks?: unknown[] } }
@@ -142,7 +143,7 @@ async function gatherSimilarCandidates(
         'Channel web expansion: grounding completed'
       )
 
-      if (!text?.trim()) return { value: [], usage: pass1.usage, searchQueries }
+      if (!text?.trim()) return { value: [], usage: pass1.usage }
 
       // Pass 2 — structure into typed candidates (no grounding needed)
       const pass2 = await generateObject({
@@ -162,7 +163,6 @@ async function gatherSimilarCandidates(
           outputTokens: (pass1.usage.outputTokens ?? 0) + (pass2.usage.outputTokens ?? 0),
           totalTokens: (pass1.usage.totalTokens ?? 0) + (pass2.usage.totalTokens ?? 0),
         },
-        searchQueries,
       }
     })
   } catch (err) {

@@ -83,9 +83,9 @@ The `generate-title-analysis` job (manual by default, schedulable, with a config
 
 When the service is enabled, the assistant also searches it for recommendations, beside Google and [Tavily](tavily.md). The switch **Use in the assistant's web search** on the card (on by default) leaves it out of the chat without turning it off for title analysis.
 
-The chat asks for much less than an analysis does: one engine (the first that isn't parked, with no cascade), up to 5 pages, 15 seconds per page and about 25 seconds for the whole search. Bot walls and pages with no real text are dropped, menus are stripped, and each page is trimmed before it is combined with the other sources. If nothing worth keeping comes back, the chat carries on with the other sources.
+The chat asks for much less than an analysis does: one engine (the first that isn't parked, with no cascade), up to 5 pages, 15 seconds per page and about 25 seconds for the whole search. Bot walls and empty pages are dropped and page clutter is stripped, but unlike title analysis a page made only of links is kept: a list of linked film titles is exactly what a recommendation search is looking for, so the links are reduced to their titles. Each page is trimmed before it is combined with the other sources. If nothing worth keeping comes back, the chat carries on with the other sources.
 
-Searches queue on the service, so while a title analysis job is running a chat search can wait behind it and run out of time. Turn the switch off if that matters more than the extra source.
+Searches queue on the service, so while a title analysis job is running a chat search can wait behind it and run out of time. Such a timeout is written to the API log but not to the API errors panel, since it means a queue rather than an outage; other failures are recorded as usual. Turn the switch off if the wait matters more than the extra source.
 
 Failures land in the [API errors](api-errors.md) panel under the fastCRW provider.
 

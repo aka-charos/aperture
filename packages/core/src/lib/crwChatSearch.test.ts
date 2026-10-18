@@ -35,6 +35,26 @@ describe('prepareChatPages', () => {
     assert.equal(dropped.length, 2)
   })
 
+  it('keeps a list made only of linked titles, flattened to the titles', () => {
+    // The shape `hasNoProse` and the navigation strip would remove: no
+    // sentence anywhere, every line a link. For a recommendation it IS the answer.
+    const list = Array.from(
+      { length: 10 },
+      (_, i) => `${i + 1}. [Film number ${i + 1} (198${i})](https://lists.example/film/${i + 1})`
+    ).join('\n')
+    const { pages, dropped } = prepareChatPages([result('lists.example', list)])
+    assert.deepEqual(dropped, [])
+    assert.equal(pages.length, 1)
+    assert.match(pages[0].text, /^1\. Film number 1 \(1980\)$/m)
+    assert.doesNotMatch(pages[0].text, /https?:\/\//)
+  })
+
+  it('drops a hand-listed low-value domain', () => {
+    const { pages, dropped } = prepareChatPages([result('arcplot.com', ARTICLE)])
+    assert.equal(pages.length, 0)
+    assert.deepEqual(dropped, [{ domain: 'arcplot.com', reason: 'listed-domain' }])
+  })
+
   it('trims each page to the character budget', () => {
     const { pages } = prepareChatPages([result('films.example', ARTICLE)], 300)
     assert.ok(pages[0].text.length <= 301)

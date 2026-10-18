@@ -89,7 +89,7 @@ export const googleGroundingSource: WebSearchSource = {
       // The empty-text retry sits INSIDE the key loop: an empty response is a
       // soft refusal worth retrying on the same key, whereas a 429 means this
       // key is done and withWebSearchModel should move to the next one.
-      const text = await withWebSearchModel(async (model, keyAttempt) => {
+      const text = await withWebSearchModel(async (model, keyAttempt, noteSearches) => {
         let text = ''
         let usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined
         let searchQueries: number | undefined
@@ -105,6 +105,7 @@ export const googleGroundingSource: WebSearchSource = {
           text = pass1.text ?? ''
           usage = pass1.usage
           searchQueries = groundingSearchCount(pass1.providerMetadata)
+          noteSearches(searchQueries)
 
           // Observability: prove grounding actually ran — the search queries Google
           // issued and how many web sources came back (grep "web-source-google").
@@ -163,7 +164,7 @@ export const googleGroundingSource: WebSearchSource = {
           }
         }
 
-        return { value: text, usage, searchQueries }
+        return { value: text, usage }
       })
 
       if (!text.trim()) {

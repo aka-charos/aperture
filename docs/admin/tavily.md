@@ -33,7 +33,17 @@ Failures are recorded to the [API errors](api-errors.md) panel under the Tavily 
 
 ## Costs
 
-Tavily is a paid API metered in credits — charged per search by depth. There is no quota machinery in Aperture for it; watch your Tavily account.
+Tavily is a paid API metered in credits — charged per search by depth. Aperture doesn't throttle or meter Tavily itself, but the card shows your balance.
+
+### Credits This Billing Cycle
+
+Once a key is saved, the card shows a **Credits this billing cycle** box, read live from Tavily's own usage endpoint with the saved key (a key typed but not yet saved is not used). It shows:
+
+- **This key** — credits this key has used, against its own limit if it has one
+- **Plan** — the account's plan name, with the credits used on it against the plan's limit
+- **Pay as you go** — only when the account has pay-as-you-go credits
+
+Bars appear where there is a limit, turning amber at 80% and red when it's reached. **No limit reported** means Tavily sent no cap for that line (it reports an unlimited key that way); **not reported** means Tavily left the figure out. Nothing is stored: the box is read when the card opens, after a save, after a test (which spends credits), and on **Refresh**. If Tavily refuses the key, the box shows Tavily's own error.
 
 ---
 
