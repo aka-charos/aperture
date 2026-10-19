@@ -159,9 +159,10 @@ export async function findSimilarItems(
    * the default 40 rows. Without it, "Also worth checking" quietly returns fewer
    * than `limit` items for anyone with a well-watched library. scopedAnnQuery
    * does that with an iterative scan on pgvector 0.8+; ef_search 500 made the
-   * planner seq-scan every embedding set instead.
+   * planner seq-scan every embedding set instead. The iterative scan still stops
+   * at hnsw.max_scan_tuples (20,000 by default), so a very narrow scope can come
+   * back short.
    */
-  const runAnn = scopedAnnQuery
 
   const items: ContentItem[] = []
   let foundTitle = ''
@@ -247,7 +248,7 @@ export async function findSimilarItems(
       ? [movie.id, modelId, embeddingStr, ctx.userId, limit]
       : [movie.id, modelId, embeddingStr, limit]
 
-    const similar = await runAnn<MovieResult & { provider_item_id?: string }>(
+    const similar = await scopedAnnQuery<MovieResult & { provider_item_id?: string }>(
       `SELECT m.id, m.title, m.year, m.genres, m.overview, m.community_rating, m.poster_url, m.provider_item_id, m.directors
        FROM ${movieEmbeddingTable} e JOIN movies m ON m.id = e.movie_id
        WHERE e.movie_id != $1 AND e.model = $2 ${watchedFilter}
@@ -281,7 +282,7 @@ export async function findSimilarItems(
       ? [series.id, modelId, embeddingStr, ctx.userId, limit]
       : [series.id, modelId, embeddingStr, limit]
 
-    const similar = await runAnn<SeriesResult & { provider_item_id?: string }>(
+    const similar = await scopedAnnQuery<SeriesResult & { provider_item_id?: string }>(
       `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, s.community_rating, s.poster_url, s.provider_item_id, s.directors
        FROM ${seriesEmbeddingTable} se
        JOIN series s ON s.id = se.series_id
@@ -728,10 +729,11 @@ export function createSearchTools(ctx: ToolContext) {
           // the default 40 rows to have anything left after them (the ef_search
           // invariant). scopedAnnQuery does that with an iterative scan on
           // pgvector 0.8+: measured live, 12 ms through the index, against a
-          // seq scan of every embedding set (1.5 s) at ef_search 500.
+          // seq scan of every embedding set (1.5 s) at ef_search 500. It still
+          // stops at hnsw.max_scan_tuples (20,000 by default), so a rare country
+          // or a narrow scope can come back short.
           const filterWatch = watchStatus !== 'all'
           const countryFilter = country?.trim() ? normalizeCountryQuery(country) : null
-          const runAnn = scopedAnnQuery
 
           // $1 embedding, $2 model and $3 limit are fixed; the optional filters
           // take the next indices in a fixed order, so the movie and series
@@ -762,7 +764,7 @@ export function createSearchTools(ctx: ToolContext) {
           if (type === 'movies' || type === 'both') {
             const movieTableName = await getActiveEmbeddingTableName('embeddings')
             const { clause, extra } = buildFilters(true, 'm')
-            const movieResults = await runAnn<
+            const movieResults = await scopedAnnQuery<
               MovieResult & { provider_item_id?: string; similarity: number }
             >(
               `SELECT m.id, m.title, m.year, m.genres, m.overview, m.community_rating, m.poster_url, m.provider_item_id, m.directors,
@@ -791,7 +793,7 @@ export function createSearchTools(ctx: ToolContext) {
           if (type === 'series' || type === 'both') {
             const seriesTableName = await getActiveEmbeddingTableName('series_embeddings')
             const { clause, extra } = buildFilters(false, 's')
-            const seriesResults = await runAnn<
+            const seriesResults = await scopedAnnQuery<
               SeriesResult & { provider_item_id?: string; similarity: number }
             >(
               `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, s.community_rating, s.poster_url, s.provider_item_id, s.directors,

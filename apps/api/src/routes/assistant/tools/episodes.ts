@@ -265,8 +265,9 @@ export async function createEpisodeTools(ctx: ToolContext): Promise<ToolSet> {
           // ANN scan, and an HNSW scan never yields more rows than ef_search
           // (default 40) — the ef_search invariant. scopedAnnQuery keeps walking
           // with an iterative scan on pgvector 0.8+ (measured 2 ms, against
-          // 14 ms at ef_search 500). Scoped to one show, the planner skips the
-          // index for the show's own episodes either way.
+          // 14 ms at ef_search 500), up to hnsw.max_scan_tuples (20,000 by
+          // default). Scoped to one show, the planner skips the index for the
+          // show's own episodes either way.
           const result = await scopedAnnQuery<EpisodeSearchRow>(sql, params)
 
           const items = result.rows.map((row) =>

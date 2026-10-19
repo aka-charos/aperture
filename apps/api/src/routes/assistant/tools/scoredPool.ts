@@ -170,47 +170,48 @@ export async function searchScoredPool(
     // A bare LIMIT 400 cannot be trusted: an HNSW scan never returns more rows
     // than ef_search (default 40), so at the default this pool came back with
     // 40. scopedAnnQuery runs an iterative scan on pgvector 0.8+, which keeps
-    // walking the index until the LIMIT is met. Measured live: 400 rows in
-    // 27 ms, against a seq scan of every embedding set (4.1 s) at ef_search 500.
+    // walking the index until the LIMIT is met or hnsw.max_scan_tuples (20,000
+    // by default) is reached. Measured live: 400 rows in 27 ms, against a seq
+    // scan of every embedding set (4.1 s) at ef_search 500.
     const rows = await scopedAnnQuery<{
-        id: string
-        title: string
-        year: number | null
-        genres: string[]
-        overview: string | null
-        community_rating: number | null
-        poster_url: string | null
-        provider_item_id: string | null
-        directors: string[] | null
-        query_score: number
-        final_score: string | number | null
-        score_breakdown: Record<string, unknown> | null
-      }>(
-        `WITH latest AS (
-               SELECT id FROM recommendation_runs
-                WHERE user_id = $1 AND status = 'completed' AND media_type = $2
-                ORDER BY created_at DESC
-                LIMIT 1
-             ),
-             near AS (
-               SELECT e.${idColumn} AS item_id,
-                      1 - (e.embedding <=> $3::halfvec) AS query_score
-                 FROM ${table} e
-                WHERE e.model = $4
-                ORDER BY e.embedding <=> $3::halfvec
-                LIMIT $5
-             )
-             SELECT c.id, c.title, c.year, c.genres, c.overview, c.community_rating,
-                    c.poster_url, c.provider_item_id, c.directors,
-                    near.query_score, rc.final_score, rc.score_breakdown
-               FROM near
-               JOIN recommendation_candidates rc
-                 ON rc.${idColumn} = near.item_id
-                AND rc.run_id = (SELECT id FROM latest)
-               JOIN ${contentTable} c ON c.id = near.item_id
-              WHERE ${inScope}`,
-        poolParams
-      )
+      id: string
+      title: string
+      year: number | null
+      genres: string[]
+      overview: string | null
+      community_rating: number | null
+      poster_url: string | null
+      provider_item_id: string | null
+      directors: string[] | null
+      query_score: number
+      final_score: string | number | null
+      score_breakdown: Record<string, unknown> | null
+    }>(
+      `WITH latest AS (
+             SELECT id FROM recommendation_runs
+              WHERE user_id = $1 AND status = 'completed' AND media_type = $2
+              ORDER BY created_at DESC
+              LIMIT 1
+           ),
+           near AS (
+             SELECT e.${idColumn} AS item_id,
+                    1 - (e.embedding <=> $3::halfvec) AS query_score
+               FROM ${table} e
+              WHERE e.model = $4
+              ORDER BY e.embedding <=> $3::halfvec
+              LIMIT $5
+           )
+           SELECT c.id, c.title, c.year, c.genres, c.overview, c.community_rating,
+                  c.poster_url, c.provider_item_id, c.directors,
+                  near.query_score, rc.final_score, rc.score_breakdown
+             FROM near
+             JOIN recommendation_candidates rc
+               ON rc.${idColumn} = near.item_id
+              AND rc.run_id = (SELECT id FROM latest)
+             JOIN ${contentTable} c ON c.id = near.item_id
+            WHERE ${inScope}`,
+      poolParams
+    )
 
     // NUMERIC arrives from pg as a string; Number() it before any maths, or the
     // blend silently compares strings.
