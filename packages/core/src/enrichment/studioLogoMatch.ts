@@ -62,10 +62,12 @@ export function replacedLogoFile(
 }
 
 /**
- * How a logo is drawn. A `tile` is an opaque image made to be shown as it is:
- * the media server's studio images (Emby's built-in set is 16:9 tiles with the
- * logo on a dark background). A `mark` is a transparent logo, TMDb's kind, and
- * most are dark, so it needs a light plate behind it on the dark theme.
+ * How a logo is drawn. A `tile` is an opaque picture made to be shown whole:
+ * a media server's Thumb (Emby's built-in studio images are 16:9 tiles with
+ * the logo on a dark background). A `mark` is a logo to be fitted, never
+ * cropped, on a light plate: every TMDb logo, and a media server's Primary,
+ * which is what a logo uploaded by hand becomes and is usually a transparent
+ * mark of any shape.
  */
 export type StudioLogoKind = 'tile' | 'mark'
 
@@ -76,17 +78,26 @@ export interface StudioLogo {
 
 /** What a stored studio row knows about its logos. */
 export interface StudioLogoSources {
-  /** The media server's studio item (`studios_networks.emby_id`, either server). */
+  /** A read of the media server's studio list has covered this row. */
+  mediaRead: boolean
+  /** The studio item the media server lists under this name. */
   mediaItemId: string | null
   mediaImageType: string | null
   mediaImageTag: string | null
+  /** The studio id on a title's studio entry; only guessed at before any read. */
+  titleStudioId: string | null
   localPath: string | null
   localFileExists: boolean
   tmdbPath: string | null
 }
 
-/** Width asked of the media server for a studio tile; drawn far smaller. */
-const MEDIA_TILE_WIDTH = 400
+/** Width asked of the media server for a studio image; drawn far smaller. */
+const MEDIA_IMAGE_WIDTH = 400
+
+function mediaImageUrl(path: string, tag?: string): string {
+  const query = new URLSearchParams(tag ? { tag, maxWidth: String(MEDIA_IMAGE_WIDTH) } : { maxWidth: String(MEDIA_IMAGE_WIDTH) })
+  return `/api/media/images/${path}?${query}`
+}
 
 /**
  * The logo a page shows for a studio or network, or null when there is none.
@@ -97,21 +108,44 @@ const MEDIA_TILE_WIDTH = 400
  * row records where a file was written, not that it is still there), then
  * TMDb's own copy of it. The tag rides in the media-server address so a
  * replaced image is fetched anew rather than served from cache.
+ *
+ * A row no read has covered yet (just deployed, or a studio synced since the
+ * last run) still guesses at the media server's Thumb through the title's
+ * studio id, as pages did before the read existed; a miss there renders the
+ * caller's fallback. A row a read HAS covered never guesses: the read said
+ * what the media server holds.
  */
 export function studioLogo(sources: StudioLogoSources): StudioLogo | null {
   const { mediaItemId, mediaImageType, mediaImageTag } = sources
   if (mediaItemId && mediaImageType && mediaImageTag) {
-    const query = new URLSearchParams({ tag: mediaImageTag, maxWidth: String(MEDIA_TILE_WIDTH) })
     return {
-      url: `/api/media/images/Items/${encodeURIComponent(mediaItemId)}/Images/${encodeURIComponent(mediaImageType)}?${query}`,
-      kind: 'tile',
+      url: mediaImageUrl(
+        `Items/${encodeURIComponent(mediaItemId)}/Images/${encodeURIComponent(mediaImageType)}`,
+        mediaImageTag
+      ),
+      kind: mediaImageType === 'Thumb' ? 'tile' : 'mark',
     }
   }
   if (sources.localPath && sources.localFileExists) {
     return { url: `/api/uploads/${sources.localPath}`, kind: 'mark' }
   }
   if (sources.tmdbPath) return { url: `${TMDB_IMAGE_BASE_URL}/w185${sources.tmdbPath}`, kind: 'mark' }
+  if (!sources.mediaRead && sources.titleStudioId) {
+    return {
+      url: mediaImageUrl(`Items/${encodeURIComponent(sources.titleStudioId)}/Images/Thumb`),
+      kind: 'tile',
+    }
+  }
   return null
+}
+
+/**
+ * A guess for a name with no stored row at all (a studio a sync added since
+ * the job last ran): the media server's Thumb by name. A miss renders the
+ * caller's fallback.
+ */
+export function unlistedStudioLogo(name: string): StudioLogo {
+  return { url: mediaImageUrl(`Studios/${encodeURIComponent(name)}/Images/Thumb`), kind: 'tile' }
 }
 
 /**

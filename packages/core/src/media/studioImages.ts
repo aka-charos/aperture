@@ -3,10 +3,11 @@
  * reports. Shared by the Emby and Jellyfin providers, which both list studios
  * at `/Studios` with an `ImageTags` map.
  *
- * Pure, no DB, pinned by studioImages.test.ts.
+ * No DB; the provider's request is passed in, so it is pinned by
+ * studioImages.test.ts against a stub.
  */
 
-import type { StudioImageType } from './types.js'
+import type { MediaServerStudio, StudioImageType } from './types.js'
 
 /**
  * Thumb first: Emby's built-in studio images are all Thumbs, and its Networks
@@ -24,4 +25,37 @@ export function pickStudioImage(
     if (tag) return { type, tag }
   }
   return null
+}
+
+/** The one thing `getStudios` needs from a provider: its authenticated GET. */
+export interface StudioListSource {
+  fetch<T>(endpoint: string, apiKey: string): Promise<T>
+}
+
+interface StudioItem {
+  Id?: string
+  Name?: string
+  ImageTags?: Record<string, string>
+}
+
+/**
+ * Every studio the server lists, with the image to show for each. One copy for
+ * both providers: Emby and Jellyfin answer `/Studios` the same way.
+ *
+ * Read-only: Aperture never uploads a studio image (core
+ * enrichment/studioLogos.ts says why). One unpaged request;
+ * `IncludeItemTypes` is ignored by `/Studios`, so movie studios and series
+ * networks come back as one list.
+ */
+export async function getStudios(source: StudioListSource, apiKey: string): Promise<MediaServerStudio[]> {
+  const params = new URLSearchParams({
+    Recursive: 'true',
+    Fields: 'ImageTags',
+    EnableImages: 'true',
+    EnableImageTypes: STUDIO_IMAGE_PREFERENCE.join(','),
+  })
+  const response = await source.fetch<{ Items?: StudioItem[] }>(`/Studios?${params}`, apiKey)
+  return (response.Items ?? []).flatMap((item) =>
+    item.Id && item.Name ? [{ id: item.Id, name: item.Name, image: pickStudioImage(item.ImageTags) }] : []
+  )
 }

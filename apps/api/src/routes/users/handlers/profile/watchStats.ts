@@ -303,7 +303,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
         // Studio logos: the media server's image first, TMDb's otherwise
         // (core resolveStudioLogo). The kind says how to draw it.
         const topStudios = await Promise.all(studiosResult.rows.map(async r => {
-          const logo = await resolveStudioLogo(r)
+          // A studio no row has yet (synced since the job last ran) guesses
+          // through the id on the title's own studio entry.
+          const logo = await resolveStudioLogo({ ...r, emby_id: r.emby_id ?? r.id })
           return {
             name: r.name,
             thumb: logo?.url ?? null,
@@ -360,7 +362,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
         // Network logos: the media server's image first, TMDb's otherwise
         // (core resolveStudioLogo). The kind says how to draw it.
         const topNetworks = await Promise.all(networksResult.rows.map(async r => {
-          const logo = await resolveStudioLogo(r)
+          // A studio no row has yet (synced since the job last ran) guesses
+          // through the id on the title's own studio entry.
+          const logo = await resolveStudioLogo({ ...r, emby_id: r.emby_id ?? r.id })
           return {
             name: r.name,
             thumb: logo?.url ?? null,

@@ -18,8 +18,11 @@ interface StudioLogoProps {
   name: string
   /** Height of a mark; a tile is drawn as tall as a mark on its plate, so the two line up. */
   height: number
-  /** Widest a mark may draw; defaults to five times its height. */
-  maxWidth?: number
+  /**
+   * Widest a mark may draw, the plate's padding not included; a number, or one
+   * per breakpoint. Defaults to five times its height.
+   */
+  maxWidth?: number | Partial<Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', number>>
   /** What to show when there is no logo, or it fails to load. */
   fallback: ReactNode
 }

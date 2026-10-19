@@ -104,6 +104,8 @@ interface StudioToEnrich {
  * This extracts unique studios from the movies.studios and series.studios JSONB columns
  */
 export async function populateStudiosFromMedia(): Promise<{ studios: number; networks: number }> {
+  // Counts are rows inserted or changed: an existing row whose studio id is
+  // unchanged is not rewritten, so the daily run leaves the table alone.
   logger.info('Populating studios_networks table from media...')
 
   // Group by (name, type) — DISTINCT on emby_id too would leave duplicate conflict keys
@@ -125,7 +127,8 @@ export async function populateStudiosFromMedia(): Promise<{ studios: number; net
      GROUP BY name
      ON CONFLICT (name, type) DO UPDATE SET
        emby_id = COALESCE(EXCLUDED.emby_id, studios_networks.emby_id),
-       updated_at = NOW()`
+       updated_at = NOW()
+     WHERE studios_networks.emby_id IS DISTINCT FROM COALESCE(EXCLUDED.emby_id, studios_networks.emby_id)`
   )
 
   // Insert unique studios/networks from series
@@ -147,7 +150,8 @@ export async function populateStudiosFromMedia(): Promise<{ studios: number; net
      GROUP BY name
      ON CONFLICT (name, type) DO UPDATE SET
        emby_id = COALESCE(EXCLUDED.emby_id, studios_networks.emby_id),
-       updated_at = NOW()`
+       updated_at = NOW()
+     WHERE studios_networks.emby_id IS DISTINCT FROM COALESCE(EXCLUDED.emby_id, studios_networks.emby_id)`
   )
 
   const studiosCount = studioResult.rowCount || 0
@@ -319,8 +323,8 @@ interface MediaServerImageRead {
   listed: number
   /** Of those, the ones holding an image. */
   withImage: number
-  /** Aperture rows now known to have a media-server image. */
-  rowsWithImage: number
+  /** Library studio and network names now known to have a media-server image. */
+  namesWithImage: number
 }
 
 /**
@@ -370,23 +374,28 @@ async function readMediaServerImages(jobId: string): Promise<MediaServerImageRea
   }
   const entries = [...byName.values()]
 
-  const result = await query<{ with_image: string }>(
+  // Only rows whose recorded image changed, or that no read has covered yet,
+  // are written: the read runs daily over every row, and rewriting thousands
+  // of unchanged rows would only churn the table. The item id has its own
+  // column (media_item_id), so the populate step's emby_id never competes
+  // with it.
+  await query(
     `WITH listed AS (
        SELECT * FROM unnest($1::text[], $2::text[], $3::text[], $4::text[])
          AS l(name, item_id, image_type, image_tag)
-     ),
-     updated AS (
-       UPDATE studios_networks sn SET
-         emby_id = COALESCE(l.item_id, sn.emby_id),
-         media_image_type = l.image_type,
-         media_image_tag = l.image_tag,
-         media_images_read_at = NOW()
-       FROM studios_networks sn_all
-       LEFT JOIN listed l ON l.name = sn_all.name
-       WHERE sn_all.id = sn.id
-       RETURNING sn.media_image_type
      )
-     SELECT COUNT(*) FILTER (WHERE media_image_type IS NOT NULL) AS with_image FROM updated`,
+     UPDATE studios_networks sn SET
+       media_item_id = l.item_id,
+       media_image_type = l.image_type,
+       media_image_tag = l.image_tag,
+       media_images_read_at = NOW()
+     FROM studios_networks sn_all
+     LEFT JOIN listed l ON l.name = sn_all.name
+     WHERE sn_all.id = sn.id
+       AND (sn.media_images_read_at IS NULL
+         OR sn.media_item_id IS DISTINCT FROM l.item_id
+         OR sn.media_image_type IS DISTINCT FROM l.image_type
+         OR sn.media_image_tag IS DISTINCT FROM l.image_tag)`,
     [
       entries.map((e) => e.name),
       entries.map((e) => e.id),
@@ -394,11 +403,15 @@ async function readMediaServerImages(jobId: string): Promise<MediaServerImageRea
       entries.map((e) => e.image?.tag ?? null),
     ]
   )
+  // Names, not rows: a company on both films and shows has a row of each kind.
+  const counted = await queryOne<{ names: string }>(
+    `SELECT COUNT(DISTINCT name) AS names FROM studios_networks WHERE media_image_type IS NOT NULL`
+  )
 
   return {
     listed: entries.length,
     withImage: entries.filter((e) => e.image).length,
-    rowsWithImage: Number.parseInt(result.rows[0]?.with_image ?? '0', 10),
+    namesWithImage: Number.parseInt(counted?.names ?? '0', 10),
   }
 }
 
@@ -732,12 +745,12 @@ export async function enrichStudioLogos(jobId: string): Promise<StudioLogoProgre
     setJobStep(jobId, 1, 'Reading studio images from the media server')
     const media = await readMediaServerImages(jobId)
     if (media) {
-      progress.mediaServerImages = media.rowsWithImage
+      progress.mediaServerImages = media.namesWithImage
       addLog(
         jobId,
         'info',
         `🖼 Media server: ${media.withImage} of ${media.listed} studios hold an image; ` +
-          `${media.rowsWithImage} of the library's studio and network names use it`
+          `${media.namesWithImage} of the library's studio and network names use it`
       )
     }
     if (isJobCancelled(jobId)) return progress
@@ -828,7 +841,7 @@ export async function enrichStudioLogos(jobId: string): Promise<StudioLogoProgre
       'info',
       `🎉 Done in ${totalDuration}s. Library now: studios ${after.studios.withLogos}/${after.studios.total} ` +
         `with a logo, networks ${after.networks.withLogos}/${after.networks.total} with a logo ` +
-        `(${after.mediaServerImages} from the media server, the rest from TMDb).`
+        `(${after.mediaServerImages} names use the media server's image, the rest TMDb's).`
     )
 
     if (isJobCancelled(jobId)) return progress
@@ -858,19 +871,22 @@ export async function enrichStudioLogos(jobId: string): Promise<StudioLogoProgre
 export async function getStudioLogoStats(): Promise<{
   studios: { total: number; withLogos: number; pending: number }
   networks: { total: number; withLogos: number; pending: number }
-  /** Names whose logo comes from the media server. */
+  /** Distinct names whose logo comes from the media server. */
   mediaServerImages: number
 }> {
-  const rows = (
-    await query<{ type: string; total: string; with_logos: string; media: string }>(
+  const [rows, media] = await Promise.all([
+    query<{ type: string; total: string; with_logos: string }>(
       `SELECT type,
          COUNT(*) AS total,
-         COUNT(*) FILTER (WHERE media_image_type IS NOT NULL OR logo_path IS NOT NULL) AS with_logos,
-         COUNT(*) FILTER (WHERE media_image_type IS NOT NULL) AS media
+         COUNT(*) FILTER (WHERE media_image_type IS NOT NULL OR logo_path IS NOT NULL) AS with_logos
        FROM studios_networks
        GROUP BY type`
-    )
-  ).rows
+    ).then((r) => r.rows),
+    // Names, not rows: a company on both films and shows has a row of each kind.
+    queryOne<{ names: string }>(
+      `SELECT COUNT(DISTINCT name) AS names FROM studios_networks WHERE media_image_type IS NOT NULL`
+    ),
+  ])
   const of = (type: string) => {
     const row = rows.find((r) => r.type === type)
     const total = Number.parseInt(row?.total ?? '0', 10)
@@ -880,7 +896,7 @@ export async function getStudioLogoStats(): Promise<{
   return {
     studios: of('studio'),
     networks: of('network'),
-    mediaServerImages: rows.reduce((sum, r) => sum + Number.parseInt(r.media, 10), 0),
+    mediaServerImages: Number.parseInt(media?.names ?? '0', 10),
   }
 }
 
@@ -926,18 +942,29 @@ export async function getStudioByName(
 
 /** A studio row's logo columns, as every reader selects them. */
 export interface StudioLogoRow {
+  /** The studio id on a title's studio entry; only guessed at before any read. */
   emby_id: string | null
+  media_item_id: string | null
   media_image_type: string | null
   media_image_tag: string | null
+  media_images_read_at: Date | null
   logo_local_path: string | null
   logo_path: string | null
 }
 
+const STUDIO_LOGO_COLUMNS = [
+  'emby_id',
+  'media_item_id',
+  'media_image_type',
+  'media_image_tag',
+  'media_images_read_at',
+  'logo_local_path',
+  'logo_path',
+] as const satisfies readonly (keyof StudioLogoRow)[]
+
 /** The columns a reader selects for `resolveStudioLogo`, with a table alias. */
 export function studioLogoColumns(alias: string): string {
-  return ['emby_id', 'media_image_type', 'media_image_tag', 'logo_local_path', 'logo_path']
-    .map((c) => `${alias}.${c}`)
-    .join(', ')
+  return STUDIO_LOGO_COLUMNS.map((c) => `${alias}.${c}`).join(', ')
 }
 
 /**
@@ -947,11 +974,14 @@ export function studioLogoColumns(alias: string): string {
  * for when the media server has no image.
  */
 export async function resolveStudioLogo(row: StudioLogoRow): Promise<StudioLogo | null> {
-  const hasMediaImage = row.emby_id != null && row.media_image_type != null && row.media_image_tag != null
+  const hasMediaImage =
+    row.media_item_id != null && row.media_image_type != null && row.media_image_tag != null
   return studioLogo({
-    mediaItemId: row.emby_id,
+    mediaRead: row.media_images_read_at != null,
+    mediaItemId: row.media_item_id,
     mediaImageType: row.media_image_type,
     mediaImageTag: row.media_image_tag,
+    titleStudioId: row.emby_id,
     localPath: row.logo_local_path,
     localFileExists:
       !hasMediaImage && row.logo_local_path != null && (await fileExists(row.logo_local_path)),
@@ -967,6 +997,8 @@ export async function resolveStudioLogo(row: StudioLogoRow): Promise<StudioLogo 
  * logo, the other's otherwise: a series' studios are filed as networks (the
  * populate step reads `series.studios` as networks), so a film company named
  * on a show is still found. Names without a logo are absent from the map.
+ * A row of the preferred kind that resolves to nothing gives way to the other
+ * kind's row.
  */
 export async function getStudioLogos(
   names: readonly string[],
@@ -980,17 +1012,19 @@ export async function getStudioLogos(
     await query<StudioLogoRow & { name: string; type: string }>(
       `SELECT sn.name, sn.type, ${studioLogoColumns('sn')}
        FROM studios_networks sn
-       WHERE sn.name = ANY($1::text[])
-         AND (sn.media_image_type IS NOT NULL OR sn.logo_path IS NOT NULL)`,
+       WHERE sn.name = ANY($1::text[])`,
       [wanted]
     )
   ).rows
 
-  await Promise.all(
-    [...preferredLogoRows(rows, prefer).values()].map(async (row) => {
-      const logo = await resolveStudioLogo(row)
-      if (logo) logos.set(row.name, logo)
-    })
+  const resolved = await Promise.all(
+    rows.map(async (row) => ({ ...row, logo: await resolveStudioLogo(row) }))
   )
+  for (const [name, row] of preferredLogoRows(
+    resolved.filter((r) => r.logo != null),
+    prefer
+  )) {
+    if (row.logo) logos.set(name, row.logo)
+  }
   return logos
 }

@@ -146,7 +146,8 @@ export function StudioDetailPage() {
               logo={data.imageUrl && data.imageKind ? { url: data.imageUrl, kind: data.imageKind } : null}
               name={`${decodedName} logo`}
               height={56}
-              maxWidth={180}
+              // Narrower on a phone, where the name and counts share the row.
+              maxWidth={{ xs: 96, sm: 166 }}
               fallback={
                 <Avatar
                   variant="rounded"

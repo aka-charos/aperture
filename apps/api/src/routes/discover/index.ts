@@ -13,6 +13,7 @@ import {
   pushImageToMediaServer,
   resolveStudioLogo,
   studioLogoColumns,
+  unlistedStudioLogo,
   type StudioLogoKind,
   type StudioLogoRow,
 } from '@aperture/core'
@@ -442,7 +443,9 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
          LIMIT 1`,
         [decodedName]
       )
-      const logo = studioRow ? await resolveStudioLogo(studioRow) : null
+      // A name no row has yet (synced since the job last ran) still guesses at
+      // the media server's Thumb by name, as this page did before the read.
+      const logo = studioRow ? await resolveStudioLogo(studioRow) : unlistedStudioLogo(decodedName)
 
       const response: StudioResponse = {
         name: decodedName,

@@ -1033,6 +1033,7 @@ export {
   studioLogoColumns,
   type StudioLogoRow,
 } from './enrichment/studioLogos.js'
+export { unlistedStudioLogo } from './enrichment/studioLogoMatch.js'
 export type { StudioLogo, StudioLogoKind } from './enrichment/studioLogoMatch.js'
 
 // Backup

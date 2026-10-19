@@ -29,7 +29,7 @@ import type {
 
 import { JellyfinProviderBase } from './base.js'
 import { authenticateByName, getServerInfo } from './auth.js'
-import { getStudios } from './studios.js'
+import { getStudios } from '../studioImages.js'
 import { getUsers, getUserById } from './users.js'
 import {
   getLibraries,
