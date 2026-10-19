@@ -1031,7 +1031,8 @@ export {
   getStudioLogoStats,
   populateStudiosFromMedia,
   getStudioByName,
-  getStudioLogoUrl,
+  resolveStudioLogoUrl,
+  getStudioLogoUrls,
 } from './enrichment/studioLogos.js'
 
 // Backup

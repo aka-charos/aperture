@@ -5,7 +5,7 @@
 
 import { createChildLogger } from '../lib/logger.js'
 import { getTMDbApiKey } from '../settings/systemSettings.js'
-import { TMDB_API_BASE_URL } from './types.js'
+import { TMDB_API_BASE_URL, TMDB_IMAGE_BASE_URL } from './types.js'
 
 const logger = createChildLogger('tmdb')
 
@@ -128,7 +128,7 @@ export function getImageUrl(
   size: 'w92' | 'w154' | 'w185' | 'w342' | 'w500' | 'w780' | 'original' = 'w500'
 ): string | null {
   if (!path) return null
-  return `https://image.tmdb.org/t/p/${size}${path}`
+  return `${TMDB_IMAGE_BASE_URL}/${size}${path}`
 }
 
 /**

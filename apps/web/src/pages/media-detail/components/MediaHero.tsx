@@ -50,10 +50,11 @@ import { isMovie, isSeries } from '../types'
 import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
 import { useWatchStatus } from '../../../hooks/useWatchStatus'
 import { formatRuntime } from '../hooks'
-import { hasCriticRatings, personPath } from '../helpers'
+import { hasCriticRatings, personPath, studioPath } from '../helpers'
 import { RatingBadges } from './RatingBadges'
 import { CommunityStrip } from './CommunityStrip'
 import { ReportIssueButton } from './ReportIssueButton'
+import { StudioLogo } from './StudioLogo'
 import {
   StarRating,
   getProxiedImageUrl,
@@ -655,9 +656,27 @@ export function MediaHero({
                 </Typography>
               </Box>
             )}
-            {/* Series network */}
+            {/* Series network: its logo where one is stored, the name
+                otherwise, and either way a link to everything it aired. */}
             {isSeries(media) && media.network && (
-              <Chip label={media.network} size="small" variant="outlined" />
+              <Tooltip title={media.network}>
+                <Box
+                  component={RouterLink}
+                  to={studioPath(media.network)}
+                  aria-label={media.network}
+                  sx={{ display: 'inline-flex', textDecoration: 'none', '&:hover': { opacity: 0.85 } }}
+                >
+                  <StudioLogo
+                    src={media.network_logo_url}
+                    name={media.network}
+                    height={22}
+                    maxWidth={120}
+                    // Not `clickable`: the link around it is the control, and a
+                    // button inside a link is two tab stops for one action.
+                    fallback={<Chip label={media.network} size="small" variant="outlined" sx={{ cursor: 'pointer' }} />}
+                  />
+                </Box>
+              </Tooltip>
             )}
           </Box>
 

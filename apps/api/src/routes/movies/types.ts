@@ -66,6 +66,11 @@ export interface MovieDetailRow extends MovieRow {
   plot_full: string | null
   /** Machine translation of overview/plot_full into the viewer's language (core translation/). */
   localized_synopsis?: LocalizedSynopsis | null
+  /**
+   * Logo addresses for this title's studios, keyed by studio name; a studio
+   * with no stored logo is absent (core enrichment/studioLogos.ts).
+   */
+  studio_logos?: Record<string, string>
   tmdb_rating: number | null
   tmdb_vote_count: number | null
   imdb_rating: number | null

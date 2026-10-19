@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { resolveStudioLogoUrl } from '@aperture/core'
 import { query, queryOne } from '../../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
 import { requireSelfOrAdmin } from './shared.js'
@@ -302,14 +303,10 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           [id]
         )
 
-        // Construct studio image URLs - prefer local path, then TMDB, then Emby
-        const topStudios = studiosResult.rows.map(r => {
-          let thumb: string | null = null
-          if (r.logo_local_path) {
-            thumb = `/api/uploads/${r.logo_local_path}`
-          } else if (r.logo_path) {
-            thumb = `https://image.tmdb.org/t/p/w185${r.logo_path}`
-          } else if (mediaServerBaseUrl && r.id) {
+        // Studio logos: the local copy while its file is on disk, TMDb's otherwise, then Emby
+        const topStudios = await Promise.all(studiosResult.rows.map(async r => {
+          let thumb = await resolveStudioLogoUrl(r.logo_local_path, r.logo_path)
+          if (!thumb && mediaServerBaseUrl && r.id) {
             thumb = `${mediaServerBaseUrl}/Items/${r.id}/Images/Thumb`
           }
           return {
@@ -317,7 +314,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
             thumb,
             count: parseInt(r.count)
           }
-        })
+        }))
 
         // Top networks (from series) - get the first studio ID matching the network name
         // Joins with studios_networks table to get TMDB logo data
@@ -367,14 +364,10 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           [id]
         )
 
-        // Construct network image URLs - prefer local path, then TMDB, then Emby
-        const topNetworks = networksResult.rows.map(r => {
-          let thumb: string | null = null
-          if (r.logo_local_path) {
-            thumb = `/api/uploads/${r.logo_local_path}`
-          } else if (r.logo_path) {
-            thumb = `https://image.tmdb.org/t/p/w185${r.logo_path}`
-          } else if (mediaServerBaseUrl && r.id) {
+        // Network logos: the local copy while its file is on disk, TMDb's otherwise, then Emby
+        const topNetworks = await Promise.all(networksResult.rows.map(async r => {
+          let thumb = await resolveStudioLogoUrl(r.logo_local_path, r.logo_path)
+          if (!thumb && mediaServerBaseUrl && r.id) {
             thumb = `${mediaServerBaseUrl}/Items/${r.id}/Images/Thumb`
           }
           return {
@@ -382,7 +375,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
             thumb,
             count: parseInt(r.count)
           }
-        })
+        }))
 
         // Series genre distribution for comparison
         const seriesGenreResult = await query<{ genre: string; count: string }>(

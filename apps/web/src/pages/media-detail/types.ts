@@ -62,6 +62,11 @@ export interface BaseMedia {
   letterboxd_score?: number | null
   mdblist_score?: number | null
   streaming_providers?: StreamingProvider[] | null
+  /**
+   * Logo addresses for this title's studios, keyed by studio name, decided by
+   * the server; a studio with no logo is absent.
+   */
+  studio_logos?: Record<string, string>
 }
 
 // Movie-specific properties
@@ -92,6 +97,8 @@ export interface Series extends BaseMedia {
   /** Average episode length from library metadata, when episodes have runtimes */
   average_episode_runtime_minutes: number | null
   network: string | null
+  /** The network's logo address, decided by the server; absent or null when none. */
+  network_logo_url?: string | null
   studios: StudioItem[]
   actors: Actor[]
   imdb_id: string | null

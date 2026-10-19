@@ -34,12 +34,17 @@ import {
   LOGO_CHECK_DUE_SQL,
   LOGO_RECHECK_DAYS,
   replacedLogoFile,
+  studioLogoUrl,
+  logoFileIsMissing,
+  LOGO_PUSH_PENDING_SQL,
+  preferredLogoRows,
   type LogoMatchSource,
   type LogoOutcome,
   type LogoTally,
   type TmdbLogoEntity,
 } from './studioLogoMatch.js'
 import { pushImageToMediaServer } from '../uploads/mediaServerSync.js'
+import { getAbsolutePath } from '../uploads/storage.js'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 
@@ -54,6 +59,9 @@ const CONCURRENCY = 5
 
 /** Number of studios to fetch per database query */
 const BATCH_SIZE = 50
+
+/** How long one logo download may take, response body included */
+const LOGO_DOWNLOAD_TIMEOUT_MS = 30_000
 
 /** How many not-found names the report lists per kind */
 const NOT_FOUND_SAMPLE = 40
@@ -177,13 +185,9 @@ async function countStudiosDue(type: 'studio' | 'network'): Promise<number> {
   return Number.parseInt(row?.count ?? '0', 10)
 }
 
-function uploadsDir(): string {
-  return process.env.UPLOADS_DIR || './uploads'
-}
-
 async function fileExists(relativePath: string): Promise<boolean> {
   try {
-    await fs.access(path.join(uploadsDir(), relativePath))
+    await fs.access(getAbsolutePath(relativePath))
     return true
   } catch {
     return false
@@ -193,7 +197,7 @@ async function fileExists(relativePath: string): Promise<boolean> {
 /** Delete a logo file this row no longer points at; a missing file is fine. */
 async function removeLogoFile(relativePath: string): Promise<void> {
   try {
-    await fs.unlink(path.join(uploadsDir(), relativePath))
+    await fs.unlink(getAbsolutePath(relativePath))
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
       logger.warn({ err, relativePath }, 'Failed to remove replaced studio logo')
@@ -212,7 +216,9 @@ async function downloadLogo(
     const imageUrl = getImageUrl(logoPath, 'w185')
     if (!imageUrl) return null
 
-    const response = await fetch(imageUrl)
+    // Bounded, because a stalled request would hold its worker forever: Stop
+    // is polled only between logos, and the restore pass downloads thousands.
+    const response = await fetch(imageUrl, { signal: AbortSignal.timeout(LOGO_DOWNLOAD_TIMEOUT_MS) })
     if (!response.ok) {
       logger.warn({ logoPath, status: response.status }, 'Failed to download logo')
       return null
@@ -221,7 +227,10 @@ async function downloadLogo(
     const buffer = Buffer.from(await response.arrayBuffer())
 
     // Save to uploads/studios directory
-    const studiosDir = path.join(uploadsDir(), 'studios')
+    // The uploads directory `/api/uploads/` serves. Logos were once written to
+    // `./uploads` under the API's working directory, a folder nothing served
+    // and a container recreate emptied; restoreMissingLogoFiles repairs those.
+    const studiosDir = getAbsolutePath('studios')
     await fs.mkdir(studiosDir, { recursive: true })
 
     const ext = path.extname(logoPath) || '.png'
@@ -236,6 +245,129 @@ async function downloadLogo(
     logger.error({ err, logoPath }, 'Failed to download logo')
     return null
   }
+}
+
+interface LogoFileRestore {
+  /** Rows holding a TMDb logo. */
+  stored: number
+  /** Of those, the rows whose local file was missing. */
+  missing: number
+  restored: number
+  failed: number
+}
+
+/**
+ * Download again every stored logo whose local file is gone.
+ *
+ * A row with a confirmed logo is never due a TMDb check again
+ * (LOGO_CHECK_DUE_SQL), so nothing else would ever notice its file missing:
+ * a container recreate, or the logos written before the uploads directory
+ * was fixed, would leave every such row pointing at a 404 for good. This asks
+ * TMDb nothing — the logo path is already known — and costs one image
+ * download per missing file. A failure leaves the row as it was, and the next
+ * run tries again.
+ */
+async function restoreMissingLogoFiles(jobId: string): Promise<LogoFileRestore> {
+  const rows = (
+    await query<{ id: string; name: string; logo_path: string; logo_local_path: string | null }>(
+      `SELECT id, name, logo_path, logo_local_path
+       FROM studios_networks
+       WHERE logo_path IS NOT NULL
+       ORDER BY name`
+    )
+  ).rows
+
+  const presence = await processWithConcurrency(rows, 20, async (row) =>
+    row.logo_local_path != null ? fileExists(row.logo_local_path) : false
+  )
+  const missing = rows.filter((row, i) => logoFileIsMissing(row.logo_local_path, presence[i]))
+  const outcome: LogoFileRestore = { stored: rows.length, missing: missing.length, restored: 0, failed: 0 }
+  if (missing.length === 0) return outcome
+
+  addLog(jobId, 'info', `🩹 ${missing.length} of ${rows.length} stored logos have no file on disk; downloading them again...`)
+
+  await processWithConcurrency(
+    missing,
+    CONCURRENCY,
+    async (row) => {
+      const localPath = await downloadLogo(row.logo_path, row.id)
+      if (!localPath) {
+        outcome.failed++
+        return
+      }
+      await query(`UPDATE studios_networks SET logo_local_path = $2 WHERE id = $1`, [row.id, localPath])
+      const leftOver = replacedLogoFile(row.logo_local_path, localPath)
+      if (leftOver) await removeLogoFile(leftOver)
+      outcome.restored++
+    },
+    () => isJobCancelled(jobId)
+  )
+
+  return outcome
+}
+
+interface PushableLogo {
+  id: string
+  name: string
+  emby_id: string
+  logo_local_path: string
+}
+
+/**
+ * Send one stored logo to the media server as the studio's Thumb image and
+ * stamp `emby_synced_at`. Never throws; false when it did not go.
+ */
+async function pushLogoToEmby(logo: PushableLogo, jobId: string): Promise<boolean> {
+  try {
+    const buffer = await fs.readFile(getAbsolutePath(logo.logo_local_path))
+    const ext = path.extname(logo.logo_local_path).toLowerCase()
+    const mimeType = ext === '.svg' ? 'image/svg+xml' : 'image/png'
+
+    const pushResult = await pushImageToMediaServer(
+      logo.emby_id,
+      'Thumb', // Studio images use 'Thumb' type in Emby
+      buffer,
+      mimeType
+    )
+    if (!pushResult.success) return false
+
+    await query(`UPDATE studios_networks SET emby_synced_at = NOW() WHERE id = $1`, [logo.id])
+    addLog(jobId, 'debug', `🖼 Pushed logo to Emby: ${logo.name}`)
+    return true
+  } catch (err) {
+    logger.warn({ err, studioId: logo.id, name: logo.name }, 'Failed to push logo to Emby')
+    return false
+  }
+}
+
+/**
+ * Push every stored logo the media server does not have yet.
+ *
+ * The TMDb steps push only the rows they check, and a row with a confirmed
+ * logo is never checked again — so a logo stored before the push setting was
+ * switched on, or whose push failed once, would otherwise never reach the
+ * media server. Runs after the restore pass, which is what puts the files
+ * these pushes read back on disk.
+ */
+async function pushPendingLogosToEmby(jobId: string): Promise<{ pending: number; pushed: number }> {
+  const rows = (
+    await query<PushableLogo>(
+      `SELECT id, name, emby_id, logo_local_path
+       FROM studios_networks
+       WHERE ${LOGO_PUSH_PENDING_SQL}
+       ORDER BY name`
+    )
+  ).rows
+  if (rows.length === 0) return { pending: 0, pushed: 0 }
+
+  addLog(jobId, 'info', `🖼 ${rows.length} stored logos are not on the media server yet; pushing them...`)
+  const results = await processWithConcurrency(
+    rows,
+    CONCURRENCY,
+    (row) => pushLogoToEmby(row, jobId),
+    () => isJobCancelled(jobId)
+  )
+  return { pending: rows.length, pushed: results.filter((r) => r === true).length }
 }
 
 interface EnrichResult {
@@ -422,28 +554,10 @@ async function enrichStudio(
     // Push to Emby if enabled, we have an Emby ID, and this logo is not there yet
     const alreadyPushed = !result.replacedLogo && studio.emby_synced_at != null
     if (pushToEmby && localPath && studio.emby_id && !alreadyPushed) {
-      try {
-        const buffer = await fs.readFile(path.join(uploadsDir(), localPath))
-        const ext = path.extname(localPath).toLowerCase()
-        const mimeType = ext === '.svg' ? 'image/svg+xml' : 'image/png'
-
-        const pushResult = await pushImageToMediaServer(
-          studio.emby_id,
-          'Thumb', // Studio images use 'Thumb' type in Emby
-          buffer,
-          mimeType
-        )
-
-        if (pushResult.success) {
-          await query(`UPDATE studios_networks SET emby_synced_at = NOW() WHERE id = $1`, [
-            studio.id,
-          ])
-          result.pushedToEmby = true
-          addLog(jobId, 'debug', `🖼 Pushed logo to Emby: ${studio.name}`)
-        }
-      } catch (err) {
-        logger.warn({ err, studioId: studio.id, name: studio.name }, 'Failed to push logo to Emby')
-      }
+      result.pushedToEmby = await pushLogoToEmby(
+        { id: studio.id, name: studio.name, emby_id: studio.emby_id, logo_local_path: localPath },
+        jobId
+      )
     }
   } catch (err) {
     logger.error({ err, studioId: studio.id }, 'Failed to enrich studio')
@@ -592,7 +706,7 @@ export async function enrichStudioLogos(jobId: string): Promise<StudioLogoProgre
   // Check push to Emby setting
   const pushToEmby = (await getSystemSetting('studio_logos_push_to_emby')) === 'true'
 
-  createJobProgress(jobId, 'enrich-studio-logos', 4)
+  createJobProgress(jobId, 'enrich-studio-logos', 6)
 
   try {
     // Step 1: Populate studios from media
@@ -601,6 +715,36 @@ export async function enrichStudioLogos(jobId: string): Promise<StudioLogoProgre
 
     const populated = await populateStudiosFromMedia()
     addLog(jobId, 'info', `✓ Found ${populated.studios} studios, ${populated.networks} networks`)
+
+    // Step 2: Put back logo files that are gone. Before the TMDb checks, and
+    // whether or not any row is due one, since no check ever revisits these.
+    setJobStep(jobId, 1, 'Restoring missing logo files')
+    const restore = await restoreMissingLogoFiles(jobId)
+    addLog(
+      jobId,
+      restore.failed > 0 ? 'warn' : 'info',
+      restore.missing === 0
+        ? `✓ All ${restore.stored} stored logos have their file on disk`
+        : `🩹 Restored ${restore.restored} of ${restore.missing} missing logo files` +
+            (restore.failed > 0 ? ` (${restore.failed} downloads failed; the next run retries them)` : '')
+    )
+    if (isJobCancelled(jobId)) return progress
+
+    // Step 3: Send the media server the stored logos it does not have.
+    if (pushToEmby) {
+      setJobStep(jobId, 2, 'Pushing stored logos to Emby')
+      const pending = await pushPendingLogosToEmby(jobId)
+      progress.logosPushedToEmby += pending.pushed
+      if (pending.pending > 0) {
+        addLog(
+          jobId,
+          pending.pushed < pending.pending ? 'warn' : 'info',
+          `🖼 Pushed ${pending.pushed} of ${pending.pending} stored logos to Emby` +
+            (pending.pushed < pending.pending ? '; the next run retries the rest' : '')
+        )
+      }
+      if (isJobCancelled(jobId)) return progress
+    }
 
     const before = await getStudioLogoStats()
     const totalStudios = await countStudiosDue('studio')
@@ -635,9 +779,9 @@ export async function enrichStudioLogos(jobId: string): Promise<StudioLogoProgre
 
     const startTime = Date.now()
 
-    // Step 2: Process studios
+    // Step 4: Process studios
     if (totalStudios > 0) {
-      setJobStep(jobId, 1, 'Enriching studios', totalItems)
+      setJobStep(jobId, 3, 'Enriching studios', totalItems)
       await enrichKind(
         'studio',
         totalStudios,
@@ -646,9 +790,9 @@ export async function enrichStudioLogos(jobId: string): Promise<StudioLogoProgre
       )
     }
 
-    // Step 3: Process networks
+    // Step 5: Process networks
     if (totalNetworks > 0 && !isJobCancelled(jobId)) {
-      setJobStep(jobId, 2, 'Enriching networks', totalItems)
+      setJobStep(jobId, 4, 'Enriching networks', totalItems)
       await enrichKind(
         'network',
         totalNetworks,
@@ -660,8 +804,8 @@ export async function enrichStudioLogos(jobId: string): Promise<StudioLogoProgre
     progress.studiosEnriched = progress.studios.logo
     progress.networksEnriched = progress.networks.logo
 
-    // Step 4: Report
-    setJobStep(jobId, 3, 'Summarising')
+    // Step 6: Report
+    setJobStep(jobId, 5, 'Summarising')
     const after = await getStudioLogoStats()
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1)
     addLog(
@@ -781,21 +925,53 @@ export async function getStudioByName(
 }
 
 /**
- * Get logo URL for a studio/network
- * Returns local path if available, otherwise TMDB URL
+ * The address a page shows this logo at, or null when there is none: the
+ * local copy while its file is on disk, TMDb's copy otherwise
+ * (`studioLogoUrl`). Every page showing a logo goes through here.
  */
-export function getStudioLogoUrl(
+export async function resolveStudioLogoUrl(
   logoLocalPath: string | null,
   logoPath: string | null
-): string | null {
-  if (logoLocalPath) {
-    // Return API endpoint for local image
-    return `/api/images/studios/${logoLocalPath.replace('studios/', '')}`
-  }
-  if (logoPath) {
-    // Return TMDB URL
-    return getImageUrl(logoPath, 'w185')
-  }
-  return null
+): Promise<string | null> {
+  return studioLogoUrl({
+    localPath: logoLocalPath,
+    localFileExists: logoLocalPath != null && (await fileExists(logoLocalPath)),
+    tmdbPath: logoPath,
+  })
+}
+
+/**
+ * Logo addresses for a set of names, keyed by the name exactly as asked.
+ *
+ * Names match exactly, as the Watch Stats join does. A name stored as both a
+ * studio and a network answers with the `prefer` kind's logo when it has one,
+ * the other's otherwise: a series' studios are filed as networks (the
+ * populate step reads `series.studios` as networks), so a film company named
+ * on a show is still found. Names without a logo are absent from the map.
+ */
+export async function getStudioLogoUrls(
+  names: readonly string[],
+  prefer: 'studio' | 'network'
+): Promise<Map<string, string>> {
+  const wanted = [...new Set(names.filter((n) => n.trim() !== ''))]
+  const urls = new Map<string, string>()
+  if (wanted.length === 0) return urls
+
+  const rows = (
+    await query<{ name: string; type: string; logo_path: string; logo_local_path: string | null }>(
+      `SELECT name, type, logo_path, logo_local_path
+       FROM studios_networks
+       WHERE name = ANY($1::text[]) AND logo_path IS NOT NULL`,
+      [wanted]
+    )
+  ).rows
+
+  await Promise.all(
+    [...preferredLogoRows(rows, prefer).values()].map(async (row) => {
+      const url = await resolveStudioLogoUrl(row.logo_local_path, row.logo_path)
+      if (url) urls.set(row.name, url)
+    })
+  )
+  return urls
 }
 

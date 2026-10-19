@@ -8,7 +8,7 @@ The Global tab (`/admin/ops/jobs`) holds every job that spans media types or ser
 |-----|------------------|--------------|
 | `enrich-metadata` | every 6 hours | TMDb (keywords, collections, crew) + OMDb (RT/Metacritic, awards) for un-enriched titles |
 | `enrich-mdblist` | daily 07:00 | Letterboxd/MDBList scores, streaming providers, keywords ([MDBList](mdblist.md)) |
-| `enrich-studio-logos` | daily 05:30 | Studio/network logos for stats and studio pages |
+| `enrich-studio-logos` | daily 05:30 | Studio/network logos for Watch Stats, studio pages and title detail pages; also downloads again any stored logo whose file is missing (after a container recreate, for instance), and pushes to Emby any stored logo not pushed yet when that setting is on |
 | `refresh-ratings` | daily 02:30 | IMDb-dataset rating freshness — **opt-in** sources ([Ratings refresh](ratings-refresh.md)) |
 
 The ratings job runs deliberately ahead of the recommendation run, so a regenerate scores against ratings refreshed the same night — and deliberately outside enrichment, which stamps a title once and never revisits it.

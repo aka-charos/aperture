@@ -5,6 +5,8 @@
  * Pure, no DB, pinned by studioLogoMatch.test.ts.
  */
 
+import { TMDB_IMAGE_BASE_URL } from '../tmdb/types.js'
+
 /** What TMDb knows about one company or network. */
 export interface TmdbLogoEntity {
   id: number
@@ -52,6 +54,57 @@ export function replacedLogoFile(
   current: string | null
 ): string | null {
   return previous && previous !== current ? previous : null
+}
+
+/**
+ * The address a page shows a stored logo at, or null when there is none.
+ *
+ * The local copy wins only when its file is actually on disk: the row records
+ * where a file was written, not that it is still there (a container recreate
+ * empties anything outside a mounted volume, and logos were once written
+ * outside it), and a 404 renders as initials on every page that shows logos.
+ * Without the file, TMDb's own copy of the same logo is served instead.
+ */
+export function studioLogoUrl(logo: {
+  localPath: string | null
+  localFileExists: boolean
+  tmdbPath: string | null
+}): string | null {
+  if (logo.localPath && logo.localFileExists) return `/api/uploads/${logo.localPath}`
+  if (logo.tmdbPath) return `${TMDB_IMAGE_BASE_URL}/w185${logo.tmdbPath}`
+  return null
+}
+
+/**
+ * Whether a stored logo has to be downloaded again: it has no local path, or
+ * the file at that path is gone.
+ */
+export function logoFileIsMissing(localPath: string | null, fileExists: boolean): boolean {
+  return localPath == null || !fileExists
+}
+
+/**
+ * The stored logos the media server does not have yet: a confirmed logo, a
+ * file to send, a media-server item to send it to, and no record of a push.
+ */
+export const LOGO_PUSH_PENDING_SQL = `(logo_path IS NOT NULL AND logo_local_path IS NOT NULL AND emby_id IS NOT NULL AND emby_synced_at IS NULL)`
+
+/**
+ * One logo row per name: the `prefer` kind's when that name has one, the
+ * other kind's otherwise. A name is filed as a studio when films carry it and
+ * as a network when shows do (the logo job reads `series.studios` as
+ * networks), so a company named on both has two rows and possibly two logos.
+ */
+export function preferredLogoRows<T extends { name: string; type: string }>(
+  rows: readonly T[],
+  prefer: 'studio' | 'network'
+): Map<string, T> {
+  const chosen = new Map<string, T>()
+  for (const row of rows) {
+    const held = chosen.get(row.name)
+    if (!held || (held.type !== prefer && row.type === prefer)) chosen.set(row.name, row)
+  }
+  return chosen
 }
 
 /** Names compare case-, accent- and spacing-insensitively. */

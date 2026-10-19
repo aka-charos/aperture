@@ -4,7 +4,7 @@
  * GET /api/series/:id - Get series by ID with full metadata
  */
 import type { FastifyInstance } from 'fastify'
-import { resolveLocalizedSynopsis } from '@aperture/core'
+import { getStudioLogoUrls, resolveLocalizedSynopsis } from '@aperture/core'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { titleInScope } from '../../../lib/viewerScope.js'
@@ -61,14 +61,33 @@ export function registerDetailHandler(fastify: FastifyInstance) {
       // A machine translation of the synopsis into the language the page is
       // shown in, when one exists for the text the title carries now. Null
       // otherwise, and never an error (core translation/store.ts).
-      const localized_synopsis = await resolveLocalizedSynopsis(
-        'series',
-        id,
-        request.query.lang,
-        request.user!.id
+      //
+      // Logos for the network the hero shows and the studios the info card
+      // lists, looked up alongside. A series' studios are filed as networks by
+      // the logo job, so network rows are preferred. Never an error: a failed
+      // lookup costs the logos, not the page.
+      const studioNames = ((series.studios ?? []) as Array<string | { name: string }>).map((st) =>
+        typeof st === 'string' ? st : st.name
+      )
+      const [localized_synopsis, logos] = await Promise.all([
+        resolveLocalizedSynopsis('series', id, request.query.lang, request.user!.id),
+        getStudioLogoUrls(
+          series.network ? [series.network, ...studioNames] : studioNames,
+          'network'
+        ).catch((err: unknown) => {
+          request.log.warn({ err, seriesId: id }, 'Studio logo lookup failed')
+          return new Map<string, string>()
+        }),
+      ])
+      const network_logo_url = series.network ? (logos.get(series.network) ?? null) : null
+      const studio_logos = Object.fromEntries(
+        studioNames.flatMap((n) => {
+          const url = logos.get(n)
+          return url ? [[n, url] as const] : []
+        })
       )
 
-      return reply.send({ ...series, localized_synopsis })
+      return reply.send({ ...series, localized_synopsis, studio_logos, network_logo_url })
     }
   )
 }

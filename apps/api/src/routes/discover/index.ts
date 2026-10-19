@@ -11,6 +11,7 @@ import {
   getPersonMediaServerDetails,
   findPersonMediaServerItemIdForName,
   pushImageToMediaServer,
+  resolveStudioLogoUrl,
 } from '@aperture/core'
 import { query, queryOne } from '../../lib/db.js'
 import { requireAuth, requireAdmin } from '../../plugins/auth.js'
@@ -440,19 +441,17 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
         [decodedName]
       )
 
-      // Use local logo if available, then TMDB, then Emby ID, then name-based fallback
-      let imageUrl: string | null = null
-      if (studioLogo?.logo_local_path) {
-        imageUrl = `/api/uploads/${studioLogo.logo_local_path}`
-      } else if (studioLogo?.logo_path) {
-        imageUrl = `https://image.tmdb.org/t/p/w185${studioLogo.logo_path}`
-      } else if (studioLogo?.emby_id) {
-        // Use Emby/Jellyfin item ID for the image
-        imageUrl = `/api/media/images/Items/${studioLogo.emby_id}/Images/Thumb`
-      } else {
-        // Last resort: try by name (may not work on all media servers)
-        imageUrl = `/api/media/images/Studios/${encodeURIComponent(decodedName)}/Images/Primary`
-      }
+      // The stored logo (the local copy while its file is on disk, TMDb's
+      // otherwise), then the Emby ID, then a name-based fallback
+      const storedLogo = studioLogo
+        ? await resolveStudioLogoUrl(studioLogo.logo_local_path, studioLogo.logo_path)
+        : null
+      const imageUrl =
+        storedLogo ??
+        (studioLogo?.emby_id
+          ? `/api/media/images/Items/${studioLogo.emby_id}/Images/Thumb`
+          : // Last resort: try by name (may not work on all media servers)
+            `/api/media/images/Studios/${encodeURIComponent(decodedName)}/Images/Primary`)
 
       const response: StudioResponse = {
         name: decodedName,
