@@ -767,6 +767,12 @@
   "mediaDetail": {
     "movieNotFound": "Película no encontrada",
     "seriesNotFound": "Serie no encontrada",
+    "loadFailed": "This title could not be loaded",
+    "loadFailedStatus": "The server answered with an error ({{status}}).",
+    "loadFailedNoAnswer": "No usable answer arrived from the server.",
+    "loadRetry": "Try again",
+    "sessionEnded": "Your session has ended",
+    "sessionContinue": "Continue",
     "hero": {
       "watched": "Observó",
       "watchedCount": "Visto {{count}}x",

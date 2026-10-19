@@ -1111,8 +1111,10 @@
     "seriesNotFound": "Series not found",
     "loadFailed": "This title could not be loaded",
     "loadFailedStatus": "The server answered with an error ({{status}}).",
-    "loadFailedNoAnswer": "No answer arrived from the server.",
+    "loadFailedNoAnswer": "No usable answer arrived from the server.",
     "loadRetry": "Try again",
+    "sessionEnded": "Your session has ended",
+    "sessionContinue": "Continue",
     "infoCard": {
       "communityActivity": "Community Activity",
       "watched": "Watched",

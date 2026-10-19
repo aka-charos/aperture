@@ -864,6 +864,12 @@
   "mediaDetail": {
     "movieNotFound": "Film niet gevonden",
     "seriesNotFound": "Serie niet gevonden",
+    "loadFailed": "This title could not be loaded",
+    "loadFailedStatus": "The server answered with an error ({{status}}).",
+    "loadFailedNoAnswer": "No usable answer arrived from the server.",
+    "loadRetry": "Try again",
+    "sessionEnded": "Your session has ended",
+    "sessionContinue": "Continue",
     "infoCard": {
       "communityActivity": "Gemeenschapsactiviteit",
       "watched": "Bekeken",

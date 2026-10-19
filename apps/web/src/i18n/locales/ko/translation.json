@@ -766,6 +766,12 @@
   "mediaDetail": {
     "movieNotFound": "영화를 찾을 수 없습니다",
     "seriesNotFound": "시리즈를 찾을 수 없습니다",
+    "loadFailed": "This title could not be loaded",
+    "loadFailedStatus": "The server answered with an error ({{status}}).",
+    "loadFailedNoAnswer": "No usable answer arrived from the server.",
+    "loadRetry": "Try again",
+    "sessionEnded": "Your session has ended",
+    "sessionContinue": "Continue",
     "hero": {
       "watched": "시청함",
       "watchedCount": "{{count}}회 시청함",

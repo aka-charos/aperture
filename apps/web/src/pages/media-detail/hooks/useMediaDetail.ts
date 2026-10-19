@@ -15,12 +15,7 @@ import type {
 import { DEFAULT_SIMILAR_MEDIA_LIMIT } from '../constants'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { onMovieWatched } from '@/lib/watchStatusEvents'
-import {
-  isTransientLoadError,
-  loadErrorForStatus,
-  LOAD_RETRY_DELAYS_MS,
-  type MediaLoadError,
-} from '../loadFailure'
+import { readJsonWithRetry, type MediaLoadError } from '../loadFailure'
 
 export type WatchStats = MovieWatchStats | SeriesWatchStats
 
@@ -151,73 +146,46 @@ export function useMediaDetail(
     setLoading(true)
     setError(null)
 
-    // Optional for the page (the play links), so it is asked on its own: when
-    // it shared one Promise.all with the title, its failure failed the title.
-    fetch('/api/settings/media-server', { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: MediaServerInfo | null) => {
-        if (live() && data) setMediaServer(data)
-      })
-      .catch(() => {})
+    // The language the page is displayed in rides along, so the server can
+    // attach a machine translation of the synopsis in that language
+    // (`localized_synopsis`) — only the client knows which one it rendered.
+    const lang = encodeURIComponent(displayLanguage)
 
-    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-    // One attempt at the title (and a series' episodes). Answers the error, or
-    // null once the page has what it needs.
-    const loadOnce = async (): Promise<MediaLoadError | null> => {
-      // The language the page is displayed in rides along, so the server can
-      // attach a machine translation of the synopsis in that language
-      // (`localized_synopsis`) — only the client knows which one it rendered.
-      const lang = encodeURIComponent(displayLanguage)
-      let mediaResponse: Response
-      let episodesResponse: Response | null = null
-      try {
-        ;[mediaResponse, episodesResponse] = await Promise.all([
-          fetch(`${base}?lang=${lang}`, { credentials: 'include' }),
-          mediaType === 'series'
-            ? fetch(`/api/series/${id}/episodes`, { credentials: 'include' }).catch(() => null)
-            : Promise.resolve(null),
-        ])
-      } catch {
-        return { kind: 'failed', status: null }
-      }
-      if (!live()) return null
-
-      if (!mediaResponse.ok) return loadErrorForStatus(mediaResponse.status)
-
-      let data: unknown
-      try {
-        data = await mediaResponse.json()
-      } catch {
-        // A proxy page in place of the API's JSON, or a body cut off mid-way.
-        return { kind: 'failed', status: mediaResponse.status }
-      }
-      if (!live()) return null
-      setMedia({ ...(data as object), type: mediaType } as Media)
-
-      if (mediaType === 'series' && episodesResponse?.ok) {
-        const episodesData = await episodesResponse.json().catch(() => null)
-        if (!live() || !episodesData) return null
-        setSeasons(episodesData.seasons || {})
-        setSeasonAvailability(episodesData.seasonAvailability || [])
-      }
-      return null
-    }
-
+    // Each request retries on its own (loadFailure.ts), so a title that
+    // answered is not asked again while its episodes are.
     const fetchMedia = async () => {
-      let failure = await loadOnce()
-      for (const delay of LOAD_RETRY_DELAYS_MS) {
-        if (!live() || !failure || !isTransientLoadError(failure)) break
-        await sleep(delay)
-        if (!live()) return
-        failure = await loadOnce()
-      }
-      if (!live()) return
+      const [title, episodes, server] = await Promise.all([
+        readJsonWithRetry<object>(`${base}?lang=${lang}`, { isLive: live }),
+        mediaType === 'series'
+          ? readJsonWithRetry<{ seasons?: Record<number, Episode[]>; seasonAvailability?: SeasonAvailability[] }>(
+              `/api/series/${id}/episodes`,
+              { isLive: live }
+            )
+          : Promise.resolve(null),
+        // Optional for the page (the play button and its colours), so its
+        // failure costs only that. It is awaited with the title, though, so
+        // the hero never paints first with no server and then switches.
+        readJsonWithRetry<MediaServerInfo>('/api/settings/media-server', { isLive: live }),
+      ])
+      if (!live() || !title) return
+
+      // A series page without its seasons is not the page, so a failed
+      // episodes request fails the load the way a failed title does.
+      const failure = !title.ok ? title.error : episodes && !episodes.ok ? episodes.error : null
       if (failure) {
         // What the server actually answered, for whoever opens the console:
         // the page shows the kind, not the request.
         console.warn(`Could not load ${base}`, failure)
         setError(failure)
+        setLoading(false)
+        return
+      }
+
+      if (server?.ok) setMediaServer(server.data)
+      setMedia({ ...(title.ok ? title.data : {}), type: mediaType } as Media)
+      if (episodes?.ok) {
+        setSeasons(episodes.data.seasons || {})
+        setSeasonAvailability(episodes.data.seasonAvailability || [])
       }
       setLoading(false)
     }
@@ -231,7 +199,8 @@ export function useMediaDetail(
 
   // Everything else on the page: independent of the language, so it starts
   // with the title rather than after it and survives a language switch. Each
-  // part fails on its own and leaves its section empty, as each did before.
+  // part fails on its own (after the same retries as the title) and leaves
+  // its section empty.
   // The viewer's rating is not fetched here — it is read from the shared
   // ratings map (see `userRating` above).
   useEffect(() => {
@@ -248,9 +217,11 @@ export function useMediaDetail(
     setInsights(null)
     setWatchStatus(null)
 
+    // Retried like the title (loadFailure.ts); what still fails leaves its
+    // section empty, as before.
     const getJson = async <T,>(url: string): Promise<T | null> => {
-      const response = await fetch(url, { credentials: 'include' })
-      return response.ok ? ((await response.json()) as T) : null
+      const result = await readJsonWithRetry<T>(url, { isLive: live })
+      return result?.ok ? result.data : null
     }
 
     getJson<{ similar?: SimilarItem[] }>(`${base}/similar?limit=${DEFAULT_SIMILAR_MEDIA_LIMIT}`)
@@ -311,12 +282,11 @@ export function useMediaDetail(
     let cancelled = false
     setIsFavorite(null)
 
-    fetch(`/api/favorites/status?movieId=${id}`, { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { favorite?: boolean } | null) => {
-        if (!cancelled && data) setIsFavorite(data.favorite === true)
-      })
-      .catch(() => {})
+    readJsonWithRetry<{ favorite?: boolean }>(`/api/favorites/status?movieId=${id}`, {
+      isLive: () => !cancelled,
+    }).then((result) => {
+      if (!cancelled && result?.ok) setIsFavorite(result.data.favorite === true)
+    })
 
     return () => {
       cancelled = true
@@ -337,21 +307,19 @@ export function useMediaDetail(
     let cancelled = false
     // Seerr's own vocabulary for a show is 'tv', not 'series'.
     const path = mediaType === 'movie' ? 'movie' : 'tv'
-    fetch(`/api/seerr/status/${path}/${numericTmdbId}`, { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { canRequest?: boolean; canReportIssue?: boolean } | null) => {
-        // Absent reads as false in both directions — an older server that does
-        // not send a field cannot honour the action behind it either.
-        if (!cancelled) {
-          setSeerrTitleStatus({
-            canRequest: data?.canRequest === true,
-            canReportIssue: data?.canReportIssue === true,
-          })
-        }
+    readJsonWithRetry<{ canRequest?: boolean; canReportIssue?: boolean }>(
+      `/api/seerr/status/${path}/${numericTmdbId}`,
+      { isLive: () => !cancelled }
+    ).then((result) => {
+      if (cancelled) return
+      // Absent reads as false in both directions — an older server that does
+      // not send a field cannot honour the action behind it either.
+      const data = result?.ok ? result.data : null
+      setSeerrTitleStatus({
+        canRequest: data?.canRequest === true,
+        canReportIssue: data?.canReportIssue === true,
       })
-      .catch(() => {
-        if (!cancelled) setSeerrTitleStatus(NO_SEERR_STATUS)
-      })
+    })
 
     return () => {
       cancelled = true

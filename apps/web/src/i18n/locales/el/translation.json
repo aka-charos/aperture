@@ -3159,8 +3159,10 @@
     "seriesNotFound": "Η σειρά δεν βρέθηκε",
     "loadFailed": "Ο τίτλος δεν φορτώθηκε",
     "loadFailedStatus": "Ο διακομιστής απάντησε με σφάλμα ({{status}}).",
-    "loadFailedNoAnswer": "Δεν ήρθε απάντηση από τον διακομιστή.",
+    "loadFailedNoAnswer": "Δεν ήρθε αξιοποιήσιμη απάντηση από τον διακομιστή.",
     "loadRetry": "Δοκιμάστε ξανά",
+    "sessionEnded": "Η σύνδεσή σας έληξε",
+    "sessionContinue": "Συνέχεια",
     "infoCard": {
       "communityActivity": "Τι κάνει το κοινό",
       "watched": "Το είδαν",

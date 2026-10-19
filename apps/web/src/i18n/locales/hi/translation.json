@@ -766,6 +766,12 @@
   "mediaDetail": {
     "movieNotFound": "फ़िल्म नहीं मिली",
     "seriesNotFound": "सीरीज़ नहीं मिली",
+    "loadFailed": "This title could not be loaded",
+    "loadFailedStatus": "The server answered with an error ({{status}}).",
+    "loadFailedNoAnswer": "No usable answer arrived from the server.",
+    "loadRetry": "Try again",
+    "sessionEnded": "Your session has ended",
+    "sessionContinue": "Continue",
     "hero": {
       "watched": "देखे",
       "watchedCount": "{{गिनती}}x देखा गया",

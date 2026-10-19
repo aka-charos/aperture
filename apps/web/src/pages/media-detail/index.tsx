@@ -50,7 +50,7 @@ export function MediaDetailPage({
   const { id: routeId } = useParams<{ id: string }>()
   const id = idProp ?? routeId
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, checkAuth } = useAuth()
   // The server's answer, not `isAdmin || canManageWatchHistory` worked out
   // here — that is the admin-override half of a rule whose other half lives
   // in core, and two copies is how they come to disagree.
@@ -104,6 +104,22 @@ export function MediaDetailPage({
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
         <CircularProgress />
+      </Box>
+    )
+  }
+
+  // A 401 is the session ending, not the title: asking again cannot help, so
+  // the button re-checks the session — which signs out to the login page, or,
+  // when an assumed account's lease ran out, returns to the admin's own view.
+  if (error?.kind === 'signedOut') {
+    return (
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <Typography color="error" variant="h6">
+          {t('mediaDetail.sessionEnded')}
+        </Typography>
+        <Button variant="outlined" onClick={() => void checkAuth()} sx={{ mt: 3 }}>
+          {t('mediaDetail.sessionContinue')}
+        </Button>
       </Box>
     )
   }
