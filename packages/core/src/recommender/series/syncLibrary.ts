@@ -11,7 +11,7 @@ import {
   failJob,
 } from '../../jobs/progress.js'
 import { randomUUID } from 'crypto'
-import type { Episode } from '../../media/types.js'
+import type { Episode, Series } from '../../media/types.js'
 import { fetchParallel, streamingBatchProcess } from '../shared/syncHelpers.js'
 import { clampMaxCandidatesToLibrary } from '../../lib/recommendationConfig.js'
 import {
@@ -23,7 +23,7 @@ import {
 import type { SyncSeriesResult, LibrarySeriesSyncResult, PreparedSeries, PreparedEpisode } from './syncTypes.js'
 import { reconcileRemovedSeries } from './reconcile.js'
 import { processSeriesBatch } from './seriesBatch.js'
-import { indexByTitleYear } from '../shared/titleYearRebind.js'
+import { buildRebindIndex, type TitleYearRow } from '../shared/titleYearRebind.js'
 import { processEpisodeBatch } from './episodeBatch.js'
 
 export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResult> {
@@ -174,7 +174,7 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
       ),
     ])
     const existingSeriesIds = new Set(existingSeriesResult.rows.map((s) => s.provider_item_id))
-    const existingSeriesTitleYears = indexByTitleYear(
+    const seriesRebindIndex = buildRebindIndex<TitleYearRow>(
       existingSeriesResult.rows.map((s) => ({
         providerItemId: s.provider_item_id,
         title: s.title,
@@ -204,10 +204,13 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
     let processedSeries = 0
     let processedEpisodes = 0
     const librarySyncResults: LibrarySeriesSyncResult[] = []
-    // Every series id the server has listed so far this run. A title+year
-    // match may not take over a row whose own id is in here
-    // (shared/titleYearRebind.ts).
+    // Every series id the server lists this run, across ALL libraries. A row
+    // whose own id is in here is not up for a takeover by external id, and
+    // only with an agreeing id by title+year (shared/titleYearRebind.ts). It
+    // must be complete before the first show is matched: a row whose show sits
+    // in a library not fetched yet would otherwise read as gone.
     const liveSeriesIds = new Set<string>()
+    const fetchedLibraries: Array<{ libraryId: string | null; seriesList: Series[] }> = []
 
     // Step 3: Process series
     setJobStep(jobId, 2, 'Processing series', totalSeries)
@@ -243,13 +246,18 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         PARALLEL_FETCHES
       )
 
-      addLog(jobId, 'info', `✅ Fetched ${seriesList.length} series, now processing...`)
+      addLog(jobId, 'info', `✅ Fetched ${seriesList.length} series`)
 
       libraryResult.fetchedSeriesCount = seriesList.length
       for (const series of seriesList) {
         libraryResult.seenSeriesProviderIds.add(series.id)
         liveSeriesIds.add(series.id)
       }
+      fetchedLibraries.push({ libraryId, seriesList })
+    }
+
+    for (const { libraryId, seriesList } of fetchedLibraries) {
+      addLog(jobId, 'info', `⚙️ Processing ${seriesList.length} series from library${libraryId ? ` ${libraryId}` : ''}...`)
 
       // Prepare series data
       const preparedSeries: PreparedSeries[] = seriesList.map((series) => ({
@@ -267,7 +275,7 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         const result = await processSeriesBatch(
           batch,
           existingSeriesIds,
-          existingSeriesTitleYears,
+          seriesRebindIndex,
           liveSeriesIds,
           jobId
         )

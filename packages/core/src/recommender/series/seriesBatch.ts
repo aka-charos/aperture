@@ -3,9 +3,9 @@ import { query } from '../../lib/db.js'
 import { clampRating } from '../shared/syncHelpers.js'
 import type { PreparedSeries } from './syncTypes.js'
 import {
-  pickTitleYearRow,
-  takeOverRow,
-  titleYearKey,
+  addToRebindIndex,
+  findRebindRow,
+  type RebindIndex,
   type TitleYearRow,
 } from '../shared/titleYearRebind.js'
 
@@ -14,7 +14,7 @@ const logger = createChildLogger('sync-series')
 export async function processSeriesBatch(
   seriesList: PreparedSeries[],
   existingProviderIds: Set<string>,
-  existingTitleYears: Map<string, TitleYearRow[]>,
+  rebindIndex: RebindIndex<TitleYearRow>,
   liveProviderIds: ReadonlySet<string>,
   _jobId: string
 ): Promise<{ added: number; updated: number }> {
@@ -22,7 +22,8 @@ export async function processSeriesBatch(
   const toUpdate: PreparedSeries[] = []
   const toInsert: PreparedSeries[] = []
   // Series whose provider id is new but which match a stored row by title+year
-  // (the server re-issued the id). `previousId` is the row they take over.
+  // or, failing that, by external id (the server re-issued the id).
+  // `previousId` is the row they take over.
   const toUpdateByTitleYear: Array<PreparedSeries & { previousId: string }> = []
 
   for (const ps of seriesList) {
@@ -31,28 +32,36 @@ export async function processSeriesBatch(
       continue
     }
     // Title+year alone is not an identity: two different shows can share both.
-    // A row is taken over only when no external id contradicts it
+    // A row is taken over only when no external id contradicts it, and by
+    // external id alone only when its own item is gone from the server
     // (shared/titleYearRebind.ts); otherwise the show gets a row of its own.
-    const key = titleYearKey(ps.series.name, ps.series.year)
-    const row = key
-      ? pickTitleYearRow(existingTitleYears.get(key), ps.series, (id) => liveProviderIds.has(id))
-      : null
-    if (row) {
-      toUpdateByTitleYear.push({ ...ps, previousId: row.providerItemId })
-      takeOverRow(row, ps.series.id, ps.series)
+    const match = findRebindRow(
+      rebindIndex,
+      {
+        providerItemId: ps.series.id,
+        title: ps.series.name,
+        year: ps.series.year,
+        tmdbId: ps.series.tmdbId,
+        imdbId: ps.series.imdbId,
+        tvdbId: ps.series.tvdbId,
+      },
+      (id) => liveProviderIds.has(id)
+    )
+    if (match) {
+      toUpdateByTitleYear.push({ ...ps, previousId: match.previousId })
     } else {
       toInsert.push(ps)
-      if (key) {
-        const entry: TitleYearRow = {
+      addToRebindIndex(
+        rebindIndex,
+        {
           providerItemId: ps.series.id,
           tmdbId: ps.series.tmdbId,
           imdbId: ps.series.imdbId,
           tvdbId: ps.series.tvdbId,
-        }
-        const list = existingTitleYears.get(key)
-        if (list) list.push(entry)
-        else existingTitleYears.set(key, [entry])
-      }
+        },
+        ps.series.name,
+        ps.series.year
+      )
     }
   }
 

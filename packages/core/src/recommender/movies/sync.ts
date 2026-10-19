@@ -18,10 +18,10 @@ import type { Movie, PaginatedResult } from '../../media/types.js'
 import type { MediaServerProvider } from '../../media/MediaServerProvider.js'
 import { clampRating } from '../shared/syncHelpers.js'
 import {
-  indexByTitleYear,
-  pickTitleYearRow,
-  takeOverRow,
-  titleYearKey,
+  addToRebindIndex,
+  buildRebindIndex,
+  findRebindRow,
+  type RebindIndex,
   type TitleYearRow,
 } from '../shared/titleYearRebind.js'
 import { clampMaxCandidatesToLibrary } from '../../lib/recommendationConfig.js'
@@ -186,7 +186,7 @@ async function fetchMoviesParallel(
 async function processMovieBatch(
   movies: PreparedMovie[],
   existingProviderIds: Set<string>,
-  existingTitleYears: Map<string, TitleYearRow[]>,
+  rebindIndex: RebindIndex<TitleYearRow>,
   liveProviderIds: ReadonlySet<string>,
   _jobId: string
 ): Promise<{ added: number; updated: number }> {
@@ -194,7 +194,8 @@ async function processMovieBatch(
   const toUpdate: PreparedMovie[] = []
   const toInsert: PreparedMovie[] = []
   // Movies whose provider id is new but which match a stored row by title+year
-  // (the server re-issued the id). `previousId` is the row they take over.
+  // or, failing that, by external id (the server re-issued the id).
+  // `previousId` is the row they take over.
   const toUpdateByTitleYear: Array<PreparedMovie & { previousId: string }> = []
 
   for (const pm of movies) {
@@ -203,27 +204,30 @@ async function processMovieBatch(
       continue
     }
     // Title+year alone is not an identity: two different films can share both.
-    // A row is taken over only when no external id contradicts it
+    // A row is taken over only when no external id contradicts it, and by
+    // external id alone only when its own item is gone from the server
     // (shared/titleYearRebind.ts); otherwise the film gets a row of its own.
-    const key = titleYearKey(pm.movie.name, pm.movie.year)
-    const row = key
-      ? pickTitleYearRow(existingTitleYears.get(key), pm.movie, (id) => liveProviderIds.has(id))
-      : null
-    if (row) {
-      toUpdateByTitleYear.push({ ...pm, previousId: row.providerItemId })
-      takeOverRow(row, pm.movie.id, pm.movie)
+    const match = findRebindRow(
+      rebindIndex,
+      {
+        providerItemId: pm.movie.id,
+        title: pm.movie.name,
+        year: pm.movie.year,
+        tmdbId: pm.movie.tmdbId,
+        imdbId: pm.movie.imdbId,
+      },
+      (id) => liveProviderIds.has(id)
+    )
+    if (match) {
+      toUpdateByTitleYear.push({ ...pm, previousId: match.previousId })
     } else {
       toInsert.push(pm)
-      if (key) {
-        const entry: TitleYearRow = {
-          providerItemId: pm.movie.id,
-          tmdbId: pm.movie.tmdbId,
-          imdbId: pm.movie.imdbId,
-        }
-        const list = existingTitleYears.get(key)
-        if (list) list.push(entry)
-        else existingTitleYears.set(key, [entry])
-      }
+      addToRebindIndex(
+        rebindIndex,
+        { providerItemId: pm.movie.id, tmdbId: pm.movie.tmdbId, imdbId: pm.movie.imdbId },
+        pm.movie.name,
+        pm.movie.year
+      )
     }
   }
 
@@ -632,7 +636,7 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
       imdb_id: string | null
     }>('SELECT provider_item_id, title, year, tmdb_id, imdb_id FROM movies')
     const existingProviderIds = new Set(existingMovies.rows.map((m) => m.provider_item_id))
-    const existingTitleYears = indexByTitleYear(
+    const rebindIndex = buildRebindIndex<TitleYearRow>(
       existingMovies.rows.map((m) => ({
         providerItemId: m.provider_item_id,
         title: m.title,
@@ -651,10 +655,13 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
     let processed = 0
     const startTime = Date.now()
     const librarySyncResults: LibraryMovieSyncResult[] = []
-    // Every provider id the server has listed so far this run. A title+year
-    // match may not take over a row whose own id is in here
-    // (shared/titleYearRebind.ts).
+    // Every provider id the server lists this run, across ALL libraries. A
+    // row whose own id is in here is not up for a takeover by external id,
+    // and only with an agreeing id by title+year (shared/titleYearRebind.ts).
+    // It must be complete before the first item is matched: a row whose item
+    // sits in a library not fetched yet would otherwise read as gone.
     const liveProviderIds = new Set<string>()
+    const fetchedLibraries: Array<{ libraryId: string | null; movies: Movie[] }> = []
 
     for (const { libraryId, count } of libraryCounts) {
       if (count === 0) continue
@@ -674,7 +681,7 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
         jobId
       )
 
-      addLog(jobId, 'info', `✅ Fetched ${movies.length} movies, now processing...`)
+      addLog(jobId, 'info', `✅ Fetched ${movies.length} movies`)
 
       librarySyncResults.push({
         libraryId,
@@ -683,6 +690,11 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
         seenProviderIds: new Set(movies.map((movie) => movie.id)),
       })
       for (const movie of movies) liveProviderIds.add(movie.id)
+      fetchedLibraries.push({ libraryId, movies })
+    }
+
+    for (const { libraryId, movies } of fetchedLibraries) {
+      addLog(jobId, 'info', `⚙️ Processing ${movies.length} movies from library${libraryId ? ` ${libraryId}` : ''}...`)
 
       // Prepare movie data
       const preparedMovies: PreparedMovie[] = movies.map((movie) => ({
@@ -699,7 +711,7 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
         const result = await processMovieBatch(
           batch,
           existingProviderIds,
-          existingTitleYears,
+          rebindIndex,
           liveProviderIds,
           jobId
         )

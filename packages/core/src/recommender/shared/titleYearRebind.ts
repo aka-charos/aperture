@@ -121,6 +121,145 @@ export function takeOverRow(row: TitleYearRow, providerItemId: string, incoming:
   row.tvdbId = incoming.tvdbId || null
 }
 
+/**
+ * The keys a row is found under by external id: `tmdb:…`, `imdb:…`, `tvdb:…`.
+ * Prefixed because the three id spaces overlap (a TMDb and a TVDb id can both
+ * be 1832).
+ */
+function externalIdKeys(ids: ExternalIds): string[] {
+  const keys: string[] = []
+  for (const [prefix, value] of [
+    ['tmdb', ids.tmdbId],
+    ['imdb', ids.imdbId],
+    ['tvdb', ids.tvdbId],
+  ] as const) {
+    const id = normalizeId(value)
+    if (id !== null) keys.push(`${prefix}:${id}`)
+  }
+  return keys
+}
+
+/**
+ * The second fallback, for an item title+year could not place: a stored row
+ * whose own item is GONE from the server and which agrees with the incoming
+ * item on an external id.
+ *
+ * Measured: a media server rescanning a folder deleted twelve films and
+ * re-added them under new ids, and the new items arrived with no year yet (and
+ * one renamed, "Clerks (Extended)" → "Clerks"). Title+year had nothing to match
+ * on, so the sync would insert twelve new rows and delete the old ones — and a
+ * movie row's delete cascades to every rating, recommendation and Watch This
+ * item that named it. The TMDb and IMDb ids were identical on both sides.
+ *
+ * Stricter than the title+year rule on purpose, since nothing about the name
+ * vouches for it: the row's item must not be live this run (an item still on
+ * the server keeps its row), no id may conflict, and at least one must agree.
+ */
+export function pickExternalIdRow<T extends TitleYearRow>(
+  candidates: readonly T[] | undefined,
+  incoming: ExternalIds,
+  isLive: (providerItemId: string) => boolean
+): T | null {
+  if (!candidates || candidates.length === 0) return null
+  let best: T | null = null
+  let bestScore = 0
+  for (const row of candidates) {
+    if (isLive(row.providerItemId)) continue
+    if (externalIdsConflict(row, incoming)) continue
+    const score = agreeingIds(row, incoming)
+    if (score > bestScore) {
+      best = row
+      bestScore = score
+    }
+  }
+  return best
+}
+
+/** Stored rows indexed both ways the sync can find a re-issued item's row. */
+export interface RebindIndex<T extends TitleYearRow> {
+  byTitleYear: Map<string, T[]>
+  byExternalId: Map<string, T[]>
+}
+
+/**
+ * Index stored rows by title+year and by external id. Both maps hold the SAME
+ * row objects, so a takeover through one is seen through the other.
+ */
+export function buildRebindIndex<T extends TitleYearRow>(
+  rows: ReadonlyArray<T & { title: string | null; year: number | null }>
+): RebindIndex<T> {
+  const byExternalId = new Map<string, T[]>()
+  for (const row of rows) addByExternalId(byExternalId, row)
+  return { byTitleYear: indexByTitleYear(rows), byExternalId }
+}
+
+function addByExternalId<T extends TitleYearRow>(index: Map<string, T[]>, row: T): void {
+  for (const key of externalIdKeys(row)) {
+    const list = index.get(key)
+    if (list) list.push(row)
+    else index.set(key, [row])
+  }
+}
+
+/**
+ * The row an item with an unknown provider id takes over, or null when it
+ * needs a row of its own: title+year first (`pickTitleYearRow`), then external
+ * ids (`pickExternalIdRow`). The chosen row is marked as the item's
+ * (`takeOverRow`), so no later item this run can take it as well; the id it
+ * had before is returned beside it, since that is the row the UPDATE targets.
+ *
+ * `isLive` must answer for EVERY item the server lists this run, across all
+ * libraries: a row whose item sits in a library not fetched yet would
+ * otherwise read as gone and be taken.
+ */
+export interface RebindMatch<T> {
+  row: T
+  /** The row's provider id before the takeover: what the sync's UPDATE targets. */
+  previousId: string
+}
+
+export function findRebindRow<T extends TitleYearRow>(
+  index: RebindIndex<T>,
+  incoming: ExternalIds & { providerItemId: string; title: string | null | undefined; year: number | null | undefined },
+  isLive: (providerItemId: string) => boolean
+): RebindMatch<T> | null {
+  const key = titleYearKey(incoming.title, incoming.year)
+  let row = key ? pickTitleYearRow(index.byTitleYear.get(key), incoming, isLive) : null
+  if (!row) {
+    const seen = new Set<T>()
+    const candidates: T[] = []
+    for (const idKey of externalIdKeys(incoming)) {
+      for (const candidate of index.byExternalId.get(idKey) ?? []) {
+        if (!seen.has(candidate)) {
+          seen.add(candidate)
+          candidates.push(candidate)
+        }
+      }
+    }
+    row = pickExternalIdRow(candidates, incoming, isLive)
+  }
+  if (!row) return null
+  const previousId = row.providerItemId
+  takeOverRow(row, incoming.providerItemId, incoming)
+  return { row, previousId }
+}
+
+/** Record a row inserted this run, so a later item can match it as before. */
+export function addToRebindIndex<T extends TitleYearRow>(
+  index: RebindIndex<T>,
+  row: T,
+  title: string | null | undefined,
+  year: number | null | undefined
+): void {
+  const key = titleYearKey(title, year)
+  if (key) {
+    const list = index.byTitleYear.get(key)
+    if (list) list.push(row)
+    else index.byTitleYear.set(key, [row])
+  }
+  addByExternalId(index.byExternalId, row)
+}
+
 /** Index stored rows by title+year; several rows may legitimately share a key. */
 export function indexByTitleYear<T extends TitleYearRow>(
   rows: ReadonlyArray<T & { title: string | null; year: number | null }>
