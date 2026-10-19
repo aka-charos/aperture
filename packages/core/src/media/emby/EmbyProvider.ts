@@ -10,6 +10,7 @@ import type {
   AuthResult,
   MediaServerUser,
   Library,
+  MediaServerStudio,
   PaginationOptions,
   PaginatedResult,
   Movie,
@@ -28,6 +29,7 @@ import type {
 
 import { EmbyProviderBase } from './base.js'
 import { authenticateByName, getServerInfo } from './auth.js'
+import { getStudios } from './studios.js'
 import { getUsers, getUserById } from './users.js'
 import {
   getLibraries,
@@ -113,6 +115,10 @@ export class EmbyProvider extends EmbyProviderBase implements MediaServerProvide
   // Libraries
   async getLibraries(apiKey: string): Promise<Library[]> {
     return getLibraries(this, apiKey)
+  }
+
+  async getStudios(apiKey: string): Promise<MediaServerStudio[]> {
+    return getStudios(this, apiKey)
   }
 
   async getMovieLibraries(apiKey: string): Promise<Library[]> {

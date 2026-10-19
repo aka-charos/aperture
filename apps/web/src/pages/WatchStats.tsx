@@ -86,8 +86,8 @@ interface WatchStats {
   totalSeries: number
   topActors: { name: string; thumb: string | null; count: number }[]
   topDirectors: { name: string; thumb: string | null; count: number }[]
-  topStudios: { name: string; thumb: string | null; count: number }[]
-  topNetworks: { name: string; thumb: string | null; count: number }[]
+  topStudios: { name: string; thumb: string | null; thumbKind?: 'tile' | 'mark' | null; count: number }[]
+  topNetworks: { name: string; thumb: string | null; thumbKind?: 'tile' | 'mark' | null; count: number }[]
   seriesGenreDistribution: { genre: string; count: number }[]
   activityHeatmap: { dow: number; hour: number; count: number }[]
   avgCommunityRating: number

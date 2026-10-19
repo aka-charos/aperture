@@ -840,7 +840,7 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
             jobId,
             studiosEnriched: result.studiosEnriched,
             networksEnriched: result.networksEnriched,
-            logosPushedToEmby: result.logosPushedToEmby,
+            mediaServerImages: result.mediaServerImages,
           },
           `✅ Studio logo enrichment complete`
         )

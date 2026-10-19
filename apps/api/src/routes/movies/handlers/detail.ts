@@ -4,7 +4,7 @@
  * GET /api/movies/:id - Get movie by ID with full metadata
  */
 import type { FastifyInstance } from 'fastify'
-import { getStudioLogoUrls, resolveLocalizedSynopsis } from '@aperture/core'
+import { getStudioLogos, resolveLocalizedSynopsis, type StudioLogo } from '@aperture/core'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { titleInScope } from '../../../lib/viewerScope.js'
@@ -52,11 +52,11 @@ export function registerDetailHandler(fastify: FastifyInstance) {
       const studioNames = (movie.studios ?? []).map((st) => (typeof st === 'string' ? st : st.name))
       const [localized_synopsis, studio_logos] = await Promise.all([
         resolveLocalizedSynopsis('movie', id, request.query.lang, request.user!.id),
-        getStudioLogoUrls(studioNames, 'studio').then(
-          (logos) => Object.fromEntries(logos) as Record<string, string>,
+        getStudioLogos(studioNames, 'studio').then(
+          (logos) => Object.fromEntries(logos) as Record<string, StudioLogo>,
           (err: unknown) => {
             request.log.warn({ err, movieId: id }, 'Studio logo lookup failed')
-            return {} as Record<string, string>
+            return {} as Record<string, StudioLogo>
           }
         ),
       ])

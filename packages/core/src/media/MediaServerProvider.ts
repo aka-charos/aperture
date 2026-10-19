@@ -2,6 +2,7 @@ import type {
   AuthResult,
   MediaServerUser,
   Library,
+  MediaServerStudio,
   PaginationOptions,
   PaginatedResult,
   Movie,
@@ -73,6 +74,12 @@ export interface MediaServerProvider {
    * Get all libraries from the media server
    */
   getLibraries(apiKey: string): Promise<Library[]>
+
+  /**
+   * Every studio and network the server lists, with the image it holds for
+   * each (Thumb, else Primary). Read-only: Aperture never uploads one.
+   */
+  getStudios(apiKey: string): Promise<MediaServerStudio[]>
 
   /**
    * Get only movie libraries from the media server

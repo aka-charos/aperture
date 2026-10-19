@@ -37,7 +37,7 @@ import {
   tmdbUrl,
   tvdbUrl,
 } from '../helpers'
-import { StudioLogo } from './StudioLogo'
+import { StudioLogo } from '../../../components/StudioLogo'
 
 interface MediaInfoCardProps {
   media: Media
@@ -500,7 +500,7 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
                     label={
                       logo ? (
                         <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-                          <StudioLogo src={logo} name="" height={14} maxWidth={56} fallback={null} />
+                          <StudioLogo logo={logo} name="" height={10} fallback={null} />
                           {studioName}
                         </Box>
                       ) : (

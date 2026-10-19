@@ -1,6 +1,7 @@
 // Unified types for both Movies and Series
 
 import type { ConnectionReason } from '../../components/SimilarityGraph/types'
+import type { StudioLogoData } from '../../components/StudioLogo'
 
 export type MediaType = 'movie' | 'series'
 
@@ -63,10 +64,10 @@ export interface BaseMedia {
   mdblist_score?: number | null
   streaming_providers?: StreamingProvider[] | null
   /**
-   * Logo addresses for this title's studios, keyed by studio name, decided by
-   * the server; a studio with no logo is absent.
+   * Logos for this title's studios, keyed by studio name, decided by the
+   * server (media server first, TMDb otherwise); a studio with none is absent.
    */
-  studio_logos?: Record<string, string>
+  studio_logos?: Record<string, StudioLogoData>
 }
 
 // Movie-specific properties
@@ -97,8 +98,8 @@ export interface Series extends BaseMedia {
   /** Average episode length from library metadata, when episodes have runtimes */
   average_episode_runtime_minutes: number | null
   network: string | null
-  /** The network's logo address, decided by the server; absent or null when none. */
-  network_logo_url?: string | null
+  /** The network's logo, decided by the server; absent or null when none. */
+  network_logo?: StudioLogoData | null
   studios: StudioItem[]
   actors: Actor[]
   imdb_id: string | null

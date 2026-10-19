@@ -718,8 +718,6 @@ export {
   testOMDbConnection,
   isOMDbPaidTier,
   // Studio logos settings
-  getStudioLogosConfig,
-  setStudioLogosConfig,
   getStreamingDiscoveryEnabled,
   setStreamingDiscoveryEnabled,
   getStreamingDiscoveryProviderStrips,
@@ -763,7 +761,6 @@ export {
   type ChatAssistantModelInfo,
   type TMDbConfig,
   type OMDbConfig,
-  type StudioLogosConfig,
   // LLDAP settings
   getLldapConfig,
   setLldapConfig,
@@ -1031,9 +1028,12 @@ export {
   getStudioLogoStats,
   populateStudiosFromMedia,
   getStudioByName,
-  resolveStudioLogoUrl,
-  getStudioLogoUrls,
+  resolveStudioLogo,
+  getStudioLogos,
+  studioLogoColumns,
+  type StudioLogoRow,
 } from './enrichment/studioLogos.js'
+export type { StudioLogo, StudioLogoKind } from './enrichment/studioLogoMatch.js'
 
 // Backup
 export {

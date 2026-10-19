@@ -11,7 +11,10 @@ import {
   getPersonMediaServerDetails,
   findPersonMediaServerItemIdForName,
   pushImageToMediaServer,
-  resolveStudioLogoUrl,
+  resolveStudioLogo,
+  studioLogoColumns,
+  type StudioLogoKind,
+  type StudioLogoRow,
 } from '@aperture/core'
 import { query, queryOne } from '../../lib/db.js'
 import { requireAuth, requireAdmin } from '../../plugins/auth.js'
@@ -59,6 +62,8 @@ interface PersonResponse {
 interface StudioResponse {
   name: string
   imageUrl: string | null
+  /** How the logo is drawn: a media-server tile as it is, a TMDb mark on a plate. */
+  imageKind: StudioLogoKind | null
   movies: ContentItem[]
   series: ContentItem[]
   stats: {
@@ -427,35 +432,22 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
         studioSeriesParams
       )
 
-      // Check if we have logo data from TMDB enrichment or Emby ID for fallback
-      // Check both 'studio' and 'network' types since this page handles both
-      const studioLogo = await queryOne<{ 
-        logo_local_path: string | null
-        logo_path: string | null
-        emby_id: string | null 
-      }>(
-        `SELECT logo_local_path, logo_path, emby_id FROM studios_networks 
-         WHERE name ILIKE $1
-         ORDER BY logo_local_path IS NOT NULL DESC, logo_path IS NOT NULL DESC
+      // The logo: the media server's image for this name first, TMDb's
+      // otherwise (core resolveStudioLogo). Both kinds of row, since this page
+      // serves studios and networks; a row with a logo wins over one without.
+      const studioRow = await queryOne<StudioLogoRow>(
+        `SELECT ${studioLogoColumns('sn')} FROM studios_networks sn
+         WHERE sn.name ILIKE $1
+         ORDER BY sn.media_image_type IS NOT NULL DESC, sn.logo_path IS NOT NULL DESC
          LIMIT 1`,
         [decodedName]
       )
-
-      // The stored logo (the local copy while its file is on disk, TMDb's
-      // otherwise), then the Emby ID, then a name-based fallback
-      const storedLogo = studioLogo
-        ? await resolveStudioLogoUrl(studioLogo.logo_local_path, studioLogo.logo_path)
-        : null
-      const imageUrl =
-        storedLogo ??
-        (studioLogo?.emby_id
-          ? `/api/media/images/Items/${studioLogo.emby_id}/Images/Thumb`
-          : // Last resort: try by name (may not work on all media servers)
-            `/api/media/images/Studios/${encodeURIComponent(decodedName)}/Images/Primary`)
+      const logo = studioRow ? await resolveStudioLogo(studioRow) : null
 
       const response: StudioResponse = {
         name: decodedName,
-        imageUrl,
+        imageUrl: logo?.url ?? null,
+        imageKind: logo?.kind ?? null,
         movies: movieResults.rows.map(r => ({
           id: r.id,
           title: r.title,

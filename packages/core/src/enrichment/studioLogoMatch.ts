@@ -32,8 +32,13 @@ export type LogoMatchSource = 'title' | 'search'
 export const LOGO_RECHECK_DAYS = 30
 
 /**
- * The rows a run looks up, shared by the job's count and its selection so the
- * progress bar describes the set the loop actually walks.
+ * The rows a run looks up on TMDb, shared by the job's count and its selection
+ * so the progress bar describes the set the loop actually walks.
+ *
+ * TMDb only fills gaps: a name the media server holds an image for is never
+ * looked up (`media_image_type`, read at the start of every run), because the
+ * media server's image is the one shown, and the one its own apps show. If
+ * that image goes away, the row is due again.
  *
  * Never checked (NULL) is due whether or not a logo is stored: logos from
  * before `logo_checked_at` existed may be another company's (first search
@@ -41,7 +46,7 @@ export const LOGO_RECHECK_DAYS = 30
  * with a logo is not asked again after that; a row without one is asked again
  * after LOGO_RECHECK_DAYS. A failed lookup stamps nothing, so it stays due.
  */
-export const LOGO_CHECK_DUE_SQL = `(logo_checked_at IS NULL OR (logo_path IS NULL AND logo_checked_at < NOW() - INTERVAL '${LOGO_RECHECK_DAYS} days'))`
+export const LOGO_CHECK_DUE_SQL = `(media_image_type IS NULL AND (logo_checked_at IS NULL OR (logo_path IS NULL AND logo_checked_at < NOW() - INTERVAL '${LOGO_RECHECK_DAYS} days')))`
 
 /**
  * The local logo file a check leaves behind, or null. Files are named after the
@@ -57,21 +62,55 @@ export function replacedLogoFile(
 }
 
 /**
- * The address a page shows a stored logo at, or null when there is none.
- *
- * The local copy wins only when its file is actually on disk: the row records
- * where a file was written, not that it is still there (a container recreate
- * empties anything outside a mounted volume, and logos were once written
- * outside it), and a 404 renders as initials on every page that shows logos.
- * Without the file, TMDb's own copy of the same logo is served instead.
+ * How a logo is drawn. A `tile` is an opaque image made to be shown as it is:
+ * the media server's studio images (Emby's built-in set is 16:9 tiles with the
+ * logo on a dark background). A `mark` is a transparent logo, TMDb's kind, and
+ * most are dark, so it needs a light plate behind it on the dark theme.
  */
-export function studioLogoUrl(logo: {
+export type StudioLogoKind = 'tile' | 'mark'
+
+export interface StudioLogo {
+  url: string
+  kind: StudioLogoKind
+}
+
+/** What a stored studio row knows about its logos. */
+export interface StudioLogoSources {
+  /** The media server's studio item (`studios_networks.emby_id`, either server). */
+  mediaItemId: string | null
+  mediaImageType: string | null
+  mediaImageTag: string | null
   localPath: string | null
   localFileExists: boolean
   tmdbPath: string | null
-}): string | null {
-  if (logo.localPath && logo.localFileExists) return `/api/uploads/${logo.localPath}`
-  if (logo.tmdbPath) return `${TMDB_IMAGE_BASE_URL}/w185${logo.tmdbPath}`
+}
+
+/** Width asked of the media server for a studio tile; drawn far smaller. */
+const MEDIA_TILE_WIDTH = 400
+
+/**
+ * The logo a page shows for a studio or network, or null when there is none.
+ *
+ * The media server's image first: it is what the media server's own apps show
+ * for that name, and TMDb only fills the names it has nothing for. Then the
+ * local copy of the TMDb logo, only while its file is actually on disk (the
+ * row records where a file was written, not that it is still there), then
+ * TMDb's own copy of it. The tag rides in the media-server address so a
+ * replaced image is fetched anew rather than served from cache.
+ */
+export function studioLogo(sources: StudioLogoSources): StudioLogo | null {
+  const { mediaItemId, mediaImageType, mediaImageTag } = sources
+  if (mediaItemId && mediaImageType && mediaImageTag) {
+    const query = new URLSearchParams({ tag: mediaImageTag, maxWidth: String(MEDIA_TILE_WIDTH) })
+    return {
+      url: `/api/media/images/Items/${encodeURIComponent(mediaItemId)}/Images/${encodeURIComponent(mediaImageType)}?${query}`,
+      kind: 'tile',
+    }
+  }
+  if (sources.localPath && sources.localFileExists) {
+    return { url: `/api/uploads/${sources.localPath}`, kind: 'mark' }
+  }
+  if (sources.tmdbPath) return { url: `${TMDB_IMAGE_BASE_URL}/w185${sources.tmdbPath}`, kind: 'mark' }
   return null
 }
 
@@ -82,12 +121,6 @@ export function studioLogoUrl(logo: {
 export function logoFileIsMissing(localPath: string | null, fileExists: boolean): boolean {
   return localPath == null || !fileExists
 }
-
-/**
- * The stored logos the media server does not have yet: a confirmed logo, a
- * file to send, a media-server item to send it to, and no record of a push.
- */
-export const LOGO_PUSH_PENDING_SQL = `(logo_path IS NOT NULL AND logo_local_path IS NOT NULL AND emby_id IS NOT NULL AND emby_synced_at IS NULL)`
 
 /**
  * One logo row per name: the `prefer` kind's when that name has one, the

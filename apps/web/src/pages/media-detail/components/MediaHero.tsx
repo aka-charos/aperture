@@ -54,7 +54,7 @@ import { hasCriticRatings, personPath, studioPath } from '../helpers'
 import { RatingBadges } from './RatingBadges'
 import { CommunityStrip } from './CommunityStrip'
 import { ReportIssueButton } from './ReportIssueButton'
-import { StudioLogo } from './StudioLogo'
+import { StudioLogo } from '../../../components/StudioLogo'
 import {
   StarRating,
   getProxiedImageUrl,
@@ -667,10 +667,9 @@ export function MediaHero({
                   sx={{ display: 'inline-flex', textDecoration: 'none', '&:hover': { opacity: 0.85 } }}
                 >
                   <StudioLogo
-                    src={media.network_logo_url}
+                    logo={media.network_logo}
                     name={media.network}
-                    height={22}
-                    maxWidth={120}
+                    height={20}
                     // Not `clickable`: the link around it is the control, and a
                     // button inside a link is two tab stops for one action.
                     fallback={<Chip label={media.network} size="small" variant="outlined" sx={{ cursor: 'pointer' }} />}

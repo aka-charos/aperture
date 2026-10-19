@@ -9,9 +9,8 @@ import {
   LOGO_RECHECK_DAYS,
   normalizeEntityName,
   replacedLogoFile,
-  studioLogoUrl,
+  studioLogo,
   logoFileIsMissing,
-  LOGO_PUSH_PENDING_SQL,
   preferredLogoRows,
 } from './studioLogoMatch.js'
 
@@ -80,42 +79,63 @@ test('the file a check leaves behind is the previous one, when it differs', () =
 })
 
 test('never-checked rows are due whatever they hold; checked rows only without a logo', () => {
+  assert.match(LOGO_CHECK_DUE_SQL, /^\(media_image_type IS NULL AND /)
   assert.match(LOGO_CHECK_DUE_SQL, /logo_checked_at IS NULL OR/)
   assert.match(LOGO_CHECK_DUE_SQL, /logo_path IS NULL AND logo_checked_at < NOW\(\)/)
   assert.ok(LOGO_CHECK_DUE_SQL.includes(`'${LOGO_RECHECK_DAYS} days'`))
 })
 
-test('a local logo is served only while its file is on disk, TMDb otherwise', () => {
-  const stored = { localPath: 'studios/a.png', tmdbPath: '/hbo.png' }
-  assert.equal(studioLogoUrl({ ...stored, localFileExists: true }), '/api/uploads/studios/a.png')
+const noMedia = { mediaItemId: null, mediaImageType: null, mediaImageTag: null }
+const tmdbStored = { localPath: 'studios/a.png', tmdbPath: '/hbo.png' }
+
+test("the media server's image is shown first, as a tile, with its tag", () => {
+  const logo = studioLogo({
+    mediaItemId: 'abc123',
+    mediaImageType: 'Thumb',
+    mediaImageTag: 't9',
+    ...tmdbStored,
+    localFileExists: true,
+  })
+  assert.deepEqual(logo, {
+    url: '/api/media/images/Items/abc123/Images/Thumb?tag=t9&maxWidth=400',
+    kind: 'tile',
+  })
+})
+
+test('a media-server image missing any part does not count', () => {
+  for (const partial of [
+    { mediaItemId: null, mediaImageType: 'Thumb', mediaImageTag: 't9' },
+    { mediaItemId: 'abc123', mediaImageType: null, mediaImageTag: null },
+    { mediaItemId: 'abc123', mediaImageType: 'Thumb', mediaImageTag: null },
+  ]) {
+    assert.equal(studioLogo({ ...partial, ...tmdbStored, localFileExists: true })?.kind, 'mark')
+  }
+})
+
+test('a TMDb logo is served locally only while its file is on disk, from TMDb otherwise', () => {
+  assert.deepEqual(studioLogo({ ...noMedia, ...tmdbStored, localFileExists: true }), {
+    url: '/api/uploads/studios/a.png',
+    kind: 'mark',
+  })
+  assert.deepEqual(studioLogo({ ...noMedia, ...tmdbStored, localFileExists: false }), {
+    url: 'https://image.tmdb.org/t/p/w185/hbo.png',
+    kind: 'mark',
+  })
   assert.equal(
-    studioLogoUrl({ ...stored, localFileExists: false }),
-    'https://image.tmdb.org/t/p/w185/hbo.png'
+    studioLogo({ ...noMedia, localPath: null, localFileExists: false, tmdbPath: null }),
+    null
   )
-  assert.equal(
-    studioLogoUrl({ localPath: null, localFileExists: false, tmdbPath: '/hbo.png' }),
-    'https://image.tmdb.org/t/p/w185/hbo.png'
-  )
-  assert.equal(studioLogoUrl({ localPath: null, localFileExists: false, tmdbPath: null }), null)
   // A file left behind after TMDb's answer changed to "no logo" is not shown.
-  assert.equal(studioLogoUrl({ localPath: 'studios/a.png', localFileExists: false, tmdbPath: null }), null)
+  assert.equal(
+    studioLogo({ ...noMedia, localPath: 'studios/a.png', localFileExists: false, tmdbPath: null }),
+    null
+  )
 })
 
 test('a stored logo is downloaded again when it has no path or its file is gone', () => {
   assert.equal(logoFileIsMissing(null, false), true)
   assert.equal(logoFileIsMissing('studios/a.png', false), true)
   assert.equal(logoFileIsMissing('studios/a.png', true), false)
-})
-
-test('only confirmed logos with a file and a media-server item, never pushed, are pending', () => {
-  for (const clause of [
-    'logo_path IS NOT NULL',
-    'logo_local_path IS NOT NULL',
-    'emby_id IS NOT NULL',
-    'emby_synced_at IS NULL',
-  ]) {
-    assert.ok(LOGO_PUSH_PENDING_SQL.includes(clause), clause)
-  }
 })
 
 test('a name filed as both kinds answers with the preferred kind, the other otherwise', () => {

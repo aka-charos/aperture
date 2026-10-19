@@ -4,7 +4,7 @@
  * GET /api/series/:id - Get series by ID with full metadata
  */
 import type { FastifyInstance } from 'fastify'
-import { getStudioLogoUrls, resolveLocalizedSynopsis } from '@aperture/core'
+import { getStudioLogos, resolveLocalizedSynopsis, type StudioLogo } from '@aperture/core'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { titleInScope } from '../../../lib/viewerScope.js'
@@ -71,15 +71,15 @@ export function registerDetailHandler(fastify: FastifyInstance) {
       )
       const [localized_synopsis, logos] = await Promise.all([
         resolveLocalizedSynopsis('series', id, request.query.lang, request.user!.id),
-        getStudioLogoUrls(
+        getStudioLogos(
           series.network ? [series.network, ...studioNames] : studioNames,
           'network'
         ).catch((err: unknown) => {
           request.log.warn({ err, seriesId: id }, 'Studio logo lookup failed')
-          return new Map<string, string>()
+          return new Map<string, StudioLogo>()
         }),
       ])
-      const network_logo_url = series.network ? (logos.get(series.network) ?? null) : null
+      const network_logo = series.network ? (logos.get(series.network) ?? null) : null
       const studio_logos = Object.fromEntries(
         studioNames.flatMap((n) => {
           const url = logos.get(n)
@@ -87,7 +87,7 @@ export function registerDetailHandler(fastify: FastifyInstance) {
         })
       )
 
-      return reply.send({ ...series, localized_synopsis, studio_logos, network_logo_url })
+      return reply.send({ ...series, localized_synopsis, studio_logos, network_logo })
     }
   )
 }

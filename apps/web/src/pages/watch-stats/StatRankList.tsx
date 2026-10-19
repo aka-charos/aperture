@@ -3,10 +3,13 @@ import { Avatar, Box, Chip, Typography } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import { getProxiedImageUrl } from '@aperture/ui'
+import { StudioLogo } from '../../components/StudioLogo'
 
 export interface RankedEntry {
   name: string
   thumb: string | null
+  /** Set on studio and network rows: how their logo is drawn (components/StudioLogo). */
+  thumbKind?: 'tile' | 'mark' | null
   count: number
 }
 
@@ -20,6 +23,55 @@ interface StatRankListProps {
   formatCount: (count: number) => string
   onSelect: (entry: RankedEntry) => void
   empty: ReactNode
+}
+
+/**
+ * The picture beside a ranked name: a person's photo in a circle, or a studio
+ * or network logo in a 16:9 slot, the shape of a media-server tile, so a wide
+ * logo is never cropped into a square. Initials when there is no picture.
+ */
+function EntryImage({
+  entry,
+  shape,
+  color,
+}: {
+  entry: RankedEntry
+  shape: 'circular' | 'rounded'
+  color: string
+}) {
+  const avatar = (
+    <Avatar
+      src={shape === 'rounded' ? undefined : getProxiedImageUrl(entry.thumb)}
+      alt={entry.name}
+      variant={shape}
+      sx={{
+        width: 36,
+        height: 36,
+        bgcolor: alpha(color, 0.25),
+        // The tint is translucent, so the letter reads against the card
+        // beneath it rather than against an opaque swatch.
+        color,
+        fontSize: '0.75rem',
+        fontWeight: 600,
+        flexShrink: 0,
+      }}
+    >
+      {shape === 'rounded' ? entry.name.substring(0, 2).toUpperCase() : entry.name.charAt(0)}
+    </Avatar>
+  )
+  if (shape !== 'rounded') return avatar
+
+  return (
+    <Box sx={{ width: 64, height: 36, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <StudioLogo
+        logo={entry.thumb && entry.thumbKind ? { url: entry.thumb, kind: entry.thumbKind } : null}
+        name={entry.name}
+        height={28}
+        maxWidth={50}
+        fallback={avatar}
+      />
+    </Box>
+  )
 }
 
 /**
@@ -88,24 +140,7 @@ export function StatRankList({
           >
             {index + 1}
           </Typography>
-          <Avatar
-            src={getProxiedImageUrl(entry.thumb)}
-            alt={entry.name}
-            variant={shape}
-            sx={{
-              width: 36,
-              height: 36,
-              bgcolor: alpha(color, 0.25),
-              // The tint is translucent, so the letter reads against the card
-              // beneath it rather than against an opaque swatch.
-              color,
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              flexShrink: 0,
-            }}
-          >
-            {shape === 'rounded' ? entry.name.substring(0, 2).toUpperCase() : entry.name.charAt(0)}
-          </Avatar>
+          <EntryImage entry={entry} shape={shape} color={color} />
           <Box flex={1} minWidth={0}>
             <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} mb={0.5}>
               <Typography variant="body2" fontWeight={500} noWrap sx={{ flex: 1 }}>
