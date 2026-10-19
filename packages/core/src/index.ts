@@ -633,6 +633,7 @@ export {
   saveUserLibraryAccess,
   scopedAnnQuery,
   SCOPED_ANN_EF_SEARCH,
+  scopedAnnSettings,
   type LibraryScope,
   type LibraryKind,
   type ConfiguredLibrary,

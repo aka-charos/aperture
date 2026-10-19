@@ -219,21 +219,79 @@ export async function saveUserLibraryAccess(userId: string, libraryIds: string[]
 
 /**
  * How far an HNSW scan walks when a nearest-neighbour query is post-filtered by
- * scope. pgvector returns at most `ef_search` rows (default 40) and applies a
- * WHERE after the scan, so a viewer allowed one small library would get a
- * similar-titles list that is nearly empty rather than one drawn from their
- * libraries. See the ef_search invariant in CLAUDE.md.
+ * scope, on a pgvector too old for iterative scans (below 0.8). pgvector returns
+ * at most `ef_search` rows (default 40) and applies a WHERE after the scan, so a
+ * viewer allowed one small library would get a similar-titles list that is
+ * nearly empty rather than one drawn from their libraries. See the ef_search
+ * invariant in CLAUDE.md.
+ *
+ * Only the fallback now, because at 500 the planner prices the index walk above
+ * a full scan and stops using the index at all. Measured on a live library (five
+ * embedding sets of 12,613 rows in one 3072-wide table), a ten-title similar
+ * list ran a parallel seq scan plus sort over all 62,969 rows: 1.46 s warm and
+ * 3.5 s cold, against 1.2 ms through the index.
  */
 export const SCOPED_ANN_EF_SEARCH = 500
 
+/** The first pgvector release with `hnsw.iterative_scan`. */
+const ITERATIVE_SCAN_SINCE = [0, 8, 0]
+
+/**
+ * Pure. The SET LOCAL statements a scoped nearest-neighbour query runs first,
+ * for the installed pgvector version (null when it could not be read).
+ *
+ * From 0.8 on, an iterative scan keeps walking the index until the LIMIT is met
+ * after the filter (up to `hnsw.max_scan_tuples`, 20,000 by default), so a
+ * restricted viewer still gets a full list while the planner keeps the index at
+ * the default `ef_search`. `strict_order` returns rows in exact distance order,
+ * which every caller's ORDER BY assumes. An unknown version gets the wide walk:
+ * on an old pgvector the iterative setting would be accepted as an unknown
+ * custom option and do nothing, and the list would come back short.
+ */
+export function scopedAnnSettings(pgvectorVersion: string | null): string[] {
+  if (pgvectorVersion && versionAtLeast(pgvectorVersion, ITERATIVE_SCAN_SINCE)) {
+    return [`SET LOCAL hnsw.iterative_scan = strict_order`]
+  }
+  return [`SET LOCAL hnsw.ef_search = ${SCOPED_ANN_EF_SEARCH}`]
+}
+
+function versionAtLeast(version: string, minimum: number[]): boolean {
+  const parts = version.split('.').map((part) => Number.parseInt(part, 10))
+  if (parts.some((part) => !Number.isFinite(part))) return false
+  for (let i = 0; i < minimum.length; i++) {
+    const part = parts[i] ?? 0
+    if (part !== minimum[i]) return part > minimum[i]
+  }
+  return true
+}
+
+let pgvectorVersion: Promise<string | null> | null = null
+
+/** The installed pgvector version, read once per process. A failed read is retried next time. */
+function installedPgvectorVersion(): Promise<string | null> {
+  if (!pgvectorVersion) {
+    pgvectorVersion = queryOne<{ extversion: string }>(
+      `SELECT extversion FROM pg_extension WHERE extname = 'vector'`
+    ).then(
+      (row) => row?.extversion ?? null,
+      () => {
+        pgvectorVersion = null
+        return null
+      }
+    )
+  }
+  return pgvectorVersion
+}
+
 /**
  * Run a nearest-neighbour query whose WHERE carries a scope clause. SET LOCAL,
- * inside a transaction, so the wider walk cannot leak onto the pooled
- * connection and change the other vector queries tuned for the default.
+ * inside a transaction, so the setting cannot leak onto the pooled connection
+ * and change the other vector queries tuned for the default.
  */
 export async function scopedAnnQuery<T>(sql: string, params: unknown[]): Promise<{ rows: T[] }> {
+  const settings = scopedAnnSettings(await installedPgvectorVersion())
   return transaction(async (client) => {
-    await client.query(`SET LOCAL hnsw.ef_search = ${SCOPED_ANN_EF_SEARCH}`)
+    for (const statement of settings) await client.query(statement)
     const result = await client.query(sql, params)
     return { rows: result.rows as T[] }
   })

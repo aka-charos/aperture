@@ -12,6 +12,8 @@ import {
   libraryScopeSql,
   resolveLibraryScope,
   scopeHas,
+  scopedAnnSettings,
+  SCOPED_ANN_EF_SEARCH,
   type ConfiguredLibrary,
 } from './libraryScope.js'
 
@@ -126,4 +128,21 @@ test('the SQL binds the scope rather than inlining it, and one shape covers ever
   const open: unknown[] = []
   libraryScopeSql({ libraryIds: null, maxParentalRating: null, hasMovies: true, hasSeries: true }, 's', binderFor(open))
   assert.deepEqual(open, [null, null])
+})
+
+test('a scoped nearest-neighbour query uses an iterative scan from pgvector 0.8', () => {
+  // At ef_search 500 the planner abandons the index for a full scan plus sort
+  // (1.46 s against 1.2 ms on a live library), so it is only the fallback.
+  for (const version of ['0.8.0', '0.8.1', '0.10.2', '1.0.0']) {
+    assert.deepEqual(scopedAnnSettings(version), ['SET LOCAL hnsw.iterative_scan = strict_order'], version)
+  }
+})
+
+test('an older or unknown pgvector keeps the wide walk, never an inert iterative setting', () => {
+  // An unknown dotted option is accepted silently and does nothing, which would
+  // bring the restricted viewer's short list back.
+  const wide = [`SET LOCAL hnsw.ef_search = ${SCOPED_ANN_EF_SEARCH}`]
+  for (const version of ['0.7.4', '0.5.1', 'garbage', '', null]) {
+    assert.deepEqual(scopedAnnSettings(version), wide, String(version))
+  }
 })
