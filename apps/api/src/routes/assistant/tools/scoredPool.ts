@@ -8,11 +8,16 @@
  * the intent router picked.
  *
  * Extracted rather than copied for that reason: the ANN pool size, the
- * `ef_search` transaction and the NUMERIC handling are each a silent-failure
+ * HNSW scan settings and the NUMERIC handling are each a silent-failure
  * trap, and a second copy is a second place to get them wrong.
  */
-import { getActiveEmbeddingTableName, createChildLogger, binderFor, libraryScopeSql } from '@aperture/core'
-import { transaction } from '../../../lib/db.js'
+import {
+  getActiveEmbeddingTableName,
+  createChildLogger,
+  binderFor,
+  libraryScopeSql,
+  scopedAnnQuery,
+} from '@aperture/core'
 import { readTwinSharedIds, resolveTwinSharedTitles } from '../../../lib/twinShared.js'
 import { blendQueryAndTaste } from './tasteBlend.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
@@ -30,18 +35,6 @@ const logger = createChildLogger('scored-pool')
  * second opinion.
  */
 export const ANN_POOL_SIZE = 400
-
-/**
- * pgvector's HNSW search-list size for the query below.
- *
- * Must be >= ANN_POOL_SIZE. The default is 40, which is smaller than the pool
- * this asks for, and an HNSW scan will never return more rows than ef_search —
- * so leaving it alone means either a short result or a planner that gives up on
- * the index and sequentially scans every embedding. Set per statement with SET
- * LOCAL rather than on the pool, so it cannot leak into the other vector
- * queries that are tuned for the default.
- */
-const HNSW_EF_SEARCH = 500
 
 /** Narrow a plural media type to the singular one the queries use. */
 export const asMedia = (type: 'movies' | 'series' | 'both'): 'movie' | 'series' =>
@@ -174,11 +167,12 @@ export async function searchScoredPool(
     const poolParams: unknown[] = [ctx.userId, media, embeddingStr, ctx.embedding.setId, ANN_POOL_SIZE]
     const inScope = libraryScopeSql(ctx.scope, 'c', binderFor(poolParams))
 
-    // Runs in a transaction solely to carry `SET LOCAL hnsw.ef_search` — see
-    // the constant above for why a bare LIMIT cannot be trusted here.
-    const rows = await transaction(async (client) => {
-      await client.query(`SET LOCAL hnsw.ef_search = ${HNSW_EF_SEARCH}`)
-      return client.query<{
+    // A bare LIMIT 400 cannot be trusted: an HNSW scan never returns more rows
+    // than ef_search (default 40), so at the default this pool came back with
+    // 40. scopedAnnQuery runs an iterative scan on pgvector 0.8+, which keeps
+    // walking the index until the LIMIT is met. Measured live: 400 rows in
+    // 27 ms, against a seq scan of every embedding set (4.1 s) at ef_search 500.
+    const rows = await scopedAnnQuery<{
         id: string
         title: string
         year: number | null
@@ -217,7 +211,6 @@ export async function searchScoredPool(
               WHERE ${inScope}`,
         poolParams
       )
-    })
 
     // NUMERIC arrives from pg as a string; Number() it before any maths, or the
     // blend silently compares strings.
