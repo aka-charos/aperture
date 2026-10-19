@@ -97,9 +97,16 @@ export type WatchStatus = 'all' | 'watched' | 'unwatched'
  * with no filter of any kind — so the model had to infer membership by eye from
  * a sample, and reported confident false negatives when the sample missed.
  *
- * `column` is the id column of the row being filtered ('id' when the table is
- * unaliased, 'm.id'/'s.id' when it is). A watched SERIES means at least one of
+ * `column` is the id column of the row being filtered, always QUALIFIED
+ * ('movies.id' when the table is unaliased, 'm.id'/'s.id' when it is): the
+ * subquery is correlated on it, and a bare `id` would bind to `wh.id` or
+ * `ep.id` inside it and match nothing. A watched SERIES means at least one of
  * its episodes was played.
+ *
+ * Written as a correlated [NOT] EXISTS, not [NOT] IN over the viewer's history.
+ * On an ANN query the NOT IN form made the planner seq-scan movies under a
+ * hashed subplan and nested-loop it against the index scan, discarding 570k
+ * rows to fill LIMIT 15 for a viewer with about 3,500 played films.
  *
  * Played is the operative word, and this docstring used to claim the bare
  * version matched "every other watched check in the codebase" — it matched
@@ -113,13 +120,14 @@ function watchStatusCondition(
   paramIdx: number
 ): string {
   const subquery = isMovie
-    ? `SELECT wh.movie_id FROM watch_history wh
-       WHERE wh.user_id = $${paramIdx} AND wh.movie_id IS NOT NULL
+    ? `SELECT 1 FROM watch_history wh
+       WHERE wh.user_id = $${paramIdx} AND wh.movie_id = ${column}
          AND ${WATCH_HISTORY_PLAYED_SQL}`
-    : `SELECT DISTINCT ep.series_id FROM watch_history wh
+    : `SELECT 1 FROM watch_history wh
        JOIN episodes ep ON ep.id = wh.episode_id
-       WHERE wh.user_id = $${paramIdx} AND ${WATCH_HISTORY_PLAYED_SQL}`
-  return `${column} ${status === 'watched' ? 'IN' : 'NOT IN'} (${subquery})`
+       WHERE wh.user_id = $${paramIdx} AND ep.series_id = ${column}
+         AND ${WATCH_HISTORY_PLAYED_SQL}`
+  return `${status === 'watched' ? 'EXISTS' : 'NOT EXISTS'} (${subquery})`
 }
 
 export interface SimilarItemsResult {
@@ -151,7 +159,7 @@ export async function findSimilarItems(
    * the default 40 rows. Without it, "Also worth checking" quietly returns fewer
    * than `limit` items for anyone with a well-watched library. scopedAnnQuery
    * does that with an iterative scan on pgvector 0.8+; ef_search 500 made the
-   * planner seq-scan every embedding set instead (measured 3.5 s against 1.5 s).
+   * planner seq-scan every embedding set instead.
    */
   const runAnn = scopedAnnQuery
 
@@ -233,8 +241,7 @@ export async function findSimilarItems(
     const embeddingStr = embeddingResult.embedding
 
     const watchedFilter = excludeWatched
-      ? `AND NOT EXISTS (SELECT 1 FROM watch_history wh
-          WHERE wh.user_id = $4 AND wh.movie_id = m.id AND ${WATCH_HISTORY_PLAYED_SQL})`
+      ? `AND ${watchStatusCondition('unwatched', true, 'm.id', 4)}`
       : ''
     const params: unknown[] = excludeWatched
       ? [movie.id, modelId, embeddingStr, ctx.userId, limit]
@@ -268,11 +275,7 @@ export async function findSimilarItems(
     const embeddingStr = embeddingResult.embedding
 
     const watchedFilter = excludeWatched
-      ? `AND NOT EXISTS (
-          SELECT 1 FROM watch_history wh
-          JOIN episodes ep ON ep.id = wh.episode_id
-          WHERE wh.user_id = $4 AND ep.series_id = s.id AND ${WATCH_HISTORY_PLAYED_SQL}
-        )`
+      ? `AND ${watchStatusCondition('unwatched', false, 's.id', 4)}`
       : ''
     const params: unknown[] = excludeWatched
       ? [series.id, modelId, embeddingStr, ctx.userId, limit]
@@ -543,7 +546,7 @@ export function createSearchTools(ctx: ToolContext) {
             idx++
           }
           if (watchStatus !== 'all') {
-            conditions.push(watchStatusCondition(watchStatus, isMovie, 'id', idx))
+            conditions.push(watchStatusCondition(watchStatus, isMovie, isMovie ? 'movies.id' : 'series.id', idx))
             values.push(ctx.userId)
             idx++
           }
