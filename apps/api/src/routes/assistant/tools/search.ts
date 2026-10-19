@@ -233,8 +233,8 @@ export async function findSimilarItems(
     const embeddingStr = embeddingResult.embedding
 
     const watchedFilter = excludeWatched
-      ? `AND m.id NOT IN (SELECT wh.movie_id FROM watch_history wh
-          WHERE wh.user_id = $4 AND wh.movie_id IS NOT NULL AND ${WATCH_HISTORY_PLAYED_SQL})`
+      ? `AND NOT EXISTS (SELECT 1 FROM watch_history wh
+          WHERE wh.user_id = $4 AND wh.movie_id = m.id AND ${WATCH_HISTORY_PLAYED_SQL})`
       : ''
     const params: unknown[] = excludeWatched
       ? [movie.id, modelId, embeddingStr, ctx.userId, limit]
@@ -268,10 +268,10 @@ export async function findSimilarItems(
     const embeddingStr = embeddingResult.embedding
 
     const watchedFilter = excludeWatched
-      ? `AND s.id NOT IN (
-          SELECT DISTINCT ep.series_id FROM watch_history wh
+      ? `AND NOT EXISTS (
+          SELECT 1 FROM watch_history wh
           JOIN episodes ep ON ep.id = wh.episode_id
-          WHERE wh.user_id = $4 AND ${WATCH_HISTORY_PLAYED_SQL}
+          WHERE wh.user_id = $4 AND ep.series_id = s.id AND ${WATCH_HISTORY_PLAYED_SQL}
         )`
       : ''
     const params: unknown[] = excludeWatched
