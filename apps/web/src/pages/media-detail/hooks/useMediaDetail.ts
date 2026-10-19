@@ -15,6 +15,12 @@ import type {
 import { DEFAULT_SIMILAR_MEDIA_LIMIT } from '../constants'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { onMovieWatched } from '@/lib/watchStatusEvents'
+import {
+  isTransientLoadError,
+  loadErrorForStatus,
+  LOAD_RETRY_DELAYS_MS,
+  type MediaLoadError,
+} from '../loadFailure'
 
 export type WatchStats = MovieWatchStats | SeriesWatchStats
 
@@ -58,7 +64,10 @@ export interface UseMediaDetailReturn {
   userRating: number | null
   ratingLoading: boolean
   loading: boolean
-  error: string | null
+  /** Why the title is not shown: missing, or failed to load (loadFailure.ts). */
+  error: MediaLoadError | null
+  /** Load the title again after a failure. */
+  retry: () => void
   // Series-specific
   seasons: Record<number, Episode[]>
   seasonAvailability: SeasonAvailability[]
@@ -104,7 +113,10 @@ export function useMediaDetail(
   const { getRating: getSharedRating, setRating: setSharedRating } = useUserRatings()
   const userRating = id ? getSharedRating(mediaType, id) : null
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<MediaLoadError | null>(null)
+  // Bumped by `retry` to run the title load again.
+  const [reloadKey, setReloadKey] = useState(0)
+  const retry = useCallback(() => setReloadKey((k) => k + 1), [])
   const [watchStats, setWatchStats] = useState<WatchStats | null>(null)
   const [seerrTitleStatus, setSeerrTitleStatus] = useState<SeerrTitleStatus>(NO_SEERR_STATUS)
   // null until the media-server favorite status has loaded
@@ -139,49 +151,75 @@ export function useMediaDetail(
     setLoading(true)
     setError(null)
 
-    const fetchMedia = async () => {
+    // Optional for the page (the play links), so it is asked on its own: when
+    // it shared one Promise.all with the title, its failure failed the title.
+    fetch('/api/settings/media-server', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: MediaServerInfo | null) => {
+        if (live() && data) setMediaServer(data)
+      })
+      .catch(() => {})
+
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+    // One attempt at the title (and a series' episodes). Answers the error, or
+    // null once the page has what it needs.
+    const loadOnce = async (): Promise<MediaLoadError | null> => {
+      // The language the page is displayed in rides along, so the server can
+      // attach a machine translation of the synopsis in that language
+      // (`localized_synopsis`) — only the client knows which one it rendered.
+      const lang = encodeURIComponent(displayLanguage)
+      let mediaResponse: Response
+      let episodesResponse: Response | null = null
       try {
-        // The language the page is displayed in rides along, so the server can
-        // attach a machine translation of the synopsis in that language
-        // (`localized_synopsis`) — only the client knows which one it rendered.
-        const lang = encodeURIComponent(displayLanguage)
-
-        const fetchPromises: Promise<Response>[] = [
+        ;[mediaResponse, episodesResponse] = await Promise.all([
           fetch(`${base}?lang=${lang}`, { credentials: 'include' }),
-          fetch('/api/settings/media-server', { credentials: 'include' }),
-        ]
-        if (mediaType === 'series') {
-          fetchPromises.push(fetch(`/api/series/${id}/episodes`, { credentials: 'include' }))
-        }
-
-        const [mediaResponse, mediaServerResponse, episodesResponse] = await Promise.all(fetchPromises)
-        if (!live()) return
-
-        if (mediaServerResponse.ok) {
-          const mediaServerData = await mediaServerResponse.json()
-          if (live()) setMediaServer(mediaServerData)
-        }
-
-        if (!mediaResponse.ok) {
-          if (live()) setError(`${mediaType === 'movie' ? 'Movie' : 'Series'} not found`)
-          return
-        }
-
-        const data = await mediaResponse.json()
-        if (!live()) return
-        setMedia({ ...data, type: mediaType } as Media)
-
-        if (mediaType === 'series' && episodesResponse?.ok) {
-          const episodesData = await episodesResponse.json()
-          if (!live()) return
-          setSeasons(episodesData.seasons || {})
-          setSeasonAvailability(episodesData.seasonAvailability || [])
-        }
+          mediaType === 'series'
+            ? fetch(`/api/series/${id}/episodes`, { credentials: 'include' }).catch(() => null)
+            : Promise.resolve(null),
+        ])
       } catch {
-        if (live()) setError('Could not connect to server')
-      } finally {
-        if (live()) setLoading(false)
+        return { kind: 'failed', status: null }
       }
+      if (!live()) return null
+
+      if (!mediaResponse.ok) return loadErrorForStatus(mediaResponse.status)
+
+      let data: unknown
+      try {
+        data = await mediaResponse.json()
+      } catch {
+        // A proxy page in place of the API's JSON, or a body cut off mid-way.
+        return { kind: 'failed', status: mediaResponse.status }
+      }
+      if (!live()) return null
+      setMedia({ ...(data as object), type: mediaType } as Media)
+
+      if (mediaType === 'series' && episodesResponse?.ok) {
+        const episodesData = await episodesResponse.json().catch(() => null)
+        if (!live() || !episodesData) return null
+        setSeasons(episodesData.seasons || {})
+        setSeasonAvailability(episodesData.seasonAvailability || [])
+      }
+      return null
+    }
+
+    const fetchMedia = async () => {
+      let failure = await loadOnce()
+      for (const delay of LOAD_RETRY_DELAYS_MS) {
+        if (!live() || !failure || !isTransientLoadError(failure)) break
+        await sleep(delay)
+        if (!live()) return
+        failure = await loadOnce()
+      }
+      if (!live()) return
+      if (failure) {
+        // What the server actually answered, for whoever opens the console:
+        // the page shows the kind, not the request.
+        console.warn(`Could not load ${base}`, failure)
+        setError(failure)
+      }
+      setLoading(false)
     }
 
     fetchMedia()
@@ -189,7 +227,7 @@ export function useMediaDetail(
     return () => {
       cancelled = true
     }
-  }, [mediaType, id, displayLanguage])
+  }, [mediaType, id, displayLanguage, reloadKey])
 
   // Everything else on the page: independent of the language, so it starts
   // with the title rather than after it and survives a language switch. Each
@@ -427,6 +465,7 @@ export function useMediaDetail(
     ratingLoading,
     loading,
     error,
+    retry,
     seasons,
     seasonAvailability,
     clearWatchStatus,

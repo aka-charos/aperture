@@ -3157,6 +3157,10 @@
   "mediaDetail": {
     "movieNotFound": "Η ταινία δεν βρέθηκε",
     "seriesNotFound": "Η σειρά δεν βρέθηκε",
+    "loadFailed": "Ο τίτλος δεν φορτώθηκε",
+    "loadFailedStatus": "Ο διακομιστής απάντησε με σφάλμα ({{status}}).",
+    "loadFailedNoAnswer": "Δεν ήρθε απάντηση από τον διακομιστή.",
+    "loadRetry": "Δοκιμάστε ξανά",
     "infoCard": {
       "communityActivity": "Τι κάνει το κοινό",
       "watched": "Το είδαν",

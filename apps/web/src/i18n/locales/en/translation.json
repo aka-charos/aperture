@@ -1109,6 +1109,10 @@
   "mediaDetail": {
     "movieNotFound": "Movie not found",
     "seriesNotFound": "Series not found",
+    "loadFailed": "This title could not be loaded",
+    "loadFailedStatus": "The server answered with an error ({{status}}).",
+    "loadFailedNoAnswer": "No answer arrived from the server.",
+    "loadRetry": "Try again",
     "infoCard": {
       "communityActivity": "Community Activity",
       "watched": "Watched",

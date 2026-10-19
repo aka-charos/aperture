@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Box, Typography, CircularProgress, Grid } from '@mui/material'
+import { Box, Button, Typography, CircularProgress, Grid } from '@mui/material'
 import { useAuth } from '../../hooks/useAuth'
 import { useCapability } from '../../hooks/useCapability'
 import { useWatching } from '../../hooks/useWatching'
@@ -74,6 +74,7 @@ export function MediaDetailPage({
     ratingLoading,
     loading,
     error,
+    retry,
     seasons,
     seasonAvailability,
     clearWatchStatus,
@@ -107,12 +108,31 @@ export function MediaDetailPage({
     )
   }
 
+  // Only a 404 is "not found". Any other failure is a failure to load, said as
+  // such and offered again — it used to read as the title not existing.
+  if (error?.kind === 'failed') {
+    return (
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <Typography color="error" variant="h6">
+          {t('mediaDetail.loadFailed')}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          {error.status == null
+            ? t('mediaDetail.loadFailedNoAnswer')
+            : t('mediaDetail.loadFailedStatus', { status: error.status })}
+        </Typography>
+        <Button variant="outlined" onClick={retry} sx={{ mt: 3 }}>
+          {t('mediaDetail.loadRetry')}
+        </Button>
+      </Box>
+    )
+  }
+
   if (error || !media) {
     return (
       <Box sx={{ textAlign: 'center', py: 8 }}>
         <Typography color="error" variant="h6">
-          {error ||
-            (mediaType === 'movie' ? t('mediaDetail.movieNotFound') : t('mediaDetail.seriesNotFound'))}
+          {mediaType === 'movie' ? t('mediaDetail.movieNotFound') : t('mediaDetail.seriesNotFound')}
         </Typography>
       </Box>
     )
