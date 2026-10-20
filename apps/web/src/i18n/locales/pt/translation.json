@@ -6657,56 +6657,18 @@
   "trails": {
     "title": "Trails",
     "description": "Follow the people, franchises and studios that link the titles in your library. The rarer the link, the more it says.",
-    "modes": {
-      "route": "Connect two titles",
-      "threads": "Follow a thread",
-      "common": "In common"
-    },
-    "route": {
-      "from": "From",
-      "to": "To",
-      "swap": "Swap the two titles",
-      "surprise": "Surprise me",
-      "surpriseFailed": "Couldn't find two titles to connect. Your library may not have enough credits filled in yet.",
-      "empty": "Pick two titles to see how they are linked: through the people who made them, a franchise, a company or an uncommon keyword. Each link says how many titles in your library share it — the fewer, the more it means.",
-      "same": "Pick two different titles.",
-      "notFound": "One of these titles isn't in your library.",
-      "isolated": "{{title}} shares no named link with anything else in your library yet. Its credits may not have been filled in.",
-      "none_one": "No trail of {{count}} step or fewer links these two.",
-      "none_other": "No trail of {{count}} steps or fewer links these two.",
-      "noneUnbounded": "No trail links these two.",
-      "best": "Shortest trail",
-      "other": "Another trail",
-      "steps_one": "{{count}} step",
-      "steps_other": "{{count}} steps",
-      "alsoShared": "Also shared: {{names}}"
-    },
     "threads": {
       "pick": "Start from a title",
       "startAgain": "Start again from…",
       "backToStart": "Back to the start",
       "trail": "Your trail",
-      "via": "via {{name}}",
       "empty": "Pick a title to see every named thread leading out of it — the people, franchise, companies and keywords it shares with the rest of your library, rarest first. Follow one to keep going.",
       "notFound": "This title isn't in your library.",
       "count_one": "{{count}} thread leads out of it, rarest first.",
       "count_other": "{{count}} threads lead out of it, rarest first.",
       "none": "{{title}} shares no named link with anything else in your library.",
-      "connectFrom": "Connect to another title",
       "more_one": "and {{count}} more",
       "more_other": "and {{count}} more"
-    },
-    "common": {
-      "add": "Add a title",
-      "max_one": "Up to {{count}} title.",
-      "max_other": "Up to {{count}} titles.",
-      "remove": "Remove {{title}}",
-      "empty": "Pick two or more titles to see what they have in common: the people, franchises, companies and keywords at least two of them share.",
-      "none": "These titles share no named link.",
-      "connectPair": "Find a trail between the first two",
-      "sharedBy_one": "In {{count}} of the {{total}}",
-      "sharedBy_other": "In {{count}} of the {{total}}",
-      "tooFew": "Fewer than two of these titles are in your library, so there is nothing to compare."
     },
     "picker": {
       "placeholder": "Search your library",
@@ -6715,7 +6677,6 @@
     },
     "actions": {
       "follow": "Follow the threads from {{title}}",
-      "open": "Open {{title}}",
       "savePlaylist": "Save as playlist"
     },
     "errors": {
@@ -6752,14 +6713,48 @@
       "count_other": "{{count}} titles in your library"
     },
     "detail": {
-      "follow": "Follow its threads",
-      "followTooltip": "Open Trails on this title: the people, franchise, companies and keywords it shares with the rest of your library",
+      "follow": "Follow a trail",
+      "followTooltip": "Start a trail at this title: the people, franchise, companies and keywords it shares with the rest of your library",
       "title": "Strongest links",
       "description": "The rarest named things this title shares with the rest of your library.",
       "seeAll_one": "See its thread in Trails",
       "seeAll_other": "See all {{count}} threads in Trails",
       "sharedWith_one": "Shared with {{count}} other title in your library",
       "sharedWith_other": "Shared with {{count}} other titles in your library"
+    },
+    "start": {
+      "surprise": "Surprise me",
+      "surpriseFailed": "Couldn't find a title with enough links to start from. Your library may not have enough credits filled in yet."
+    },
+    "walk": {
+      "button": "Take me on a trail",
+      "tooltip_one": "Walk {{count}} step from here, along a strong link to a title you haven’t watched",
+      "tooltip_other": "Walk {{count}} steps from here, each along a strong link to a title you haven’t watched",
+      "none": "Nothing you haven’t watched is linked from here. Try another title, or fewer filters.",
+      "short_one": "The trail ran out after {{count}} step: nothing new was linked further on.",
+      "short_other": "The trail ran out after {{count}} steps: nothing new was linked further on.",
+      "failed": "Couldn't walk a trail from here. Try again."
+    },
+    "filters": {
+      "hideWatched": "Hide what I’ve watched",
+      "kinds": "Threads through",
+      "all": "Show every kind",
+      "kind": {
+        "person": "People",
+        "franchise": "Franchises",
+        "company": "Studios & networks",
+        "keyword": "Keywords"
+      },
+      "noneLeft": "With these filters, nothing leads out of {{title}}."
+    },
+    "strip": {
+      "back": "Go back to {{title}}"
+    },
+    "thread": {
+      "showAll_one": "Show all {{count}}",
+      "showAll_other": "Show all {{count}}",
+      "showFewer": "Show fewer",
+      "loadFailed": "Couldn't load the whole list. Try again."
     }
   }
 }

@@ -127,10 +127,10 @@ interface MediaHeroProps {
    */
   onRecommend?: () => void
   /**
-   * Follow a thread on this title, in Trails. Unset (no button) for a title
+   * Start a trail at this title, in Trails. Unset (no button) for a title
    * Trails has answered links to nothing.
    */
-  threadsPath?: string | null
+  trailPath?: string | null
 }
 
 export function MediaHero({
@@ -154,7 +154,7 @@ export function MediaHero({
   favoriteLoading = false,
   onFavoriteToggle,
   onRecommend,
-  threadsPath,
+  trailPath,
 }: MediaHeroProps) {
   const { t } = useTranslation()
   // The grid this page was opened from is still mounted behind it and reads the
@@ -911,12 +911,12 @@ export function MediaHero({
             )}
             {/* Into Trails, starting from this title: the people, franchise,
                 companies and keywords it shares with the rest of the library. */}
-            {threadsPath && (
+            {trailPath && (
               <Tooltip title={t('trails.detail.followTooltip')}>
                 <Button
                   variant="outlined"
                   component={RouterLink}
-                  to={threadsPath}
+                  to={trailPath}
                   startIcon={<RouteOutlinedIcon />}
                   sx={actionBtnSx}
                 >

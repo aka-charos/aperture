@@ -18,14 +18,13 @@ import {
 } from './rules.js'
 import {
   buildTrailIndex,
-  commonGround,
   createView,
   describeIndex,
-  findPath,
-  findPaths,
-  pickDistantTitle,
   sharedLinks,
+  titleThread,
   titleThreads,
+  walkTrail,
+  weightedPick,
   type TrailIndex,
   type CreditSource,
   type TitleSource,
@@ -141,48 +140,41 @@ test('the index keeps only what two titles share, merges one person\'s roles, an
   assert.equal(again.titles.length, 1)
 })
 
-test('a path names the rare link: Heat reaches The Black Dahlia through Spinotti, then Ellroy', () => {
-  const { index, at, heat, confidential, dahlia } = library()
+test('two titles share their rarest link first: Heat and L.A. Confidential through Spinotti, then the studio', () => {
+  const { index, at, heat, confidential } = library()
   const view = createView(index, null)
-  const path = findPath(view, at(heat), at(dahlia))
-  assert.ok(path)
-  assert.deepEqual(path.titles, [at(heat), at(confidential), at(dahlia)])
+  const shared = sharedLinks(view, at(heat), at(confidential))
   assert.deepEqual(
-    path.entities.map((entity) => index.entities[entity].name),
-    ['Dante Spinotti', 'James Ellroy']
+    shared.map((link) => index.entities[link.entity].name),
+    ['Dante Spinotti', 'Warner Bros.']
   )
-  // The cost is the sum of its steps, as rules.ts defines one.
-  const expected =
-    stepCost(roleBit('cinematographer'), roleBit('cinematographer'), 3) +
-    stepCost(roleBit('writer'), roleBit('writer'), 2)
-  assert.ok(Math.abs(path.cost - expected) < 1e-9)
-  // The studio both share is offered beside the step, not instead of it.
-  const shared = sharedLinks(view, at(heat), at(confidential)).map((link) => index.entities[link.entity].name)
-  assert.deepEqual(shared, ['Dante Spinotti', 'Warner Bros.'])
+  // A step costs what rules.ts says one does.
+  assert.equal(shared[0].cost, stepCost(roleBit('cinematographer'), roleBit('cinematographer'), 3))
 })
 
 test('one person in two roles links a film to a show', () => {
   const { index, at, mulholland, peaks } = library()
-  const path = findPath(createView(index, null), at(mulholland), at(peaks))
-  assert.ok(path)
-  assert.equal(path.titles.length, 2)
-  assert.equal(index.entities[path.entities[0]].name, 'David Lynch')
+  const shared = sharedLinks(createView(index, null), at(mulholland), at(peaks))
+  assert.equal(shared.length, 1)
+  assert.equal(index.entities[shared[0].entity].name, 'David Lynch')
 })
 
-test('a title with no shared thing has no path', () => {
+test('a title with no shared thing has no threads', () => {
   const { index, at, heat, lonely } = library()
-  assert.equal(findPath(createView(index, null), at(heat), at(lonely)), null)
-  assert.equal(findPath(createView(index, null), at(heat), at(heat)), null)
+  const view = createView(index, null)
+  assert.deepEqual(titleThreads(view, at(lonely)), [])
+  assert.deepEqual(sharedLinks(view, at(heat), at(lonely)), [])
 })
 
-test('the scope decides both which titles a path may use and how rare a link is', () => {
+test('the scope decides both which titles a thread leads to and how rare a link is', () => {
   const { index, at, heat, confidential, dahlia, insider } = library()
   const allowed = [heat, dahlia, insider].map(at)
   const view = createView(index, allowed)
-  assert.equal(findPath(view, at(heat), at(dahlia)), null)
   assert.equal(view.count(entityNamed(index, 'Dante Spinotti')), 2)
-  // A title out of scope cannot be an end either.
-  assert.equal(findPath(view, at(heat), at(confidential)), null)
+  const spinotti = titleThreads(view, at(heat)).find((thread) => index.entities[thread.entity].name === 'Dante Spinotti')
+  assert.deepEqual(spinotti?.others.map((member) => member.title), [at(insider)])
+  // A title out of scope has no threads at all.
+  assert.deepEqual(titleThreads(view, at(confidential)), [])
 })
 
 test('a category carried by too many titles links nothing', () => {
@@ -193,28 +185,16 @@ test('a category carried by too many titles links nothing', () => {
   const index = buildTrailIndex(sources)
   const view = createView(index, null)
   assert.equal(view.links(entityNamed(index, 'based on novel')), false)
-  assert.equal(findPath(view, 0, 1), null)
+  assert.deepEqual(titleThreads(view, 0), [])
 })
 
-test('alternative routes go through different titles', () => {
-  const hub = title('Start', 2000, [['director', 'A'], ['director', 'B'], ['director', 'C']])
-  const viaA = title('Via A', 2001, [['director', 'A'], ['writer', 'X']])
-  const viaB = title('Via B', 2002, [['director', 'B'], ['writer', 'Y']])
-  const viaC = title('Via C', 2003, [['director', 'C'], ['writer', 'Z']])
-  const end = title('End', 2004, [['writer', 'X'], ['writer', 'Y'], ['writer', 'Z']])
-  const index = buildTrailIndex([hub, viaA, viaB, viaC, end])
-  const paths = findPaths(createView(index, null), 0, 4)
-  assert.equal(paths.length, 3)
-  const middles = paths.map((path) => path.titles[1])
-  assert.equal(new Set(middles).size, 3)
-  assert.ok(paths[0].cost <= paths[1].cost && paths[1].cost <= paths[2].cost)
-})
-
-test('a direct link is one route; what else the two share rides beside it', () => {
-  const { index, at, heat, insider } = library()
-  const paths = findPaths(createView(index, null), at(heat), at(insider))
-  assert.equal(paths.length, 1)
-  assert.equal(paths[0].titles.length, 2)
+test('every entity has a stable key the index finds it by', () => {
+  const { index } = library()
+  const spinotti = entityNamed(index, 'Dante Spinotti')
+  assert.equal(index.entities[spinotti].key, 'person:dante spinotti')
+  assert.equal(index.byKey.get('person:dante spinotti'), spinotti)
+  // A rebuild of the same library gives the same keys.
+  assert.equal(library().index.entities[spinotti].key, index.entities[spinotti].key)
 })
 
 test('threads leave out the starting title, list members oldest first and count the rest', () => {
@@ -233,20 +213,77 @@ test('threads leave out the starting title, list members oldest first and count 
   assert.deepEqual(costs, [...costs].sort((a, b) => a - b))
 })
 
-test('in common: what more of the chosen titles share comes first', () => {
-  const { index, at, heat, insider, collateral } = library()
-  const links = commonGround(createView(index, null), [at(heat), at(insider), at(collateral)])
-  assert.equal(index.entities[links[0].entity].name, 'Michael Mann')
-  assert.equal(links[0].carriers.length, 3)
-  assert.ok(links.every((link) => link.carriers.length >= 2))
+test('hiding watched titles leaves a thread\'s rarity alone and drops a thread that leads only to them', () => {
+  const { index, at, heat, insider, collateral, confidential } = library()
+  const view = createView(index, null)
+  const exclude = new Uint8Array(index.titles.length)
+  exclude[at(insider)] = 1
+  exclude[at(confidential)] = 1
+  const threads = titleThreads(view, at(heat), { exclude })
+  const names = threads.map((thread) => index.entities[thread.entity].name)
+  // Spinotti and Pacino lead only to watched titles now; Mann still leads to Collateral.
+  assert.ok(!names.includes('Dante Spinotti'))
+  assert.ok(!names.includes('Al Pacino'))
+  const mann = threads.find((thread) => index.entities[thread.entity].name === 'Michael Mann')
+  assert.deepEqual(mann?.others.map((member) => member.title), [at(collateral)])
+  assert.equal(mann?.count, 3)
 })
 
-test('a surprise target is at least the asked number of steps away', () => {
-  const { index, at, heat, dahlia } = library()
+test('a kind filter keeps only threads of those kinds', () => {
+  const { index, at, heat } = library()
+  const threads = titleThreads(createView(index, null), at(heat), { kinds: new Set(['company'] as const) })
+  assert.deepEqual(threads.map((thread) => index.entities[thread.entity].name), ['Warner Bros.'])
+})
+
+test('a thread opened on its own lists every title it leads to', () => {
+  const { index, at, heat, insider, collateral } = library()
   const view = createView(index, null)
-  const target = pickDistantTitle(view, at(heat), () => 0, 2, 3)
-  assert.equal(target, at(dahlia))
-  assert.equal(pickDistantTitle(view, at(heat), () => 0, 5, 6), null)
+  const mann = entityNamed(index, 'Michael Mann')
+  const opened = titleThread(view, at(heat), mann)
+  assert.deepEqual(opened?.others.map((member) => member.title), [at(insider), at(collateral)])
+  assert.equal(opened?.more, 0)
+  // A title not carrying it, and an entity that links nothing, open nothing.
+  assert.equal(titleThread(view, at(collateral), entityNamed(index, 'Dante Spinotti')), null)
+})
+
+test('a walk follows a strong thread to a new title each step, and never follows one thing twice', () => {
+  const { index, at, heat, insider } = library()
+  const view = createView(index, null)
+  // random() = 0 always takes the strongest choice.
+  const walked = walkTrail(view, at(heat), { random: () => 0 })
+  assert.ok(walked.length > 0)
+  const titles = [at(heat), ...walked.map((step) => step.to)]
+  assert.equal(new Set(titles).size, titles.length)
+  const entities = walked.map((step) => step.entity)
+  assert.equal(new Set(entities).size, entities.length)
+  walked.forEach((step, i) => {
+    assert.equal(step.from, titles[i])
+    assert.ok(sharedLinks(view, step.from, step.to).some((link) => link.entity === step.entity))
+  })
+  // The first step takes Heat's strongest thread, to that thread's strongest title.
+  const strongest = titleThreads(view, at(heat))[0]
+  assert.equal(walked[0].entity, strongest.entity)
+  assert.equal(index.entities[strongest.entity].name, 'Al Pacino')
+  assert.equal(walked[0].to, at(insider))
+})
+
+test('a walk avoids excluded and already-visited titles and stops where nothing is left', () => {
+  const { index, at, heat, lonely } = library()
+  const view = createView(index, null)
+  const exclude = new Uint8Array(index.titles.length).fill(1)
+  exclude[at(heat)] = 0
+  assert.deepEqual(walkTrail(view, at(heat), { random: () => 0, exclude }), [])
+  assert.deepEqual(walkTrail(view, at(lonely), { random: () => 0 }), [])
+  const visited = titleThreads(view, at(heat)).flatMap((thread) => thread.others.map((member) => member.title))
+  assert.deepEqual(walkTrail(view, at(heat), { random: () => 0, visited }), [])
+})
+
+test('a weighted pick favours the first choice and covers them all', () => {
+  assert.equal(weightedPick(3, () => 0), 0)
+  assert.equal(weightedPick(3, () => 0.49), 0)
+  assert.equal(weightedPick(3, () => 0.51), 1)
+  assert.equal(weightedPick(3, () => 0.99), 2)
+  assert.equal(weightedPick(1, () => 0.99), 0)
 })
 
 test('the description counts isolated titles and capped entities', () => {
@@ -321,82 +358,6 @@ test('a show credits its creators and its network', () => {
   )
 })
 
-/** Plain one-ended Dijkstra over the same costs, to check the two-ended search against. */
-function referenceCost(index: TrailIndex, from: number, to: number): number | null {
-  const view = createView(index, null)
-  const dist = new Map<number, number>([[from, 0]])
-  const done = new Set<number>()
-  for (;;) {
-    let node = -1
-    let best = Number.POSITIVE_INFINITY
-    for (const [title, cost] of dist) {
-      if (!done.has(title) && cost < best) {
-        best = cost
-        node = title
-      }
-    }
-    if (node < 0) return null
-    if (node === to) return best
-    done.add(node)
-    for (const link of index.titleEntities[node]) {
-      if (!view.links(link)) continue
-      for (const other of index.entities[link].titles) {
-        if (other === node) continue
-        const shared = sharedLinks(view, node, other).find((entry) => entry.entity === link)
-        if (!shared) continue
-        const cost = best + shared.cost
-        if (cost < (dist.get(other) ?? Number.POSITIVE_INFINITY)) dist.set(other, cost)
-      }
-    }
-  }
-}
-
-test('the two-ended search finds the cheapest path, on random libraries', () => {
-  let seed = 11
-  const random = () => {
-    seed = (seed * 1103515245 + 12345) % 2147483648
-    return seed / 2147483648
-  }
-  const roles: LinkRole[] = ['director', 'writer', 'lead', 'actor', 'keyword', 'studio', 'composer']
-  for (let round = 0; round < 25; round += 1) {
-    const sources: TitleSource[] = []
-    for (let i = 0; i < 30; i += 1) {
-      const credits: Array<[LinkRole, string]> = []
-      for (let k = 0; k < 3; k += 1) {
-        const role = roles[Math.floor(random() * roles.length)]
-        credits.push([role, `P${Math.floor(random() * 25)}`])
-      }
-      sources.push(title(`R${round}-${i}`, 2000, credits))
-    }
-    const index = buildTrailIndex(sources)
-    const view = createView(index, null)
-    for (let pair = 0; pair < 6; pair += 1) {
-      const from = Math.floor(random() * 30)
-      const to = Math.floor(random() * 30)
-      if (from === to) continue
-      const found = findPath(view, from, to, { maxHops: 30 })
-      const expected = referenceCost(index, from, to)
-      if (expected == null) {
-        assert.equal(found, null)
-        continue
-      }
-      assert.ok(found, `round ${round}: ${from} → ${to} has a path`)
-      assert.ok(Math.abs(found.cost - expected) < 1e-9, `round ${round}: ${found.cost} vs ${expected}`)
-      // The path it names really costs what it says.
-      let walked = 0
-      for (let step = 0; step < found.entities.length; step += 1) {
-        const shared = sharedLinks(view, found.titles[step], found.titles[step + 1])
-        const link = shared.find((entry) => entry.entity === found.entities[step])
-        assert.ok(link)
-        walked += link.cost
-      }
-      assert.ok(Math.abs(walked - found.cost) < 1e-9)
-      assert.equal(found.titles[0], from)
-      assert.equal(found.titles[found.titles.length - 1], to)
-    }
-  }
-})
-
 test('production meta-keywords are not links, whatever their casing', () => {
   const source = seriesSource({
     id: uuid(),
@@ -414,85 +375,4 @@ test('production meta-keywords are not links, whatever their casing', () => {
     source.credits.map((credit) => credit.name),
     ['heist']
   )
-})
-
-test('a route inside the step limit is found even when a cheaper one needs more steps', () => {
-  // A–B–M and M–C–D are cheap franchise steps; A–M and M–D are dear studio
-  // steps. The cheapest A→D route takes four steps; with a limit of two only
-  // A–M–D fits, and with one label per node the cheap long prefixes claimed M
-  // from both ends and hid it.
-  const a = title('A', 2000, [['franchise', 'F1'], ['studio', 'S1']])
-  const b = title('B', 2001, [['franchise', 'F1'], ['franchise', 'F1b']])
-  const m = title('M', 2002, [['franchise', 'F1b'], ['franchise', 'F2b'], ['studio', 'S1'], ['studio', 'S2']])
-  const c = title('C', 2003, [['franchise', 'F2b'], ['franchise', 'F2']])
-  const d = title('D', 2004, [['franchise', 'F2'], ['studio', 'S2']])
-  const index = buildTrailIndex([a, b, m, c, d])
-  const at = (source: TitleSource) => index.byRef.get(`${source.type}:${source.id}`) as number
-  const view = createView(index, null)
-  const short = findPath(view, at(a), at(d), { maxHops: 2 })
-  assert.ok(short)
-  assert.deepEqual(short.titles, [at(a), at(m), at(d)])
-  const unlimited = findPath(view, at(a), at(d), { maxHops: 8 })
-  assert.equal(unlimited?.titles.length, 5)
-  assert.ok((unlimited?.cost ?? 0) < short.cost)
-})
-
-/** The cheapest route of at most `maxHops` steps, by dynamic programming over step counts. */
-function referenceLimitedCost(index: TrailIndex, from: number, to: number, maxHops: number): number | null {
-  const view = createView(index, null)
-  const count = index.titles.length
-  let layer = new Map<number, number>([[from, 0]])
-  let best = Number.POSITIVE_INFINITY
-  for (let step = 1; step <= maxHops; step += 1) {
-    const next = new Map<number, number>()
-    for (const [title, cost] of layer) {
-      for (let other = 0; other < count; other += 1) {
-        if (other === title) continue
-        const shared = sharedLinks(view, title, other)
-        if (shared.length === 0) continue
-        const total = cost + shared[0].cost
-        if (total < (next.get(other) ?? Number.POSITIVE_INFINITY)) next.set(other, total)
-      }
-    }
-    const reached = next.get(to)
-    if (reached != null && reached < best) best = reached
-    layer = next
-  }
-  return Number.isFinite(best) ? best : null
-}
-
-test('with a step limit, the two-ended search still finds the cheapest route that fits', () => {
-  let seed = 23
-  const random = () => {
-    seed = (seed * 1103515245 + 12345) % 2147483648
-    return seed / 2147483648
-  }
-  const roles: LinkRole[] = ['director', 'writer', 'lead', 'actor', 'keyword', 'studio', 'franchise']
-  for (let round = 0; round < 30; round += 1) {
-    const sources: TitleSource[] = []
-    for (let i = 0; i < 18; i += 1) {
-      const credits: Array<[LinkRole, string]> = []
-      for (let k = 0; k < 2; k += 1) {
-        credits.push([roles[Math.floor(random() * roles.length)], `Q${Math.floor(random() * 14)}`])
-      }
-      sources.push(title(`L${round}-${i}`, 2000, credits))
-    }
-    const index = buildTrailIndex(sources)
-    const view = createView(index, null)
-    for (let pair = 0; pair < 5; pair += 1) {
-      const from = Math.floor(random() * 18)
-      const to = Math.floor(random() * 18)
-      if (from === to) continue
-      const maxHops = 1 + Math.floor(random() * 3)
-      const found = findPath(view, from, to, { maxHops })
-      const expected = referenceLimitedCost(index, from, to, maxHops)
-      if (expected == null) {
-        assert.equal(found, null, `round ${round}: ${from} → ${to} within ${maxHops}`)
-        continue
-      }
-      assert.ok(found, `round ${round}: ${from} → ${to} within ${maxHops} exists`)
-      assert.ok(found.entities.length <= maxHops)
-      assert.ok(Math.abs(found.cost - expected) < 1e-9, `round ${round}: ${found.cost} vs ${expected}`)
-    }
-  }
 })

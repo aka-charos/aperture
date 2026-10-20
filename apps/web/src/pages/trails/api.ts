@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { TrailTitle } from './types'
+import { pairKey } from './labels'
+import type { TrailLink, TrailResponse, TrailTitle } from './types'
 
 export class TrailsRequestError extends Error {
   constructor(readonly status: number) {
@@ -18,10 +19,10 @@ export function isAbort(error: unknown): boolean {
 }
 
 export interface TrailLimits {
-  maxCommonTitles: number
-  maxSteps: number
-  /** The most refs one title-card lookup may name. */
-  maxTitleLookup: number
+  /** The most titles a trail holds; older ones fall off the front. */
+  maxTrailLength: number
+  /** How many steps "Take me on a trail" walks. */
+  walkSteps: number
 }
 
 /** The limits the API enforces, decided there (null until they arrive). */
@@ -40,22 +41,23 @@ export function useTrailLimits(): TrailLimits | null {
 }
 
 /**
- * Title cards for the titles the page HOLDS (the pair, the followed trail, the
- * compared titles), by ref. Responses feed it through `remember`, and refs the
- * page holds without a card — a URL opened cold — are looked up once, in
- * batches the API's `maxTitleLookup` allows (so nothing is asked before the
- * limits arrive). A ref the API does not return (out of scope, deleted) stays
- * unknown and is not asked about again. Titles a response merely SHOWS are
- * read from that response, never stored here, so the cache grows with what
- * the viewer picks rather than with everything they scroll past.
+ * The trail's title cards and the link between each consecutive pair, by ref
+ * and by `pairKey`. Steps taken on the page supply both as they happen (the
+ * thread followed is the link), and a walk supplies its own; only a trail the
+ * page holds without them — a URL opened cold, a title picked to start from —
+ * is looked up, once, through `/trail`, which names the strongest thing each
+ * pair shares. A link the page already knows is kept over the looked-up one,
+ * so a step shows the thread actually followed. Nothing is asked before the
+ * limits arrive, since the lookup is capped by them.
  */
-export function useTitleCache(refs: readonly string[], batchSize: number | null) {
+export function useTrailData(trail: readonly string[], maxTrail: number | null) {
   const [cards, setCards] = useState<ReadonlyMap<string, TrailTitle>>(() => new Map())
+  const [links, setLinks] = useState<ReadonlyMap<string, TrailLink | null>>(() => new Map())
   const asked = useRef(new Set<string>())
-  // Read through a ref so a card arriving from elsewhere does not restart (and
-  // abort) a lookup already on its way.
-  const cardsRef = useRef(cards)
-  cardsRef.current = cards
+  // Read through refs so knowledge arriving from elsewhere does not restart
+  // (and abort) a lookup already on its way.
+  const known = useRef({ cards, links })
+  known.current = { cards, links }
 
   const remember = useCallback((titles: readonly TrailTitle[]) => {
     if (titles.length === 0) return
@@ -67,48 +69,47 @@ export function useTitleCache(refs: readonly string[], batchSize: number | null)
     })
   }, [])
 
-  const key = refs.join(',')
-  useEffect(() => {
-    const missing = key
-      .split(',')
-      .filter((ref) => ref && !cardsRef.current.has(ref) && !asked.current.has(ref))
-    if (missing.length === 0 || batchSize == null || batchSize < 1) return
-    for (const ref of missing) asked.current.add(ref)
-    const controller = new AbortController()
-    let answered = false
-    // An aborted or failed lookup is not an answer about the title, so its refs
-    // may be asked again. Released in the cleanup itself, not in the catch: the
-    // next run of this effect starts before an aborted request settles, and
-    // would otherwise find them still marked as asked and skip them for good.
-    const release = () => {
-      if (!answered) for (const ref of missing) asked.current.delete(ref)
-    }
-    const batches: string[][] = []
-    for (let at = 0; at < missing.length; at += batchSize) batches.push(missing.slice(at, at + batchSize))
-    Promise.all(
-      batches.map((batch) =>
-        fetchTrails<{ titles: TrailTitle[] }>(`titles?refs=${encodeURIComponent(batch.join(','))}`, controller.signal)
-      )
-    )
-      .then((responses) => {
-        answered = true
-        remember(responses.flatMap((response) => response.titles))
-      })
-      .catch(release)
-    return () => {
-      release()
-      controller.abort()
-    }
-  }, [key, batchSize, remember])
+  const rememberLink = useCallback((from: string, to: string, link: TrailLink | null, replace = true) => {
+    setLinks((current) => {
+      const key = pairKey(from, to)
+      if (current.has(key) && (!replace || current.get(key) === link)) return current
+      return new Map(current).set(key, link)
+    })
+  }, [])
 
-  return useMemo(() => ({ cards, remember }), [cards, remember])
+  const key = trail.join(',')
+  useEffect(() => {
+    if (!key || maxTrail == null) return
+    const refs = key.split(',')
+    const { cards: knownCards, links: knownLinks } = known.current
+    const missing =
+      refs.some((ref) => !knownCards.has(ref)) ||
+      refs.slice(1).some((ref, i) => !knownLinks.has(pairKey(refs[i], ref)))
+    if (!missing || asked.current.has(key)) return
+    asked.current.add(key)
+    const controller = new AbortController()
+    fetchTrails<TrailResponse>(`trail?refs=${encodeURIComponent(refs.slice(-maxTrail).join(','))}`, controller.signal)
+      .then((response) => {
+        remember(response.titles)
+        response.links.forEach((link, i) => {
+          rememberLink(response.titles[i].ref, response.titles[i + 1].ref, link, false)
+        })
+      })
+      .catch(() => {
+        // Not an answer about the trail: it may be asked again.
+        asked.current.delete(key)
+      })
+    return () => controller.abort()
+  }, [key, maxTrail, remember, rememberLink])
+
+  return useMemo(() => ({ cards, links, remember, rememberLink }), [cards, links, remember, rememberLink])
 }
 
-/** How many answers each mode keeps, so walking back along a trail asks nothing. */
+/** How many answers the page keeps, so walking back along a trail asks nothing. */
 const RECENT_ANSWERS = 24
 
 /**
- * A mode's recent answers by key, and its one failure. A failure is kept only
+ * Recent answers by key, and the one failure. A failure is kept only
  * until the next request starts, so returning to a title that failed asks again.
  */
 export function useAnswers<T>() {

@@ -109,12 +109,11 @@ export const MAX_BILLED_ACTORS = 12
 export const LEAD_BILLING = 3
 
 /**
- * Added to every step of a path, so of two routes with similar link strength
- * the shorter wins: each extra title is one more thing to read.
+ * Added to every step between two titles. It moves every step by the same
+ * amount, so it never reorders what two titles share; it is what a step costs
+ * on top of the link itself.
  */
 export const HOP_COST = 0.75
-/** The longest path offered, in steps. Past this a path explains nothing. */
-export const MAX_PATH_HOPS = 6
 
 /**
  * The cap on how many titles in scope may carry an entity before it stops

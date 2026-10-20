@@ -9,8 +9,8 @@ import type { StrongestLinksState } from '../hooks/useStrongestLinks'
 
 interface StrongestLinksProps {
   state: StrongestLinksState
-  /** Follow a thread on this title, in Trails. */
-  threadsPath: string
+  /** Start a trail at this title, in Trails. */
+  trailPath: string
 }
 
 /**
@@ -20,7 +20,7 @@ interface StrongestLinksProps {
  * empty marker (which starts the request when it nears the screen), and on a
  * failure or for a title that links to nothing it draws nothing at all.
  */
-export function StrongestLinks({ state, threadsPath }: StrongestLinksProps) {
+export function StrongestLinks({ state, trailPath }: StrongestLinksProps) {
   const { t } = useTranslation()
   const { hereText } = useTrailText()
   const { links, watch } = state
@@ -63,7 +63,7 @@ export function StrongestLinks({ state, threadsPath }: StrongestLinksProps) {
         <Button
           size="small"
           component={RouterLink}
-          to={threadsPath}
+          to={trailPath}
           endIcon={<RouteOutlinedIcon />}
           sx={{ textTransform: 'none' }}
         >

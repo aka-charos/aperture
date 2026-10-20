@@ -1,15 +1,18 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  MAX_TRAIL_LENGTH,
+  TRAIL_KINDS,
+  extendTrail,
+  filterQuery,
   hereCaption,
+  pairKey,
   rarityText,
   readTrailsUrl,
-  stepCaption,
   sharedWithOthers,
+  stepCaption,
   stepTrail,
-  threadsPathFor,
   titleRefFor,
+  trailPathFor,
   writeTrailsUrl,
 } from './labels'
 
@@ -46,53 +49,57 @@ test('rarity is stated as a count, with two titles said plainly', () => {
   assert.deepEqual(rarityText(7), { key: 'trails.rarity.count', count: 7 })
 })
 
-test('the URL keeps every mode\'s selection, drops malformed refs and repeats, and caps the lists', () => {
+test('the URL holds the trail and the filters, drops malformed refs and repeats, and caps the trail', () => {
   const state = readTrailsUrl(
     new URLSearchParams({
       mode: 'common',
-      from: A.toUpperCase().replace('MOVIE', 'movie'),
-      to: 'movie:42',
-      trail: `${A},${B},${A}`,
-      titles: `${A},${B},${C}`,
+      from: A,
+      trail: `${A},movie:42,${B},${A},${C}`,
+      unwatched: '1',
+      kinds: 'keyword,nonsense,person',
     }),
     2
   )
-  assert.equal(state.mode, 'common')
-  assert.equal(state.from, A)
-  assert.equal(state.to, null)
-  assert.deepEqual(state.trail, [A, B])
-  assert.deepEqual(state.titles, [B, C])
-  assert.equal(readTrailsUrl(writeTrailsUrl(state), 8).titles.join(), [B, C].join())
-  assert.equal(readTrailsUrl(new URLSearchParams({ mode: 'nonsense' }), 8).mode, 'route')
-  assert.equal(writeTrailsUrl({ mode: 'route', from: null, to: null, trail: [], titles: [] }).toString(), 'mode=route')
+  assert.deepEqual(state, { trail: [B, C], hideWatched: true, kinds: ['person', 'keyword'] })
+  assert.deepEqual(readTrailsUrl(writeTrailsUrl(state)), state)
+  assert.equal(writeTrailsUrl({ trail: [], hideWatched: false, kinds: [] }).toString(), '')
+  // Every kind chosen reads as no filter, so it is written as none.
+  assert.equal(writeTrailsUrl({ trail: [], hideWatched: false, kinds: [...TRAIL_KINDS] }).toString(), '')
+  assert.equal(filterQuery({ hideWatched: true, kinds: ['franchise'] }), '&unwatched=1&kinds=franchise')
+  assert.equal(filterQuery({ hideWatched: false, kinds: [] }), '')
 })
 
 test('stepping back onto the trail cuts it there, and a long trail drops its oldest', () => {
   assert.deepEqual(stepTrail([A, B], C), [A, B, C])
   assert.deepEqual(stepTrail([A, B, C], B), [A, B])
-  const long = Array.from({ length: MAX_TRAIL_LENGTH }, (_, i) => `movie:00000000-0000-4000-8000-${String(i + 10).padStart(12, '0')}`)
-  const next = stepTrail(long, A)
-  assert.equal(next.length, MAX_TRAIL_LENGTH)
+  const long = Array.from({ length: 12 }, (_, i) => `movie:00000000-0000-4000-8000-${String(i + 10).padStart(12, '0')}`)
+  const next = stepTrail(long, A, 12)
+  assert.equal(next.length, 12)
   assert.equal(next[next.length - 1], A)
   assert.equal(next[0], long[1])
 })
 
-test('a link from a detail page opens Follow a thread on that title, and reads back the same', () => {
+test('a walked trail is appended in order, within the cap', () => {
+  assert.deepEqual(extendTrail([A], [B, C]), [A, B, C])
+  assert.deepEqual(extendTrail([A], [B, C], 2), [B, C])
+  assert.equal(pairKey(A, B), `${A}>${B}`)
+})
+
+test('a link from a detail page starts a trail at that title, and reads back the same', () => {
   const ref = titleRefFor('movie', '00000000-0000-4000-8000-00000000000A')
   assert.equal(ref, 'movie:00000000-0000-4000-8000-00000000000a')
-  const path = threadsPathFor(ref!)
-  assert.equal(path, '/trails?mode=threads&trail=movie%3A00000000-0000-4000-8000-00000000000a')
-  const state = readTrailsUrl(new URLSearchParams(path.slice(path.indexOf('?') + 1)), 8)
-  assert.equal(state.mode, 'threads')
+  const path = trailPathFor(ref!)
+  assert.equal(path, '/trails?trail=movie%3A00000000-0000-4000-8000-00000000000a')
+  const state = readTrailsUrl(new URLSearchParams(path.slice(path.indexOf('?') + 1)))
   assert.deepEqual(state.trail, [ref])
   assert.equal(titleRefFor('series', 'not-a-uuid'), null)
 })
 
-test('following from on top of the Trails page keeps the other modes and restarts the trail', () => {
-  const current = writeTrailsUrl({ mode: 'route', from: A, to: B, trail: [B, C], titles: [A, C] })
-  const path = threadsPathFor(C, current)
-  const state = readTrailsUrl(new URLSearchParams(path.slice(path.indexOf('?') + 1)), 8)
-  assert.deepEqual(state, { mode: 'threads', from: A, to: B, trail: [C], titles: [A, C] })
+test('following from on top of the Trails page keeps the filters and restarts the trail', () => {
+  const current = writeTrailsUrl({ trail: [B, C], hideWatched: true, kinds: ['person'] })
+  const path = trailPathFor(A, current)
+  const state = readTrailsUrl(new URLSearchParams(path.slice(path.indexOf('?') + 1)))
+  assert.deepEqual(state, { trail: [A], hideWatched: true, kinds: ['person'] })
 })
 
 test('a detail page counts the OTHER titles sharing a thread, never "these two"', () => {

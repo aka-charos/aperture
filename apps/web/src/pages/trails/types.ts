@@ -30,6 +30,8 @@ export interface TrailTitle {
 }
 
 export interface TrailEntity {
+  /** Stable across index rebuilds: how a thread is asked for again. */
+  key: string
   kind: TrailEntityKind
   name: string
   photo: string | null
@@ -41,23 +43,6 @@ export interface TrailLink extends TrailEntity {
   rolesFrom: TrailRole[]
   rolesTo: TrailRole[]
 }
-
-export interface TrailStep {
-  from: TrailTitle
-  to: TrailTitle
-  via: TrailLink
-  alsoShared: TrailLink[]
-}
-
-export interface TrailRoute {
-  steps: TrailStep[]
-}
-
-export type TrailResult =
-  | { status: 'notFound' }
-  | { status: 'same'; from: TrailTitle }
-  | { status: 'found'; from: TrailTitle; to: TrailTitle; paths: TrailRoute[] }
-  | { status: 'none'; from: TrailTitle; to: TrailTitle; isolated: string[] }
 
 export interface ThreadMember {
   title: TrailTitle
@@ -77,11 +62,20 @@ export interface ThreadsResponse {
   total: number
 }
 
-export interface CommonLink extends TrailEntity {
-  carriers: Array<{ ref: string; roles: TrailRole[] }>
+export interface ThreadResponse {
+  title: TrailTitle
+  /** Null when the thread leads nowhere (everything on it hidden, or gone). */
+  thread: Thread | null
 }
 
-export interface CommonResponse {
+export interface TrailResponse {
+  /** The trail's titles in the viewer's library, in order. */
   titles: TrailTitle[]
-  links: CommonLink[]
+  /** links[i] joins titles[i] to titles[i + 1]: the strongest thing they share, or null. */
+  links: (TrailLink | null)[]
+}
+
+export interface WalkResponse {
+  start: TrailTitle
+  steps: Array<{ title: TrailTitle; via: TrailLink }>
 }

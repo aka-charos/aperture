@@ -9,7 +9,7 @@ import { useConnections } from '../../hooks/useConnections'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useMediaDetail } from './hooks'
 import { useStrongestLinks } from './hooks/useStrongestLinks'
-import { useThreadsPath } from '../trails/useThreadsPath'
+import { useTrailPath } from '../trails/useTrailPath'
 import {
   MediaBackdrop,
   MediaHero,
@@ -96,7 +96,7 @@ export function MediaDetailPage({
 
   // Trails, from this title: the hero's link and the Strongest links card.
   const trailRef = id ? titleRefFor(mediaType, id) : null
-  const threadsPath = useThreadsPath(trailRef)
+  const trailPath = useTrailPath(trailRef)
   const strongestLinks = useStrongestLinks(trailRef)
 
   // Reading why a title was scored is one of the getting-started steps, and
@@ -207,7 +207,7 @@ export function MediaDetailPage({
         onFavoriteToggle={isMovie(media) && user?.id ? toggleFavorite : undefined}
         onRecommend={hasConnections && id ? () => setRecommendOpen(true) : undefined}
         // Dropped once Trails has answered that the title links to nothing.
-        threadsPath={strongestLinks.knownEmpty ? null : threadsPath}
+        trailPath={strongestLinks.knownEmpty ? null : trailPath}
       />
 
       {id && hasConnections && (
@@ -264,7 +264,7 @@ export function MediaDetailPage({
               {/* The strongest named links out of this title, from Trails.
                   Asked for only as it nears the screen; draws nothing until
                   it has some. */}
-              {threadsPath && <StrongestLinks state={strongestLinks} threadsPath={threadsPath} />}
+              {trailPath && <StrongestLinks state={strongestLinks} trailPath={trailPath} />}
               {/* Aired episodes missing from the server + Seerr requests (series only) */}
               {isSeries(media) && (
                 <MissingSeasonsCard

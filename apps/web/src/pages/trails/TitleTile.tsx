@@ -10,7 +10,10 @@ interface TitleTileProps {
   onOpen: (title: TrailTitle) => void
   /** Follow the threads out of this title; absent draws no button. */
   onFollow?: (title: TrailTitle) => void
-  width?: number
+  /** The corner button's label, when it does something other than follow this title's threads. */
+  followLabel?: string
+  /** Pixels, or '100%' to fill a grid cell. */
+  width?: number | '100%'
   /** Drawn with a ring: the title a trail starts or ends at. */
   emphasised?: boolean
 }
@@ -20,8 +23,16 @@ interface TitleTileProps {
  * count, opening the title's details on click. Following its threads is the
  * corner button, so a click always means "show me this".
  */
-export function TitleTile({ title, onOpen, onFollow, width = 112, emphasised = false }: TitleTileProps) {
+export function TitleTile({
+  title,
+  onOpen,
+  onFollow,
+  followLabel,
+  width = 112,
+  emphasised = false,
+}: TitleTileProps) {
   const { t } = useTranslation()
+  const label = followLabel ?? t('trails.actions.follow', { title: title.title })
   const { isWatched, getEpisodeProgress } = useWatchStatus()
   return (
     <Box
@@ -51,10 +62,10 @@ export function TitleTile({ title, onOpen, onFollow, width = 112, emphasised = f
         hideExploreButton
       >
         {onFollow && (
-          <Tooltip title={t('trails.actions.follow', { title: title.title })}>
+          <Tooltip title={label}>
             <IconButton
               size="small"
-              aria-label={t('trails.actions.follow', { title: title.title })}
+              aria-label={label}
               onClick={(event) => {
                 event.stopPropagation()
                 onFollow(title)

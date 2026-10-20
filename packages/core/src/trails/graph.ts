@@ -1,8 +1,9 @@
 /**
- * The Trails index and the searches over it: a two-sided graph of titles
- * and the named things they carry (people, franchises, companies, keywords),
- * with a step between two titles costing what rules.ts says that shared thing
- * is worth.
+ * The Trails index and what is read from it: a two-sided graph of titles and
+ * the named things they carry (people, franchises, companies, keywords), with
+ * a step between two titles costing what rules.ts says that shared thing is
+ * worth. A trail is walked one title at a time, along the threads out of the
+ * title it stands on.
  *
  * Built once from the whole library and narrowed per viewer by a VIEW (the
  * titles in their scope), so one index serves every scope and rarity is still
@@ -16,15 +17,13 @@
  */
 
 import {
-  HOP_COST,
-  MAX_PATH_HOPS,
   ROLE_KIND,
   entityKey,
   formatTitleRef,
   linkCap,
   maskCost,
-  rarity,
   roleBit,
+  stepCost,
   threadCost,
   type EntityKind,
   type LinkRole,
@@ -59,6 +58,8 @@ export interface IndexedTitle {
 }
 
 export interface IndexedEntity {
+  /** Stable across rebuilds (rules.ts `entityKey`, or the source's own id): how a client names it. */
+  key: string
   kind: EntityKind
   name: string
   photo: string | null
@@ -72,6 +73,7 @@ export interface TrailIndex {
   titles: IndexedTitle[]
   byRef: Map<string, number>
   entities: IndexedEntity[]
+  byKey: Map<string, number>
   /** Per title: the entities it carries, parallel to `titleMasks`. */
   titleEntities: Int32Array[]
   titleMasks: Uint16Array[]
@@ -85,6 +87,7 @@ export function buildTrailIndex(sources: Iterable<TitleSource>): TrailIndex {
   const titles: IndexedTitle[] = []
   const byRef = new Map<string, number>()
   const keyToEntity = new Map<string, number>()
+  const keys: string[] = []
   const kinds: EntityKind[] = []
   const names: string[] = []
   const photos: (string | null)[] = []
@@ -114,6 +117,7 @@ export function buildTrailIndex(sources: Iterable<TitleSource>): TrailIndex {
       if (entity === undefined) {
         entity = kinds.length
         keyToEntity.set(key, entity)
+        keys.push(key)
         kinds.push(kind)
         names.push(name)
         photos.push(credit.photo || null)
@@ -132,10 +136,13 @@ export function buildTrailIndex(sources: Iterable<TitleSource>): TrailIndex {
 
   const remap = new Int32Array(kinds.length).fill(-1)
   const entities: IndexedEntity[] = []
+  const byKey = new Map<string, number>()
   for (let entity = 0; entity < kinds.length; entity += 1) {
     if (counts[entity] < 2) continue
     remap[entity] = entities.length
+    byKey.set(keys[entity], entities.length)
     entities.push({
+      key: keys[entity],
       kind: kinds[entity],
       name: names[entity],
       photo: photos[entity],
@@ -164,7 +171,7 @@ export function buildTrailIndex(sources: Iterable<TitleSource>): TrailIndex {
     titleMasks.push(masks)
   })
 
-  return { titles, byRef, entities, titleEntities, titleMasks }
+  return { titles, byRef, entities, byKey, titleEntities, titleMasks }
 }
 
 // ---------------------------------------------------------------------------
@@ -224,247 +231,8 @@ export function createView(index: TrailIndex, allowedTitles: Iterable<number> | 
 }
 
 // ---------------------------------------------------------------------------
-// Paths between two titles
+// What two titles share
 // ---------------------------------------------------------------------------
-
-class MinHeap {
-  private keys: number[] = []
-  private values: number[] = []
-
-  get size(): number {
-    return this.keys.length
-  }
-
-  /** The smallest key; call only when size > 0. */
-  peekKey(): number {
-    return this.keys[0]
-  }
-
-  push(key: number, value: number): void {
-    const keys = this.keys
-    const values = this.values
-    let at = keys.length
-    keys.push(key)
-    values.push(value)
-    while (at > 0) {
-      const parent = (at - 1) >> 1
-      if (keys[parent] <= key) break
-      keys[at] = keys[parent]
-      values[at] = values[parent]
-      at = parent
-    }
-    keys[at] = key
-    values[at] = value
-  }
-
-  /** The smallest value; call only when size > 0. */
-  pop(): number {
-    const keys = this.keys
-    const values = this.values
-    const top = values[0]
-    const lastKey = keys.pop() as number
-    const lastValue = values.pop() as number
-    if (keys.length > 0) {
-      let at = 0
-      const length = keys.length
-      for (;;) {
-        const left = at * 2 + 1
-        if (left >= length) break
-        const right = left + 1
-        const child = right < length && keys[right] < keys[left] ? right : left
-        if (keys[child] >= lastKey) break
-        keys[at] = keys[child]
-        values[at] = values[child]
-        at = child
-      }
-      keys[at] = lastKey
-      values[at] = lastValue
-    }
-    return top
-  }
-}
-
-export interface FoundPath {
-  cost: number
-  /** Titles from start to end. */
-  titles: number[]
-  /** The entity linking titles[i] to titles[i + 1]. */
-  entities: number[]
-}
-
-export interface PathOptions {
-  /** Titles a path may not pass through (never the ends). */
-  banned?: ReadonlySet<number>
-  maxHops?: number
-}
-
-/**
- * The cheapest path from one title to another within `maxHops` steps, or null
- * when there is none.
- *
- * Dijkstra over titles and entities, searched from both ends at once and
- * stopped when the two searches can no longer improve on the best meeting
- * point. Every title–entity edge costs half of HOP_COST plus half of that
- * title's role weight times the entity's rarity, so a path costs the sum of
- * rules.ts `stepCost` over its steps, whichever end it is read from — which is
- * what lets both ends search. One-ended, a dense library spent over 100 ms on
- * a route; most of that was the far side of the library the target sits
- * nowhere near.
- *
- * The step limit is exact, which is why every node is searched once PER STEP
- * COUNT (a state is a node and how many steps reached it). With one label per
- * node, a cheap prefix that had used too many steps claimed a title first and
- * hid a dearer prefix that fit, so a route inside the limit could be reported
- * as missing. A step limit of six makes that seven states per node per side.
- */
-export function findPath(view: TrailView, from: number, to: number, options: PathOptions = {}): FoundPath | null {
-  const { index, allowed } = view
-  if (from === to || !allowed[from] || !allowed[to]) return null
-  const maxHops = Math.max(1, options.maxHops ?? MAX_PATH_HOPS)
-  const banned = options.banned
-  const titleCount = index.titles.length
-  const layers = maxHops + 1
-  const stateCount = (titleCount + index.entities.length) * layers
-  const stateOf = (node: number, steps: number) => node * layers + steps
-
-  const makeSide = (start: number): SearchSide => {
-    const side: SearchSide = {
-      dist: new Float64Array(stateCount).fill(Number.POSITIVE_INFINITY),
-      prev: new Int32Array(stateCount).fill(-1),
-      done: new Uint8Array(stateCount),
-      heap: new MinHeap(),
-    }
-    side.dist[stateOf(start, 0)] = 0
-    side.heap.push(0, stateOf(start, 0))
-    return side
-  }
-  const forward = makeSide(from)
-  const backward = makeSide(to)
-
-  let best = Number.POSITIVE_INFINITY
-  let meetForward = -1
-  let meetBackward = -1
-  // A path through a node joins a forward state and a backward state of that
-  // node whose steps add up to no more than the limit (one more when the node
-  // is an entity: the step through it is counted on neither side).
-  const consider = (node: number, steps: number, side: SearchSide, other: SearchSide) => {
-    const reached = side.dist[stateOf(node, steps)]
-    const spare = maxHops - steps - (node >= titleCount ? 1 : 0)
-    for (let otherSteps = 0; otherSteps <= spare; otherSteps += 1) {
-      const total = reached + other.dist[stateOf(node, otherSteps)]
-      if (total >= best) continue
-      best = total
-      meetForward = side === forward ? stateOf(node, steps) : stateOf(node, otherSteps)
-      meetBackward = side === forward ? stateOf(node, otherSteps) : stateOf(node, steps)
-    }
-  }
-
-  const expand = (side: SearchSide, other: SearchSide) => {
-    const state = side.heap.pop()
-    if (side.done[state]) return
-    side.done[state] = 1
-    const node = Math.floor(state / layers)
-    const steps = state - node * layers
-    const reached = side.dist[state]
-
-    if (node < titleCount) {
-      if (steps >= maxHops) return
-      const entities = index.titleEntities[node]
-      const masks = index.titleMasks[node]
-      for (let i = 0; i < entities.length; i += 1) {
-        const entity = entities[i]
-        if (!view.links(entity)) continue
-        const target = stateOf(titleCount + entity, steps)
-        if (side.done[target]) continue
-        const cost = reached + edgeCost(masks[i], view.count(entity))
-        if (cost < side.dist[target]) {
-          side.dist[target] = cost
-          side.prev[target] = state
-          side.heap.push(cost, target)
-          consider(titleCount + entity, steps, side, other)
-        }
-      }
-    } else {
-      const entity = index.entities[node - titleCount]
-      const carried = view.count(node - titleCount)
-      const nextSteps = steps + 1
-      for (let i = 0; i < entity.titles.length; i += 1) {
-        const title = entity.titles[i]
-        if (!allowed[title]) continue
-        if (banned?.has(title) && title !== from && title !== to) continue
-        const target = stateOf(title, nextSteps)
-        if (side.done[target]) continue
-        const cost = reached + edgeCost(entity.masks[i], carried)
-        if (cost < side.dist[target]) {
-          side.dist[target] = cost
-          side.prev[target] = state
-          side.heap.push(cost, target)
-          consider(title, nextSteps, side, other)
-        }
-      }
-    }
-  }
-
-  while (forward.heap.size > 0 && backward.heap.size > 0) {
-    const forwardTop = forward.heap.peekKey()
-    const backwardTop = backward.heap.peekKey()
-    if (forwardTop + backwardTop >= best) break
-    if (forwardTop <= backwardTop) expand(forward, backward)
-    else expand(backward, forward)
-  }
-
-  if (meetForward < 0) return null
-  // from … meeting node, then on to `to`; both meeting states are that node.
-  const nodes: number[] = []
-  for (let state = meetForward; state !== -1; state = forward.prev[state]) nodes.push(Math.floor(state / layers))
-  nodes.reverse()
-  for (let state = backward.prev[meetBackward]; state !== -1; state = backward.prev[state]) {
-    nodes.push(Math.floor(state / layers))
-  }
-  const titles = nodes.filter((node) => node < titleCount)
-  const entities = nodes.filter((node) => node >= titleCount).map((node) => node - titleCount)
-  return { cost: best, titles, entities }
-}
-
-interface SearchSide {
-  /** By state: a node and the steps taken from this side's end to reach it. */
-  dist: Float64Array
-  prev: Int32Array
-  done: Uint8Array
-  heap: MinHeap
-}
-
-/** One half of a step: entering or leaving an entity from one title. */
-function edgeCost(mask: number, carried: number): number {
-  return 0.5 * HOP_COST + 0.5 * maskCost(mask) * rarity(carried)
-}
-
-/**
- * Up to `limit` routes, each through titles none of the earlier ones used:
- * the best path, then the best path avoiding its middle, and so on. Three
- * routes through three different films say more than three variations on one.
- */
-export function findPaths(
-  view: TrailView,
-  from: number,
-  to: number,
-  limit = 3,
-  maxHops = MAX_PATH_HOPS
-): FoundPath[] {
-  const paths: FoundPath[] = []
-  const banned = new Set<number>()
-  while (paths.length < limit) {
-    const path = findPath(view, from, to, { banned, maxHops })
-    if (!path) break
-    paths.push(path)
-    const middle = path.titles.slice(1, -1)
-    // A direct link has no middle to avoid, so a second route would be the
-    // same step again; the other things the two share are its `alsoShared`.
-    if (middle.length === 0) break
-    for (const title of middle) banned.add(title)
-  }
-  return paths
-}
 
 export interface SharedLink {
   entity: number
@@ -488,12 +256,7 @@ export function sharedLinks(view: TrailView, a: number, b: number): SharedLink[]
     const maskA = ofA.get(entity)
     if (maskA === undefined || !view.links(entity)) continue
     const maskB = masksB[i]
-    shared.push({
-      entity,
-      maskA,
-      maskB,
-      cost: HOP_COST + 0.5 * (maskCost(maskA) + maskCost(maskB)) * rarity(view.count(entity)),
-    })
+    shared.push({ entity, maskA, maskB, cost: stepCost(maskA, maskB, view.count(entity)) })
   }
   return shared.sort((x, y) => x.cost - y.cost || compareNames(view, x.entity, y.entity))
 }
@@ -526,20 +289,69 @@ export interface Thread {
 
 /** The most threads one title answers with. */
 export const MAX_THREADS = 30
-/** The most titles one thread names; the rest are counted in `more`. */
+/** The most titles one thread names in a title's list; the rest are counted in `more`. */
 export const THREAD_MEMBERS = 12
+/** The most titles one thread names when it is opened on its own. */
+export const OPENED_THREAD_MEMBERS = 200
 
-export interface ThreadOptions {
+/**
+ * Narrowing a title's threads. `exclude` marks titles a thread may not lead to
+ * (by title index: the viewer's watched titles); a thread left leading nowhere
+ * is dropped, while how many titles CARRY it — its rarity — is unchanged,
+ * since hiding what someone has seen does not make a cinematographer rarer.
+ * `kinds` keeps only threads of those kinds; null or absent keeps every kind.
+ */
+export interface ThreadFilter {
+  exclude?: Uint8Array | null
+  kinds?: ReadonlySet<EntityKind> | null
+}
+
+export interface ThreadOptions extends ThreadFilter {
   maxThreads?: number
   perThread?: number
 }
 
 /**
+ * The other titles in scope carrying `entity`, strongest role there first
+ * (a director's films before their cameos), newest first among equals.
+ */
+function membersOf(view: TrailView, title: number, entity: number, exclude?: Uint8Array | null): ThreadMember[] {
+  const { index, allowed } = view
+  const record = index.entities[entity]
+  const members: ThreadMember[] = []
+  for (let j = 0; j < record.titles.length; j += 1) {
+    const other = record.titles[j]
+    if (other !== title && allowed[other] && !exclude?.[other]) members.push({ title: other, mask: record.masks[j] })
+  }
+  return members.sort(
+    (a, b) =>
+      maskCost(a.mask) - maskCost(b.mask) ||
+      (index.titles[b.title].year ?? 0) - (index.titles[a.title].year ?? 0) ||
+      a.title - b.title
+  )
+}
+
+function threadAt(
+  view: TrailView,
+  title: number,
+  position: number,
+  perThread: number,
+  exclude?: Uint8Array | null
+): Thread | null {
+  const entity = view.index.titleEntities[title][position]
+  const mask = view.index.titleMasks[title][position]
+  const members = membersOf(view, title, entity, exclude)
+  if (members.length === 0) return null
+  const carried = view.count(entity)
+  const others = members.slice(0, perThread).sort((a, b) => byRelease(view, a.title, b.title))
+  return { entity, mask, count: carried, cost: threadCost(mask, carried), others, more: members.length - others.length }
+}
+
+/**
  * Every named thing a title shares with others in scope, strongest first, each
  * with the titles it leads to. Where a thread leads to more titles than fit,
- * the ones kept are those where the entity's role is strongest (a director's
- * films before their cameos), then shown oldest first so a person's thread
- * reads as a filmography.
+ * the ones kept are those where the entity's role is strongest, then shown
+ * oldest first so a person's thread reads as a filmography.
  */
 export function titleThreads(view: TrailView, title: number, options: ThreadOptions = {}): Thread[] {
   const { index, allowed } = view
@@ -548,37 +360,35 @@ export function titleThreads(view: TrailView, title: number, options: ThreadOpti
   const perThread = options.perThread ?? THREAD_MEMBERS
   const threads: Thread[] = []
   const entities = index.titleEntities[title]
-  const masks = index.titleMasks[title]
 
   for (let i = 0; i < entities.length; i += 1) {
     const entity = entities[i]
     if (!view.links(entity)) continue
-    const carried = view.count(entity)
-    const record = index.entities[entity]
-    const members: ThreadMember[] = []
-    for (let j = 0; j < record.titles.length; j += 1) {
-      const other = record.titles[j]
-      if (other !== title && allowed[other]) members.push({ title: other, mask: record.masks[j] })
-    }
-    members.sort(
-      (a, b) =>
-        maskCost(a.mask) - maskCost(b.mask) ||
-        (index.titles[b.title].year ?? 0) - (index.titles[a.title].year ?? 0)
-    )
-    const others = members.slice(0, perThread).sort((a, b) => byRelease(view, a.title, b.title))
-    threads.push({
-      entity,
-      mask: masks[i],
-      count: carried,
-      cost: threadCost(masks[i], carried),
-      others,
-      more: members.length - others.length,
-    })
+    if (options.kinds && !options.kinds.has(index.entities[entity].kind)) continue
+    const thread = threadAt(view, title, i, perThread, options.exclude)
+    if (thread) threads.push(thread)
   }
 
   return threads
     .sort((a, b) => a.cost - b.cost || a.count - b.count || compareNames(view, a.entity, b.entity))
     .slice(0, maxThreads)
+}
+
+/**
+ * One thread out of a title, opened on its own: up to `perThread` of the
+ * titles it leads to. Null when the title does not carry it, it links nothing
+ * in this scope, or every title it leads to is excluded.
+ */
+export function titleThread(
+  view: TrailView,
+  title: number,
+  entity: number,
+  options: { perThread?: number; exclude?: Uint8Array | null } = {}
+): Thread | null {
+  if (!view.allowed[title] || !view.links(entity)) return null
+  const position = view.index.titleEntities[title].indexOf(entity)
+  if (position < 0) return null
+  return threadAt(view, title, position, options.perThread ?? OPENED_THREAD_MEMBERS, options.exclude)
 }
 
 function byRelease(view: TrailView, a: number, b: number): number {
@@ -591,60 +401,101 @@ function byRelease(view: TrailView, a: number, b: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// What several titles have in common
+// A trail walked for the viewer
 // ---------------------------------------------------------------------------
 
-export interface CommonLink {
+/** How many steps "Take me on a trail" walks. */
+export const WALK_STEPS = 5
+/** Each step picks among this many of the strongest threads, so a walk is not the same every time. */
+export const WALK_CHOICES = 3
+
+export interface WalkStep {
+  from: number
+  to: number
   entity: number
-  /** Titles in scope carrying it. */
-  count: number
-  /** The chosen titles carrying it, in the order they were chosen. */
-  carriers: ThreadMember[]
-  score: number
+  /** The roles the step's first title gives the entity. */
+  maskFrom: number
+  /** The roles the step's second title gives it. */
+  maskTo: number
+}
+
+export interface WalkOptions extends ThreadFilter {
+  steps?: number
+  /** Titles already on the trail, which a walk never returns to. */
+  visited?: Iterable<number>
+  random: () => number
 }
 
 /**
- * The named things at least two of the chosen titles share, best first: shared
- * by more of them before fewer, and among those the rarer and the stronger
- * role first.
+ * A trail walked from `start`: at each title, one of the WALK_CHOICES
+ * strongest threads leading to a title not yet on the trail and not excluded
+ * (the strongest likeliest, weighted 3:2:1), taken to that thread's strongest
+ * title (its strongest role there, newest among equals). A thing already
+ * followed is not followed again, or a director's thread would walk five of
+ * their films and call it a trail. Stops early where nothing is left to
+ * follow; an empty result means nothing could be followed from `start`.
  */
-export function commonGround(view: TrailView, chosen: readonly number[], limit = 40): CommonLink[] {
+export function walkTrail(view: TrailView, start: number, options: WalkOptions): WalkStep[] {
   const { index, allowed } = view
-  const carriersOf = new Map<number, ThreadMember[]>()
-  const seen = new Set<number>()
-  for (const title of chosen) {
-    if (!allowed[title] || seen.has(title)) continue
-    seen.add(title)
-    const entities = index.titleEntities[title]
-    const masks = index.titleMasks[title]
+  if (!allowed[start]) return []
+  const steps = options.steps ?? WALK_STEPS
+  const visited = new Set<number>([start, ...(options.visited ?? [])])
+  const followed = new Set<number>()
+  const walked: WalkStep[] = []
+  let current = start
+
+  while (walked.length < steps) {
+    const candidates: Array<WalkStep & { cost: number; count: number }> = []
+    const entities = index.titleEntities[current]
+    const masks = index.titleMasks[current]
     for (let i = 0; i < entities.length; i += 1) {
       const entity = entities[i]
-      if (!view.links(entity)) continue
-      const list = carriersOf.get(entity)
-      if (list) list.push({ title, mask: masks[i] })
-      else carriersOf.set(entity, [{ title, mask: masks[i] }])
+      if (followed.has(entity) || !view.links(entity)) continue
+      if (options.kinds && !options.kinds.has(index.entities[entity].kind)) continue
+      const next = membersOf(view, current, entity, options.exclude).find((member) => !visited.has(member.title))
+      if (!next) continue
+      const count = view.count(entity)
+      candidates.push({
+        from: current,
+        to: next.title,
+        entity,
+        maskFrom: masks[i],
+        maskTo: next.mask,
+        cost: threadCost(masks[i], count),
+        count,
+      })
     }
+    if (candidates.length === 0) break
+    candidates.sort((a, b) => a.cost - b.cost || a.count - b.count || compareNames(view, a.entity, b.entity))
+    const choices = candidates.slice(0, WALK_CHOICES)
+    const chosen = choices[weightedPick(choices.length, options.random)]
+    walked.push({
+      from: chosen.from,
+      to: chosen.to,
+      entity: chosen.entity,
+      maskFrom: chosen.maskFrom,
+      maskTo: chosen.maskTo,
+    })
+    visited.add(chosen.to)
+    followed.add(chosen.entity)
+    current = chosen.to
   }
+  return walked
+}
 
-  const links: CommonLink[] = []
-  for (const [entity, carriers] of carriersOf) {
-    if (carriers.length < 2) continue
-    const count = view.count(entity)
-    const meanCost = carriers.reduce((sum, member) => sum + maskCost(member.mask), 0) / carriers.length
-    links.push({ entity, count, carriers, score: 1 / (meanCost * rarity(count)) })
+/** An index into `count` choices, the first likeliest: weights count, count − 1, … 1. */
+export function weightedPick(count: number, random: () => number): number {
+  const total = (count * (count + 1)) / 2
+  let roll = random() * total
+  for (let i = 0; i < count; i += 1) {
+    roll -= count - i
+    if (roll < 0) return i
   }
-  return links
-    .sort(
-      (a, b) =>
-        b.carriers.length - a.carriers.length ||
-        b.score - a.score ||
-        compareNames(view, a.entity, b.entity)
-    )
-    .slice(0, limit)
+  return count - 1
 }
 
 // ---------------------------------------------------------------------------
-// Surprise pairs
+// A random place to start
 // ---------------------------------------------------------------------------
 
 /** How many of a title's entities link anything in this scope. */
@@ -666,44 +517,6 @@ export function pickWellConnected(view: TrailView, random: () => number, minThre
     if (view.allowed[title] && linkedThreadCount(view, title) >= minThreads) return title
   }
   return null
-}
-
-/**
- * A title some steps away from `from` (counted in steps, not cost): far enough
- * that the path between them is worth reading, near enough to exist. Null when
- * nothing lies that far.
- */
-export function pickDistantTitle(
-  view: TrailView,
-  from: number,
-  random: () => number,
-  minHops = 3,
-  maxHops = 4
-): number | null {
-  const { index, allowed } = view
-  const depth = new Int16Array(index.titles.length).fill(-1)
-  const usedEntity = new Uint8Array(index.entities.length)
-  depth[from] = 0
-  let frontier = [from]
-  const candidates: number[] = []
-  for (let step = 1; step <= maxHops && frontier.length > 0; step += 1) {
-    const next: number[] = []
-    for (const title of frontier) {
-      for (const entity of index.titleEntities[title]) {
-        if (usedEntity[entity] || !view.links(entity)) continue
-        usedEntity[entity] = 1
-        for (const other of index.entities[entity].titles) {
-          if (!allowed[other] || depth[other] >= 0) continue
-          depth[other] = step
-          next.push(other)
-          if (step >= minHops) candidates.push(other)
-        }
-      }
-    }
-    frontier = next
-  }
-  if (candidates.length === 0) return null
-  return candidates[Math.floor(random() * candidates.length)]
 }
 
 // ---------------------------------------------------------------------------

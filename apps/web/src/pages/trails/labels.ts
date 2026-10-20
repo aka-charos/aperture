@@ -65,21 +65,15 @@ export function rarityText(titleCount: number): { key: 'trails.rarity.onlyTwo' }
 // The selection in the URL
 // ---------------------------------------------------------------------------
 
-export type TrailsMode = 'route' | 'threads' | 'common'
-
-export const TRAILS_MODES: readonly TrailsMode[] = ['route', 'threads', 'common']
-
-/** How many titles the followed trail remembers; older ones fall off the front. */
-export const MAX_TRAIL_LENGTH = 12
+export const TRAIL_KINDS: readonly TrailEntityKind[] = ['person', 'franchise', 'company', 'keyword']
 
 export interface TrailsUrlState {
-  mode: TrailsMode
-  from: string | null
-  to: string | null
-  /** Titles followed in Follow a thread, oldest first; the last is the current one. */
+  /** Titles followed, oldest first; the last is the one the threads lead out of. */
   trail: string[]
-  /** Titles compared in In common. */
-  titles: string[]
+  /** Leave out titles the viewer has watched. */
+  hideWatched: boolean
+  /** Only these kinds of thread; empty means every kind. */
+  kinds: TrailEntityKind[]
 }
 
 const REF = /^(movie|series):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -92,7 +86,7 @@ function readRef(value: string | null): string | null {
   return value && isTitleRef(value) ? value.toLowerCase() : null
 }
 
-/** Refs from a comma-separated value: malformed ones dropped, repeats kept once, capped. */
+/** Refs from a comma-separated value: malformed ones dropped, repeats kept once, the newest `max` kept. */
 function readRefList(value: string | null, max: number): string[] {
   if (!value) return []
   const refs: string[] = []
@@ -103,40 +97,63 @@ function readRefList(value: string | null, max: number): string[] {
   return refs.slice(-max)
 }
 
-export function readTrailsUrl(params: URLSearchParams, maxCommonTitles: number): TrailsUrlState {
-  const mode = params.get('mode')
-  return {
-    mode: TRAILS_MODES.includes(mode as TrailsMode) ? (mode as TrailsMode) : 'route',
-    from: readRef(params.get('from')),
-    to: readRef(params.get('to')),
-    trail: readRefList(params.get('trail'), MAX_TRAIL_LENGTH),
-    titles: readRefList(params.get('titles'), maxCommonTitles),
-  }
+function readKinds(value: string | null): TrailEntityKind[] {
+  if (!value) return []
+  const wanted = new Set(value.split(','))
+  // In the page's own order, so one selection has one address.
+  return TRAIL_KINDS.filter((kind) => wanted.has(kind))
 }
 
 /**
- * The state as URL parameters. Every mode's selection is kept, so switching
- * tab and back finds the titles where they were; an empty value is left out.
+ * The page's state from its address. `maxTrail` is the API's limit, or no cap
+ * before it arrives. Parameters this page no longer reads (the retired
+ * `mode`, `from`, `to`, `titles`) are ignored, so an old link still opens its
+ * trail.
  */
+export function readTrailsUrl(params: URLSearchParams, maxTrail = Number.MAX_SAFE_INTEGER): TrailsUrlState {
+  return {
+    trail: readRefList(params.get('trail'), maxTrail),
+    hideWatched: params.get('unwatched') === '1',
+    kinds: readKinds(params.get('kinds')),
+  }
+}
+
+/** The state as URL parameters; an empty or default value is left out. */
 export function writeTrailsUrl(state: TrailsUrlState): URLSearchParams {
   const params = new URLSearchParams()
-  params.set('mode', state.mode)
-  if (state.from) params.set('from', state.from)
-  if (state.to) params.set('to', state.to)
   if (state.trail.length > 0) params.set('trail', state.trail.join(','))
-  if (state.titles.length > 0) params.set('titles', state.titles.join(','))
+  if (state.hideWatched) params.set('unwatched', '1')
+  const kinds = TRAIL_KINDS.filter((kind) => state.kinds.includes(kind))
+  if (kinds.length > 0 && kinds.length < TRAIL_KINDS.length) params.set('kinds', kinds.join(','))
   return params
+}
+
+/** The API query for the state's filters: `unwatched` and `kinds`, as the page writes them. */
+export function filterQuery(state: Pick<TrailsUrlState, 'hideWatched' | 'kinds'>): string {
+  const params = writeTrailsUrl({ trail: [], ...state })
+  const query = params.toString()
+  return query ? `&${query}` : ''
 }
 
 /**
  * The followed trail after stepping to `ref`: going back to a title already on
  * it cuts the trail there rather than looping, and the oldest falls off once
- * it is long.
+ * it is longer than `max`.
  */
-export function stepTrail(trail: readonly string[], ref: string): string[] {
+export function stepTrail(trail: readonly string[], ref: string, max = Number.MAX_SAFE_INTEGER): string[] {
   const at = trail.indexOf(ref)
   if (at >= 0) return trail.slice(0, at + 1)
-  return [...trail, ref].slice(-MAX_TRAIL_LENGTH)
+  return [...trail, ref].slice(-max)
+}
+
+/** The trail with several titles walked onto its end, in order. */
+export function extendTrail(trail: readonly string[], refs: readonly string[], max = Number.MAX_SAFE_INTEGER): string[] {
+  return refs.reduce<string[]>((current, ref) => stepTrail(current, ref, max), [...trail])
+}
+
+/** The key a link between two consecutive titles of a trail is remembered by. */
+export function pairKey(from: string, to: string): string {
+  return `${from}>${to}`
 }
 
 /** A library title's ref, or null for an id Trails would not accept. */
@@ -146,20 +163,18 @@ export function titleRefFor(type: 'movie' | 'series', id: string): string | null
 }
 
 /**
- * The Trails address that follows the threads out of one title, for links into
- * the page from elsewhere (a title's detail page). Built through
- * `writeTrailsUrl` so it reads back exactly as the page writes its own state.
+ * The Trails address that starts a trail at one title, for links into the
+ * page from elsewhere (a title's detail page). Built through `writeTrailsUrl`
+ * so it reads back exactly as the page writes its own state.
  *
  * `current` is the Trails page's own query when the link is followed from on
- * top of it (a title opened in its dialog): the other modes' selections are
- * kept, as switching tab keeps them, and only the followed trail starts again.
+ * top of it (a title opened in its dialog): the filters are kept and only the
+ * trail starts again.
  */
-export function threadsPathFor(ref: string, current?: URLSearchParams | null): string {
-  const kept = current
-    ? readTrailsUrl(current, Number.MAX_SAFE_INTEGER)
-    : { mode: 'threads' as const, from: null, to: null, trail: [], titles: [] }
-  const params = writeTrailsUrl({ ...kept, mode: 'threads', trail: [ref] })
-  return `/trails?${params.toString()}`
+export function trailPathFor(ref: string, current?: URLSearchParams | null): string {
+  const kept = current ? readTrailsUrl(current) : { trail: [], hideWatched: false, kinds: [] }
+  const query = writeTrailsUrl({ ...kept, trail: [ref] }).toString()
+  return `/trails?${query}`
 }
 
 /**

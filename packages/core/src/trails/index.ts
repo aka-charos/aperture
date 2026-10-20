@@ -1,6 +1,6 @@
 /**
- * Trails: how library titles are linked through the named things they
- * share (rules.ts says what counts and how much; graph.ts searches it).
+ * Trails: following library titles one to the next through the named things
+ * they share (rules.ts says what counts and how much; graph.ts reads it).
  *
  * The index is built from the whole library in memory, rebuilt when it is an
  * hour old, and narrowed per viewer to the titles their library scope allows —
@@ -13,28 +13,27 @@
 import { createChildLogger } from '../lib/logger.js'
 import { query } from '../lib/db.js'
 import { libraryScopeSql, type LibraryScope } from '../lib/libraryScope.js'
+import { getWatchStatusForUser } from '../watching/watchedItems.js'
 import {
   buildTrailIndex,
-  commonGround,
   createView,
   describeIndex,
-  findPaths,
-  pickDistantTitle,
   pickWellConnected,
   sharedLinks,
+  titleThread,
   titleThreads,
+  walkTrail,
+  type IndexedTitle,
+  type Thread,
+  type ThreadFilter,
   type TrailIndex,
   type TrailView,
-  type FoundPath,
-  type IndexedTitle,
-  type SharedLink,
 } from './graph.js'
 import { movieSource, seriesSource, type MovieCreditRow, type SeriesCreditRow } from './sources.js'
 import { formatTitleRef, rolesOf, type EntityKind, type LinkRole, type TitleRef } from './rules.js'
 
 export {
   LINK_ROLES,
-  MAX_PATH_HOPS,
   parseTitleRef,
   formatTitleRef,
   type EntityKind,
@@ -50,11 +49,6 @@ const INDEX_MAX_AGE_MS = 60 * 60 * 1000
 const EARLY_REBUILD_AFTER_MS = 5 * 60 * 1000
 /** Distinct scopes remembered per index; most instances have a handful. */
 const MAX_CACHED_VIEWS = 50
-
-/** The most titles "In common" compares at once. */
-export const MAX_COMMON_TITLES = 8
-
-export { MAX_THREADS, THREAD_MEMBERS } from './graph.js'
 
 interface IndexCache {
   index: TrailIndex
@@ -211,6 +205,8 @@ export interface TrailTitle {
 }
 
 export interface TrailEntity {
+  /** Stable across index rebuilds; how a client asks for this thread again. */
+  key: string
   kind: EntityKind
   name: string
   photo: string | null
@@ -225,25 +221,6 @@ export interface TrailLink extends TrailEntity {
   rolesTo: LinkRole[]
 }
 
-export interface TrailStep {
-  from: TrailTitle
-  to: TrailTitle
-  via: TrailLink
-  /** The other things these two share, strongest first. */
-  alsoShared: TrailLink[]
-}
-
-export interface TrailRoute {
-  steps: TrailStep[]
-}
-
-export type TrailResult =
-  | { status: 'notFound' }
-  | { status: 'same'; from: TrailTitle }
-  | { status: 'found'; from: TrailTitle; to: TrailTitle; paths: TrailRoute[] }
-  /** No path; `isolated` lists the ends that have no thread at all. */
-  | { status: 'none'; from: TrailTitle; to: TrailTitle; isolated: string[] }
-
 export interface ThreadMemberView {
   title: TrailTitle
   roles: LinkRole[]
@@ -256,11 +233,21 @@ export interface ThreadView extends TrailEntity {
   more: number
 }
 
-export interface CommonLinkView extends TrailEntity {
-  carriers: Array<{ ref: string; roles: LinkRole[] }>
-}
+/** The most titles one trail holds; older ones fall off the front. */
+export const MAX_TRAIL_TITLES = 12
 
-const ALSO_SHARED_LIMIT = 4
+export { MAX_THREADS, THREAD_MEMBERS, WALK_STEPS } from './graph.js'
+
+/**
+ * How a viewer narrows what threads lead to. `hideWatchedFor` is the user
+ * whose watched titles are left out — finished films and finished shows, the
+ * same reading as the watched tick on a poster (`getWatchStatusForUser`), so
+ * a title hidden here is exactly one that would wear a tick.
+ */
+export interface TrailFilter {
+  hideWatchedFor?: string | null
+  kinds?: readonly EntityKind[] | null
+}
 
 function titleView(title: IndexedTitle): TrailTitle {
   return {
@@ -275,90 +262,64 @@ function titleView(title: IndexedTitle): TrailTitle {
 
 function entityView(view: TrailView, entity: number): TrailEntity {
   const record = view.index.entities[entity]
-  return { kind: record.kind, name: record.name, photo: record.photo, titleCount: view.count(entity) }
-}
-
-function linkView(view: TrailView, shared: SharedLink): TrailLink {
-  return { ...entityView(view, shared.entity), rolesFrom: rolesOf(shared.maskA), rolesTo: rolesOf(shared.maskB) }
-}
-
-function pathView(view: TrailView, path: FoundPath): TrailRoute {
-  const steps: TrailStep[] = []
-  for (let i = 0; i < path.entities.length; i += 1) {
-    const a = path.titles[i]
-    const b = path.titles[i + 1]
-    const shared = sharedLinks(view, a, b)
-    const via = shared.find((link) => link.entity === path.entities[i])
-    if (!via) continue // cannot happen: the path stepped through it
-    steps.push({
-      from: titleView(view.index.titles[a]),
-      to: titleView(view.index.titles[b]),
-      via: linkView(view, via),
-      alsoShared: shared
-        .filter((link) => link.entity !== via.entity)
-        .slice(0, ALSO_SHARED_LIMIT)
-        .map((link) => linkView(view, link)),
-    })
-  }
-  return { steps }
-}
-
-function hasThreads(view: TrailView, title: number): boolean {
-  for (const entity of view.index.titleEntities[title]) if (view.links(entity)) return true
-  return false
-}
-
-function trailsWithin(view: TrailView, from: number, to: number): TrailResult {
-  const fromTitle = titleView(view.index.titles[from])
-  if (from === to) return { status: 'same', from: fromTitle }
-  const toTitle = titleView(view.index.titles[to])
-  const paths = findPaths(view, from, to)
-  if (paths.length > 0) {
-    return { status: 'found', from: fromTitle, to: toTitle, paths: paths.map((path) => pathView(view, path)) }
-  }
-  const isolated = [from, to].filter((title) => !hasThreads(view, title))
   return {
-    status: 'none',
-    from: fromTitle,
-    to: toTitle,
-    isolated: isolated.map((title) => formatTitleRef(view.index.titles[title])),
+    key: record.key,
+    kind: record.kind,
+    name: record.name,
+    photo: record.photo,
+    titleCount: view.count(entity),
+  }
+}
+
+function linkView(view: TrailView, entity: number, maskFrom: number, maskTo: number): TrailLink {
+  return { ...entityView(view, entity), rolesFrom: rolesOf(maskFrom), rolesTo: rolesOf(maskTo) }
+}
+
+function threadView(view: TrailView, thread: Thread): ThreadView {
+  return {
+    ...entityView(view, thread.entity),
+    roles: rolesOf(thread.mask),
+    others: thread.others.map((member) => ({
+      title: titleView(view.index.titles[member.title]),
+      roles: rolesOf(member.mask),
+    })),
+    more: thread.more,
+  }
+}
+
+/** The viewer's watched titles as index positions, or null when nothing is hidden. */
+async function watchedMask(index: TrailIndex, userId: string | null | undefined): Promise<Uint8Array | null> {
+  if (!userId) return null
+  const status = await getWatchStatusForUser(userId)
+  const mask = new Uint8Array(index.titles.length)
+  const mark = (ref: TitleRef) => {
+    const title = index.byRef.get(formatTitleRef(ref))
+    if (title !== undefined) mask[title] = 1
+  }
+  for (const id of status.movieIds) mark({ type: 'movie', id })
+  for (const series of status.series) if (series.watched >= series.total) mark({ type: 'series', id: series.id })
+  return mask
+}
+
+async function threadFilter(view: TrailView, filter: TrailFilter): Promise<ThreadFilter> {
+  return {
+    exclude: await watchedMask(view.index, filter.hideWatchedFor),
+    kinds: filter.kinds && filter.kinds.length > 0 ? new Set(filter.kinds) : null,
   }
 }
 
 // ---------------------------------------------------------------------------
-// The four questions
+// The questions the page asks
 // ---------------------------------------------------------------------------
 
-/** How two titles are connected, by up to three routes through different titles. */
-export async function findTrails(scope: LibraryScope, from: TitleRef, to: TitleRef): Promise<TrailResult> {
-  const { view, titles } = await resolve(scope, [from, to])
-  const [a, b] = titles
-  if (a == null || b == null) return { status: 'notFound' }
-  return trailsWithin(view, a, b)
-}
-
-/** Two well-connected titles a few steps apart, and how they connect. */
-export async function surpriseTrail(scope: LibraryScope, random: () => number = Math.random): Promise<TrailResult> {
-  const view = await viewFor(scope)
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const from = pickWellConnected(view, random)
-    if (from == null) break
-    const to = pickDistantTitle(view, from, random)
-    if (to == null) continue
-    const result = trailsWithin(view, from, to)
-    if (result.status === 'found') return result
-  }
-  return { status: 'notFound' }
-}
-
-/** Every thread leading out of one title, strongest first. */
-export interface TitleThreadsOptions {
+export interface TitleThreadsOptions extends TrailFilter {
   /** Only the strongest this many threads (the full list is still counted in `total`). */
   limit?: number
   /** Titles named per thread, 0 for none; the rest are counted in `more`. */
   members?: number
 }
 
+/** Every thread leading out of one title, strongest first; null when the title is not in scope. */
 export async function getTitleThreads(
   scope: LibraryScope,
   ref: TitleRef,
@@ -367,47 +328,98 @@ export async function getTitleThreads(
   const { view, titles } = await resolve(scope, [ref])
   const title = titles[0]
   if (title == null) return null
-  const all = titleThreads(view, title, { perThread: options.members })
+  const all = titleThreads(view, title, { perThread: options.members, ...(await threadFilter(view, options)) })
   const shown = options.limit == null ? all : all.slice(0, options.limit)
   return {
     title: titleView(view.index.titles[title]),
     total: all.length,
-    threads: shown.map((thread) => ({
-      ...entityView(view, thread.entity),
-      roles: rolesOf(thread.mask),
-      others: thread.others.map((member) => ({
-        title: titleView(view.index.titles[member.title]),
-        roles: rolesOf(member.mask),
-      })),
-      more: thread.more,
-    })),
+    threads: shown.map((thread) => threadView(view, thread)),
   }
 }
 
 /**
- * What several titles have in common. A title out of scope is dropped rather
- * than failing the request; `titles` lists the ones compared, in the order given.
+ * One thread out of a title opened in full (up to OPENED_THREAD_MEMBERS
+ * titles). Null when the title is not in scope; `thread` is null when the
+ * title does not carry that entity, it links nothing here, or every title it
+ * leads to is hidden.
  */
-export async function getCommonGround(
+export async function getTitleThread(
   scope: LibraryScope,
-  refs: readonly TitleRef[]
-): Promise<{ titles: TrailTitle[]; links: CommonLinkView[] }> {
-  const { view, titles } = await resolve(scope, refs.slice(0, MAX_COMMON_TITLES))
-  const chosen = [...new Set(titles.filter((title): title is number => title != null))]
-  return {
-    titles: chosen.map((title) => titleView(view.index.titles[title])),
-    links: commonGround(view, chosen).map((link) => ({
-      ...entityView(view, link.entity),
-      carriers: link.carriers.map((member) => ({
-        ref: formatTitleRef(view.index.titles[member.title]),
-        roles: rolesOf(member.mask),
-      })),
-    })),
-  }
+  ref: TitleRef,
+  entityKey: string,
+  filter: TrailFilter = {}
+): Promise<{ title: TrailTitle; thread: ThreadView | null } | null> {
+  const { view, titles } = await resolve(scope, [ref])
+  const title = titles[0]
+  if (title == null) return null
+  const entity = view.index.byKey.get(entityKey)
+  const { exclude } = await threadFilter(view, filter)
+  const thread = entity === undefined ? null : titleThread(view, title, entity, { exclude })
+  return { title: titleView(view.index.titles[title]), thread: thread ? threadView(view, thread) : null }
 }
 
-/** Title cards for refs, in the order given, skipping any out of scope. */
-export async function getTrailTitles(scope: LibraryScope, refs: readonly TitleRef[]): Promise<TrailTitle[]> {
-  const { view, titles } = await resolve(scope, refs)
-  return titles.filter((title): title is number => title != null).map((title) => titleView(view.index.titles[title]))
+/**
+ * A trail read back: the titles in scope in the order given, and what links
+ * each to the next — the strongest thing the two share, or null where they
+ * share nothing (a title between them was dropped as out of scope).
+ */
+export async function getTrail(
+  scope: LibraryScope,
+  refs: readonly TitleRef[]
+): Promise<{ titles: TrailTitle[]; links: (TrailLink | null)[] }> {
+  const { view, titles } = await resolve(scope, refs.slice(-MAX_TRAIL_TITLES))
+  const kept = titles.filter((title): title is number => title != null)
+  const links: (TrailLink | null)[] = []
+  for (let i = 1; i < kept.length; i += 1) {
+    const strongest = sharedLinks(view, kept[i - 1], kept[i])[0]
+    links.push(strongest ? linkView(view, strongest.entity, strongest.maskA, strongest.maskB) : null)
+  }
+  return { titles: kept.map((title) => titleView(view.index.titles[title])), links }
+}
+
+/** A random well-connected title in scope to start a trail from, or null when the library has none. */
+export async function getTrailStart(
+  scope: LibraryScope,
+  random: () => number = Math.random
+): Promise<TrailTitle | null> {
+  const view = await viewFor(scope)
+  const title = pickWellConnected(view, random)
+  return title == null ? null : titleView(view.index.titles[title])
+}
+
+export interface WalkRequest {
+  /** Titles already on the trail, which the walk does not return to. */
+  visited?: readonly TitleRef[]
+  /** The user whose watched titles the walk avoids: it leads only to titles they have not seen. */
+  userId: string
+  kinds?: readonly EntityKind[] | null
+  random?: () => number
+}
+
+/**
+ * "Take me on a trail": up to WALK_STEPS steps walked from a title (graph.ts
+ * `walkTrail`), always to titles the viewer has not watched. Null when the
+ * title is not in scope; an empty `steps` means nothing could be followed.
+ */
+export async function walkFrom(
+  scope: LibraryScope,
+  ref: TitleRef,
+  request: WalkRequest
+): Promise<{ start: TrailTitle; steps: Array<{ title: TrailTitle; via: TrailLink }> } | null> {
+  const { view, titles } = await resolve(scope, [ref, ...(request.visited ?? []).slice(-MAX_TRAIL_TITLES)])
+  const start = titles[0]
+  if (start == null) return null
+  const filter = await threadFilter(view, { hideWatchedFor: request.userId, kinds: request.kinds })
+  const walked = walkTrail(view, start, {
+    ...filter,
+    visited: titles.slice(1).filter((title): title is number => title != null),
+    random: request.random ?? Math.random,
+  })
+  return {
+    start: titleView(view.index.titles[start]),
+    steps: walked.map((step) => ({
+      title: titleView(view.index.titles[step.to]),
+      via: linkView(view, step.entity, step.maskFrom, step.maskTo),
+    })),
+  }
 }

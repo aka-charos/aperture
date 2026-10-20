@@ -66,7 +66,7 @@ Find content that isn't in your library yet, and get it in.
 18. [My Requests](features/my-requests.md) - Track your requests, request anything by name, and report playback problems
 19. [Media Graph](features/explore.md) - Explore your library as a visual similarity graph
 20. [Related-Content Graphs](features/similarity-graphs.md) - See what connects a title to its neighbours
-21. [Trails](features/trails.md) - Follow the people, franchises and studios that link your titles
+21. [Trails](features/trails.md) - Follow a trail from title to title through the people, franchises and studios they share
 
 ---
 
@@ -129,7 +129,7 @@ Your settings open from the avatar menu, in up to four tabs: Recommendations, Di
 | Read about how a film was made | [Title Analysis](features/title-analysis.md) |
 | Create a playlist or collection | [Playlists](features/playlists.md) / [Collections](features/collections.md) |
 | Explore similar content visually | [Media Graph](features/explore.md) |
-| See how two titles are connected | [Trails](features/trails.md) |
+| Follow a trail from one title to the next through who made them | [Trails](features/trails.md) |
 | See my viewing statistics | [Watch Stats](features/watch-stats.md) |
 | Customize my recommendations | [Recommendations settings](features/user-settings/recommendations.md) |
 | Recommend something to someone | [Watch This](features/watch-this.md) |
