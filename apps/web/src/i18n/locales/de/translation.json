@@ -974,7 +974,6 @@
       "tabGraph": "Grafik",
       "tooltipFullscreen": "Vollbild",
       "tooltipStartOver": "Neu starten",
-      "graphHint": "Poster anklicken zum Erkunden • ⓘ für Details anklicken",
       "expandedSubtitle": "Erweiterte Ansicht • {{count}} Elemente",
       "fallbackCenterTitle": "Medien"
     },
@@ -3016,8 +3015,6 @@
     "createPlaylistTooltip": "Playlist aus diesen Elementen erstellen",
     "createPlaylist": "Playlist erstellen",
     "exitFullscreen": "Vollbild beenden",
-    "hintsDesktop": "Poster anklicken zum Erkunden • ⓘ für Details anklicken • Ziehen zum Verschieben • Scrollen zum Zoomen",
-    "hintsMobile": "Tippen zum Erkunden • Lang drücken für Details",
     "playlistCreated": "Playlist erfolgreich erstellt!"
   },
   "mediaGraph": {

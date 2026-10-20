@@ -977,7 +977,6 @@
       "tabGraph": "Graphique",
       "tooltipFullscreen": "Plein écran",
       "tooltipStartOver": "Recommencer",
-      "graphHint": "Cliquez sur l'affiche pour explorer • Cliquez sur ⓘ pour plus de détails",
       "expandedSubtitle": "Vue développée • {{count}} éléments",
       "fallbackCenterTitle": "Médias"
     },
@@ -3020,8 +3019,6 @@
     "createPlaylistTooltip": "Créer une playlist à partir de ces éléments",
     "createPlaylist": "Créer une liste de lecture",
     "exitFullscreen": "Quitter le plein écran",
-    "hintsDesktop": "Cliquez sur l'affiche pour l'explorer • Cliquez sur ⓘ pour plus de détails • Faites glisser pour repositionner • Faites défiler pour zoomer",
-    "hintsMobile": "Appuyez pour explorer • Appuyez longuement pour plus de détails",
     "playlistCreated": "Playlist créée avec succès !"
   },
   "mediaGraph": {

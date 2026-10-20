@@ -1371,7 +1371,7 @@
       "tabGraph": "Graph",
       "tooltipFullscreen": "Fullscreen",
       "tooltipStartOver": "Start over",
-      "graphHint": "Click poster to explore • Click ⓘ for details",
+      "graphHintOpen": "Click a poster for details • Shift+click to explore from it",
       "expandedSubtitle": "Expanded view • {{count}} items",
       "fallbackCenterTitle": "Media"
     },
@@ -4178,8 +4178,12 @@
     "createPlaylistTooltip": "Create playlist from these items",
     "createPlaylist": "Create playlist",
     "exitFullscreen": "Exit fullscreen",
-    "hintsDesktop": "Click poster to explore • Click ⓘ for details • Drag to reposition • Scroll to zoom",
-    "hintsMobile": "Tap to explore • Long press for details",
+    "hintsDesktopOpen": "Click a poster for details • Shift+click or its corner button to explore from it • Drag to move • Scroll to zoom",
+    "hintsMobileOpen": "Tap for details • Long press to explore from it",
+    "exploreFromHere": "Explore from here (Shift+click)",
+    "connectionFilterLabel": "Connection types shown",
+    "connectionFilterTooltip": "Click to hide or show • Shift+click to show only this",
+    "connectionFilterShowAll": "Show all",
     "playlistCreated": "Playlist created successfully!"
   },
   "mediaGraph": {
@@ -4203,6 +4207,7 @@
     "browseBy": "Browse by",
     "recentSearches": "Recent searches",
     "connectionTypesHeading": "Connection types",
+    "connectionTypesHint": "Choose which connections the graph draws.",
     "crossMedia": "Show cross-media connections",
     "crossMediaHelp": "Off, a film only connects to other films and a series only to other series. On, each item also reaches across: a film can link to a series that resembles it, and the other way round.",
     "crossMediaHelpSlots": "One connection per item is held for the other media type, so a cross-media match still appears when same-media matches score higher.",
@@ -6458,7 +6463,7 @@
       "explore": {
         "graph": {
           "title": "A map of your library",
-          "body": "Each point is a title, and lines join titles that are alike. Click one to move it to the middle and follow where it leads."
+          "body": "Each poster is a title, and lines join titles that are alike. Click one to see it; Shift+click (or its corner button) moves it to the middle so you can follow where it leads."
         },
         "controls": {
           "title": "Search and find your way back",

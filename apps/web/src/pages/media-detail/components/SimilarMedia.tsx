@@ -172,19 +172,20 @@ export function SimilarMedia({
     navigate(`/${type === 'movie' ? 'movies' : 'series'}/${id}`)
   }
 
-  const handleNodeClick = (node: GraphNode) => {
-    // Rabbit hole navigation - click to refocus
+  // Rabbit hole navigation: Shift+click (or the node's corner button)
+  // re-centres the graph on a title
+  const handleNodeExplore = (node: GraphNode) => {
     if (!node.isCenter) {
       setFocusId(node.id, node.type)
     }
   }
 
-  const handleNodeDoubleClick = (node: GraphNode) => {
-    // Double-click opens the item's detail view
+  // A plain click shows the title itself
+  const handleNodeOpen = (node: GraphNode) => {
     openMedia(node.type, node.id)
   }
 
-  const handleFullscreenNodeClick = useCallback(
+  const handleFullscreenNodeExplore = useCallback(
     (node: GraphNode) => {
       if (!node.isCenter) {
         fullscreenSetFocusId(node.id, node.type)
@@ -363,9 +364,8 @@ export function SimilarMedia({
               data={graphData}
               loading={graphLoading}
               loadingStatus={graphLoadingStatus || undefined}
-              onNodeClick={handleNodeClick}
-              onNodeDoubleClick={handleNodeDoubleClick}
-              onNodeDetailsClick={handleNodeDoubleClick}
+              onNodeOpen={handleNodeOpen}
+              onNodeExplore={handleNodeExplore}
               compact
             />
             <Box
@@ -373,7 +373,7 @@ export function SimilarMedia({
             >
               <GraphLegend compact />
               <Typography variant="caption" color="text.secondary">
-                {t('mediaDetail.similar.graphHint')}
+                {t('mediaDetail.similar.graphHintOpen')}
               </Typography>
             </Box>
           </Paper>
@@ -408,9 +408,8 @@ export function SimilarMedia({
                 index === 0 ? fullscreenStartOver() : fullscreenGoToHistoryIndex(index)
               }
               onStartOver={fullscreenStartOver}
-              onNodeClick={handleFullscreenNodeClick}
-              onNodeDoubleClick={handleNodeDoubleClick}
-              onNodeDetailsClick={handleNodeDoubleClick}
+              onNodeOpen={handleNodeOpen}
+              onNodeExplore={handleFullscreenNodeExplore}
               showCreatePlaylist
               showExitFullscreen
               onExitFullscreen={() => setIsFullscreen(false)}

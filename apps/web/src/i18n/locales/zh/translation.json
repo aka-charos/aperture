@@ -1556,7 +1556,6 @@
       "tabGraph": "图形",
       "tooltipFullscreen": "全屏",
       "tooltipStartOver": "重新开始",
-      "graphHint": "单击海报进行探索 • 单击 ⓘ 了解详细信息",
       "expandedSubtitle": "扩展视图 • {{count}} 项",
       "fallbackCenterTitle": "媒体"
     },
@@ -3016,8 +3015,6 @@
     "createPlaylistTooltip": "从这些项目创建播放列表",
     "createPlaylist": "创建播放列表",
     "exitFullscreen": "退出全屏",
-    "hintsDesktop": "单击海报进行探索 • 单击 ⓘ 了解详细信息 • 拖动以重新定位 • 滚动以缩放",
-    "hintsMobile": "点击探索 • 长按查看详细信息",
     "playlistCreated": "播放列表创建成功！"
   },
   "mediaGraph": {

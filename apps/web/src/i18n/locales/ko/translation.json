@@ -974,7 +974,6 @@
       "tabGraph": "그래프",
       "tooltipFullscreen": "전체 화면",
       "tooltipStartOver": "다시 시작하세요",
-      "graphHint": "살펴보려면 포스터를 클릭하세요. • 자세한 내용을 보려면 ⓘ를 클릭하세요.",
       "expandedSubtitle": "확장 보기 • 항목 {{count}}개",
       "fallbackCenterTitle": "메디아"
     },
@@ -3016,8 +3015,6 @@
     "createPlaylistTooltip": "이 항목으로 재생목록 만들기",
     "createPlaylist": "재생목록 만들기",
     "exitFullscreen": "전체 화면 종료",
-    "hintsDesktop": "살펴보려면 포스터를 클릭하세요. • 자세한 내용을 보려면 ⓘ를 클릭하세요. • 드래그하여 위치를 변경하세요. • 스크롤하여 확대/축소하세요.",
-    "hintsMobile": "탐색하려면 탭하세요. • 세부정보를 보려면 길게 누르세요.",
     "playlistCreated": "재생목록이 성공적으로 생성되었습니다!"
   },
   "mediaGraph": {

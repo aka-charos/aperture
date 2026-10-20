@@ -1556,7 +1556,6 @@
       "tabGraph": "グラフ",
       "tooltipFullscreen": "全画面表示",
       "tooltipStartOver": "やり直す",
-      "graphHint": "ポスターをクリックして詳細をご覧ください • ⓘ をクリックすると詳細が表示されます",
       "expandedSubtitle": "展開ビュー • {{count}} 個のアイテム",
       "fallbackCenterTitle": "メディア"
     },
@@ -3016,8 +3015,6 @@
     "createPlaylistTooltip": "これらのアイテムからプレイリストを作成する",
     "createPlaylist": "プレイリストの作成",
     "exitFullscreen": "全画面表示を終了する",
-    "hintsDesktop": "ポスターをクリックして詳細を確認します。 • ⓘ をクリックして詳細を表示します。 • ドラッグして位置を変更します。 • スクロールしてズームします。",
-    "hintsMobile": "タップして探索する • 長押しすると詳細が表示されます",
     "playlistCreated": "プレイリストが正常に作成されました。"
   },
   "mediaGraph": {

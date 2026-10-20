@@ -29,7 +29,8 @@ While the graph builds, the page narrates what it's doing — searching your lib
 - **Nodes** are posters; the center/primary items render larger. Node size does *not* encode similarity
 - **Edges** connect related items; hover an edge for the **similarity percentage**
 - **Hover a node** for title, year, type, and **"Connected via:"** reason chips
-- **Click a poster** to make it the new center (with breadcrumbs tracking your path); **click ⓘ** (or double-click) to open its detail page
+- **Click a poster** to open its details over the graph; close them and the graph is as you left it
+- **Shift+click a poster**, or click its corner button, to make it the new center (breadcrumbs track your path; from a browse list the first crumb takes you back to the list). On a touch screen, tap for details and long-press to re-center
 - **Drag** to reposition, **scroll** to zoom
 
 ### Connection Colors
@@ -46,7 +47,7 @@ While the graph builds, the page narrates what it's doing — searching your lib
 | **Gray** | AI similar (embedding similarity) |
 | **Emerald** | AI discovery (deliberately diverse picks) |
 
-The sidebar legend shows the same list live.
+The legend in the sidebar, and the one under the graph, are also switches: **click a connection type** to hide or show its lines, **Shift+click** to show that type alone, and **Show all** to bring everything back. Posters that no shown line reaches drop out, so turning off broad types such as genre match leaves only the closer links. Your choice is remembered in this browser and applies to every graph, including a title's own Similar graph.
 
 ---
 

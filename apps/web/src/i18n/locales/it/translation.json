@@ -977,7 +977,6 @@
       "tabGraph": "Grafico",
       "tooltipFullscreen": "A schermo intero",
       "tooltipStartOver": "Ricominciare",
-      "graphHint": "Fare clic sul poster per esplorare • Fare clic su ⓘ per i dettagli",
       "expandedSubtitle": "Visualizzazione espansa • {{count}} elementi",
       "fallbackCenterTitle": "Media"
     },
@@ -3020,8 +3019,6 @@
     "createPlaylistTooltip": "Crea playlist da questi elementi",
     "createPlaylist": "Crea playlist",
     "exitFullscreen": "Esci dallo schermo intero",
-    "hintsDesktop": "Fai clic sul poster per esplorare • Fai clic su ⓘ per i dettagli • Trascina per riposizionare • Scorri per ingrandire",
-    "hintsMobile": "Tocca per esplorare • Premi a lungo per i dettagli",
     "playlistCreated": "Playlist creata con successo!"
   },
   "mediaGraph": {

@@ -977,7 +977,6 @@
       "tabGraph": "Gráfico",
       "tooltipFullscreen": "Pantalla completa",
       "tooltipStartOver": "Empezar de nuevo",
-      "graphHint": "Haga clic en el póster para explorar • Haga clic en ⓘ para obtener más detalles",
       "expandedSubtitle": "Vista ampliada • {{count}} elementos",
       "fallbackCenterTitle": "Medios de comunicación"
     },
@@ -3020,8 +3019,6 @@
     "createPlaylistTooltip": "Crear lista de reproducción a partir de estos elementos",
     "createPlaylist": "Crear lista de reproducción",
     "exitFullscreen": "Salir de pantalla completa",
-    "hintsDesktop": "Haga clic en el póster para explorar • Haga clic en ⓘ para obtener más detalles • Arrastre para reposicionar • Desplácese para ampliar",
-    "hintsMobile": "Toque para explorar • Mantenga presionado para obtener más detalles",
     "playlistCreated": "¡Lista de reproducción creada exitosamente!"
   },
   "mediaGraph": {

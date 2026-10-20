@@ -1072,7 +1072,6 @@
       "tabGraph": "Grafiek",
       "tooltipFullscreen": "Volledig scherm",
       "tooltipStartOver": "Begin opnieuw",
-      "graphHint": "Klik op de poster om te verkennen • Klik op ⓘ voor details",
       "expandedSubtitle": "Uitgebreide weergave • {{count}} items",
       "fallbackCenterTitle": "Media"
     },
@@ -2953,8 +2952,6 @@
     "createPlaylistTooltip": "Maak een afspeellijst van deze items",
     "createPlaylist": "Maak een afspeellijst",
     "exitFullscreen": "Volledig scherm afsluiten",
-    "hintsDesktop": "Klik op de poster om te verkennen • Klik op ⓘ voor details • Sleep om te verplaatsen • Scroll om in te zoomen",
-    "hintsMobile": "Tik om te verkennen • Druk lang in voor details",
     "playlistCreated": "Afspeellijst succesvol aangemaakt!"
   },
   "mediaGraph": {

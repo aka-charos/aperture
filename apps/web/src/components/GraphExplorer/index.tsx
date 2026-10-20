@@ -61,10 +61,10 @@ export interface GraphExplorerProps {
   onHistoryNavigate: (index: number) => void
   onStartOver: () => void
 
-  // Node interactions
-  onNodeClick: (node: GraphNode) => void
-  onNodeDoubleClick?: (node: GraphNode) => void
-  onNodeDetailsClick?: (node: GraphNode) => void
+  // Node interactions: a click shows the title, Shift+click (or the node's
+  // corner button, or a long press) re-centres the graph on it.
+  onNodeOpen: (node: GraphNode) => void
+  onNodeExplore?: (node: GraphNode) => void
 
   // Search (optional)
   showSearch?: boolean
@@ -103,9 +103,8 @@ export function GraphExplorer({
   history,
   onHistoryNavigate,
   onStartOver,
-  onNodeClick,
-  onNodeDoubleClick,
-  onNodeDetailsClick,
+  onNodeOpen,
+  onNodeExplore,
   showSearch = false,
   searchQuery = '',
   onSearchChange,
@@ -356,9 +355,8 @@ export function GraphExplorer({
           data={data}
           loading={loading}
           loadingStatus={loadingStatus || undefined}
-          onNodeClick={onNodeClick}
-          onNodeDoubleClick={onNodeDoubleClick}
-          onNodeDetailsClick={onNodeDetailsClick}
+          onNodeOpen={onNodeOpen}
+          onNodeExplore={onNodeExplore}
           compact={compact}
         />
       </Box>
@@ -384,10 +382,10 @@ export function GraphExplorer({
           color="text.secondary"
           sx={{ display: { xs: 'none', sm: 'block' } }}
         >
-          {t('graphExplorer.hintsDesktop')}
+          {t('graphExplorer.hintsDesktopOpen')}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', sm: 'none' } }}>
-          {t('graphExplorer.hintsMobile')}
+          {t('graphExplorer.hintsMobileOpen')}
         </Typography>
       </Box>
 

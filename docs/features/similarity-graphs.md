@@ -20,12 +20,12 @@ The section shows a fixed set of the strongest connections (10 docked; the fulls
 - Nodes are posters; the item you're viewing and its primary relations render larger — size reflects role, not similarity
 - Edge **width** scales with similarity; hover an edge for the exact percentage ("71% similar")
 - Hover a node for title, year, type, and **"Connected via:"** reason chips
-- **Click a node** to refocus the graph on it (breadcrumbs appear; **Start over** resets); **double-click or ⓘ** opens the detail page
+- **Click a node** to open its details; **Shift+click it**, or click its corner button, to refocus the graph on it (breadcrumbs appear; **Start over** resets). On a touch screen, tap for details and long-press to refocus
 - **Fullscreen** expands the graph to more items ("Expanded view • N items") — with its own create-playlist button
 
 ### Connection colors
 
-One edge, one color — the strongest reason wins:
+One edge, one color — the strongest reason wins. The legend under the graph is also a filter: click a type to hide or show it, Shift+click to show it alone (the same choice as on [Explore](explore.md)):
 
 | Color | Connection |
 |-------|-----------|

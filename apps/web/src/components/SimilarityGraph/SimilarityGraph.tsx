@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react'
+import { useEffect, useRef, useState, useMemo, memo } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as d3 from 'd3'
 import { Box, Typography, Fade, CircularProgress, Chip, Stack } from '@mui/material'
@@ -6,6 +6,8 @@ import { alpha } from '@mui/material/styles'
 import { getProxiedImageUrl } from '@aperture/ui'
 import type { GraphNode, GraphEdge, GraphData, ConnectionReason, LoadingStatus, ConnectionType } from './types'
 import { CONNECTION_COLORS } from './types'
+import { filterGraphByConnectionTypes, primaryConnectionType } from './connectionFilter'
+import { useHiddenConnectionTypes } from './connectionFilterStore'
 import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 import { palette } from '@/theme'
 
@@ -18,10 +20,13 @@ const PRIMARY_NODE_WIDTH = 110
 const PRIMARY_NODE_HEIGHT = 165
 const TITLE_HEIGHT = 32
 const PRIMARY_LABEL_HEIGHT = 16
-/** How long a touch must rest on a node before it opens that node's details. */
+/** How long a touch must rest on a node before the graph re-centres on it. */
 const LONG_PRESS_MS = 500
 /** Movement allowed during a long press before it counts as a drag instead. */
 const LONG_PRESS_SLOP_PX = 8
+/** @mui/icons-material Hub, on a 24px grid: the explore-from-here button. */
+const HUB_ICON_PATH =
+  'M8.4 18.2c.38.5.6 1.12.6 1.8 0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3c.44 0 .85.09 1.23.26l1.41-1.77c-.92-1.03-1.29-2.39-1.09-3.69l-2.03-.68c-.54.83-1.46 1.38-2.52 1.38-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3c0 .07 0 .14-.01.21l2.03.68c.64-1.21 1.82-2.09 3.22-2.32V5.91C9.96 5.57 9 4.4 9 3c0-1.66 1.34-3 3-3s3 1.34 3 3c0 1.4-.96 2.57-2.25 2.91v2.16c1.4.23 2.58 1.11 3.22 2.32L18 9.71V9.5c0-1.66 1.34-3 3-3s3 1.34 3 3-1.34 3-3 3c-1.06 0-1.98-.55-2.52-1.37l-2.03.68c.2 1.29-.16 2.65-1.09 3.69l1.41 1.77Q17.34 17 18 17c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3c0-.68.22-1.3.6-1.8l-1.41-1.77c-1.35.75-3.01.76-4.37 0z'
 
 interface NodeConnectionInfo {
   node: GraphNode
@@ -36,21 +41,25 @@ interface SimilarityGraphProps {
   data: GraphData | null
   loading?: boolean
   loadingStatus?: LoadingStatus
-  onNodeClick?: (node: GraphNode) => void
-  onNodeDoubleClick?: (node: GraphNode) => void
-  onNodeDetailsClick?: (node: GraphNode) => void
+  /** Click or tap: show the title's details. */
+  onNodeOpen?: (node: GraphNode) => void
+  /**
+   * Re-centre the graph on a title: Shift+click, the node's corner button, or a
+   * long press on touch. Not offered on the one centre of a focused graph,
+   * which is already where the graph is centred.
+   */
+  onNodeExplore?: (node: GraphNode) => void
   compact?: boolean
   width?: number
   height?: number
 }
 
 export const SimilarityGraph = memo(function SimilarityGraph({
-  data,
+  data: allData,
   loading = false,
   loadingStatus,
-  onNodeClick,
-  onNodeDoubleClick,
-  onNodeDetailsClick,
+  onNodeOpen,
+  onNodeExplore,
   compact = false,
   width: propWidth,
   height: propHeight,
@@ -64,30 +73,40 @@ export const SimilarityGraph = memo(function SimilarityGraph({
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphEdge> | null>(null)
   
   // Store callbacks in refs to prevent effect re-runs when parent re-renders
-  const onNodeClickRef = useRef(onNodeClick)
-  const onNodeDoubleClickRef = useRef(onNodeDoubleClick)
-  const onNodeDetailsClickRef = useRef(onNodeDetailsClick)
-  
+  const onNodeOpenRef = useRef(onNodeOpen)
+  const onNodeExploreRef = useRef(onNodeExplore)
+
   // Keep refs updated with latest callbacks
   useEffect(() => {
-    onNodeClickRef.current = onNodeClick
-  }, [onNodeClick])
-  
+    onNodeOpenRef.current = onNodeOpen
+  }, [onNodeOpen])
+
   useEffect(() => {
-    onNodeDoubleClickRef.current = onNodeDoubleClick
-  }, [onNodeDoubleClick])
-  
-  useEffect(() => {
-    onNodeDetailsClickRef.current = onNodeDetailsClick
-  }, [onNodeDetailsClick])
-  
-  // Create a stable key for data to prevent unnecessary re-renders
-  // Only re-render when actual node IDs change, not when object references change
+    onNodeExploreRef.current = onNodeExplore
+  }, [onNodeExplore])
+
+  // Only the connection types the viewer has left switched on, and the posters
+  // they still reach (connectionFilter.ts). Everything below draws this.
+  const { hidden: hiddenConnectionTypes } = useHiddenConnectionTypes()
+  const data = useMemo(
+    () => (allData ? filterGraphByConnectionTypes(allData, hiddenConnectionTypes) : null),
+    [allData, hiddenConnectionTypes]
+  )
+
+  // Create a stable key for data to prevent unnecessary re-renders: only when
+  // the nodes or the edges actually drawn change, not when object references
+  // do. The edges are in it because a connection-type toggle can change them
+  // and leave every node in place.
   const dataKey = useMemo(() => {
     if (!data) return ''
     const nodeIds = data.nodes.map(n => n.id).sort().join(',')
     const centerId = data.nodes.find(n => n.isCenter)?.id || ''
-    return `${centerId}:${nodeIds}`
+    const endId = (end: string | GraphNode) => (typeof end === 'string' ? end : end.id)
+    const edgeIds = data.edges
+      .map((e) => `${endId(e.source)}>${endId(e.target)}:${e.reasons.map((r) => r.type).join('+')}`)
+      .sort()
+      .join(',')
+    return `${centerId}:${nodeIds}|${edgeIds}`
   }, [data])
   const dataRef = useRef(data)
 
@@ -150,25 +169,8 @@ export const SimilarityGraph = memo(function SimilarityGraph({
     return () => observer.disconnect()
   }, [propWidth, propHeight])
 
-  // Get primary connection type for edge coloring
-  const getPrimaryConnectionType = useCallback((reasons: ConnectionReason[]) => {
-    const priority: Array<ConnectionReason['type']> = [
-      'collection',
-      'director',
-      'actor',
-      'network',
-      'studio',
-      'genre',
-      'keyword',
-      'similarity',
-    ]
-    for (const type of priority) {
-      if (reasons.some((r) => r.type === type)) {
-        return type
-      }
-    }
-    return 'similarity'
-  }, [])
+  // Edge colour: the strongest reason left after the filter (connectionFilter.ts)
+  const getPrimaryConnectionType = primaryConnectionType
 
   // D3 force simulation
   useEffect(() => {
@@ -179,6 +181,13 @@ export const SimilarityGraph = memo(function SimilarityGraph({
     svg.selectAll('*').remove()
 
     const { width, height } = dimensions
+    // The lone centre of a focused graph is already where the graph is
+    // centred; on the browse and search graphs every centre is a result, and
+    // each can be explored from.
+    const centerCount = graphData.nodes.filter((n) => n.isCenter).length
+    const canExplore = (d: GraphNode) =>
+      Boolean(onNodeExploreRef.current) && !(d.isCenter && centerCount === 1)
+    const exploreLabel = t('graphExplorer.exploreFromHere')
     const nodeWidth = compact ? NODE_WIDTH * 0.8 : NODE_WIDTH
     const nodeHeight = compact ? NODE_HEIGHT * 0.8 : NODE_HEIGHT
     const centerNodeWidth = compact ? CENTER_NODE_WIDTH * 0.8 : CENTER_NODE_WIDTH
@@ -259,13 +268,13 @@ export const SimilarityGraph = memo(function SimilarityGraph({
             d.fx = d.x
             d.fy = d.y
             longPressFired = false
-            if (isTouchGesture(event.sourceEvent)) {
+            if (isTouchGesture(event.sourceEvent) && canExplore(d)) {
               cancelLongPress()
               longPressStart = { x: event.x, y: event.y }
               longPressTimer = setTimeout(() => {
                 longPressTimer = null
                 longPressFired = true
-                onNodeDoubleClickRef.current?.(d)
+                onNodeExploreRef.current?.(d)
               }, LONG_PRESS_MS)
             }
           })
@@ -286,17 +295,19 @@ export const SimilarityGraph = memo(function SimilarityGraph({
             d.fy = null
           })
       )
-      .on('click', (event, d) => {
+      .on('click', (event: MouseEvent, d) => {
         event.stopPropagation()
         if (longPressFired) {
           longPressFired = false
           return
         }
-        onNodeClickRef.current?.(d)
+        // Shift+click re-centres the graph; a plain click shows the details.
+        if (event.shiftKey && canExplore(d)) onNodeExploreRef.current?.(d)
+        else onNodeOpenRef.current?.(d)
       })
-      .on('dblclick', (event, d) => {
+      // Swallowed so a quick second click does not also zoom the canvas.
+      .on('dblclick', (event) => {
         event.stopPropagation()
-        onNodeDoubleClickRef.current?.(d)
       })
       // pointer events filtered to a mouse: a tap fires mouseenter and never
       // mouseleave, which left the connection panel stuck over the graph.
@@ -371,12 +382,13 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       .attr('font-size', '7px')
       .attr('font-weight', 500)
 
-    // Details button (info icon) - top right corner, only on non-center nodes
-    if (onNodeDetailsClickRef.current) {
+    // Explore button - top right corner, on every node the graph could
+    // re-centre on (a click on the poster itself shows the details).
+    if (onNodeExploreRef.current) {
       const detailsButtonGroup = nodes
-        .filter((d) => !d.isCenter)
+        .filter((d) => canExplore(d))
         .append('g')
-        .attr('class', 'details-button')
+        .attr('class', 'explore-button')
         .attr('transform', (d) => {
           const nw = getNodeWidth(d)
           const nh = getNodeHeight(d)
@@ -392,8 +404,14 @@ export const SimilarityGraph = memo(function SimilarityGraph({
         })
         .on('click', (event, d) => {
           event.stopPropagation()
-          onNodeDetailsClickRef.current?.(d)
+          onNodeExploreRef.current?.(d)
         })
+        .on('dblclick', (event) => {
+          event.stopPropagation()
+        })
+
+      // Hover text, read by the browser rather than drawn
+      detailsButtonGroup.append('title').text(exploreLabel)
 
       // Button background circle
       detailsButtonGroup
@@ -403,17 +421,12 @@ export const SimilarityGraph = memo(function SimilarityGraph({
         .attr('stroke', '#fff')
         .attr('stroke-width', 1.5)
 
-      // Info icon (letter "i")
+      // Explore icon (MUI's Hub glyph, 24px, drawn at 14px)
       detailsButtonGroup
-        .append('text')
-        .text('i')
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'central')
+        .append('path')
+        .attr('d', HUB_ICON_PATH)
+        .attr('transform', 'translate(-7, -7) scale(0.5833)')
         .attr('fill', '#fff')
-        .attr('font-size', '14px')
-        .attr('font-weight', 700)
-        .attr('font-family', 'Georgia, serif')
-        .attr('font-style', 'italic')
         .style('pointer-events', 'none')
     }
 
@@ -526,7 +539,7 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       cancelLongPress()
       simulation.stop()
     }
-  }, [dataKey, dimensions, compact, getPrimaryConnectionType])
+  }, [dataKey, dimensions, compact, getPrimaryConnectionType, t])
 
   if (loading) {
     return (

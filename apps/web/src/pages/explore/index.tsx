@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import {
   Box,
   Typography,
@@ -33,16 +33,17 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import HistoryIcon from '@mui/icons-material/History'
 import {
+  GraphLegend,
   useGraphData,
   useSimilarityData,
   type GraphNode,
   type GraphData,
   type LoadingStatus,
 } from '../../components/SimilarityGraph'
-import { CONNECTION_COLORS, type ConnectionType } from '../../components/SimilarityGraph/types'
-import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 import { GraphExplorer } from '../../components/GraphExplorer'
 import { usePageHeader } from '@/hooks/usePageHeader'
+import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
+import { useOpenMedia } from '@/hooks/useOpenMedia'
 
 type GraphSource = 'ai-movies' | 'ai-series' | 'watching' | 'top-movies' | 'top-series'
 
@@ -70,6 +71,16 @@ function randomItem<T>(arr: T[]): T {
 }
 
 export function ExplorePage() {
+  // A poster opens over the graph, so closing it returns the reader to the
+  // graph exactly as they left it instead of routing away from it.
+  return (
+    <MediaDetailModalProvider>
+      <ExploreContent />
+    </MediaDetailModalProvider>
+  )
+}
+
+function ExploreContent() {
   const { t } = useTranslation()
   // No in-page block: the graph fills the viewport and breaks out of the
   // layout padding, so the bar is the only place a title fits.
@@ -77,7 +88,7 @@ export function ExplorePage() {
   const theme = useTheme()
   const isNarrow = useMediaQuery(theme.breakpoints.down('md'))
   const [controlsOpen, setControlsOpen] = useState(false)
-  const navigate = useNavigate()
+  const openMedia = useOpenMedia()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Get initial state from URL params
@@ -388,8 +399,9 @@ export function ExplorePage() {
     setSearchQuery('')
   }
 
-  // Handle node click (rabbit-hole navigation)
-  const handleNodeClick = useCallback(
+  // Re-centre the graph on a title (rabbit-hole navigation): Shift+click, the
+  // node's corner button, or a long press. A plain click opens the title.
+  const handleNodeExplore = useCallback(
     (node: GraphNode) => {
       // Only the focused title itself is a no-op. On the browse and search
       // graphs every result is a centre, and those are what a user drills into.
@@ -431,11 +443,11 @@ export function ExplorePage() {
     [focusedItemId, selectedBrowseSource, semanticSearch.results, semanticSearch.query, displayData, setFocusId, t]
   )
 
-  const handleNodeDoubleClick = useCallback(
+  const handleNodeOpen = useCallback(
     (node: GraphNode) => {
-      navigate(`/${node.type === 'movie' ? 'movies' : 'series'}/${node.id}`)
+      openMedia(node.type, node.id)
     },
-    [navigate]
+    [openMedia]
   )
 
   // Handle history navigation (breadcrumb click)
@@ -690,23 +702,10 @@ export function ExplorePage() {
         <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
           {t('mediaGraph.connectionTypesHeading')}
         </Typography>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-          {(Object.keys(CONNECTION_COLORS) as ConnectionType[]).map((type) => (
-            <Box key={type} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box
-                sx={{
-                  width: 14,
-                  height: 3,
-                  bgcolor: CONNECTION_COLORS[type],
-                  borderRadius: 1,
-                }}
-              />
-              <Typography variant="caption" sx={{ fontSize: '10px' }}>
-                {connectionTypeLabel(type, t)}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
+        <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
+          {t('mediaGraph.connectionTypesHint')}
+        </Typography>
+        <GraphLegend orientation="column" />
       </Box>
 
       <Divider />
@@ -779,9 +778,8 @@ export function ExplorePage() {
           history={breadcrumbHistory}
           onHistoryNavigate={handleHistoryNavigate}
           onStartOver={handleStartOver}
-          onNodeClick={handleNodeClick}
-          onNodeDoubleClick={handleNodeDoubleClick}
-          onNodeDetailsClick={handleNodeDoubleClick}
+          onNodeOpen={handleNodeOpen}
+          onNodeExplore={handleNodeExplore}
           showSearch
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
