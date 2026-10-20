@@ -235,6 +235,15 @@ const tags = [
     },
   },
   {
+    name: 'trails',
+    description:
+      'How library titles are linked through the people, franchises, companies and uncommon keywords they share, weighted by how rare each is in the viewer\'s library: routes between two titles, threads out of one, and what several have in common.',
+    externalDocs: {
+      description: 'Trails',
+      url: `${DOCS_BASE}/features/trails.md`,
+    },
+  },
+  {
     name: 'top-picks',
     description:
       'Curated top picks generated per user based on their taste profile. Refreshed on configurable schedule.',

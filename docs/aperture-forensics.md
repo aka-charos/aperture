@@ -1930,3 +1930,25 @@ The fix is a second fallback in `recommender/shared/titleYearRebind.ts`, taken o
 Pinned by `titleYearRebind.test.ts` and `keepStored.test.ts` (`test:sync-identity`), including the measured case, a live row refusing an id-only takeover, the id-space collision, a row taken only once per run, and a tie going to the oldest row.
 
 The probe also reported 12,187 movie rows as having an outdated poster tag. That is the probe, not the data: the tag stored from the sync's listing carries a third segment that Emby appends for the fields that listing asks for, and the first two segments match. The images load either way, since Emby ignores the tag.
+
+## F-162
+
+**The Explore graph was felt to be a toy, and the reason is structural: its lines are embedding neighbours, and what they "share" is a label added afterwards.** `computeConnectionReasons` names whatever two neighbours happen to have in common, falling back to `similarity` when nothing overlaps, so a line means "these vectors are close" and a viewer following one learns nothing they can check. Positions carry no meaning either (the force layout places titles where the simulation settles), and nothing on the graph answers a question someone came with. Trails is the answer built beside it, rather than a rework of it, so the graph stays as it is until Trails can replace it.
+
+**What a link is.** A shared, NAMED credit: a person, a TMDb franchise, a company, a TMDb keyword. Genre and country are left out (every title has them, and they name nothing to follow). How much a link is worth is its role weight (directing both is a stronger reason than appearing in both, a keyword weaker still) times log2 of how many titles in the viewer's scope carry it, so a credit two titles share costs its base weight once and each doubling of its reach adds it again. This is idf, the measure `twinAffinity.ts` already uses for the same reason: what is common says little.
+
+**The caps.** Past a share of the library (2% for people and companies, 1.5% for keywords, never below 8 titles, and at most 150/120/200), an entity stops linking anything: a keyword on hundreds of titles is a category, and letting it through puts every title two steps from every other, which is the toy again. The failure is asymmetric and the caps lean to the safe side: a link lost to a cap set too low is still reachable through its titles, while one let through by a cap set too high is drawn as a reason.
+
+**None of these numbers is measured on a real library**: there was no database to measure against when this shipped. What exists is a synthetic 14,000-title library with Zipf-ish credit pools (12 billed actors, 18 keywords, 3 studios and one each of the crew roles per title), which is denser than any real one since every title is fully credited:
+
+- index build 0.75 s, 32,346 entities linking two or more titles, 85 capped (24 people, 8 companies, 53 keywords); median 37 threads per title, none isolated;
+- route search, three routes per request: **one-ended Dijkstra p50 368 ms (max 585)**, which on a single-threaded API blocks every other request for that long; **two-ended p50 6 ms (max 38)**, the same answers (pinned against a plain one-ended reference on random libraries, for cost and for the path actually walked);
+- mean route length 2.9 steps between two random titles.
+
+So `loadIndex` logs, at every build and over the whole library, exactly the figures the weights depend on (threads per title p10/median/p90, isolated titles, linking and capped entities per kind) under `Trails index built`. That line is the measurement to read before changing a weight; the synthetic run only shows the code is fast enough.
+
+**Alternatives are routes through different titles.** The second route bans the first route's middle titles and the third bans both, so three routes are three different paths through the library, not one path with a different label on a step. A direct link has no middle to ban, so it is one route; the other things the two titles share ride beside it as "Also shared".
+
+**The name.** "Connections" already means the admin-paired users of the social feature (`user_connections`, the Watch This page), so this feature is named Trails in code, routes, string keys and copy. The verb stays ("Connect two titles"), since only the noun is taken.
+
+**Not built yet, named rather than guessed at:** a Trails entry point on the title page (the title page hosts the similarity graph, left alone by design), a person's own thread page, and a taste map over `user_taste_clusters`.

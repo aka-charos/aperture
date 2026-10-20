@@ -53,7 +53,8 @@
     "sharedWithMeBadge_other": "{{count}} novas indicações",
     "watchThis": "Imperdíveis",
     "sharedWithMeBadge_many": "{{count}} novas indicações",
-    "userMenu": "Account menu"
+    "userMenu": "Account menu",
+    "trails": "Trails"
   },
   "admin": {
     "title": "Administração",
@@ -6652,5 +6653,102 @@
     "war": "War",
     "war_politics": "War & Politics",
     "western": "Western"
+  },
+  "trails": {
+    "title": "Trails",
+    "description": "Follow the people, franchises and studios that link the titles in your library. The rarer the link, the more it says.",
+    "modes": {
+      "route": "Connect two titles",
+      "threads": "Follow a thread",
+      "common": "In common"
+    },
+    "route": {
+      "from": "From",
+      "to": "To",
+      "swap": "Swap the two titles",
+      "surprise": "Surprise me",
+      "surpriseFailed": "Couldn't find two titles to connect. Your library may not have enough credits filled in yet.",
+      "empty": "Pick two titles to see how they are linked: through the people who made them, a franchise, a company or an uncommon keyword. Each link says how many titles in your library share it — the fewer, the more it means.",
+      "same": "Pick two different titles.",
+      "notFound": "One of these titles isn't in your library.",
+      "isolated": "{{title}} shares no named link with anything else in your library yet. Its credits may not have been filled in.",
+      "none_one": "No trail of {{count}} step or fewer links these two.",
+      "none_other": "No trail of {{count}} steps or fewer links these two.",
+      "noneUnbounded": "No trail links these two.",
+      "best": "Shortest trail",
+      "other": "Another trail",
+      "steps_one": "{{count}} step",
+      "steps_other": "{{count}} steps",
+      "alsoShared": "Also shared: {{names}}"
+    },
+    "threads": {
+      "pick": "Start from a title",
+      "startAgain": "Start again from…",
+      "backToStart": "Back to the start",
+      "trail": "Your trail",
+      "via": "via {{name}}",
+      "empty": "Pick a title to see every named thread leading out of it — the people, franchise, companies and keywords it shares with the rest of your library, rarest first. Follow one to keep going.",
+      "notFound": "This title isn't in your library.",
+      "count_one": "{{count}} thread leads out of it, rarest first.",
+      "count_other": "{{count}} threads lead out of it, rarest first.",
+      "none": "{{title}} shares no named link with anything else in your library.",
+      "connectFrom": "Connect to another title",
+      "more_one": "and {{count}} more",
+      "more_other": "and {{count}} more"
+    },
+    "common": {
+      "add": "Add a title",
+      "max_one": "Up to {{count}} title.",
+      "max_other": "Up to {{count}} titles.",
+      "remove": "Remove {{title}}",
+      "empty": "Pick two or more titles to see what they have in common: the people, franchises, companies and keywords at least two of them share.",
+      "none": "These titles share no named link.",
+      "connectPair": "Find a trail between the first two",
+      "sharedBy_one": "In {{count}} of the {{total}}",
+      "sharedBy_other": "In {{count}} of the {{total}}"
+    },
+    "picker": {
+      "placeholder": "Search your library",
+      "typeMore": "Type at least two letters",
+      "noResults": "No titles found"
+    },
+    "actions": {
+      "follow": "Follow the threads from {{title}}",
+      "open": "Open {{title}}",
+      "savePlaylist": "Save as playlist"
+    },
+    "errors": {
+      "load": "Couldn't load this. Try again."
+    },
+    "roles": {
+      "franchise": "Franchise",
+      "director": "Director",
+      "creator": "Creator",
+      "writer": "Writer",
+      "lead": "Lead actor",
+      "cinematographer": "Cinematographer",
+      "composer": "Composer",
+      "editor": "Editor",
+      "actor": "Actor",
+      "keyword": "Keyword",
+      "studio": "Studio",
+      "network": "Network"
+    },
+    "caption": {
+      "same": "{{role}} on both",
+      "differs": "{{from}}, then {{to}}",
+      "franchise": "Same franchise",
+      "keyword": "Tagged on both"
+    },
+    "here": {
+      "role": "{{role}} here",
+      "franchise": "This title's franchise",
+      "keyword": "Tagged here"
+    },
+    "rarity": {
+      "onlyTwo": "Only these two in your library",
+      "count_one": "{{count}} title in your library",
+      "count_other": "{{count}} titles in your library"
+    }
   }
 }

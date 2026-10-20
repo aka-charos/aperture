@@ -2048,3 +2048,31 @@ export {
 // and the first-visit hints a person has seen; whether the tour starts by
 // itself is decided here, never in the bundle.
 export * from './onboarding/index.js'
+
+// Trails (./trails): titles linked through the named things they
+// share (people, franchises, companies, uncommon keywords), weighted by how
+// rare each is in the viewer's library. Separate from the similarity graph.
+export {
+  findTrails,
+  surpriseTrail,
+  getTitleThreads,
+  getCommonGround,
+  getTrailTitles,
+  MAX_COMMON_TITLES,
+  MAX_PATH_HOPS as MAX_TRAIL_STEPS,
+  LINK_ROLES,
+  parseTitleRef,
+  formatTitleRef,
+  type TrailResult,
+  type TrailTitle,
+  type TrailEntity,
+  type TrailLink,
+  type TrailStep,
+  type TrailRoute,
+  type ThreadView,
+  type ThreadMemberView,
+  type CommonLinkView,
+  type EntityKind as TrailEntityKind,
+  type LinkRole as TrailLinkRole,
+  type TitleRef as TrailTitleRef,
+} from './trails/index.js'
