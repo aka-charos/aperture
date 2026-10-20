@@ -64,6 +64,29 @@ export function edgeColorType(
   return primaryConnectionType(chosen.length > 0 ? chosen : reasons)
 }
 
+/** The chosen set with one type added or removed; a new set, the input untouched. */
+export function toggleHighlight(
+  highlighted: ReadonlySet<ConnectionType>,
+  type: ConnectionType
+): ReadonlySet<ConnectionType> {
+  const next = new Set(highlighted)
+  if (next.has(type)) next.delete(type)
+  else next.add(type)
+  return next
+}
+
+/**
+ * What a graph draws: the hovered legend entry while there is one, else the
+ * chosen set. With no preview it returns the chosen set ITSELF, so a graph's
+ * restyle effect, keyed on this value, does not re-run while nothing changed.
+ */
+export function effectiveHighlight(
+  highlighted: ReadonlySet<ConnectionType>,
+  preview: ConnectionType | null
+): ReadonlySet<ConnectionType> {
+  return preview ? new Set([preview]) : highlighted
+}
+
 function endpointId(end: string | GraphNode): string {
   return typeof end === 'string' ? end : end.id
 }

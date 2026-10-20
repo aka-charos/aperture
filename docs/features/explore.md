@@ -47,7 +47,7 @@ While the graph builds, the page narrates what it's doing — searching your lib
 | **Gray** | AI similar (embedding similarity) |
 | **Emerald** | AI discovery (deliberately diverse picks) |
 
-The legend in the sidebar, and the one under the graph, also highlights: **hover a connection type** to preview its lines, **click it** to keep them highlighted (click several to combine them), and **Clear highlight** to go back. Highlighted lines are drawn strongly and everything else is dimmed; nothing moves and nothing disappears, so the graph keeps its shape. Lines are chosen by how alike two titles are, and the colour only names what they also share, so a highlight shows which links are explained by, say, the same director, not which titles are closest. The highlight applies to every graph on screen and resets when you reload.
+The legend in the sidebar, and the one under the graph, also highlights: **hover a connection type** to preview its lines, **click it** to keep them highlighted (click several to combine them), and **Clear highlight** to go back. Highlighted lines are drawn strongly and everything else is dimmed; nothing moves and nothing disappears, so the graph keeps its shape. Lines are chosen by how alike two titles are, and the colour only names what they also share, so a highlight shows which links are explained by, say, the same director, not which titles are closest. The highlight applies to every graph on screen and clears when you leave the page.
 
 ---
 

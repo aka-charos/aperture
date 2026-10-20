@@ -2,7 +2,7 @@ import { Box, ButtonBase, Link, Tooltip, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { CONNECTION_COLORS } from './types'
 import { CONNECTION_TYPES } from './connectionHighlight'
-import { useConnectionHighlight } from './connectionHighlightStore'
+import { useLegendHighlight } from './connectionHighlightStore'
 import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 
 interface GraphLegendProps {
@@ -15,11 +15,12 @@ interface GraphLegendProps {
  * The connection colours, and a highlight for each: hover a type to preview
  * its lines, click it to keep them highlighted (several may be), Clear to go
  * back. Nothing is removed and nothing moves; every legend and every graph on
- * screen share one highlight (connectionHighlightStore.ts).
+ * screen share one highlight (connectionHighlightStore.ts), which lasts while
+ * some legend is mounted.
  */
 export function GraphLegend({ compact = false, orientation = 'row' }: GraphLegendProps) {
   const { t } = useTranslation()
-  const { highlighted, toggle, clear, setPreview } = useConnectionHighlight()
+  const { highlighted, toggle, clear, setPreview } = useLegendHighlight()
   const fontSize = orientation === 'column' ? '11px' : compact ? '9px' : '10px'
   const anyChosen = highlighted.size > 0
 

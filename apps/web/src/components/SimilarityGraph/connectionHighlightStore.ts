@@ -3,22 +3,29 @@
  *
  * A module store rather than a context: the Explore sidebar, the graph footer
  * and a title's Similar graph sit in unrelated subtrees, and they must agree
- * the moment one of them is clicked. Deliberately NOT remembered across loads:
- * a highlight is a way of reading the graph in front of you, and one left over
- * from another page would dim a graph for reasons nobody can see.
+ * the moment one of them is clicked.
  *
- * `preview` is the legend entry under the pointer; while it is set it stands in
- * for the chosen set, so hovering a type shows what clicking it would do.
+ * It lives exactly as long as some legend is mounted. A legend is the only
+ * thing that shows a highlight is on, so a highlight with no legend on screen
+ * would dim a graph for reasons nobody can see: when the last legend goes (the
+ * page is left, the graph view closed), the store resets, and it is never
+ * written to storage. `preview` is the legend entry under the pointer and is
+ * cleared whenever any legend unmounts, since that legend can no longer
+ * receive the pointerleave that would clear it.
  */
-import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { ConnectionType } from './types'
+import { effectiveHighlight, toggleHighlight } from './connectionHighlight'
 
 interface HighlightState {
   highlighted: ReadonlySet<ConnectionType>
   preview: ConnectionType | null
 }
 
-let state: HighlightState = { highlighted: new Set(), preview: null }
+const EMPTY: HighlightState = { highlighted: new Set(), preview: null }
+
+let state: HighlightState = EMPTY
+let mountedLegends = 0
 const listeners = new Set<() => void>()
 
 function set(next: Partial<HighlightState>) {
@@ -35,30 +42,51 @@ function subscribe(listener: () => void) {
 
 const getSnapshot = () => state
 
-export function useConnectionHighlight() {
+/** The current state, for tests and nothing else. */
+export function readHighlightState(): HighlightState {
+  return state
+}
+
+/**
+ * Called by every legend while it is mounted. Returns the cleanup: the preview
+ * goes with any legend, everything goes with the last one.
+ */
+export function registerLegend(): () => void {
+  mountedLegends += 1
+  return () => {
+    mountedLegends -= 1
+    if (mountedLegends <= 0) {
+      mountedLegends = 0
+      if (state !== EMPTY) set(EMPTY)
+    } else if (state.preview !== null) {
+      set({ preview: null })
+    }
+  }
+}
+
+export function toggleHighlightedType(type: ConnectionType) {
+  set({ highlighted: toggleHighlight(state.highlighted, type) })
+}
+
+export function clearHighlight() {
+  set({ highlighted: new Set() })
+}
+
+export function setHighlightPreview(type: ConnectionType | null) {
+  if (state.preview !== type) set({ preview: type })
+}
+
+/** For a legend: the state and the controls, and its registration. */
+export function useLegendHighlight() {
   const current = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  useEffect(() => registerLegend(), [])
+  const toggle = useCallback((type: ConnectionType) => toggleHighlightedType(type), [])
+  const setPreview = useCallback((type: ConnectionType | null) => setHighlightPreview(type), [])
+  return { highlighted: current.highlighted, toggle, clear: clearHighlight, setPreview }
+}
 
-  /** Add or remove one type from the highlight. */
-  const toggle = useCallback((type: ConnectionType) => {
-    const next = new Set(state.highlighted)
-    if (next.has(type)) next.delete(type)
-    else next.add(type)
-    set({ highlighted: next })
-  }, [])
-
-  const clear = useCallback(() => set({ highlighted: new Set() }), [])
-
-  const setPreview = useCallback((type: ConnectionType | null) => {
-    if (state.preview !== type) set({ preview: type })
-  }, [])
-
-  // What a graph draws: the hovered entry while there is one, else the choice.
-  // Memoised on the two values so a graph's effect does not run every render.
-  const { highlighted, preview } = current
-  const effective = useMemo<ReadonlySet<ConnectionType>>(
-    () => (preview ? new Set([preview]) : highlighted),
-    [highlighted, preview]
-  )
-
-  return { highlighted, preview, effective, toggle, clear, setPreview }
+/** For a graph: what to draw. Stable while neither the choice nor the preview changes. */
+export function useEffectiveHighlight(): ReadonlySet<ConnectionType> {
+  const { highlighted, preview } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  return useMemo(() => effectiveHighlight(highlighted, preview), [highlighted, preview])
 }

@@ -7,7 +7,7 @@ import { getProxiedImageUrl } from '@aperture/ui'
 import type { GraphNode, GraphEdge, GraphData, ConnectionReason, LoadingStatus, ConnectionType } from './types'
 import { CONNECTION_COLORS } from './types'
 import { edgeColorType, edgeIsLit, litNodeIds } from './connectionHighlight'
-import { useConnectionHighlight } from './connectionHighlightStore'
+import { useEffectiveHighlight } from './connectionHighlightStore'
 import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 import { palette } from '@/theme'
 
@@ -38,8 +38,14 @@ const CENTRE_PULL = 0.06
 const PRESETTLE_TICKS = 120
 /** Space left round the graph when it is fitted to the view. */
 const FIT_PADDING = 40
-/** Furthest a fit zooms out; past this a poster is a coloured dot. */
+/** Furthest the viewer can zoom out by hand. */
 const MIN_ZOOM = 0.15
+/**
+ * Furthest a FIT zooms out. Below this a poster's title cannot be read, so a
+ * graph too large to show whole at it is fitted on its centres instead and the
+ * outer ring is left for the viewer to pan or zoom out to.
+ */
+const MIN_FIT_ZOOM = 0.4
 /** @mui/icons-material Hub, on a 24px grid: the explore-from-here button. */
 const HUB_ICON_PATH =
   'M8.4 18.2c.38.5.6 1.12.6 1.8 0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3c.44 0 .85.09 1.23.26l1.41-1.77c-.92-1.03-1.29-2.39-1.09-3.69l-2.03-.68c-.54.83-1.46 1.38-2.52 1.38-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3c0 .07 0 .14-.01.21l2.03.68c.64-1.21 1.82-2.09 3.22-2.32V5.91C9.96 5.57 9 4.4 9 3c0-1.66 1.34-3 3-3s3 1.34 3 3c0 1.4-.96 2.57-2.25 2.91v2.16c1.4.23 2.58 1.11 3.22 2.32L18 9.71V9.5c0-1.66 1.34-3 3-3s3 1.34 3 3-1.34 3-3 3c-1.06 0-1.98-.55-2.52-1.37l-2.03.68c.2 1.29-.16 2.65-1.09 3.69l1.41 1.77Q17.34 17 18 17c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3c0-.68.22-1.3.6-1.8l-1.41-1.77c-1.35.75-3.01.76-4.37 0z'
@@ -104,7 +110,7 @@ export const SimilarityGraph = memo(function SimilarityGraph({
   // The highlighted connection types (connectionHighlight.ts). They only change
   // how lines and posters are drawn, never what is laid out, so they live in a
   // ref the drawing reads and do not re-run the simulation.
-  const { effective: highlight } = useConnectionHighlight()
+  const highlight = useEffectiveHighlight()
   const highlightRef = useRef(highlight)
   const applyHighlightRef = useRef<((animate: boolean) => void) | null>(null)
 
@@ -228,6 +234,9 @@ export const SimilarityGraph = memo(function SimilarityGraph({
     // Container for zoom/pan
     const container = svg.append('g')
 
+    // The line under the pointer, which a highlight change leaves alone.
+    let hoveredLine: GraphEdge | null = null
+
     const edgeOpacity = (d: GraphEdge) => {
       const current = highlightRef.current
       if (current.size === 0) return EDGE_OPACITY.rest
@@ -244,10 +253,17 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       .attr('stroke-width', (d) => Math.max(1, d.similarity * 4))
       .style('cursor', 'pointer')
       .on('mouseenter', function (_event, d) {
-        d3.select(this).attr('stroke-opacity', 1).attr('stroke-width', Math.max(2, d.similarity * 6))
+        // A highlight transition still running on this line would otherwise
+        // overwrite the hover a frame later.
+        hoveredLine = d
+        d3.select(this)
+          .interrupt()
+          .attr('stroke-opacity', 1)
+          .attr('stroke-width', Math.max(2, d.similarity * 6))
         setHoveredEdge(d)
       })
       .on('mouseleave', function (_event, d) {
+        hoveredLine = null
         d3.select(this)
           .attr('stroke-opacity', edgeOpacity(d))
           .attr('stroke-width', Math.max(1, d.similarity * 4))
@@ -299,6 +315,9 @@ export const SimilarityGraph = memo(function SimilarityGraph({
             }
           })
           .on('drag', (event, d) => {
+            // Arranging posters is the viewer taking charge of the view too;
+            // a fit after this would move the camera off what they moved.
+            viewerMovedView = true
             d.fx = event.x
             d.fy = event.y
             if (
@@ -476,7 +495,11 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       // A zero-length transition when drawing for the first time: one code path,
       // and it lands before the graph fades in.
       const duration = animate ? 180 : 0
+      // A dimmed line takes no pointer, or it catches hovers meant for the lit
+      // line or poster under it and shows a tooltip for a type not asked for.
+      edges.style('pointer-events', (d) => (edgeIsLit(d.reasons, current) ? null : 'none'))
       edges
+        .filter((d) => d !== hoveredLine)
         .transition()
         .duration(duration)
         .attr('stroke', (d) => CONNECTION_COLORS[edgeColorType(d.reasons, current)])
@@ -533,31 +556,44 @@ export const SimilarityGraph = memo(function SimilarityGraph({
 
     /**
      * Zoom and pan so every poster is on screen, never past natural size (a
-     * small graph stays at 100% rather than being blown up). Skipped once the
-     * viewer has zoomed or panned.
+     * small graph stays at 100% rather than being blown up) and never below
+     * MIN_FIT_ZOOM. Skipped once the viewer has zoomed, panned or dragged.
      */
     const fitToView = (duration: number) => {
       if (viewerMovedView) return
-      let minX = Infinity
-      let minY = Infinity
-      let maxX = -Infinity
-      let maxY = -Infinity
-      for (const node of graphData.nodes) {
-        if (node.x === undefined || node.y === undefined) continue
-        const halfWidth = getNodeWidth(node) / 2
-        minX = Math.min(minX, node.x - halfWidth)
-        maxX = Math.max(maxX, node.x + halfWidth)
-        minY = Math.min(minY, node.y - getNodeHeight(node) / 2)
-        maxY = Math.max(maxY, node.y + getNodeHeight(node) / 2 + getNodeTitleHeight(node))
+      const boundsOf = (list: GraphNode[]) => {
+        let minX = Infinity
+        let minY = Infinity
+        let maxX = -Infinity
+        let maxY = -Infinity
+        for (const node of list) {
+          if (node.x === undefined || node.y === undefined) continue
+          const halfWidth = getNodeWidth(node) / 2
+          minX = Math.min(minX, node.x - halfWidth)
+          maxX = Math.max(maxX, node.x + halfWidth)
+          minY = Math.min(minY, node.y - getNodeHeight(node) / 2)
+          maxY = Math.max(maxY, node.y + getNodeHeight(node) / 2 + getNodeTitleHeight(node))
+        }
+        if (!Number.isFinite(minX)) return null
+        const fit = Math.min(
+          1,
+          width / (maxX - minX + FIT_PADDING * 2),
+          height / (maxY - minY + FIT_PADDING * 2)
+        )
+        return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, fit }
       }
-      if (!Number.isFinite(minX)) return
-      const boxWidth = maxX - minX + FIT_PADDING * 2
-      const boxHeight = maxY - minY + FIT_PADDING * 2
-      const scale = Math.max(MIN_ZOOM, Math.min(1, width / boxWidth, height / boxHeight))
+      // Everything, when that stays readable; otherwise the centres, at the
+      // smallest readable size.
+      let bounds = boundsOf(graphData.nodes)
+      if (bounds && bounds.fit < MIN_FIT_ZOOM) {
+        bounds = boundsOf(graphData.nodes.filter((n) => n.isCenter)) ?? bounds
+      }
+      if (!bounds) return
+      const scale = Math.max(MIN_FIT_ZOOM, bounds.fit)
       const target = d3.zoomIdentity
         .translate(width / 2, height / 2)
         .scale(scale)
-        .translate(-(minX + maxX) / 2, -(minY + maxY) / 2)
+        .translate(-bounds.cx, -bounds.cy)
       if (duration > 0) svg.transition().duration(duration).call(zoom.transform, target)
       else svg.call(zoom.transform, target)
     }
@@ -594,8 +630,10 @@ export const SimilarityGraph = memo(function SimilarityGraph({
     }
   }, [dataKey, dimensions, compact, t])
 
-  // A new highlight restyles what is already drawn and moves nothing.
+  // A new highlight restyles what is already drawn and moves nothing. The
+  // first run finds the highlight the drawing already used, and does nothing.
   useEffect(() => {
+    if (highlightRef.current === highlight) return
     highlightRef.current = highlight
     applyHighlightRef.current?.(true)
   }, [highlight])

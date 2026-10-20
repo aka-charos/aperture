@@ -4,9 +4,17 @@ import {
   CONNECTION_TYPES,
   edgeColorType,
   edgeIsLit,
+  effectiveHighlight,
   litNodeIds,
   primaryConnectionType,
+  toggleHighlight,
 } from './connectionHighlight'
+import {
+  readHighlightState,
+  registerLegend,
+  setHighlightPreview,
+  toggleHighlightedType,
+} from './connectionHighlightStore'
 import { CONNECTION_COLORS, type ConnectionType, type GraphData, type GraphNode } from './types'
 
 function node(id: string, isCenter = false): GraphNode {
@@ -67,4 +75,33 @@ test('the primary type follows core: AI discovery first, then the strongest reas
 
 test('every colour is a legend entry, so every drawn type can be highlighted', () => {
   assert.deepEqual([...CONNECTION_TYPES].sort(), Object.keys(CONNECTION_COLORS).sort())
+})
+
+test('toggling adds and removes a type and leaves the input alone', () => {
+  const start = new Set<ConnectionType>(['genre'])
+  const added = toggleHighlight(start, 'director')
+  assert.deepEqual([...added].sort(), ['director', 'genre'])
+  assert.deepEqual([...toggleHighlight(added, 'genre')], ['director'])
+  assert.deepEqual([...start], ['genre'])
+})
+
+test('a preview stands in for the choice, and with none the choice itself comes back', () => {
+  const chosen = new Set<ConnectionType>(['genre'])
+  assert.deepEqual([...effectiveHighlight(chosen, 'actor')], ['actor'])
+  // Same object, so a graph keyed on it does not restyle on every render.
+  assert.equal(effectiveHighlight(chosen, null), chosen)
+})
+
+test('the highlight lasts while a legend is mounted and resets with the last one', () => {
+  const first = registerLegend()
+  const second = registerLegend()
+  toggleHighlightedType('director')
+  setHighlightPreview('genre')
+  // One legend going clears the preview it can no longer clear itself.
+  first()
+  assert.equal(readHighlightState().preview, null)
+  assert.deepEqual([...readHighlightState().highlighted], ['director'])
+  // The last one going leaves nothing behind for the next page's graph.
+  second()
+  assert.equal(readHighlightState().highlighted.size, 0)
 })
