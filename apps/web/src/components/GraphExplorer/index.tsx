@@ -32,6 +32,7 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import {
   SimilarityGraph,
   GraphLegend,
+  useFilteredGraph,
   type GraphData,
   type GraphNode,
   type LoadingStatus,
@@ -91,6 +92,11 @@ export interface GraphExplorerProps {
 
   // Styling
   compact?: boolean
+  /**
+   * The connection-type legend under the graph. Off where the page shows its
+   * own (Explore's sidebar), so the same switches are not on screen twice.
+   */
+  showLegend?: boolean
 }
 
 export function GraphExplorer({
@@ -122,6 +128,7 @@ export function GraphExplorer({
   sourceItemId,
   sourceItemType,
   compact = false,
+  showLegend = true,
 }: GraphExplorerProps) {
   const { t } = useTranslation()
   const [playlistDialogOpen, setPlaylistDialogOpen] = useState(false)
@@ -141,7 +148,11 @@ export function GraphExplorer({
   // Get current center node title
   const resolvedSearchPlaceholder = searchPlaceholder ?? t('graphExplorer.searchPlaceholderDefault')
   const currentTitle = data?.nodes.find((n) => n.isCenter)?.title || title || t('graphExplorer.fallbackTitle')
-  const displayItemCount = itemCount ?? data?.nodes.length ?? 0
+  // What the connection-type filter leaves on screen: the count and a playlist
+  // made from the graph describe the posters the viewer can see, not the ones
+  // they switched off.
+  const shownData = useFilteredGraph(data)
+  const displayItemCount = itemCount ?? shownData?.nodes.length ?? 0
 
   const handleSearchSubmit = useCallback(() => {
     if (localSearchQuery.trim() && onSearch) {
@@ -329,7 +340,7 @@ export function GraphExplorer({
                 variant="outlined"
                 startIcon={<PlaylistAddIcon />}
                 onClick={() => setPlaylistDialogOpen(true)}
-                disabled={!data || data.nodes.length === 0}
+                disabled={!shownData || shownData.nodes.length === 0}
                 sx={{
                   fontSize: { xs: '0.75rem', md: '0.875rem' },
                   whiteSpace: 'nowrap',
@@ -376,7 +387,7 @@ export function GraphExplorer({
           gap: 1,
         }}
       >
-        <GraphLegend compact={compact} />
+        {showLegend ? <GraphLegend compact={compact} /> : <Box />}
         <Typography
           variant={compact ? 'caption' : 'body2'}
           color="text.secondary"
@@ -394,7 +405,7 @@ export function GraphExplorer({
         open={playlistDialogOpen}
         onClose={() => setPlaylistDialogOpen(false)}
         nodes={
-          data?.nodes.map((n) => ({
+          shownData?.nodes.map((n) => ({
             id: n.id,
             title: n.title,
             year: n.year,

@@ -789,6 +789,9 @@ function ExploreContent() {
           searchLoading={semanticSearch.loading}
           searchExamples={searchExamples}
           showCreatePlaylist
+          // The sidebar carries the legend on a wide screen; on a narrow one it
+          // is behind the controls button, so the graph keeps its own.
+          showLegend={isNarrow}
           showRefresh={showRefreshButton}
           onRefresh={handleRefresh}
           // In the header, beside Create playlist: floating over the graph it

@@ -31,6 +31,7 @@ import {
   SimilarityGraph,
   GraphLegend,
   useSimilarityData,
+  useFilteredGraph,
   CONNECTION_COLORS,
 } from '../../../components/SimilarityGraph'
 import type { GraphNode, ConnectionReason, ConnectionType } from '../../../components/SimilarityGraph'
@@ -142,6 +143,8 @@ export function SimilarMedia({
     limit: FULLSCREEN_SIMILAR_GRAPH_LIMIT,
     depth: 3,
   })
+  // The count in the fullscreen subtitle is of what the connection filter shows.
+  const shownFullscreenData = useFilteredGraph(fullscreenGraphData)
 
   // View mode intentionally always starts on 'list' and is not persisted:
   // every item view should open with the List, Graph is a per-visit choice.
@@ -180,8 +183,13 @@ export function SimilarMedia({
     }
   }
 
-  // A plain click shows the title itself
+  // A plain click shows the title itself. The page's own title is already on
+  // screen, so its poster does nothing; anything else closes the fullscreen
+  // graph first, since on the title route opening a title navigates and this
+  // component (not remounted per title) would keep the dialog over the page.
   const handleNodeOpen = (node: GraphNode) => {
+    if (node.id === mediaId) return
+    setIsFullscreen(false)
     openMedia(node.type, node.id)
   }
 
@@ -401,7 +409,7 @@ export function SimilarMedia({
                   : t('mediaDetail.similar.titleSeries')
               }
               subtitle={t('mediaDetail.similar.expandedSubtitle', {
-                count: fullscreenGraphData?.nodes.length || 0,
+                count: shownFullscreenData?.nodes.length || 0,
               })}
               history={fullscreenHistory}
               onHistoryNavigate={(index) =>

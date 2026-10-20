@@ -6,8 +6,8 @@ import { alpha } from '@mui/material/styles'
 import { getProxiedImageUrl } from '@aperture/ui'
 import type { GraphNode, GraphEdge, GraphData, ConnectionReason, LoadingStatus, ConnectionType } from './types'
 import { CONNECTION_COLORS } from './types'
-import { filterGraphByConnectionTypes, primaryConnectionType } from './connectionFilter'
-import { useHiddenConnectionTypes } from './connectionFilterStore'
+import { primaryConnectionType } from './connectionFilter'
+import { useFilteredGraph } from './connectionFilterStore'
 import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 import { palette } from '@/theme'
 
@@ -87,11 +87,7 @@ export const SimilarityGraph = memo(function SimilarityGraph({
 
   // Only the connection types the viewer has left switched on, and the posters
   // they still reach (connectionFilter.ts). Everything below draws this.
-  const { hidden: hiddenConnectionTypes } = useHiddenConnectionTypes()
-  const data = useMemo(
-    () => (allData ? filterGraphByConnectionTypes(allData, hiddenConnectionTypes) : null),
-    [allData, hiddenConnectionTypes]
-  )
+  const data = useFilteredGraph(allData)
 
   // Create a stable key for data to prevent unnecessary re-renders: only when
   // the nodes or the edges actually drawn change, not when object references

@@ -16,6 +16,7 @@ export { CONNECTION_COLORS, CONNECTION_LABELS } from './types'
 
 // Legend
 export { GraphLegend } from './GraphLegend'
+export { useFilteredGraph } from './connectionFilterStore'
 
 // Hooks
 export { useGraphData, useSimilarityData } from './useGraphData'

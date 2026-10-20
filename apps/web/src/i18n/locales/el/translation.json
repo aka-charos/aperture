@@ -2152,6 +2152,7 @@
     "exploreFromHere": "Εξερεύνηση από εδώ (Shift+κλικ)",
     "connectionFilterLabel": "Είδη συνδέσεων που εμφανίζονται",
     "connectionFilterTooltip": "Κλικ για απόκρυψη ή εμφάνιση • Shift+κλικ για να εμφανίζεται μόνο αυτό",
+    "connectionFilterLastShown": "Τουλάχιστον ένα είδος σύνδεσης μένει ορατό",
     "connectionFilterShowAll": "Εμφάνιση όλων",
     "playlistCreated": "Η λίστα δημιουργήθηκε!"
   },
@@ -6619,5 +6620,32 @@
     "war": "Πολεμική",
     "war_politics": "Πόλεμος & Πολιτική",
     "western": "Γουέστερν"
+  },
+  "adminDocs": {
+    "navGroup": "Help",
+    "guide": {
+      "title": "Admin guide",
+      "blurb": "How each part of the console works, and how to set it up"
+    },
+    "index": {
+      "start": "Getting started",
+      "filter": "Search the guide",
+      "noMatches": "No page mentions “{{query}}”."
+    },
+    "page": {
+      "allGuides": "All guide pages",
+      "openSection": "Open {{section}}",
+      "notFound": "There is no guide page called “{{slug}}”."
+    },
+    "help": {
+      "button": "Guide",
+      "tooltip": "How this section works",
+      "back": "Back",
+      "openInNewTab": "Open in a new tab",
+      "close": "Close"
+    },
+    "link": {
+      "outside": "This page is not part of the admin guide"
+    }
   }
 }

@@ -7,26 +7,25 @@
  * legend that toggles it agree.
  */
 import type { ConnectionType, GraphData, GraphEdge, GraphNode } from './types'
+import { CONNECTION_COLORS } from './types'
 
-/** Every connection type a graph can draw, in legend order. */
-export const CONNECTION_TYPES: readonly ConnectionType[] = [
-  'director',
-  'actor',
-  'collection',
-  'genre',
-  'keyword',
-  'studio',
-  'network',
-  'similarity',
-  'ai_diverse',
-]
+/**
+ * Every connection type a graph can draw, in legend order. Read off the colour
+ * map, which is typed `Record<ConnectionType, …>`, so a new type cannot be
+ * drawn without also appearing in every legend (and so being filterable).
+ */
+export const CONNECTION_TYPES = Object.keys(CONNECTION_COLORS) as readonly ConnectionType[]
 
 /**
  * The type an edge is drawn in: the strongest reason it carries. The reason
  * list it is given is already filtered, so a hidden type never colours a line.
+ *
+ * Mirrors core's getPrimaryConnectionType (packages/core/src/similarity/
+ * reasons.ts); change the two together.
  */
 export function primaryConnectionType(reasons: GraphEdge['reasons']): ConnectionType {
   const priority: ConnectionType[] = [
+    'ai_diverse',
     'collection',
     'director',
     'actor',
@@ -34,7 +33,6 @@ export function primaryConnectionType(reasons: GraphEdge['reasons']): Connection
     'studio',
     'genre',
     'keyword',
-    'ai_diverse',
     'similarity',
   ]
   for (const type of priority) {
@@ -52,10 +50,11 @@ function endpointId(end: string | GraphNode): string {
  *
  * An edge keeps only its reasons of a shown type, and goes when none is left,
  * so its colour and its "Connected via" chips both describe what is selected.
- * A node goes when no edge is left touching it, since a poster floating free
- * reads as a connection nobody drew; centres always stay, being what the graph
- * is about. Nothing hidden returns `data` itself, so the graph does not re-lay
- * itself out for a filter that changed nothing.
+ * What stays is what a centre still REACHES over shown lines: a poster, or a
+ * whole cluster, cut off from every centre goes with the lines that tied it on,
+ * since a group floating free reads as a connection to nothing the graph is
+ * about. Centres always stay. Nothing hidden returns `data` itself, so the
+ * graph does not re-lay itself out for a filter that changed nothing.
  */
 export function filterGraphByConnectionTypes(
   data: GraphData,
@@ -63,8 +62,13 @@ export function filterGraphByConnectionTypes(
 ): GraphData {
   if (hidden.size === 0) return data
 
-  const edges: GraphEdge[] = []
-  const touched = new Set<string>()
+  const shown: GraphEdge[] = []
+  const neighbours = new Map<string, string[]>()
+  const link = (from: string, to: string) => {
+    const list = neighbours.get(from)
+    if (list) list.push(to)
+    else neighbours.set(from, [to])
+  }
   for (const edge of data.edges) {
     const reasons = edge.reasons.filter((reason) => !hidden.has(reason.type))
     if (reasons.length === 0) continue
@@ -72,24 +76,41 @@ export function filterGraphByConnectionTypes(
     const target = endpointId(edge.target)
     // Ids, not node objects: the simulation rewrites an edge's ends in place,
     // and a fresh copy keeps the caller's data untouched.
-    edges.push({ ...edge, source, target, reasons })
-    touched.add(source)
-    touched.add(target)
+    shown.push({ ...edge, source, target, reasons })
+    link(source, target)
+    link(target, source)
+  }
+
+  // Everything a centre reaches, walking shown lines in either direction.
+  const reached = new Set(data.nodes.filter((node) => node.isCenter).map((node) => node.id))
+  const queue = [...reached]
+  while (queue.length > 0) {
+    const id = queue.pop() as string
+    for (const next of neighbours.get(id) ?? []) {
+      if (reached.has(next)) continue
+      reached.add(next)
+      queue.push(next)
+    }
   }
 
   return {
-    nodes: data.nodes.filter((node) => node.isCenter || touched.has(node.id)),
-    edges,
+    nodes: data.nodes.filter((node) => reached.has(node.id)),
+    edges: shown.filter((edge) => reached.has(edge.source as string) && reached.has(edge.target as string)),
   }
 }
 
-/** Parse a stored list, keeping only types that exist. Anything else reads as nothing hidden. */
+/**
+ * Parse a stored list, keeping only types that exist. Anything unreadable, and
+ * a list hiding every type (which would draw a graph of bare centres with
+ * nothing saying why), reads as nothing hidden.
+ */
 export function parseHiddenConnectionTypes(raw: string | null): ConnectionType[] {
   if (!raw) return []
   try {
     const value: unknown = JSON.parse(raw)
     if (!Array.isArray(value)) return []
-    return CONNECTION_TYPES.filter((type) => value.includes(type))
+    const hidden = CONNECTION_TYPES.filter((type) => value.includes(type))
+    return hidden.length === CONNECTION_TYPES.length ? [] : hidden
   } catch {
     return []
   }

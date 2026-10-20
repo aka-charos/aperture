@@ -36,8 +36,15 @@ export function GraphLegend({ compact = false, orientation = 'row' }: GraphLegen
     >
       {CONNECTION_TYPES.map((type) => {
         const shown = !hidden.has(type)
+        // The store refuses to hide the last shown type; say so rather than
+        // let the click look broken.
+        const lastShown = shown && hidden.size === CONNECTION_TYPES.length - 1
         return (
-          <Tooltip key={type} title={t('graphExplorer.connectionFilterTooltip')} enterDelay={600}>
+          <Tooltip
+            key={type}
+            title={t(lastShown ? 'graphExplorer.connectionFilterLastShown' : 'graphExplorer.connectionFilterTooltip')}
+            enterDelay={lastShown ? 0 : 600}
+          >
             <ButtonBase
               aria-pressed={shown}
               onClick={(event) => (event.shiftKey ? showOnly(type) : toggle(type))}

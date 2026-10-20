@@ -4183,6 +4183,7 @@
     "exploreFromHere": "Explore from here (Shift+click)",
     "connectionFilterLabel": "Connection types shown",
     "connectionFilterTooltip": "Click to hide or show • Shift+click to show only this",
+    "connectionFilterLastShown": "At least one connection type stays shown",
     "connectionFilterShowAll": "Show all",
     "playlistCreated": "Playlist created successfully!"
   },

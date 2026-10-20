@@ -52,7 +52,8 @@
     "sharedWithMeBadge_one": "{{count}} nuovo consiglio",
     "sharedWithMeBadge_other": "{{count}} nuovi consigli",
     "watchThis": "Da vedere",
-    "sharedWithMeBadge_many": "{{count}} nuovi consigli"
+    "sharedWithMeBadge_many": "{{count}} nuovi consigli",
+    "userMenu": "Account menu"
   },
   "admin": {
     "title": "Amministrazione",
@@ -978,7 +979,8 @@
       "tooltipFullscreen": "A schermo intero",
       "tooltipStartOver": "Ricominciare",
       "expandedSubtitle": "Visualizzazione espansa • {{count}} elementi",
-      "fallbackCenterTitle": "Media"
+      "fallbackCenterTitle": "Media",
+      "graphHintOpen": "Click a poster for details • Shift+click to explore from it"
     },
     "missingSeasons": {
       "title": "Not on your server",
@@ -3019,7 +3021,14 @@
     "createPlaylistTooltip": "Crea playlist da questi elementi",
     "createPlaylist": "Crea playlist",
     "exitFullscreen": "Esci dallo schermo intero",
-    "playlistCreated": "Playlist creata con successo!"
+    "playlistCreated": "Playlist creata con successo!",
+    "hintsDesktopOpen": "Click a poster for details • Shift+click or its corner button to explore from it • Drag to move • Scroll to zoom",
+    "hintsMobileOpen": "Tap for details • Long press to explore from it",
+    "exploreFromHere": "Explore from here (Shift+click)",
+    "connectionFilterLabel": "Connection types shown",
+    "connectionFilterTooltip": "Click to hide or show • Shift+click to show only this",
+    "connectionFilterLastShown": "At least one connection type stays shown",
+    "connectionFilterShowAll": "Show all"
   },
   "mediaGraph": {
     "searchPlaceholder": "Cerca per stato d'animo, tema o descrizione...",
@@ -3063,7 +3072,8 @@
     "crossMediaHelpSlots": "One connection per item is held for the other media type, so a cross-media match still appears when same-media matches score higher.",
     "crossMediaUnavailable": "Applies to the Browse views only. Clear the search or press Start over to use it.",
     "crossMediaHelpAria": "About cross-media connections",
-    "controlsButton": "Filtri e fonti"
+    "controlsButton": "Filtri e fonti",
+    "connectionTypesHint": "Choose which connections the graph draws."
   },
   "seasonRequest": {
     "dialogTitle": "Richiedi serie",
@@ -4822,7 +4832,19 @@
     "errSave": "Failed to save configuration",
     "errConnect": "Could not connect to server",
     "maxContentChars": "Max characters per result",
-    "maxContentCharsHelper": "Truncate each result snippet to this many characters (100–8000)"
+    "maxContentCharsHelper": "Truncate each result snippet to this many characters (100–8000)",
+    "creditsTitle": "Credits this billing cycle",
+    "creditsRefresh": "Refresh",
+    "creditsKey": "This key",
+    "creditsPlan": "Plan",
+    "creditsPlanNamed": "Plan: {{plan}}",
+    "creditsPayg": "Pay as you go",
+    "creditsNoLimit": "{{used}} used · no limit reported",
+    "creditsNotReported": "not reported",
+    "creditsEmpty": "Tavily answered without any usage figures.",
+    "creditsNoKey": "No API key is saved.",
+    "creditsError": "Could not read credits from Tavily: {{message}}",
+    "creditsNote": "Read live from Tavily each time this card opens, after a save and after a test."
   },
   "webSearchUsage": {
     "title": "Free tier usage",
@@ -4845,7 +4867,13 @@
     "groundingBlocked": "This model has no free-tier grounding allowance, so grounded searches are refused no matter how much of the budget above is left. On the free tier only the Gemini 2.x models can ground.",
     "limitsObserved": "Ceilings shown were enforced by Google against this key.",
     "limitsAssumed": "Ceilings shown are the free-tier defaults for this model. Google enforces the real ones, and they replace these as soon as a rate-limit response names them.",
-    "limitsMixed": "Some ceilings shown were enforced by Google against this key; the rest are free-tier defaults, replaced as Google names them."
+    "limitsMixed": "Some ceilings shown were enforced by Google against this key; the rest are free-tier defaults, replaced as Google names them.",
+    "titlePaid": "Usage today",
+    "resetsPaid": "Today's counts reset at {{time}}",
+    "searchesDetail": "Requests {{requests}} · Google searches {{searches}}",
+    "searchesUncounted": "{{count}} request today was recorded before searches were counted, so the search figures above are low.",
+    "searchesUncounted_plural": "{{count}} requests today were recorded before searches were counted, so the search figures above are low.",
+    "searchesNote": "One request can run several Google searches; Gemini decides how many. Check your Google plan for whether grounding is billed per request or per search."
   },
   "inferenceDashboard": {
     "title": "AI Spend",
@@ -5096,7 +5124,9 @@
     "curatedSitesInvalid": "Enter a host such as rogerebert.com",
     "curatedSitesDuplicate": "That site is already listed",
     "pageTimeoutLabel": "Time per page (seconds)",
-    "pageTimeoutHelp": "How long the service may spend fetching one result page (5–60). Pages behind a bot check need the time: the browser tier waits up to 20 seconds for a challenge to clear, and the challenge solver only gets what is left after it. The service gives each page 15 seconds if this is not sent, and refuses more than 60. A search waits for its slowest page, so this only costs time on titles with a slow page."
+    "pageTimeoutHelp": "How long the service may spend fetching one result page (5–60). Pages behind a bot check need the time: the browser tier waits up to 20 seconds for a challenge to clear, and the challenge solver only gets what is left after it. The service gives each page 15 seconds if this is not sent, and refuses more than 60. A search waits for its slowest page, so this only costs time on titles with a slow page.",
+    "assistantSearchLabel": "Use in the assistant's web search",
+    "assistantSearchHelp": "When the service is on, the assistant also searches it for recommendations, beside Google and Tavily: one engine, up to 5 pages, at most about 25 seconds per request. Turn this off to keep it for title analysis only; searches queue on the service, so a running analysis job can slow the chat."
   },
   "settingsRatings": {
     "title": "Ratings Refresh",
@@ -5327,6 +5357,10 @@
     "smtp": {
       "title": "Outgoing email",
       "blurb": "The mail server {{appName}} sends email through"
+    },
+    "offsiteAnalysis": {
+      "title": "Offsite analysis",
+      "blurb": "Prepare film analysis prompts here, run them on another machine, and import the answers."
     }
   },
   "settingsEvaluation": {
@@ -6201,5 +6235,423 @@
       "emailPending": "LLDAP has {{email}}; the next email import copies it in.",
       "emailOverridden": "Keeps the address they set themselves; LLDAP has {{email}}."
     }
+  },
+  "adminDocs": {
+    "navGroup": "Help",
+    "guide": {
+      "title": "Admin guide",
+      "blurb": "How each part of the console works, and how to set it up"
+    },
+    "index": {
+      "start": "Getting started",
+      "filter": "Search the guide",
+      "noMatches": "No page mentions “{{query}}”."
+    },
+    "page": {
+      "allGuides": "All guide pages",
+      "openSection": "Open {{section}}",
+      "notFound": "There is no guide page called “{{slug}}”."
+    },
+    "help": {
+      "button": "Guide",
+      "tooltip": "How this section works",
+      "back": "Back",
+      "openInNewTab": "Open in a new tab",
+      "close": "Close"
+    },
+    "link": {
+      "outside": "This page is not part of the admin guide"
+    }
+  },
+  "userGuide": {
+    "title": "User guide",
+    "blurb": "How each part of {{appName}} works",
+    "menu": "User guide",
+    "index": {
+      "filter": "Search the guide",
+      "noMatches": "No page mentions “{{query}}”."
+    },
+    "page": {
+      "allPages": "All guide pages",
+      "notFound": "There is no guide page called “{{slug}}”.",
+      "openScreen": "Go to this page"
+    },
+    "help": {
+      "tooltip": "How this page works",
+      "openGuide": "User guide",
+      "back": "Back",
+      "openInNewTab": "Open in a new tab",
+      "close": "Close"
+    },
+    "link": {
+      "outside": "This page is not part of the user guide"
+    }
+  },
+  "offsiteAnalysis": {
+    "intro": "Build the analysis prompts for a batch of titles on this server, run them with a model on another machine (LM Studio on a laptop, for example), then import the answers. Every answer is checked and stored exactly like one written here. While a batch is open, its titles are held back from the Generate Title Analysis job for {{days}} days, so nothing is analysed twice.",
+    "stepPrepare": "1. Prepare a batch",
+    "prepareHint": "Picks the next pending titles in the order the job uses, current recommendations first, and fetches their sources. This takes a minute or so per title; you can download what is ready at any point.",
+    "countLabel": "Titles",
+    "countHelp": "1 to {{max}}",
+    "movies": "Movies",
+    "series": "Series",
+    "prepare": "Prepare batch",
+    "onePreparing": "A batch is being prepared. Only one is prepared at a time.",
+    "prepareFailed": "Could not start the batch.",
+    "actionFailed": "That did not work.",
+    "stepRun": "2. Run it on the other machine",
+    "runHint": "Download the batch file (from the batch below) and the runner script, and put both in one folder on the other machine.",
+    "runStepNode": "Install Node.js 18 or newer (on a Mac: brew install node).",
+    "runStepContext": "In LM Studio, load the model with a context length of at least 32,768. A prompt is about 20,000 tokens and the answer can reach the output ceiling; the default context is much smaller.",
+    "runStepServer": "Start LM Studio's local server (Developer tab, Start server). The runner uses http://localhost:1234/v1 unless you pass --base-url.",
+    "runStepCommand": "In a terminal in that folder, run the command below. Leave out --model to see the models the server lists, and add --limit 2 for a quick test first.",
+    "runStepResume": "Each answer is saved as soon as its title finishes, to a .results.jsonl file next to the batch. Stopping is safe: run the same command again and it carries on, retrying any title that failed.",
+    "downloadRunner": "Download runner script",
+    "stepImport": "3. Import the results",
+    "importHint": "Upload the .results.jsonl file. Each answer goes through the same checks as an analysis written here; an answer the checks reject stays in the batch so you can run it again.",
+    "importButton": "Choose results file",
+    "importFailed": "Could not import that file.",
+    "importNothing": "The file held no results.",
+    "badLines": "{{count}} line(s) were not results and were skipped (lines {{lines}}).",
+    "outcome": {
+      "stored": "Stored",
+      "declined": "Declined (sources too thin)",
+      "rejected": "Rejected",
+      "runnerError": "Failed on the other machine",
+      "superseded": "Already analysed another way",
+      "duplicate": "Already imported",
+      "notExported": "Not in the batch file",
+      "stale": "Prompt version too old",
+      "gone": "No longer in the library",
+      "unknown": "Not found",
+      "olderAttempt": "An earlier attempt, already judged",
+      "importFailed": "Could not be saved; import the file again"
+    },
+    "batches": "Batches",
+    "noBatches": "No batches yet.",
+    "status": {
+      "preparing": "Preparing",
+      "open": "Open",
+      "closed": "Released",
+      "expired": "Expired"
+    },
+    "batchMeta": "Prompt {{version}} · {{requested}} titles asked for",
+    "preparingProgress": "{{done}} of {{requested}} prepared",
+    "count": {
+      "inFile": "{{count}} to run",
+      "stored": "{{count}} stored",
+      "declined": "{{count}} declined",
+      "rejected": "{{count}} rejected",
+      "skipped": "{{count}} skipped",
+      "retrievalFailed": "{{count}} with no sources"
+    },
+    "reservedUntil": "Titles held until {{date}}",
+    "released": "Titles released to the library job",
+    "lastImport": "last import {{date}}",
+    "download": "Download batch ({{count}})",
+    "stop": "Stop",
+    "titles": "Titles",
+    "release": "Release titles",
+    "delete": "Delete",
+    "confirmDelete": "Delete this batch? Analyses already imported stay, but answers for this batch can no longer be imported.",
+    "confirmRelease": "Release this batch's unanswered titles back to the Generate Title Analysis job? Answers can still be imported afterwards.",
+    "itemStatus": {
+      "pending": "Fetching sources",
+      "ready": "In the file",
+      "rejected": "Rejected",
+      "stored": "Stored",
+      "declined": "Declined",
+      "skipped": "Skipped",
+      "retrieval_failed": "Sources failed"
+    }
+  },
+  "onboarding": {
+    "explainerDone": "Got it",
+    "helpHint": "How this works",
+    "menu": {
+      "takeTour": "Take the tour"
+    },
+    "hint": {
+      "dismiss": "Don't show this again",
+      "eyebrow": "Tip"
+    },
+    "offer": {
+      "title": "New: a quick tour",
+      "body": "See where everything is in {{appName}} in about a minute.",
+      "take": "Take the tour",
+      "decline": "No thanks",
+      "later": "Not now",
+      "badge": "New",
+      "heading": "A quick tour"
+    },
+    "tour": {
+      "progress": "Step {{current}} of {{total}}",
+      "start": "Show me around",
+      "later": "Not now",
+      "skip": "Skip tour",
+      "close": "Close",
+      "done": "Done",
+      "next": "Next",
+      "back": "Back",
+      "readMore": "Read more",
+      "howPicksAreMade": "How picks are made",
+      "showMeAround": "Show me around",
+      "keysMove": "to move",
+      "keysClose": "to close"
+    },
+    "tours": {
+      "welcome": {
+        "intro": {
+          "title": "Welcome to {{appName}}",
+          "body": "{{appName}} works alongside your media server. It learns from what you watch and rate, and suggests what to watch next. Here's where everything is."
+        },
+        "recommendations": {
+          "title": "Your recommendations",
+          "body": "Movies and series picked for you from your own library. Each pick tells you why it was chosen, and the list changes as your taste does."
+        },
+        "rating": {
+          "title": "Rate what you've seen",
+          "body": "Use the stars on any poster to rate a title from 1 to 10. Rating is the fastest way to teach {{appName}} what you like, and what you don't."
+        },
+        "search": {
+          "title": "Search everything",
+          "body": "Find any movie, series or person in your library. Press Ctrl+K (⌘K on a Mac) from any screen."
+        },
+        "assistant": {
+          "title": "Ask the assistant",
+          "body": "Say what you're in the mood for in your own words, like \"a slow-burn thriller set in winter\", and it finds matches in your library."
+        },
+        "more": {
+          "title": "More for you",
+          "body": "A few more places worth a look:",
+          "items": {
+            "topPicks": "Most Watched Lately: what people on your server have been watching",
+            "watching": "Shows You Watch: new and upcoming episodes of the series you follow",
+            "discover": "Discover: titles you don't have yet that suit your taste, ready to request",
+            "watchThis": "Watch This: titles people you're connected with recommend to you",
+            "collections": "Collections: themed lists built for you and saved to your media server",
+            "explore": "Explore: a map of how the titles in your library connect"
+          }
+        },
+        "help": {
+          "title": "Help is always here",
+          "body": "The ? button explains the screen you're on. Many screens also have a \"Show me around\" tour like this one."
+        },
+        "menu": {
+          "title": "Your settings",
+          "body": "Your picture opens your settings, the full user guide, and this tour again. Your getting-started list is on Home."
+        }
+      },
+      "home": {
+        "checklist": {
+          "title": "Getting started",
+          "body": "A few things that teach {{appName}} about you. Each one ticks itself off once it's done."
+        },
+        "stats": {
+          "title": "Your numbers at a glance",
+          "body": "What you've watched and rated lately. Watch Stats has the full picture."
+        },
+        "rows": {
+          "title": "Rows picked for you",
+          "body": "Your recommendations, your new episodes and what is played most on the server. Click a poster to open it, or the stars to rate it."
+        }
+      },
+      "browse": {
+        "tabs": {
+          "title": "Movies, series and people",
+          "body": "Switch between the three here. People lists the cast and crew of everything in your library."
+        },
+        "filters": {
+          "title": "Narrow it down",
+          "body": "Filter by genre, year, rating, country and more. Save a mix you use often as a preset."
+        },
+        "view": {
+          "title": "Grid or list",
+          "body": "Posters, or a list with more detail. Your choice is remembered."
+        },
+        "open": {
+          "title": "Open or rate",
+          "body": "Click a title to open its page, or rate it from the poster without leaving the list."
+        }
+      },
+      "title": {
+        "hero": {
+          "title": "Everything about this title",
+          "body": "The synopsis, the cast, scores from IMDb and others, and whether you've watched it."
+        },
+        "actions": {
+          "title": "Play, rate, mark watched",
+          "body": "Open it on your media server, rate it, mark it watched or add it to your favorites."
+        },
+        "insights": {
+          "title": "Why it fits you",
+          "body": "How close it is to your taste, which titles in your history it resembles and, for a pick, a written explanation."
+        },
+        "analysis": {
+          "title": "Title analysis",
+          "body": "A short essay on the work itself: where it comes from, what it does, how it was made and how it was received. It's closed until you open it."
+        },
+        "similar": {
+          "title": "More like this",
+          "body": "The titles in your library closest to this one. Switch to the graph to see how they connect."
+        }
+      },
+      "recommendations": {
+        "list": {
+          "title": "Your picks",
+          "body": "Ranked for you. The number on a poster is its place in the list. Open one to see why it is there."
+        },
+        "why": {
+          "title": "How picks are made",
+          "body": "Each pick weighs how close a title is to your taste, how much it widens it, and how well it is regarded. The explainer goes through it step by step."
+        },
+        "teach": {
+          "title": "Steer them",
+          "body": "Rate titles, add interests and adjust genres in Settings → Recommendations. Your picks update by themselves as your history grows."
+        }
+      },
+      "explore": {
+        "graph": {
+          "title": "A map of your library",
+          "body": "Each poster is a title, and lines join titles that are alike. Click one to see it; Shift+click (or its corner button) moves it to the middle so you can follow where it leads."
+        },
+        "controls": {
+          "title": "Search and find your way back",
+          "body": "Start from any title, step back along the path you took, and change what the map shows."
+        },
+        "playlist": {
+          "title": "Turn it into a playlist",
+          "body": "Found a thread you like? Make a playlist from the titles on the map."
+        }
+      },
+      "settings-recommendations": {
+        "interests": {
+          "title": "Say what you like",
+          "body": "Add interests in your own words, like \"heist films\" or \"Nordic noir\". Titles that match them get their own places in your list."
+        },
+        "weights": {
+          "title": "Turn genres up or down",
+          "body": "How much each genre counts is worked out from what you watch. Adjust one if it looks wrong."
+        },
+        "rescan": {
+          "title": "Start again from your history",
+          "body": "Rescan rebuilds your taste from your whole watch history. It helps after a long break, or when what you watch has changed a lot."
+        }
+      }
+    },
+    "hints": {
+      "home": "This is your home screen: your picks, your shows and what is popular, in one place.",
+      "browse": "Everything on your server is here. Filter, sort, and rate titles straight from their posters.",
+      "title": "Rate this title with the stars, and scroll down to see why it suits you.",
+      "recommendations": "Your picks come from your own library and change as your taste does. Rating titles makes them better.",
+      "watching": "Follow a series to see its new and upcoming episodes here.",
+      "discovery": "Titles your server doesn't have yet that you would probably like. Request one to have it added.",
+      "stats": "Click any number or chart to see the titles behind it.",
+      "settings-recommendations": "These settings shape your picks. A change shows from the next refresh of your recommendations."
+    },
+    "checklist": {
+      "title": "Getting started",
+      "subtitle": "A few things that make your recommendations yours.",
+      "dismiss": "Hide this list",
+      "progress": "{{done}} of {{total}} done",
+      "counted": "{{progress}} of {{goal}} so far",
+      "items": {
+        "watch": {
+          "title": "Watch something",
+          "detail": "Play a movie or an episode on your media server. Your history is read from there."
+        },
+        "rate": {
+          "title": "Rate 5 titles",
+          "detail": "Rating is the fastest way to teach it."
+        },
+        "interest": {
+          "title": "Add an interest",
+          "detail": "Say what you like in your own words."
+        },
+        "why": {
+          "title": "See why a title was picked",
+          "detail": "Open any recommendation and read the panel on it."
+        },
+        "assistant": {
+          "title": "Ask the assistant something",
+          "detail": "Describe what you're in the mood for."
+        },
+        "watching": {
+          "title": "Follow a show",
+          "detail": "New episodes of the shows you follow appear on Home."
+        }
+      },
+      "recommendations": {
+        "ready": "Your recommendations are ready.",
+        "pending": "Your first recommendations are on their way. They are made at the next scheduled update, so check back later.",
+        "off": "Recommendations are switched off for your account."
+      },
+      "hide": "Hide",
+      "nextUp": "Next up",
+      "done": "Done"
+    },
+    "settings": {
+      "title": "Tour and tips",
+      "description": "Take the welcome tour again, or bring back the tips you've closed and the getting-started list on Home.",
+      "reset": "Show tips again",
+      "resetDone": "Tips are back"
+    },
+    "welcome": {
+      "eyebrow": "A one-minute tour",
+      "pills": {
+        "ratings": "Learns from your ratings",
+        "minute": "About a minute",
+        "skip": "Skip whenever you like"
+      }
+    }
+  },
+  "genres": {
+    "action": "Action",
+    "adventure": "Adventure",
+    "action_adventure": "Action & Adventure",
+    "animation": "Animation",
+    "anime": "Anime",
+    "biography": "Biography",
+    "children": "Children",
+    "comedy": "Comedy",
+    "crime": "Crime",
+    "documentary": "Documentary",
+    "drama": "Drama",
+    "family": "Family",
+    "fantasy": "Fantasy",
+    "film_noir": "Film-Noir",
+    "food": "Food",
+    "game_show": "Game Show",
+    "history": "History",
+    "holiday": "Holiday",
+    "home_and_garden": "Home and Garden",
+    "horror": "Horror",
+    "indie": "Indie",
+    "kids": "Kids",
+    "martial_arts": "Martial Arts",
+    "mini_series": "Mini-Series",
+    "music": "Music",
+    "musical": "Musical",
+    "mystery": "Mystery",
+    "news": "News",
+    "reality": "Reality",
+    "reality_tv": "Reality-TV",
+    "romance": "Romance",
+    "sci_fi": "Sci-Fi",
+    "sci_fi_fantasy": "Sci-Fi & Fantasy",
+    "science_fiction": "Science Fiction",
+    "short": "Short",
+    "soap": "Soap",
+    "sport": "Sport",
+    "sports": "Sports",
+    "suspense": "Suspense",
+    "talk": "Talk",
+    "talk_show": "Talk Show",
+    "thriller": "Thriller",
+    "travel": "Travel",
+    "tv_movie": "TV Movie",
+    "war": "War",
+    "war_politics": "War & Politics",
+    "western": "Western"
   }
 }
