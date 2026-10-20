@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation, useNavigationType } from 'react-router-dom'
 import { MediaDetailModal, type MediaDetailTarget } from '../components/MediaDetailModal'
 import { MediaDetailModalContext, type OpenMediaDetail } from './media-detail-modal-context'
+import { navigationClosesDialog } from './mediaDetailNavigation'
 
 interface MediaDetailModalProviderProps {
   /**
@@ -39,13 +40,18 @@ export function MediaDetailModalProvider({
     if (!enabled) setTarget(null)
   }, [enabled])
 
-  // Links inside the dialog — a cast name, a studio, the franchise — route the
-  // page underneath it. Left open, the dialog would cover the very page the
-  // reader just asked for.
-  const { pathname } = useLocation()
+  // Links inside the dialog — a cast name, a studio, the franchise, Follow its
+  // threads — route the page underneath it. Left open, the dialog would cover
+  // the very page the reader just asked for. Which navigations count is
+  // navigationClosesDialog's decision.
+  const { pathname, search } = useLocation()
+  const navigationType = useNavigationType()
+  const lastLocation = useRef({ pathname, search })
   useEffect(() => {
-    setTarget(null)
-  }, [pathname])
+    const previous = lastLocation.current
+    lastLocation.current = { pathname, search }
+    if (navigationClosesDialog(previous, { pathname, search }, navigationType)) setTarget(null)
+  }, [pathname, search, navigationType])
 
   return (
     <MediaDetailModalContext.Provider value={value}>

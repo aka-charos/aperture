@@ -18,6 +18,8 @@ import {
   surpriseTrail,
   MAX_COMMON_TITLES,
   MAX_TRAIL_STEPS,
+  MAX_TRAIL_THREADS,
+  TRAIL_THREAD_MEMBERS,
   type TrailTitleRef,
 } from '@aperture/core'
 
@@ -83,14 +85,35 @@ const trailsRoutes: FastifyPluginAsync = async (fastify) => {
     async (request) => surpriseTrail(await viewerScope(request))
   )
 
-  /** GET /api/trails/threads?title=movie:<id> — every thread out of one title. */
-  fastify.get<{ Querystring: { title?: string } }>(
+  /**
+   * GET /api/trails/threads?title=movie:<id>[&limit=3&members=0] — every thread
+   * out of one title, strongest first. `limit` keeps only the strongest few and
+   * `members` caps the titles named per thread (0 for none), for a caller that
+   * shows a summary; `total` always counts every thread.
+   */
+  fastify.get<{ Querystring: { title?: string; limit?: number; members?: number } }>(
     '/api/trails/threads',
-    { preHandler: requireAuth, schema: { tags: ['trails'] } },
+    {
+      preHandler: requireAuth,
+      schema: {
+        tags: ['trails'],
+        querystring: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            limit: { type: 'integer', minimum: 1, maximum: MAX_TRAIL_THREADS },
+            members: { type: 'integer', minimum: 0, maximum: TRAIL_THREAD_MEMBERS },
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const ref = parseTitleRef(request.query.title)
       if (!ref) return reply.status(400).send({ error: 'title must be movie:<id> or series:<id>' })
-      const result = await getTitleThreads(await viewerScope(request), ref)
+      const result = await getTitleThreads(await viewerScope(request), ref, {
+        limit: request.query.limit,
+        members: request.query.members,
+      })
       if (!result) return reply.status(404).send(NOT_FOUND)
       return result
     }

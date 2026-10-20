@@ -524,6 +524,11 @@ export interface Thread {
   more: number
 }
 
+/** The most threads one title answers with. */
+export const MAX_THREADS = 30
+/** The most titles one thread names; the rest are counted in `more`. */
+export const THREAD_MEMBERS = 12
+
 export interface ThreadOptions {
   maxThreads?: number
   perThread?: number
@@ -539,8 +544,8 @@ export interface ThreadOptions {
 export function titleThreads(view: TrailView, title: number, options: ThreadOptions = {}): Thread[] {
   const { index, allowed } = view
   if (!allowed[title]) return []
-  const maxThreads = options.maxThreads ?? 30
-  const perThread = options.perThread ?? 12
+  const maxThreads = options.maxThreads ?? MAX_THREADS
+  const perThread = options.perThread ?? THREAD_MEMBERS
   const threads: Thread[] = []
   const entities = index.titleEntities[title]
   const masks = index.titleMasks[title]

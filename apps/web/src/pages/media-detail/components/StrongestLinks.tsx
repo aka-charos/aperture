@@ -1,52 +1,32 @@
-import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link as RouterLink } from 'react-router-dom'
 import { Box, Button, Card, CardContent, Typography } from '@mui/material'
 import RouteOutlinedIcon from '@mui/icons-material/RouteOutlined'
-import { fetchTrails } from '../../trails/api'
 import { LinkCard } from '../../trails/LinkCard'
-import { threadsPathFor } from '../../trails/labels'
+import { sharedWithOthers } from '../../trails/labels'
 import { useTrailText } from '../../trails/useTrailText'
-import type { Thread, ThreadsResponse } from '../../trails/types'
-
-/** Threads shown here; the rest are a click away on the Trails page. */
-const LINKS_SHOWN = 3
+import type { StrongestLinksState } from '../hooks/useStrongestLinks'
 
 interface StrongestLinksProps {
-  /** The title's Trails ref (`movie:<id>` / `series:<id>`). */
-  titleRef: string
-  /**
-   * Called as the reader follows the link out. Set when the page is a dialog
-   * over Trails itself: the address then changes only in its query, which does
-   * not close the dialog by itself.
-   */
-  onLeave?: () => void
+  state: StrongestLinksState
+  /** Follow a thread on this title, in Trails. */
+  threadsPath: string
 }
 
 /**
  * The strongest few named links out of this title — the threads Trails ranks
  * first (rarest, most telling role) — with a way into the page for the rest.
- * An extra, never a requirement: while loading, on any failure and when the
- * title links to nothing, it draws nothing at all.
+ * An extra, never a requirement: until it has links to show it draws only an
+ * empty marker (which starts the request when it nears the screen), and on a
+ * failure or for a title that links to nothing it draws nothing at all.
  */
-export function StrongestLinks({ titleRef, onLeave }: StrongestLinksProps) {
+export function StrongestLinks({ state, threadsPath }: StrongestLinksProps) {
   const { t } = useTranslation()
   const { hereText } = useTrailText()
-  const [answer, setAnswer] = useState<{ ref: string; threads: Thread[] } | null>(null)
+  const { links, watch } = state
 
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchTrails<ThreadsResponse>(`threads?title=${encodeURIComponent(titleRef)}`, controller.signal)
-      .then((response) => setAnswer({ ref: titleRef, threads: response.threads }))
-      .catch(() => {
-        /* fails quietly: the card is not drawn */
-      })
-    return () => controller.abort()
-  }, [titleRef])
-
-  // An answer for the title shown before is not one for this title.
-  const threads = answer?.ref === titleRef ? answer.threads : []
-  if (threads.length === 0) return null
+  if (!links) return <Box ref={watch} aria-hidden sx={{ height: 0 }} />
+  if (links.threads.length === 0) return null
 
   return (
     <Card sx={{ backgroundColor: 'background.paper', borderRadius: 2 }}>
@@ -68,23 +48,26 @@ export function StrongestLinks({ titleRef, onLeave }: StrongestLinksProps) {
             mb: 1.5,
           }}
         >
-          {threads.slice(0, LINKS_SHOWN).map((thread) => (
-            <LinkCard
-              key={`${thread.kind}:${thread.name}`}
-              entity={thread}
-              caption={hereText(thread.kind, thread.roles)}
-            />
-          ))}
+          {links.threads.map((thread) => {
+            const shared = sharedWithOthers(thread.titleCount)
+            return (
+              <LinkCard
+                key={`${thread.kind}:${thread.name}`}
+                entity={thread}
+                caption={hereText(thread.kind, thread.roles)}
+                rarity={t(shared.key, { count: shared.count })}
+              />
+            )
+          })}
         </Box>
         <Button
           size="small"
           component={RouterLink}
-          to={threadsPathFor(titleRef)}
-          onClick={onLeave}
+          to={threadsPath}
           endIcon={<RouteOutlinedIcon />}
           sx={{ textTransform: 'none' }}
         >
-          {t('trails.detail.seeAll', { count: threads.length })}
+          {t('trails.detail.seeAll', { count: links.total })}
         </Button>
       </CardContent>
     </Card>

@@ -73,6 +73,8 @@ export interface Thread extends TrailEntity {
 export interface ThreadsResponse {
   title: TrailTitle
   threads: Thread[]
+  /** Every thread out of the title, also when `limit` asked for fewer. */
+  total: number
 }
 
 export interface CommonLink extends TrailEntity {

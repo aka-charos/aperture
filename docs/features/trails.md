@@ -39,9 +39,9 @@ If the titles share nothing, **Find a trail between the first two** takes you to
 
 ## From a title's page
 
-Every movie and series page has a **Follow its threads** button beside its other actions. It opens Trails in *Follow a thread*, starting from that title. Pressed from a title opened over another page, it closes the title's details and goes to Trails.
+Every movie and series page has a **Follow its threads** button beside its other actions. It opens Trails in *Follow a thread*, starting from that title. Pressed from a title opened over another page, it closes the title's details and goes to Trails; pressed from a title opened over Trails itself, it keeps what you had picked in the other two modes.
 
-Further down, below the cast and crew, a **Strongest links** card names the title's three strongest threads: who or what each is, what it is in this title ("Director here", "This title's franchise"), and how many titles in your library share it. **See all threads in Trails** opens the full list. A title with no named links, or one Trails can't read, simply has no card.
+Further down, below the cast and crew, a **Strongest links** card names the title's three strongest threads: who or what each is, what it is in this title ("Director here", "This title's franchise"), and how many other titles in your library share it. The link under the card (**See all 12 threads in Trails**, with the title's own count) opens the full list. A title with no named links shows no card, and its **Follow its threads** button goes once the page has checked (as the card's place scrolls into view); if Trails can't be reached, the card is simply left out.
 
 ---
 

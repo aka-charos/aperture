@@ -65,7 +65,6 @@ import {
   EpisodeProgressBadge,
 } from '@aperture/ui'
 import { genreLabel } from '@/lib/genreLabel'
-import { threadsPathFor, titleRefFor } from '../../trails/labels'
 
 // The "open in <server>" CTA is branded like the app it opens, not the instance's own
 // theme — these are the media servers' own colors, not admin-configurable.
@@ -128,11 +127,10 @@ interface MediaHeroProps {
    */
   onRecommend?: () => void
   /**
-   * Called as the reader follows a link out of the page. Set when the page is
-   * a dialog: over Trails itself, opening Follow a thread changes only the
-   * query, which does not close the dialog by itself.
+   * Follow a thread on this title, in Trails. Unset (no button) for a title
+   * Trails has answered links to nothing.
    */
-  onLeave?: () => void
+  threadsPath?: string | null
 }
 
 export function MediaHero({
@@ -156,7 +154,7 @@ export function MediaHero({
   favoriteLoading = false,
   onFavoriteToggle,
   onRecommend,
-  onLeave,
+  threadsPath,
 }: MediaHeroProps) {
   const { t } = useTranslation()
   // The grid this page was opened from is still mounted behind it and reads the
@@ -177,7 +175,6 @@ export function MediaHero({
   const heroProgress = isMovie(media) ? undefined : getEpisodeProgress('series', media.id)
   const theme = useTheme()
   const serverName = useServerDisplayName()
-  const trailRef = titleRefFor(isSeries(media) ? 'series' : 'movie', media.id)
   const [showFullPlot, setShowFullPlot] = useState(false)
   // Only worth offering when it actually adds something: OMDb answers plot=full
   // with the short blurb whenever IMDb has no long synopsis, and for a good
@@ -914,13 +911,12 @@ export function MediaHero({
             )}
             {/* Into Trails, starting from this title: the people, franchise,
                 companies and keywords it shares with the rest of the library. */}
-            {trailRef && (
+            {threadsPath && (
               <Tooltip title={t('trails.detail.followTooltip')}>
                 <Button
                   variant="outlined"
                   component={RouterLink}
-                  to={threadsPathFor(trailRef)}
-                  onClick={onLeave}
+                  to={threadsPath}
                   startIcon={<RouteOutlinedIcon />}
                   sx={actionBtnSx}
                 >

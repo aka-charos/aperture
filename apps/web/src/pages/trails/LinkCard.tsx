@@ -34,6 +34,11 @@ interface LinkCardProps {
   caption: string
   /** Smaller, for the links offered beside a step. */
   dense?: boolean
+  /**
+   * The rarity line, when the default ("Only these two in your library")
+   * would point at titles the surface does not show.
+   */
+  rarity?: string
 }
 
 /**
@@ -41,7 +46,7 @@ interface LinkCardProps {
  * many titles in the library share it — the count is the rarity, stated so the
  * reader can check it.
  */
-export function LinkCard({ entity, caption, dense = false }: LinkCardProps) {
+export function LinkCard({ entity, caption, dense = false, rarity: rarityLine }: LinkCardProps) {
   const { t } = useTranslation()
   const rarity = rarityText(entity.titleCount)
   return (
@@ -71,7 +76,8 @@ export function LinkCard({ entity, caption, dense = false }: LinkCardProps) {
         </Typography>
         {!dense && (
           <Typography variant="caption" color="text.secondary" component="div" noWrap sx={{ opacity: 0.8 }}>
-            {rarity.key === 'trails.rarity.onlyTwo' ? t(rarity.key) : t(rarity.key, { count: rarity.count })}
+            {rarityLine ??
+              (rarity.key === 'trails.rarity.onlyTwo' ? t(rarity.key) : t(rarity.key, { count: rarity.count }))}
           </Typography>
         )}
       </Box>

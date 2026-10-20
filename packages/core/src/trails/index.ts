@@ -54,6 +54,8 @@ const MAX_CACHED_VIEWS = 50
 /** The most titles "In common" compares at once. */
 export const MAX_COMMON_TITLES = 8
 
+export { MAX_THREADS, THREAD_MEMBERS } from './graph.js'
+
 interface IndexCache {
   index: TrailIndex
   builtAt: number
@@ -350,16 +352,27 @@ export async function surpriseTrail(scope: LibraryScope, random: () => number = 
 }
 
 /** Every thread leading out of one title, strongest first. */
+export interface TitleThreadsOptions {
+  /** Only the strongest this many threads (the full list is still counted in `total`). */
+  limit?: number
+  /** Titles named per thread, 0 for none; the rest are counted in `more`. */
+  members?: number
+}
+
 export async function getTitleThreads(
   scope: LibraryScope,
-  ref: TitleRef
-): Promise<{ title: TrailTitle; threads: ThreadView[] } | null> {
+  ref: TitleRef,
+  options: TitleThreadsOptions = {}
+): Promise<{ title: TrailTitle; threads: ThreadView[]; total: number } | null> {
   const { view, titles } = await resolve(scope, [ref])
   const title = titles[0]
   if (title == null) return null
+  const all = titleThreads(view, title, { perThread: options.members })
+  const shown = options.limit == null ? all : all.slice(0, options.limit)
   return {
     title: titleView(view.index.titles[title]),
-    threads: titleThreads(view, title).map((thread) => ({
+    total: all.length,
+    threads: shown.map((thread) => ({
       ...entityView(view, thread.entity),
       roles: rolesOf(thread.mask),
       others: thread.others.map((member) => ({

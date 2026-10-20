@@ -8,6 +8,8 @@ import { useWatching } from '../../hooks/useWatching'
 import { useConnections } from '../../hooks/useConnections'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useMediaDetail } from './hooks'
+import { useStrongestLinks } from './hooks/useStrongestLinks'
+import { useThreadsPath } from '../trails/useThreadsPath'
 import {
   MediaBackdrop,
   MediaHero,
@@ -92,6 +94,11 @@ export function MediaDetailPage({
   // operator's. The route also allows a viewer's own picks, as the bulk one does.
   const onRefreshExplanation = user?.isAdmin ? refreshExplanation : undefined
 
+  // Trails, from this title: the hero's link and the Strongest links card.
+  const trailRef = id ? titleRefFor(mediaType, id) : null
+  const threadsPath = useThreadsPath(trailRef)
+  const strongestLinks = useStrongestLinks(trailRef)
+
   // Reading why a title was scored is one of the getting-started steps, and
   // only the browser sees it happen. The panel draws only for a scored title
   // (`isRecommended`), so that is when it counts.
@@ -156,8 +163,6 @@ export function MediaDetailPage({
     )
   }
 
-  const trailRef = id ? titleRefFor(mediaType, id) : null
-
   return (
     <Box>
       {/* Backdrop */}
@@ -201,9 +206,8 @@ export function MediaDetailPage({
         favoriteLoading={favoriteLoading}
         onFavoriteToggle={isMovie(media) && user?.id ? toggleFavorite : undefined}
         onRecommend={hasConnections && id ? () => setRecommendOpen(true) : undefined}
-        // Only a dialog passes onBack, and only a dialog needs closing as the
-        // reader leaves for Trails (see MediaHero's onLeave).
-        onLeave={onBack}
+        // Dropped once Trails has answered that the title links to nothing.
+        threadsPath={strongestLinks.knownEmpty ? null : threadsPath}
       />
 
       {id && hasConnections && (
@@ -258,8 +262,9 @@ export function MediaDetailPage({
               {id && <TitleAnalysis mediaType={mediaType} mediaId={id} />}
               <MediaInfoCard media={media} />
               {/* The strongest named links out of this title, from Trails.
-                  Draws nothing until it has some. */}
-              {trailRef && <StrongestLinks titleRef={trailRef} onLeave={onBack} />}
+                  Asked for only as it nears the screen; draws nothing until
+                  it has some. */}
+              {threadsPath && <StrongestLinks state={strongestLinks} threadsPath={threadsPath} />}
               {/* Aired episodes missing from the server + Seerr requests (series only) */}
               {isSeries(media) && (
                 <MissingSeasonsCard

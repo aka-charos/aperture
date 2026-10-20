@@ -149,8 +149,24 @@ export function titleRefFor(type: 'movie' | 'series', id: string): string | null
  * The Trails address that follows the threads out of one title, for links into
  * the page from elsewhere (a title's detail page). Built through
  * `writeTrailsUrl` so it reads back exactly as the page writes its own state.
+ *
+ * `current` is the Trails page's own query when the link is followed from on
+ * top of it (a title opened in its dialog): the other modes' selections are
+ * kept, as switching tab keeps them, and only the followed trail starts again.
  */
-export function threadsPathFor(ref: string): string {
-  const params = writeTrailsUrl({ mode: 'threads', from: null, to: null, trail: [ref], titles: [] })
+export function threadsPathFor(ref: string, current?: URLSearchParams | null): string {
+  const kept = current
+    ? readTrailsUrl(current, Number.MAX_SAFE_INTEGER)
+    : { mode: 'threads' as const, from: null, to: null, trail: [], titles: [] }
+  const params = writeTrailsUrl({ ...kept, mode: 'threads', trail: [ref] })
   return `/trails?${params.toString()}`
+}
+
+/**
+ * How many OTHER titles in the library share a thread. A thread's `titleCount`
+ * includes the title it starts from, and a page showing only that title (its
+ * detail page) cannot say "these two".
+ */
+export function sharedWithOthers(titleCount: number): { key: 'trails.detail.sharedWith'; count: number } {
+  return { key: 'trails.detail.sharedWith', count: Math.max(1, titleCount - 1) }
 }

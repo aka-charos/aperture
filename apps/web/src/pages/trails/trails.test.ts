@@ -6,6 +6,7 @@ import {
   rarityText,
   readTrailsUrl,
   stepCaption,
+  sharedWithOthers,
   stepTrail,
   threadsPathFor,
   titleRefFor,
@@ -85,4 +86,16 @@ test('a link from a detail page opens Follow a thread on that title, and reads b
   assert.equal(state.mode, 'threads')
   assert.deepEqual(state.trail, [ref])
   assert.equal(titleRefFor('series', 'not-a-uuid'), null)
+})
+
+test('following from on top of the Trails page keeps the other modes and restarts the trail', () => {
+  const current = writeTrailsUrl({ mode: 'route', from: A, to: B, trail: [B, C], titles: [A, C] })
+  const path = threadsPathFor(C, current)
+  const state = readTrailsUrl(new URLSearchParams(path.slice(path.indexOf('?') + 1)), 8)
+  assert.deepEqual(state, { mode: 'threads', from: A, to: B, trail: [C], titles: [A, C] })
+})
+
+test('a detail page counts the OTHER titles sharing a thread, never "these two"', () => {
+  assert.deepEqual(sharedWithOthers(2), { key: 'trails.detail.sharedWith', count: 1 })
+  assert.deepEqual(sharedWithOthers(9), { key: 'trails.detail.sharedWith', count: 8 })
 })
