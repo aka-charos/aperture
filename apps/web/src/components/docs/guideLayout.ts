@@ -13,9 +13,14 @@
  * - `terms`    a two-column table, as a term list (`dl`); wider tables stay
  * - `features` a top-level bullet list, each item a `feature`; one opening on
  *              bold followed by a dash or colon splits into `term` and `desc`
- * - `ui`       words in quotes ("…", “…”, «…»): what the screen says
- * - `callout`  a blockquote opening on bold or on a GitHub alert (`[!TIP]`),
- *              with `data-tone` info or warning
+ * - `ui`       what the screen says: words in quotes ("…", “…”, «…»), and a
+ *              short bold label (`**Airing**`, `**More details**`) — capital
+ *              first, at most six words, no closing punctuation. Lower-case
+ *              bold (`**last 30 days**`) is emphasis and stays bold, and so
+ *              does bold opening a list item, a table cell or a term.
+ * - `callout`  a blockquote opening on bold (a notice, `data-tone` warning) or
+ *              on a GitHub alert: `[!TIP]` tip, `[!NOTE]`/`[!IMPORTANT]` info,
+ *              `[!WARNING]`/`[!CAUTION]` warning
  * - `example`  a blockquote that is one quoted line: something to type
  * - `next`     a closing `**Next:** [Page](page.md)` paragraph
  *
@@ -219,14 +224,15 @@ function layoutBlockquote(quote: HastElement): void {
     quote.properties = {
       ...quote.properties,
       dataDoc: 'callout',
-      dataTone: kind === 'WARNING' || kind === 'CAUTION' ? 'warning' : 'info',
+      dataTone: kind === 'WARNING' || kind === 'CAUTION' ? 'warning' : kind === 'TIP' ? 'tip' : 'info',
     }
     return
   }
 
   const lead = meaningful(first.children)[0]
   if (isElement(lead) && lead.tagName === 'strong') {
-    quote.properties = { ...quote.properties, dataDoc: 'callout', dataTone: 'info' }
+    // "**This is a legacy feature.**", "**Warning:** …": a notice.
+    quote.properties = { ...quote.properties, dataDoc: 'callout', dataTone: 'warning' }
     return
   }
 
@@ -275,15 +281,54 @@ function splitQuoted(value: string): HastNode[] | null {
   return out
 }
 
-function markUiLabels(parent: HastElement | HastRoot): void {
+/** Bold that names something on screen: longer than this is a phrase. */
+const LABEL_MAX_WORDS = 6
+const LABEL_MAX_CHARS = 40
+
+/** Containers whose opening bold names the item rather than quoting the screen. */
+const OPENS_AN_ITEM = new Set(['li', 'td', 'th', 'dt'])
+
+/**
+ * The words of a bold run that reads as a screen label, or null: plain text,
+ * a capital (or digit) first, at most six words and no closing punctuation —
+ * "**Airing**", "**More details**", but not "**last 30 days**" (emphasis) or
+ * "**Note:**" (a lead-in). A label written in quotes inside the bold loses them.
+ */
+export function screenLabel(strong: HastElement): string | null {
+  if (!strong.children.every((c) => c.type === 'text')) return null
+  let words = textContent(strong).trim()
+  const quoted = /^(?:"([^"]+)"|“([^”]+)”|«([^»]+)»)$/.exec(words)
+  if (quoted) words = (quoted[1] ?? quoted[2] ?? quoted[3]).trim()
+  if (!words || words.length > LABEL_MAX_CHARS) return null
+  if (!/^[\p{Lu}\p{N}]/u.test(words) || /[.!?;:]$/.test(words)) return null
+  if (words.split(/\s+/).length > LABEL_MAX_WORDS) return null
+  return words
+}
+
+function markUiLabels(parent: HastElement | HastRoot, opensItem = false): void {
   const next: HastNode[] = []
+  let leading = true
   for (const node of parent.children) {
     if (node.type === 'text') {
+      if ((node as HastText).value.trim()) leading = false
       next.push(...(splitQuoted((node as HastText).value) ?? [node]))
-    } else {
-      if (isElement(node) && !NO_UI_LABELS.has(node.tagName)) markUiLabels(node)
-      next.push(node)
+      continue
     }
+    if (isElement(node)) {
+      const label = node.tagName === 'strong' && !(opensItem && leading) ? screenLabel(node) : null
+      if (label) {
+        next.push(element('span', { dataDoc: 'ui' }, [text(label)]))
+        leading = false
+        continue
+      }
+      if (!NO_UI_LABELS.has(node.tagName)) {
+        // A list item's first paragraph opens the item just as the item does.
+        const opens = OPENS_AN_ITEM.has(node.tagName) || (parent.type === 'element' && parent.tagName === 'li' && leading && node.tagName === 'p')
+        markUiLabels(node, opens)
+      }
+      leading = false
+    }
+    next.push(node)
   }
   parent.children = next
 }

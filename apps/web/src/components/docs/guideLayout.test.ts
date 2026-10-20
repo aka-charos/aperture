@@ -127,13 +127,42 @@ test('quoted words are what the screen says, outside code, links and headings', 
   assert.doesNotMatch(render(`It says "${'word '.repeat(12).trim()}".`), /data-doc="ui"/)
 })
 
+test('a short capitalised bold run is a screen label; emphasis and item names stay bold', () => {
+  const html = render(
+    'Links **More details**, shows **Airing** and **«Επόμενο»**, over the **last 30 days**. **Note:** a lead-in. ' +
+      '**This is a whole sentence that runs well past six words**.'
+  )
+  assert.match(html, /<span data-doc="ui">More details<\/span>/)
+  assert.match(html, /<span data-doc="ui">Airing<\/span>/)
+  assert.match(html, /<span data-doc="ui">Επόμενο<\/span>/, 'quotes inside the bold are dropped')
+  assert.match(html, /<strong>last 30 days<\/strong>/)
+  assert.match(html, /<strong>Note:<\/strong>/)
+  assert.match(html, /<strong>This is a whole sentence that runs well past six words<\/strong>/)
+
+  // Bold that opens a list item, a cell or a term names the item.
+  const items = render('- **Click any poster** to open **Insights**\n\n| A | B | C |\n|---|---|---|\n| **Movies** | **Today** | x |')
+  assert.match(items, /<strong>Click any poster<\/strong> to open <span data-doc="ui">Insights<\/span>/)
+  assert.match(items, /<td><strong>Movies<\/strong><\/td><td><strong>Today<\/strong><\/td>/)
+  const loose = render('- **Rate it** in place\n\n- **Skip it** with **Esc**')
+  assert.match(loose, /<p><strong>Rate it<\/strong> in place<\/p>/)
+  assert.match(loose, /<strong>Skip it<\/strong> with <span data-doc="ui">Esc<\/span>/)
+  // A label inside a split description is a label.
+  assert.match(render('- **Rank badges** — tap **Open**'), /<span data-doc="desc">tap <span data-doc="ui">Open<\/span><\/span>/)
+  // Headings keep their bold.
+  assert.match(render('## The **Next** step'), /<strong>Next<\/strong>/)
+})
+
 test('blockquotes: alerts and bold openings are callouts, a quoted line is an example', () => {
   const tip = render('> [!TIP]\n> Rate five titles.')
-  assert.match(tip, /<blockquote data-doc="callout" data-tone="info">/)
+  assert.match(tip, /<blockquote data-doc="callout" data-tone="tip">/)
   assert.doesNotMatch(tip, /\[!TIP\]/)
   assert.match(tip, /Rate five titles\./)
+  assert.match(render('> [!NOTE]\n> Noted.'), /data-tone="info"/)
   assert.match(render('> [!WARNING]\n> Deletes it.'), /data-tone="warning"/)
-  assert.match(render('> **Legacy.** Being phased out.'), /<blockquote data-doc="callout" data-tone="info">/)
+  // A bold opening is a notice, and its bold stays bold.
+  const notice = render('> **This is a legacy feature.** Being phased out.')
+  assert.match(notice, /<blockquote data-doc="callout" data-tone="warning">/)
+  assert.match(notice, /<strong>This is a legacy feature\.<\/strong>/)
   assert.match(render('> "What should I watch tonight?"'), /<blockquote data-doc="example">\s*<p>What should I watch tonight\?<\/p>/)
   assert.match(render('> «Τι να δω απόψε;»'), /data-doc="example"/)
   assert.doesNotMatch(render('> *Status: Searching…*'), /data-doc=/)

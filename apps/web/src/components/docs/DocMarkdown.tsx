@@ -19,6 +19,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined'
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
 import type { DocLinkTarget } from './docLinks'
 import type { DocPage } from './pages'
@@ -87,8 +88,9 @@ const REHYPE_PLUGINS = [rehypeGuideLayout]
  *
  * The pages stay plain markdown for GitHub; the layout is read off their
  * shape by `rehypeGuideLayout` — a lead paragraph, one numbered card per
- * section, term lists, feature rows, on-screen words, callouts and a "Next"
- * card — so there is no second copy of the guide to keep.
+ * section, term lists, feature rows, on-screen labels (quoted words and short
+ * capitalised bold), notice/tip/info callouts and a "Next" card — so there is
+ * no second copy of the guide to keep.
  */
 export function DocMarkdown({
   doc,
@@ -459,12 +461,13 @@ export function DocMarkdown({
           )
         }
         if (role === 'callout') {
-          const warning = node?.properties?.dataTone === 'warning'
-          const Icon = warning ? WarningAmberRoundedIcon : InfoOutlinedIcon
+          const tone = node?.properties?.dataTone
+          const warning = tone === 'warning'
+          const Icon = warning ? WarningAmberRoundedIcon : tone === 'tip' ? LightbulbOutlinedIcon : InfoOutlinedIcon
           return (
             <Box
               sx={(theme) => {
-                const tone = warning ? theme.palette.warning.main : theme.palette.primary.main
+                const color = warning ? theme.palette.warning.main : theme.palette.primary.main
                 return {
                   display: 'flex',
                   gap: 1.25,
@@ -473,8 +476,9 @@ export function DocMarkdown({
                   py: 1.5,
                   borderRadius: 1.25,
                   border: 1,
-                  borderColor: alpha(tone, 0.4),
-                  bgcolor: alpha(tone, 0.09),
+                  borderColor: alpha(color, 0.4),
+                  bgcolor: alpha(color, 0.09),
+                  ...(warning && { '& strong': { color: theme.palette.warning.light } }),
                   '& > div > :last-child': { mb: 0 },
                 }
               }}
