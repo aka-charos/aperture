@@ -481,9 +481,11 @@ export function MoviePoster({
         {/* Custom children (for badges like play count, favorite icon, etc.) */}
         {children}
 
-        {/* Hover overlay with details — not drawn when the plot sits under the
-            card, where everything it would show is already printed. */}
-        {!overviewBelow && (
+        {/* Hover overlay: the plot, and only the plot. Title, year and genres
+            are printed under the poster already, so repeating them here only
+            covered the artwork with a second copy. With no plot (or with the
+            plot printed under the card) there is nothing to show. */}
+        {!overviewBelow && overview && (
         <Box
           sx={{
             position: 'absolute',
@@ -501,64 +503,20 @@ export function MoviePoster({
             zIndex: 1,
           }}
         >
-          {/* Year badge */}
-          {year && (
-            <Typography
-              variant="caption"
-              sx={{
-                color: 'primary.main',
-                fontWeight: 700,
-                mb: 0.5,
-              }}
-            >
-              {year}
-            </Typography>
-          )}
-
-          {/* Title */}
           <Typography
-            variant="body2"
-            fontWeight={700}
+            variant="caption"
             sx={{
-              color: 'white',
-              lineHeight: 1.2,
-              mb: 0.5,
+              color: 'grey.300',
+              lineHeight: 1.4,
+              display: '-webkit-box',
+              WebkitLineClamp: overviewLines,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              fontSize: '0.7rem',
             }}
           >
-            {title}
+            {overview}
           </Typography>
-
-          {/* Overview */}
-          {overview && (
-            <Typography
-              variant="caption"
-              sx={{
-                color: 'grey.300',
-                lineHeight: 1.4,
-                display: '-webkit-box',
-                WebkitLineClamp: overviewLines,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                fontSize: '0.7rem',
-              }}
-            >
-              {overview}
-            </Typography>
-          )}
-
-          {/* Genres */}
-          {genres && genres.length > 0 && (
-            <Typography
-              variant="caption"
-              sx={{
-                color: 'grey.500',
-                mt: 0.5,
-                fontSize: '0.65rem',
-              }}
-            >
-              {genres.slice(0, 3).join(' • ')}
-            </Typography>
-          )}
         </Box>
         )}
 

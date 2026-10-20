@@ -41,6 +41,7 @@ interface RecentWatchItem {
   year: number | null
   posterUrl: string | null
   genres: string[]
+  overview: string | null
   lastWatched: string
   playCount: number
   lastEpisode?: { seasonNumber: number; episodeNumber: number }
@@ -53,6 +54,7 @@ interface MovieRow {
   year: number | null
   poster_url: string | null
   genres: string[] | null
+  overview: string | null
   last_played_at: Date
   play_count: number | null
 }
@@ -89,7 +91,7 @@ export function registerRecentWatchesHandler(fastify: FastifyInstance) {
         const [movies, series] = await Promise.all([
           query<MovieRow>(
             `WITH ranked AS (
-               SELECT wh.user_id, m.id, m.title, m.year, m.poster_url, m.genres,
+               SELECT wh.user_id, m.id, m.title, m.year, m.poster_url, m.genres, m.overview,
                       wh.last_played_at, wh.play_count,
                       ROW_NUMBER() OVER (PARTITION BY wh.user_id ORDER BY wh.last_played_at DESC) AS rn
                  FROM watch_history wh
@@ -105,7 +107,7 @@ export function registerRecentWatchesHandler(fastify: FastifyInstance) {
           // Latest episode per (person, series), then the newest series per person.
           query<SeriesRow>(
             `WITH per_series AS (
-               SELECT wh.user_id, s.id, s.title, s.year, s.poster_url, s.genres,
+               SELECT wh.user_id, s.id, s.title, s.year, s.poster_url, s.genres, s.overview,
                       wh.last_played_at, wh.play_count, e.season_number, e.episode_number,
                       ROW_NUMBER() OVER (PARTITION BY wh.user_id, s.id ORDER BY wh.last_played_at DESC) AS rn
                  FROM watch_history wh
@@ -139,6 +141,7 @@ export function registerRecentWatchesHandler(fastify: FastifyInstance) {
             year: r.year ?? null,
             posterUrl: r.poster_url,
             genres: r.genres ?? [],
+            overview: r.overview,
             lastWatched: r.last_played_at.toISOString(),
             playCount: r.play_count ?? 0,
           })
@@ -151,6 +154,7 @@ export function registerRecentWatchesHandler(fastify: FastifyInstance) {
             year: r.year ?? null,
             posterUrl: r.poster_url,
             genres: r.genres ?? [],
+            overview: r.overview,
             lastWatched: r.last_played_at.toISOString(),
             playCount: r.play_count ?? 0,
             ...(r.season_number != null && r.episode_number != null

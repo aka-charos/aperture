@@ -16,6 +16,8 @@ interface MediaItem {
   year: number | null
   posterUrl: string | null
   genres: string[]
+  /** Shown when the poster is hovered, translated through `titleRef`. */
+  overview?: string | null
   matchScore?: number | null
   rank?: number
 }
@@ -82,6 +84,8 @@ export function MediaCarousel({
       year={item.year}
       posterUrl={item.posterUrl}
       genres={item.genres}
+      overview={item.overview}
+      titleRef={{ mediaType: item.type, id: item.id }}
       score={showScore ? (item.matchScore != null ? item.matchScore / 100 : null) : undefined}
       showScore={showScore && item.matchScore != null}
       userRating={getRating(item.type, item.id)}
