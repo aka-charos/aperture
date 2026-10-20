@@ -52,6 +52,7 @@ export function UserHelpDrawer({ open, docs, anchor, tour, onClose }: UserHelpDr
       openInNewTab: t('userGuide.help.openInNewTab'),
       close: t('userGuide.help.close'),
       textLinkHint: t('userGuide.link.outside'),
+      onThisPage: t('userGuide.page.onThisPage'),
     }),
     [t]
   )
@@ -60,13 +61,14 @@ export function UserHelpDrawer({ open, docs, anchor, tour, onClose }: UserHelpDr
     tour && isTourId(tour) ? (
       <Button
         size="small"
+        variant="outlined"
         startIcon={<ExploreOutlinedIcon fontSize="small" />}
         onClick={() => {
           // The drawer closes first: the tour points at the screen behind it.
           onClose()
           startTour(tour)
         }}
-        sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+        sx={{ whiteSpace: 'nowrap', flexShrink: 0, borderRadius: 999, mx: 0.5 }}
       >
         {t('onboarding.tour.showMeAround')}
       </Button>

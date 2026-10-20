@@ -28,6 +28,7 @@ export function AdminHelpDrawer({ open, docs, onClose }: AdminHelpDrawerProps) {
       openInNewTab: t('adminDocs.help.openInNewTab'),
       close: t('adminDocs.help.close'),
       textLinkHint: t('adminDocs.link.outside'),
+      onThisPage: t('adminDocs.page.onThisPage'),
     }),
     [t]
   )
