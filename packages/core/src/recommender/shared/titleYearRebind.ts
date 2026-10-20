@@ -29,6 +29,11 @@ export interface ExternalIds {
 /** A stored row a title+year match could land on. */
 export interface TitleYearRow extends ExternalIds {
   providerItemId: string
+  /**
+   * The row's names (title, original title), read only by the external-id
+   * fallback: one agreeing id is trusted only when a name is related too.
+   */
+  titles?: ReadonlyArray<string | null | undefined>
 }
 
 /** The title+year key, or null when either half is missing (no fallback then). */
@@ -114,11 +119,45 @@ export function pickTitleYearRow<T extends TitleYearRow>(
  * run positively agree with a row that no longer carries it, and take it from
  * its live owner.
  */
-export function takeOverRow(row: TitleYearRow, providerItemId: string, incoming: ExternalIds): void {
+export function takeOverRow(
+  row: TitleYearRow,
+  providerItemId: string,
+  incoming: ExternalIds & { titles?: ReadonlyArray<string | null | undefined> }
+): void {
   row.providerItemId = providerItemId
   row.tmdbId = incoming.tmdbId || null
   row.imdbId = incoming.imdbId || null
   row.tvdbId = incoming.tvdbId || null
+  if (incoming.titles) row.titles = incoming.titles
+}
+
+/** A name folded for comparison: accents off, case off, letters and digits only. */
+function foldTitle(title: string): string {
+  return title
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '')
+}
+
+/**
+ * Whether any name on one side contains a name on the other once folded:
+ * "Clerks" and "Clerks (Extended)", or a title and the same title with its
+ * year appended. A name folding to nothing (punctuation only) relates to
+ * nothing.
+ */
+export function titlesRelated(
+  a: ReadonlyArray<string | null | undefined> | undefined,
+  b: ReadonlyArray<string | null | undefined> | undefined
+): boolean {
+  const fold = (names: ReadonlyArray<string | null | undefined> | undefined) =>
+    (names ?? [])
+      .filter((n): n is string => typeof n === 'string')
+      .map(foldTitle)
+      .filter((n) => n.length > 0)
+  const left = fold(a)
+  const right = fold(b)
+  return left.some((x) => right.some((y) => x.includes(y) || y.includes(x)))
 }
 
 /**
@@ -151,13 +190,22 @@ function externalIdKeys(ids: ExternalIds): string[] {
  * movie row's delete cascades to every rating, recommendation and Watch This
  * item that named it. The TMDb and IMDb ids were identical on both sides.
  *
- * Stricter than the title+year rule on purpose, since nothing about the name
- * vouches for it: the row's item must not be live this run (an item still on
- * the server keeps its row), no id may conflict, and at least one must agree.
+ * Stricter than the title+year rule on purpose, since the title and year did
+ * not vouch for it: the row's item must not be live this run (an item still on
+ * the server keeps its row), no id may conflict, and either two ids agree or
+ * one does AND a name is related (`titlesRelated`). One id alone is what a
+ * mis-identified item carries, and a wrong match hands a gone film's ratings
+ * and history to a different one. Two ids agreeing is the same work under
+ * another name (a translated title), and so is a different cut of it: TMDb
+ * gives an extended edition the film's own ids, the identity the title+year
+ * rule already lets two libraries share one row by.
+ *
+ * Ties keep the FIRST candidate, so the caller decides the order: both syncs
+ * read their rows oldest first, and the row with the longest history wins.
  */
 export function pickExternalIdRow<T extends TitleYearRow>(
   candidates: readonly T[] | undefined,
-  incoming: ExternalIds,
+  incoming: ExternalIds & { titles?: ReadonlyArray<string | null | undefined> },
   isLive: (providerItemId: string) => boolean
 ): T | null {
   if (!candidates || candidates.length === 0) return null
@@ -167,6 +215,7 @@ export function pickExternalIdRow<T extends TitleYearRow>(
     if (isLive(row.providerItemId)) continue
     if (externalIdsConflict(row, incoming)) continue
     const score = agreeingIds(row, incoming)
+    if (score < 2 && !titlesRelated(row.titles, incoming.titles)) continue
     if (score > bestScore) {
       best = row
       bestScore = score
@@ -201,31 +250,49 @@ function addByExternalId<T extends TitleYearRow>(index: Map<string, T[]>, row: T
   }
 }
 
-/**
- * The row an item with an unknown provider id takes over, or null when it
- * needs a row of its own: title+year first (`pickTitleYearRow`), then external
- * ids (`pickExternalIdRow`). The chosen row is marked as the item's
- * (`takeOverRow`), so no later item this run can take it as well; the id it
- * had before is returned beside it, since that is the row the UPDATE targets.
- *
- * `isLive` must answer for EVERY item the server lists this run, across all
- * libraries: a row whose item sits in a library not fetched yet would
- * otherwise read as gone and be taken.
- */
 export interface RebindMatch<T> {
   row: T
   /** The row's provider id before the takeover: what the sync's UPDATE targets. */
   previousId: string
 }
 
+/** An item with an unknown provider id, as the matcher reads it. */
+export type IncomingItem = ExternalIds & {
+  providerItemId: string
+  title: string | null | undefined
+  originalTitle?: string | null
+  year: number | null | undefined
+}
+
+export interface RebindOptions {
+  /**
+   * Whether the external-id fallback may run. Only once `isLive` answers for
+   * EVERY item the server lists this run, across all libraries: a row whose
+   * item sits in a library not listed yet reads as gone, and the fallback has
+   * no title+year check to stop it handing that row to another item.
+   * Required, so no caller gets it by default.
+   */
+  byExternalId: boolean
+}
+
+/**
+ * The row an item with an unknown provider id takes over, or null when it
+ * needs a row of its own: title+year first (`pickTitleYearRow`), then, when
+ * allowed, external ids (`pickExternalIdRow`). The chosen row is marked as the
+ * item's (`takeOverRow`), so no later item this run can take it as well; the
+ * id it had before is returned beside it, since that is the row the UPDATE
+ * targets.
+ */
 export function findRebindRow<T extends TitleYearRow>(
   index: RebindIndex<T>,
-  incoming: ExternalIds & { providerItemId: string; title: string | null | undefined; year: number | null | undefined },
-  isLive: (providerItemId: string) => boolean
+  incoming: IncomingItem,
+  isLive: (providerItemId: string) => boolean,
+  options: RebindOptions
 ): RebindMatch<T> | null {
+  const titles = [incoming.title, incoming.originalTitle]
   const key = titleYearKey(incoming.title, incoming.year)
   let row = key ? pickTitleYearRow(index.byTitleYear.get(key), incoming, isLive) : null
-  if (!row) {
+  if (!row && options.byExternalId) {
     const seen = new Set<T>()
     const candidates: T[] = []
     for (const idKey of externalIdKeys(incoming)) {
@@ -236,12 +303,49 @@ export function findRebindRow<T extends TitleYearRow>(
         }
       }
     }
-    row = pickExternalIdRow(candidates, incoming, isLive)
+    row = pickExternalIdRow(candidates, { ...incoming, titles }, isLive)
   }
   if (!row) return null
   const previousId = row.providerItemId
-  takeOverRow(row, incoming.providerItemId, incoming)
+  takeOverRow(row, incoming.providerItemId, { ...incoming, titles })
   return { row, previousId }
+}
+
+/** What the sync does with one listed item (`decideIncoming`). */
+export type IncomingDecision<T> =
+  /** Its provider id is a stored row's: refresh that row. */
+  | { kind: 'update' }
+  /** It takes over the stored row `match.previousId` (a re-issued id). */
+  | { kind: 'takeover'; match: RebindMatch<T> }
+  /** Nothing matched yet: ask again once every library has been listed. */
+  | { kind: 'defer' }
+  /** Nothing matches: it gets a row of its own. */
+  | { kind: 'insert' }
+
+/**
+ * The one decision both syncs make per listed item, in two phases. While the
+ * libraries are still being listed (`'listing'`), an item is matched by
+ * provider id or title+year exactly as before, and anything else is DEFERRED
+ * rather than inserted, because the external-id fallback cannot run until
+ * every library has answered. In the `'final'` phase, with liveness complete,
+ * a deferred item is matched again with the fallback allowed, and inserted
+ * only when nothing takes it.
+ *
+ * Deferring rather than fetching every library first is what keeps one
+ * library's failure from costing the others: each library is still written as
+ * it is listed, and only the items no row claimed wait for the end.
+ */
+export function decideIncoming<T extends TitleYearRow>(
+  index: RebindIndex<T>,
+  existingProviderIds: ReadonlySet<string>,
+  incoming: IncomingItem,
+  isLive: (providerItemId: string) => boolean,
+  phase: 'listing' | 'final'
+): IncomingDecision<T> {
+  if (existingProviderIds.has(incoming.providerItemId)) return { kind: 'update' }
+  const match = findRebindRow(index, incoming, isLive, { byExternalId: phase === 'final' })
+  if (match) return { kind: 'takeover', match }
+  return phase === 'listing' ? { kind: 'defer' } : { kind: 'insert' }
 }
 
 /** Record a row inserted this run, so a later item can match it as before. */

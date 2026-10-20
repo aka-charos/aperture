@@ -20,11 +20,12 @@ import { clampRating } from '../shared/syncHelpers.js'
 import {
   addToRebindIndex,
   buildRebindIndex,
-  findRebindRow,
+  decideIncoming,
   type RebindIndex,
   type TitleYearRow,
 } from '../shared/titleYearRebind.js'
 import { clampMaxCandidatesToLibrary } from '../../lib/recommendationConfig.js'
+import { keepStoredJsonArray, keepStoredText, keepStoredTextArray, keepStoredValue } from '../shared/keepStored.js'
 
 const logger = createChildLogger('sync')
 
@@ -188,8 +189,9 @@ async function processMovieBatch(
   existingProviderIds: Set<string>,
   rebindIndex: RebindIndex<TitleYearRow>,
   liveProviderIds: ReadonlySet<string>,
+  phase: 'listing' | 'final',
   _jobId: string
-): Promise<{ added: number; updated: number }> {
+): Promise<{ added: number; updated: number; deferred: PreparedMovie[] }> {
   // Separate into updates and inserts
   const toUpdate: PreparedMovie[] = []
   const toInsert: PreparedMovie[] = []
@@ -197,34 +199,45 @@ async function processMovieBatch(
   // or, failing that, by external id (the server re-issued the id).
   // `previousId` is the row they take over.
   const toUpdateByTitleYear: Array<PreparedMovie & { previousId: string }> = []
+  // Movies nothing claimed while libraries are still being listed; matched
+  // again, external ids included, once every library has answered.
+  const deferred: PreparedMovie[] = []
 
   for (const pm of movies) {
-    if (existingProviderIds.has(pm.movie.id)) {
-      toUpdate.push(pm)
-      continue
-    }
     // Title+year alone is not an identity: two different films can share both.
     // A row is taken over only when no external id contradicts it, and by
-    // external id alone only when its own item is gone from the server
-    // (shared/titleYearRebind.ts); otherwise the film gets a row of its own.
-    const match = findRebindRow(
+    // external id only in the final phase, against a row whose own item is
+    // gone from the server (shared/titleYearRebind.ts).
+    const decision = decideIncoming(
       rebindIndex,
+      existingProviderIds,
       {
         providerItemId: pm.movie.id,
         title: pm.movie.name,
+        originalTitle: pm.movie.originalTitle,
         year: pm.movie.year,
         tmdbId: pm.movie.tmdbId,
         imdbId: pm.movie.imdbId,
       },
-      (id) => liveProviderIds.has(id)
+      (id) => liveProviderIds.has(id),
+      phase
     )
-    if (match) {
-      toUpdateByTitleYear.push({ ...pm, previousId: match.previousId })
+    if (decision.kind === 'update') {
+      toUpdate.push(pm)
+    } else if (decision.kind === 'takeover') {
+      toUpdateByTitleYear.push({ ...pm, previousId: decision.match.previousId })
+    } else if (decision.kind === 'defer') {
+      deferred.push(pm)
     } else {
       toInsert.push(pm)
       addToRebindIndex(
         rebindIndex,
-        { providerItemId: pm.movie.id, tmdbId: pm.movie.tmdbId, imdbId: pm.movie.imdbId },
+        {
+          providerItemId: pm.movie.id,
+          tmdbId: pm.movie.tmdbId,
+          imdbId: pm.movie.imdbId,
+          titles: [pm.movie.name, pm.movie.originalTitle],
+        },
         pm.movie.name,
         pm.movie.year
       )
@@ -242,30 +255,30 @@ async function processMovieBatch(
       const result = await query(
         `UPDATE movies SET
           title = data.title,
-          original_title = data.original_title,
-          year = data.year,
-          genres = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.genres)), '{}'),
-          overview = data.overview,
-          community_rating = data.community_rating,
-          critic_rating = data.critic_rating,
-          runtime_minutes = data.runtime_minutes,
+          original_title = ${keepStoredText('original_title', 'movies')},
+          year = ${keepStoredValue('year', 'movies')},
+          genres = ${keepStoredTextArray('genres', 'movies')},
+          overview = ${keepStoredText('overview', 'movies')},
+          community_rating = ${keepStoredValue('community_rating', 'movies')},
+          critic_rating = ${keepStoredValue('critic_rating', 'movies')},
+          runtime_minutes = ${keepStoredValue('runtime_minutes', 'movies')},
           path = data.path,
           media_sources = data.media_sources,
           poster_url = data.poster_url,
           backdrop_url = data.backdrop_url,
           provider_library_id = data.provider_library_id,
-          tagline = data.tagline,
-          content_rating = data.content_rating,
-          premiere_date = data.premiere_date,
-          studios = data.studios,
-          directors = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.directors)), '{}'),
-          writers = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.writers)), '{}'),
-          actors = data.actors,
+          tagline = ${keepStoredText('tagline', 'movies')},
+          content_rating = ${keepStoredText('content_rating', 'movies')},
+          premiere_date = ${keepStoredValue('premiere_date', 'movies')},
+          studios = ${keepStoredJsonArray('studios', 'movies')},
+          directors = ${keepStoredTextArray('directors', 'movies')},
+          writers = ${keepStoredTextArray('writers', 'movies')},
+          actors = ${keepStoredJsonArray('actors', 'movies')},
           imdb_id = data.imdb_id,
           tmdb_id = data.tmdb_id,
           tags = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.tags)), '{}'),
           sort_title = data.sort_title,
-          production_countries = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.production_countries)), '{}'),
+          production_countries = ${keepStoredTextArray('production_countries', 'movies')},
           awards = data.awards,
           video_resolution = data.video_resolution,
           video_codec = data.video_codec,
@@ -343,30 +356,30 @@ async function processMovieBatch(
         `UPDATE movies SET
           provider_item_id = data.provider_item_id,
           title = data.title,
-          year = data.year,
-          original_title = data.original_title,
-          genres = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.genres)), '{}'),
-          overview = data.overview,
-          community_rating = data.community_rating,
-          critic_rating = data.critic_rating,
-          runtime_minutes = data.runtime_minutes,
+          year = ${keepStoredValue('year', 'movies')},
+          original_title = ${keepStoredText('original_title', 'movies')},
+          genres = ${keepStoredTextArray('genres', 'movies')},
+          overview = ${keepStoredText('overview', 'movies')},
+          community_rating = ${keepStoredValue('community_rating', 'movies')},
+          critic_rating = ${keepStoredValue('critic_rating', 'movies')},
+          runtime_minutes = ${keepStoredValue('runtime_minutes', 'movies')},
           path = data.path,
           media_sources = data.media_sources,
           poster_url = data.poster_url,
           backdrop_url = data.backdrop_url,
           provider_library_id = data.provider_library_id,
-          tagline = data.tagline,
-          content_rating = data.content_rating,
-          premiere_date = data.premiere_date,
-          studios = data.studios,
-          directors = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.directors)), '{}'),
-          writers = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.writers)), '{}'),
-          actors = data.actors,
+          tagline = ${keepStoredText('tagline', 'movies')},
+          content_rating = ${keepStoredText('content_rating', 'movies')},
+          premiere_date = ${keepStoredValue('premiere_date', 'movies')},
+          studios = ${keepStoredJsonArray('studios', 'movies')},
+          directors = ${keepStoredTextArray('directors', 'movies')},
+          writers = ${keepStoredTextArray('writers', 'movies')},
+          actors = ${keepStoredJsonArray('actors', 'movies')},
           imdb_id = data.imdb_id,
           tmdb_id = data.tmdb_id,
           tags = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.tags)), '{}'),
           sort_title = data.sort_title,
-          production_countries = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.production_countries)), '{}'),
+          production_countries = ${keepStoredTextArray('production_countries', 'movies')},
           awards = data.awards,
           video_resolution = data.video_resolution,
           video_codec = data.video_codec,
@@ -533,7 +546,7 @@ async function processMovieBatch(
     }
   }
 
-  return { added, updated }
+  return { added, updated, deferred }
 }
 
 /**
@@ -628,13 +641,19 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
 
     // Pre-fetch existing movies from database for fast duplicate checking
     addLog(jobId, 'info', '🔍 Loading existing movies from database...')
+    // Oldest first: when two stored rows tie for one re-issued item, the
+    // external-id fallback keeps the first, so the row with the longest
+    // history survives (shared/titleYearRebind.ts).
     const existingMovies = await query<{
       provider_item_id: string
       title: string
+      original_title: string | null
       year: number | null
       tmdb_id: string | null
       imdb_id: string | null
-    }>('SELECT provider_item_id, title, year, tmdb_id, imdb_id FROM movies')
+    }>(
+      'SELECT provider_item_id, title, original_title, year, tmdb_id, imdb_id FROM movies ORDER BY created_at, id'
+    )
     const existingProviderIds = new Set(existingMovies.rows.map((m) => m.provider_item_id))
     const rebindIndex = buildRebindIndex<TitleYearRow>(
       existingMovies.rows.map((m) => ({
@@ -643,6 +662,7 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
         year: m.year,
         tmdbId: m.tmdb_id,
         imdbId: m.imdb_id,
+        titles: [m.title, m.original_title],
       }))
     )
     addLog(jobId, 'info', `📊 Found ${existingMovies.rows.length} existing movies in database`)
@@ -655,69 +675,31 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
     let processed = 0
     const startTime = Date.now()
     const librarySyncResults: LibraryMovieSyncResult[] = []
-    // Every provider id the server lists this run, across ALL libraries. A
-    // row whose own id is in here is not up for a takeover by external id,
-    // and only with an agreeing id by title+year (shared/titleYearRebind.ts).
-    // It must be complete before the first item is matched: a row whose item
-    // sits in a library not fetched yet would otherwise read as gone.
+    // Every provider id the server has listed so far this run. Each library
+    // is written as it is listed, matching by provider id or title+year; an
+    // item nothing claims is DEFERRED, and only once every library has
+    // answered (liveness complete) is it matched again with the external-id
+    // fallback allowed, then inserted if nothing takes it
+    // (shared/titleYearRebind.ts `decideIncoming`). So one library failing to
+    // list costs only the deferred items, never the libraries before it.
     const liveProviderIds = new Set<string>()
-    const fetchedLibraries: Array<{ libraryId: string | null; movies: Movie[] }> = []
+    const deferred: PreparedMovie[] = []
 
-    for (const { libraryId, count } of libraryCounts) {
-      if (count === 0) continue
-
-      addLog(jobId, 'info', `📂 Fetching ${count} movies from library${libraryId ? ` ${libraryId}` : ''}...`)
-
-      // Fetch all movies from this library in parallel
-      // Note: We don't update job progress during fetch since it's fast (~7s for 12k movies)
-      // Progress updates happen during the processing phase below
-      const movies = await fetchMoviesParallel(
-        provider,
-        apiKey,
-        libraryId,
-        count,
-        PAGE_SIZE,
-        PARALLEL_FETCHES,
-        jobId
-      )
-
-      addLog(jobId, 'info', `✅ Fetched ${movies.length} movies`)
-
-      librarySyncResults.push({
-        libraryId,
-        expectedCount: count,
-        fetchedCount: movies.length,
-        seenProviderIds: new Set(movies.map((movie) => movie.id)),
-      })
-      for (const movie of movies) liveProviderIds.add(movie.id)
-      fetchedLibraries.push({ libraryId, movies })
-    }
-
-    for (const { libraryId, movies } of fetchedLibraries) {
-      addLog(jobId, 'info', `⚙️ Processing ${movies.length} movies from library${libraryId ? ` ${libraryId}` : ''}...`)
-
-      // Prepare movie data
-      const preparedMovies: PreparedMovie[] = movies.map((movie) => ({
-        movie,
-        runtimeMinutes: movie.runtimeTicks ? Math.round(movie.runtimeTicks / 600000000) : null,
-        posterUrl: movie.posterImageTag ? provider.getPosterUrl(movie.id, movie.posterImageTag) : null,
-        backdropUrl: movie.backdropImageTag ? provider.getBackdropUrl(movie.id, movie.backdropImageTag) : null,
-        libraryId,
-      }))
-
-      // Process in batches
-      for (let i = 0; i < preparedMovies.length; i += DB_BATCH_SIZE) {
-        const batch = preparedMovies.slice(i, i + DB_BATCH_SIZE)
+    const processBatches = async (prepared: PreparedMovie[], phase: 'listing' | 'final') => {
+      for (let i = 0; i < prepared.length; i += DB_BATCH_SIZE) {
+        const batch = prepared.slice(i, i + DB_BATCH_SIZE)
         const result = await processMovieBatch(
           batch,
           existingProviderIds,
           rebindIndex,
           liveProviderIds,
+          phase,
           jobId
         )
         added += result.added
         updated += result.updated
-        processed += batch.length
+        deferred.push(...result.deferred)
+        processed += batch.length - result.deferred.length
 
         updateJobProgress(
           jobId,
@@ -737,6 +719,54 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
           )
         }
       }
+    }
+
+    for (const { libraryId, count } of libraryCounts) {
+      if (count === 0) continue
+
+      addLog(jobId, 'info', `📂 Fetching ${count} movies from library${libraryId ? ` ${libraryId}` : ''}...`)
+
+      // Fetch all movies from this library in parallel
+      // Note: We don't update job progress during fetch since it's fast (~7s for 12k movies)
+      // Progress updates happen during the processing phase below
+      const movies = await fetchMoviesParallel(
+        provider,
+        apiKey,
+        libraryId,
+        count,
+        PAGE_SIZE,
+        PARALLEL_FETCHES,
+        jobId
+      )
+
+      addLog(jobId, 'info', `✅ Fetched ${movies.length} movies, now processing...`)
+
+      librarySyncResults.push({
+        libraryId,
+        expectedCount: count,
+        fetchedCount: movies.length,
+        seenProviderIds: new Set(movies.map((movie) => movie.id)),
+      })
+      for (const movie of movies) liveProviderIds.add(movie.id)
+
+      // Prepare movie data
+      const preparedMovies: PreparedMovie[] = movies.map((movie) => ({
+        movie,
+        runtimeMinutes: movie.runtimeTicks ? Math.round(movie.runtimeTicks / 600000000) : null,
+        posterUrl: movie.posterImageTag ? provider.getPosterUrl(movie.id, movie.posterImageTag) : null,
+        backdropUrl: movie.backdropImageTag ? provider.getBackdropUrl(movie.id, movie.backdropImageTag) : null,
+        libraryId,
+      }))
+
+      await processBatches(preparedMovies, 'listing')
+    }
+
+    // Every library has answered: the items nothing claimed get the
+    // external-id fallback, then a row of their own.
+    if (deferred.length > 0) {
+      const finalPass = deferred.splice(0)
+      addLog(jobId, 'info', `🔗 Matching ${finalPass.length} new movie item(s) against stored rows by external id...`)
+      await processBatches(finalPass, 'final')
     }
 
     const removed = await reconcileRemovedMovies(jobId, librarySyncResults)
