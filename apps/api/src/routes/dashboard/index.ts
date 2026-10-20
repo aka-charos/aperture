@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import { query, queryOne } from '../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../plugins/auth.js'
 import { idsInScope } from '../../lib/viewerScope.js'
+import { clipPosterOverview, posterOverviewSql } from '../../lib/posterOverview.js'
 import { dashboardSchemas, getDashboardSchema } from './schemas.js'
 // Shared with the Watch Stats page. The bar links there, so a viewer will
 // compare the two: they have to be counting the same population.
@@ -205,7 +206,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             m.year,
             m.poster_url,
             m.genres,
-            m.overview,
+            ${posterOverviewSql('m.overview')} AS overview,
             rc.final_score,
             m.runtime_minutes
           FROM recommendation_candidates rc
@@ -242,7 +243,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
             s.year,
             s.poster_url,
             s.genres,
-            s.overview,
+            ${posterOverviewSql('s.overview')} AS overview,
             rc.final_score,
             s.total_seasons,
             s.total_episodes
@@ -461,7 +462,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         year: m.year,
         posterUrl: m.posterUrl,
         genres: m.genres || [],
-        overview: m.overview,
+        overview: clipPosterOverview(m.overview),
         rank: m.rank,
         popularityScore: m.popularityScore,
       }))
@@ -472,7 +473,7 @@ const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         year: s.year,
         posterUrl: s.posterUrl,
         genres: s.genres || [],
-        overview: s.overview,
+        overview: clipPosterOverview(s.overview),
         rank: s.rank,
         popularityScore: s.popularityScore,
       }))
