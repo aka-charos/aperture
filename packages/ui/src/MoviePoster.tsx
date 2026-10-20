@@ -310,8 +310,13 @@ export function MoviePoster({
     )
   }
 
-  // Calculate max lines for overview based on size
-  const overviewLines = size === 'small' ? 3 : size === 'medium' ? 5 : 7
+  // How many lines of plot the hover overlay may show. The plot is all the
+  // overlay carries, so it may take most of the poster; the bottom row of
+  // buttons is kept clear by the padding below, not by these numbers.
+  const overviewLines = size === 'small' ? 6 : size === 'medium' ? 10 : 13
+  // The explore and rating buttons sit in the bottom-right corner over the
+  // overlay, so the plot stops above them instead of running underneath.
+  const bottomButtonsShown = !hideUserRating || (!hideExploreButton && !!onExploreClick)
 
   return (
     <Box
@@ -510,13 +515,14 @@ export function MoviePoster({
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.8) 50%, rgba(0,0,0,0.4) 100%)',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.88) 60%, rgba(0,0,0,0.55) 100%)',
             opacity: isHovered ? 1 : 0,
             transition: 'opacity 0.3s ease',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'flex-end',
             p: 1.5,
+            pb: bottomButtonsShown ? 6 : 1.5,
             zIndex: 1,
           }}
         >
@@ -531,15 +537,15 @@ export function MoviePoster({
           )}
           {hasOverview && (
             <Typography
-              variant="caption"
+              variant="body2"
               sx={{
-                color: 'grey.300',
-                lineHeight: 1.4,
+                color: 'grey.200',
+                lineHeight: 1.45,
                 display: '-webkit-box',
                 WebkitLineClamp: overviewLines,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
-                fontSize: '0.7rem',
+                fontSize: size === 'small' ? '0.75rem' : '0.825rem',
               }}
             >
               {overview}

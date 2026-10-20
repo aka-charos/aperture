@@ -1,12 +1,12 @@
 /**
  * The plot a poster card shows on hover, cut down before it leaves the server.
  *
- * The overlay clamps it to a few lines of small type (at most seven, on the
- * largest card), so a rail of dozens of titles carrying full synopses ships
+ * The overlay clamps it to at most thirteen lines (on the largest card, about
+ * 500 characters), so a rail of dozens of titles carrying full synopses ships
  * text nobody can see. The cut sits well past what the clamp shows; the
  * translated text arrives separately, by title id, and is not affected.
  */
-export const POSTER_OVERVIEW_CHARS = 400
+export const POSTER_OVERVIEW_CHARS = 700
 
 /** `column`, cut to `POSTER_OVERVIEW_CHARS`, NULL when blank. Interpolates a column name only. */
 export function posterOverviewSql(column: string): string {
