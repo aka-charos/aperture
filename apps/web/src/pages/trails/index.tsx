@@ -54,7 +54,7 @@ function TrailsContent() {
     () => [...new Set([state.from, state.to, ...state.trail, ...state.titles].filter((ref): ref is string => !!ref))],
     [state]
   )
-  const { cards, remember } = useTitleCache(refs)
+  const { cards, remember } = useTitleCache(refs, limits?.maxTitleLookup ?? null)
 
   const onOpen = useCallback((title: TrailTitle) => openMedia(title.type, title.id), [openMedia])
   const followFrom = useCallback(

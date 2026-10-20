@@ -1,20 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Autocomplete, Box, TextField, Typography } from '@mui/material'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import { getProxiedImageUrl } from '@aperture/ui'
+import { useLibraryTitleSearch, type LibrarySearchHit } from '@/hooks/useLibraryTitleSearch'
 import type { TrailTitle } from './types'
 
-interface SearchHit {
-  id: string
-  type: 'movie' | 'series'
-  title: string
-  year: number | null
-  poster_url: string | null
-}
-
-function toTrailTitle(hit: SearchHit): TrailTitle {
+function toTrailTitle(hit: LibrarySearchHit): TrailTitle {
   return {
     ref: `${hit.type}:${hit.id.toLowerCase()}`,
     type: hit.type,
@@ -38,9 +31,8 @@ interface TitlePickerProps {
 }
 
 /**
- * A library title chosen by typing its name. The library search is the one
- * every page uses (`/api/search`, already scoped to the viewer); the request
- * is debounced and a reply to an older query is dropped.
+ * A library title chosen by typing its name, through the shared library
+ * search (`useLibraryTitleSearch`: `/api/search`, scoped to the viewer).
  */
 export function TitlePicker({
   label,
@@ -53,39 +45,11 @@ export function TitlePicker({
 }: TitlePickerProps) {
   const { t } = useTranslation()
   const [input, setInput] = useState('')
-  const [options, setOptions] = useState<TrailTitle[]>([])
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    const term = input.trim()
-    // Typing into a box that shows the chosen title echoes the title back; that
-    // is not a search.
-    if (term.length < 2 || (value && term === value.title)) {
-      setOptions([])
-      setLoading(false)
-      return
-    }
-    const controller = new AbortController()
-    setLoading(true)
-    const timer = setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(term)}&type=all&limit=10`, {
-        credentials: 'include',
-        signal: controller.signal,
-      })
-        .then((response) => (response.ok ? response.json() : null))
-        .then((json: { results?: SearchHit[] } | null) => {
-          setOptions((json?.results ?? []).map(toTrailTitle))
-          setLoading(false)
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) setLoading(false)
-        })
-    }, 250)
-    return () => {
-      clearTimeout(timer)
-      controller.abort()
-    }
-  }, [input, value])
+  // Typing into a box that shows the chosen title echoes the title back; that
+  // is not a search.
+  const echoesValue = value != null && input.trim() === value.title
+  const { hits, loading, tooShort } = useLibraryTitleSearch(input, { enabled: !echoesValue })
+  const options = hits.map(toTrailTitle)
 
   const offered = options.filter((option) => !exclude.includes(option.ref))
 
@@ -108,7 +72,7 @@ export function TitlePicker({
       filterOptions={(list) => list}
       isOptionEqualToValue={(option, chosen) => option.ref === chosen.ref}
       getOptionLabel={(option) => option.title}
-      noOptionsText={input.trim().length < 2 ? t('trails.picker.typeMore') : t('trails.picker.noResults')}
+      noOptionsText={tooShort ? t('trails.picker.typeMore') : t('trails.picker.noResults')}
       loadingText={t('common.loading')}
       renderOption={(props, option) => {
         const { key, ...rest } = props as typeof props & { key: string }

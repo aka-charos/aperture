@@ -415,3 +415,84 @@ test('production meta-keywords are not links, whatever their casing', () => {
     ['heist']
   )
 })
+
+test('a route inside the step limit is found even when a cheaper one needs more steps', () => {
+  // A–B–M and M–C–D are cheap franchise steps; A–M and M–D are dear studio
+  // steps. The cheapest A→D route takes four steps; with a limit of two only
+  // A–M–D fits, and with one label per node the cheap long prefixes claimed M
+  // from both ends and hid it.
+  const a = title('A', 2000, [['franchise', 'F1'], ['studio', 'S1']])
+  const b = title('B', 2001, [['franchise', 'F1'], ['franchise', 'F1b']])
+  const m = title('M', 2002, [['franchise', 'F1b'], ['franchise', 'F2b'], ['studio', 'S1'], ['studio', 'S2']])
+  const c = title('C', 2003, [['franchise', 'F2b'], ['franchise', 'F2']])
+  const d = title('D', 2004, [['franchise', 'F2'], ['studio', 'S2']])
+  const index = buildTrailIndex([a, b, m, c, d])
+  const at = (source: TitleSource) => index.byRef.get(`${source.type}:${source.id}`) as number
+  const view = createView(index, null)
+  const short = findPath(view, at(a), at(d), { maxHops: 2 })
+  assert.ok(short)
+  assert.deepEqual(short.titles, [at(a), at(m), at(d)])
+  const unlimited = findPath(view, at(a), at(d), { maxHops: 8 })
+  assert.equal(unlimited?.titles.length, 5)
+  assert.ok((unlimited?.cost ?? 0) < short.cost)
+})
+
+/** The cheapest route of at most `maxHops` steps, by dynamic programming over step counts. */
+function referenceLimitedCost(index: TrailIndex, from: number, to: number, maxHops: number): number | null {
+  const view = createView(index, null)
+  const count = index.titles.length
+  let layer = new Map<number, number>([[from, 0]])
+  let best = Number.POSITIVE_INFINITY
+  for (let step = 1; step <= maxHops; step += 1) {
+    const next = new Map<number, number>()
+    for (const [title, cost] of layer) {
+      for (let other = 0; other < count; other += 1) {
+        if (other === title) continue
+        const shared = sharedLinks(view, title, other)
+        if (shared.length === 0) continue
+        const total = cost + shared[0].cost
+        if (total < (next.get(other) ?? Number.POSITIVE_INFINITY)) next.set(other, total)
+      }
+    }
+    const reached = next.get(to)
+    if (reached != null && reached < best) best = reached
+    layer = next
+  }
+  return Number.isFinite(best) ? best : null
+}
+
+test('with a step limit, the two-ended search still finds the cheapest route that fits', () => {
+  let seed = 23
+  const random = () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648
+    return seed / 2147483648
+  }
+  const roles: LinkRole[] = ['director', 'writer', 'lead', 'actor', 'keyword', 'studio', 'franchise']
+  for (let round = 0; round < 30; round += 1) {
+    const sources: TitleSource[] = []
+    for (let i = 0; i < 18; i += 1) {
+      const credits: Array<[LinkRole, string]> = []
+      for (let k = 0; k < 2; k += 1) {
+        credits.push([roles[Math.floor(random() * roles.length)], `Q${Math.floor(random() * 14)}`])
+      }
+      sources.push(title(`L${round}-${i}`, 2000, credits))
+    }
+    const index = buildTrailIndex(sources)
+    const view = createView(index, null)
+    for (let pair = 0; pair < 5; pair += 1) {
+      const from = Math.floor(random() * 18)
+      const to = Math.floor(random() * 18)
+      if (from === to) continue
+      const maxHops = 1 + Math.floor(random() * 3)
+      const found = findPath(view, from, to, { maxHops })
+      const expected = referenceLimitedCost(index, from, to, maxHops)
+      if (expected == null) {
+        assert.equal(found, null, `round ${round}: ${from} → ${to} within ${maxHops}`)
+        continue
+      }
+      assert.ok(found, `round ${round}: ${from} → ${to} within ${maxHops} exists`)
+      assert.ok(found.entities.length <= maxHops)
+      assert.ok(Math.abs(found.cost - expected) < 1e-9, `round ${round}: ${found.cost} vs ${expected}`)
+    }
+  }
+})

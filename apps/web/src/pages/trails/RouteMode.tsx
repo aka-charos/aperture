@@ -49,14 +49,14 @@ export function RouteMode({
   onFollow,
 }: RouteModeProps) {
   const { t } = useTranslation()
-  const { answers, store, failure, fail, clearFailure } = useAnswers<TrailResult>()
+  const { answers, hasAnswer, store, failure, fail, clearFailure } = useAnswers<TrailResult>()
   const [surprising, setSurprising] = useState(false)
   const [surpriseError, setSurpriseError] = useState<string | null>(null)
   const key = pairKey(from, to)
   const failedHere = key != null && failure?.key === key
 
   useEffect(() => {
-    if (!key || answers.has(key) || failedHere) return
+    if (!key || hasAnswer(key) || failedHere) return
     const [fromRef, toRef] = key.split('|')
     const controller = new AbortController()
     clearFailure()
@@ -74,7 +74,13 @@ export function RouteMode({
         else fail(key, t('trails.errors.load'))
       })
     return () => controller.abort()
-  }, [key, answers, failedHere, remember, store, fail, clearFailure, t])
+  }, [key, hasAnswer, failedHere, remember, store, fail, clearFailure, t])
+
+  // A pair the viewer chose by hand replaces whatever the last surprise said.
+  const choose = (nextFrom: string | null, nextTo: string | null) => {
+    setSurpriseError(null)
+    onChange(nextFrom, nextTo)
+  }
 
   const surprise = async () => {
     setSurprising(true)
@@ -111,7 +117,7 @@ export function RouteMode({
           exclude={to ? [to] : []}
           onChange={(picked) => {
             if (picked) remember([picked])
-            onChange(picked?.ref ?? null, to)
+            choose(picked?.ref ?? null, to)
           }}
         />
         <Tooltip title={t('trails.route.swap')}>
@@ -119,7 +125,7 @@ export function RouteMode({
             <IconButton
               aria-label={t('trails.route.swap')}
               disabled={!from && !to}
-              onClick={() => onChange(to, from)}
+              onClick={() => choose(to, from)}
             >
               <SwapHorizIcon />
             </IconButton>
@@ -131,7 +137,7 @@ export function RouteMode({
           exclude={from ? [from] : []}
           onChange={(picked) => {
             if (picked) remember([picked])
-            onChange(from, picked?.ref ?? null)
+            choose(from, picked?.ref ?? null)
           }}
         />
         <Button

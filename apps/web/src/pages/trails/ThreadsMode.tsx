@@ -49,7 +49,7 @@ export function ThreadsMode({
 }: ThreadsModeProps) {
   const { t } = useTranslation()
   const { hereText } = useTrailText()
-  const { answers, store, failure, fail, clearFailure } = useAnswers<ThreadsResponse>()
+  const { answers, hasAnswer, store, failure, fail, clearFailure } = useAnswers<ThreadsResponse>()
   // What each followed title was reached through, for the trail above. Only
   // known for steps taken on this page; a trail opened from a link shows titles.
   const [reachedVia, setReachedVia] = useState<ReadonlyMap<string, string>>(() => new Map())
@@ -57,15 +57,13 @@ export function ThreadsMode({
   const failedHere = current != null && failure?.key === current
 
   useEffect(() => {
-    if (!current || answers.has(current) || failedHere) return
+    if (!current || hasAnswer(current) || failedHere) return
     const controller = new AbortController()
     clearFailure()
     fetchTrails<ThreadsResponse>(`threads?title=${encodeURIComponent(current)}`, controller.signal)
       .then((response) => {
-        remember([
-          response.title,
-          ...response.threads.flatMap((thread) => thread.others.map((member) => member.title)),
-        ])
+        // The threads' own titles are read from the response, never cached.
+        remember([response.title])
         store(current, response)
       })
       .catch((caught) => {
@@ -78,7 +76,7 @@ export function ThreadsMode({
         )
       })
     return () => controller.abort()
-  }, [current, answers, failedHere, remember, store, fail, clearFailure, t])
+  }, [current, hasAnswer, failedHere, remember, store, fail, clearFailure, t])
 
   const follow = (title: TrailTitle, thread: Thread) => {
     remember([title])

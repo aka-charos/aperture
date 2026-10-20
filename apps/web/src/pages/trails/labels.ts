@@ -2,14 +2,18 @@
  * How Trails words a link, and how the page's selection lives in the URL.
  * Pure, pinned by trails.test.ts.
  */
+import { CONNECTION_COLORS } from '../../components/SimilarityGraph/types'
 import type { TrailEntityKind, TrailLink, TrailRole } from './types'
 
-/** The legend colours of the similarity graph, so a kind reads the same on both. */
+/**
+ * Each kind in the similarity graph's legend colour for the same thing, read
+ * from its palette so the two pages cannot drift apart.
+ */
 export const KIND_COLOR: Record<TrailEntityKind, string> = {
-  person: '#3B82F6',
-  franchise: '#F59E0B',
-  company: '#F97316',
-  keyword: '#EC4899',
+  person: CONNECTION_COLORS.director,
+  franchise: CONNECTION_COLORS.collection,
+  company: CONNECTION_COLORS.studio,
+  keyword: CONNECTION_COLORS.keyword,
 }
 
 /** The i18n key of a role's name: "Director", "Lead", "Cinematographer"… */

@@ -102,6 +102,10 @@ async function currentIndex(forceRebuild = false): Promise<IndexCache> {
       .finally(() => {
         building = null
       })
+    // A stale index answers while this builds, so nothing may await it — and
+    // an unawaited rejection is fatal here (the API exits on one). Handled
+    // once at the source; a caller that does await still gets the error.
+    building.catch((err) => logger.warn({ err }, 'Trails index rebuild failed; the previous index stays in use'))
   }
   // A stale index still answers while its replacement builds; only the first
   // build, or a forced one, is waited for.
@@ -147,16 +151,42 @@ async function viewFor(scope: LibraryScope, forceRebuild = false): Promise<Trail
 }
 
 /**
+ * Whether any of these refs is a title the library holds. Asked only about refs
+ * the index lacks, before rebuilding for them: a deleted title in a saved link,
+ * or an id someone made up, must not cost a full rebuild.
+ */
+async function anyTitleExists(refs: readonly TitleRef[]): Promise<boolean> {
+  const movies = refs.filter((ref) => ref.type === 'movie').map((ref) => ref.id)
+  const series = refs.filter((ref) => ref.type === 'series').map((ref) => ref.id)
+  const row = await query<{ found: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM movies WHERE id = ANY($1::uuid[]))
+         OR EXISTS (SELECT 1 FROM series WHERE id = ANY($2::uuid[])) AS found`,
+    [movies, series]
+  )
+  return row.rows[0]?.found === true
+}
+
+/**
  * The view and the indices of `refs` in it; a title out of scope reads as
  * missing (null), exactly like one that does not exist. A ref the index does
- * not hold may be a title synced since the last build, so the index is rebuilt
- * early once before giving up on it.
+ * not hold may be a title synced since the last build, so when the library
+ * has it the index is rebuilt early (at most every few minutes) before giving
+ * up on it.
  */
 async function resolve(scope: LibraryScope, refs: readonly TitleRef[]): Promise<{ view: TrailView; titles: (number | null)[] }> {
   let view = await viewFor(scope)
-  const unknown = refs.some((ref) => !view.index.byRef.has(formatTitleRef(ref)))
-  if (unknown && cache && Date.now() - cache.builtAt > EARLY_REBUILD_AFTER_MS) {
-    view = await viewFor(scope, true)
+  const unknown = refs.filter((ref) => !view.index.byRef.has(formatTitleRef(ref)))
+  if (
+    unknown.length > 0 &&
+    cache &&
+    Date.now() - cache.builtAt > EARLY_REBUILD_AFTER_MS &&
+    (await anyTitleExists(unknown))
+  ) {
+    try {
+      view = await viewFor(scope, true)
+    } catch {
+      // Logged where it failed; the index already loaded still answers.
+    }
   }
   const titles = refs.map((ref) => {
     const title = view.index.byRef.get(formatTitleRef(ref))

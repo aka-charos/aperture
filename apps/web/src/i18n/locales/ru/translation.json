@@ -6711,7 +6711,8 @@
       "none": "These titles share no named link.",
       "connectPair": "Find a trail between the first two",
       "sharedBy_one": "In {{count}} of the {{total}}",
-      "sharedBy_other": "In {{count}} of the {{total}}"
+      "sharedBy_other": "In {{count}} of the {{total}}",
+      "tooFew": "Fewer than two of these titles are in your library, so there is nothing to compare."
     },
     "picker": {
       "placeholder": "Search your library",

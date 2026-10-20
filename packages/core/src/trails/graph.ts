@@ -299,8 +299,8 @@ export interface PathOptions {
 }
 
 /**
- * The cheapest path from one title to another, or null when none exists inside
- * `maxHops` steps.
+ * The cheapest path from one title to another within `maxHops` steps, or null
+ * when there is none.
  *
  * Dijkstra over titles and entities, searched from both ends at once and
  * stopped when the two searches can no longer improve on the best meeting
@@ -311,84 +311,95 @@ export interface PathOptions {
  * a route; most of that was the far side of the library the target sits
  * nowhere near.
  *
- * The step limit is applied as each side reaches a title and again when the
- * two halves meet, so a cheaper path needing more steps than allowed is not
- * offered — near enough, since a path that long explains nothing anyway.
+ * The step limit is exact, which is why every node is searched once PER STEP
+ * COUNT (a state is a node and how many steps reached it). With one label per
+ * node, a cheap prefix that had used too many steps claimed a title first and
+ * hid a dearer prefix that fit, so a route inside the limit could be reported
+ * as missing. A step limit of six makes that seven states per node per side.
  */
 export function findPath(view: TrailView, from: number, to: number, options: PathOptions = {}): FoundPath | null {
   const { index, allowed } = view
   if (from === to || !allowed[from] || !allowed[to]) return null
-  const maxHops = options.maxHops ?? MAX_PATH_HOPS
+  const maxHops = Math.max(1, options.maxHops ?? MAX_PATH_HOPS)
   const banned = options.banned
   const titleCount = index.titles.length
-  const nodeCount = titleCount + index.entities.length
+  const layers = maxHops + 1
+  const stateCount = (titleCount + index.entities.length) * layers
+  const stateOf = (node: number, steps: number) => node * layers + steps
 
   const makeSide = (start: number): SearchSide => {
     const side: SearchSide = {
-      dist: new Float64Array(nodeCount).fill(Number.POSITIVE_INFINITY),
-      prev: new Int32Array(nodeCount).fill(-1),
-      steps: new Uint8Array(nodeCount),
-      done: new Uint8Array(nodeCount),
+      dist: new Float64Array(stateCount).fill(Number.POSITIVE_INFINITY),
+      prev: new Int32Array(stateCount).fill(-1),
+      done: new Uint8Array(stateCount),
       heap: new MinHeap(),
     }
-    side.dist[start] = 0
-    side.heap.push(0, start)
+    side.dist[stateOf(start, 0)] = 0
+    side.heap.push(0, stateOf(start, 0))
     return side
   }
   const forward = makeSide(from)
   const backward = makeSide(to)
 
   let best = Number.POSITIVE_INFINITY
-  let meeting = -1
-  // A path through `node` is the two halves joined there; through an entity the
-  // join itself is one more step.
-  const consider = (node: number, side: SearchSide, other: SearchSide) => {
-    const total = side.dist[node] + other.dist[node]
-    if (total >= best) return
-    const steps = side.steps[node] + other.steps[node] + (node >= titleCount ? 1 : 0)
-    if (steps > maxHops) return
-    best = total
-    meeting = node
+  let meetForward = -1
+  let meetBackward = -1
+  // A path through a node joins a forward state and a backward state of that
+  // node whose steps add up to no more than the limit (one more when the node
+  // is an entity: the step through it is counted on neither side).
+  const consider = (node: number, steps: number, side: SearchSide, other: SearchSide) => {
+    const reached = side.dist[stateOf(node, steps)]
+    const spare = maxHops - steps - (node >= titleCount ? 1 : 0)
+    for (let otherSteps = 0; otherSteps <= spare; otherSteps += 1) {
+      const total = reached + other.dist[stateOf(node, otherSteps)]
+      if (total >= best) continue
+      best = total
+      meetForward = side === forward ? stateOf(node, steps) : stateOf(node, otherSteps)
+      meetBackward = side === forward ? stateOf(node, otherSteps) : stateOf(node, steps)
+    }
   }
 
   const expand = (side: SearchSide, other: SearchSide) => {
-    const node = side.heap.pop()
-    if (side.done[node]) return
-    side.done[node] = 1
-    const reached = side.dist[node]
+    const state = side.heap.pop()
+    if (side.done[state]) return
+    side.done[state] = 1
+    const node = Math.floor(state / layers)
+    const steps = state - node * layers
+    const reached = side.dist[state]
 
     if (node < titleCount) {
-      if (side.steps[node] >= maxHops) return
+      if (steps >= maxHops) return
       const entities = index.titleEntities[node]
       const masks = index.titleMasks[node]
       for (let i = 0; i < entities.length; i += 1) {
         const entity = entities[i]
-        const target = titleCount + entity
-        if (side.done[target] || !view.links(entity)) continue
+        if (!view.links(entity)) continue
+        const target = stateOf(titleCount + entity, steps)
+        if (side.done[target]) continue
         const cost = reached + edgeCost(masks[i], view.count(entity))
         if (cost < side.dist[target]) {
           side.dist[target] = cost
-          side.prev[target] = node
-          side.steps[target] = side.steps[node]
+          side.prev[target] = state
           side.heap.push(cost, target)
-          consider(target, side, other)
+          consider(titleCount + entity, steps, side, other)
         }
       }
     } else {
       const entity = index.entities[node - titleCount]
       const carried = view.count(node - titleCount)
-      const nextSteps = side.steps[node] + 1
+      const nextSteps = steps + 1
       for (let i = 0; i < entity.titles.length; i += 1) {
         const title = entity.titles[i]
-        if (!allowed[title] || side.done[title]) continue
+        if (!allowed[title]) continue
         if (banned?.has(title) && title !== from && title !== to) continue
+        const target = stateOf(title, nextSteps)
+        if (side.done[target]) continue
         const cost = reached + edgeCost(entity.masks[i], carried)
-        if (cost < side.dist[title]) {
-          side.dist[title] = cost
-          side.prev[title] = node
-          side.steps[title] = nextSteps
-          side.heap.push(cost, title)
-          consider(title, side, other)
+        if (cost < side.dist[target]) {
+          side.dist[target] = cost
+          side.prev[target] = state
+          side.heap.push(cost, target)
+          consider(title, nextSteps, side, other)
         }
       }
     }
@@ -402,22 +413,23 @@ export function findPath(view: TrailView, from: number, to: number, options: Pat
     else expand(backward, forward)
   }
 
-  if (meeting < 0) return null
-  // from … meeting, then meeting … to.
+  if (meetForward < 0) return null
+  // from … meeting node, then on to `to`; both meeting states are that node.
   const nodes: number[] = []
-  for (let node = meeting; node !== -1; node = forward.prev[node]) nodes.push(node)
+  for (let state = meetForward; state !== -1; state = forward.prev[state]) nodes.push(Math.floor(state / layers))
   nodes.reverse()
-  for (let node = backward.prev[meeting]; node !== -1; node = backward.prev[node]) nodes.push(node)
+  for (let state = backward.prev[meetBackward]; state !== -1; state = backward.prev[state]) {
+    nodes.push(Math.floor(state / layers))
+  }
   const titles = nodes.filter((node) => node < titleCount)
   const entities = nodes.filter((node) => node >= titleCount).map((node) => node - titleCount)
   return { cost: best, titles, entities }
 }
 
 interface SearchSide {
+  /** By state: a node and the steps taken from this side's end to reach it. */
   dist: Float64Array
   prev: Int32Array
-  /** For a title, steps from this side's end; for an entity, those of the title it was entered from. */
-  steps: Uint8Array
   done: Uint8Array
   heap: MinHeap
 }

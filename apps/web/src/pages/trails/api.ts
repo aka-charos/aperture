@@ -17,11 +17,11 @@ export function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError'
 }
 
-const LOOKUP_BATCH = 20
-
 export interface TrailLimits {
   maxCommonTitles: number
   maxSteps: number
+  /** The most refs one title-card lookup may name. */
+  maxTitleLookup: number
 }
 
 /** The limits the API enforces, decided there (null until they arrive). */
@@ -40,12 +40,16 @@ export function useTrailLimits(): TrailLimits | null {
 }
 
 /**
- * Title cards the page has seen, by ref. Every response feeds it (`remember`),
- * and refs the page holds without a card — a URL opened cold — are looked up
- * once. A ref the API does not return (out of scope, deleted) stays unknown and
- * is not asked about again.
+ * Title cards for the titles the page HOLDS (the pair, the followed trail, the
+ * compared titles), by ref. Responses feed it through `remember`, and refs the
+ * page holds without a card — a URL opened cold — are looked up once, in
+ * batches the API's `maxTitleLookup` allows (so nothing is asked before the
+ * limits arrive). A ref the API does not return (out of scope, deleted) stays
+ * unknown and is not asked about again. Titles a response merely SHOWS are
+ * read from that response, never stored here, so the cache grows with what
+ * the viewer picks rather than with everything they scroll past.
  */
-export function useTitleCache(refs: readonly string[]) {
+export function useTitleCache(refs: readonly string[], batchSize: number | null) {
   const [cards, setCards] = useState<ReadonlyMap<string, TrailTitle>>(() => new Map())
   const asked = useRef(new Set<string>())
   // Read through a ref so a card arriving from elsewhere does not restart (and
@@ -68,7 +72,7 @@ export function useTitleCache(refs: readonly string[]) {
     const missing = key
       .split(',')
       .filter((ref) => ref && !cardsRef.current.has(ref) && !asked.current.has(ref))
-    if (missing.length === 0) return
+    if (missing.length === 0 || batchSize == null || batchSize < 1) return
     for (const ref of missing) asked.current.add(ref)
     const controller = new AbortController()
     let answered = false
@@ -79,10 +83,8 @@ export function useTitleCache(refs: readonly string[]) {
     const release = () => {
       if (!answered) for (const ref of missing) asked.current.delete(ref)
     }
-    // In batches comfortably under the API's limit, so a page holding more refs
-    // than one lookup allows still resolves them all.
     const batches: string[][] = []
-    for (let at = 0; at < missing.length; at += LOOKUP_BATCH) batches.push(missing.slice(at, at + LOOKUP_BATCH))
+    for (let at = 0; at < missing.length; at += batchSize) batches.push(missing.slice(at, at + batchSize))
     Promise.all(
       batches.map((batch) =>
         fetchTrails<{ titles: TrailTitle[] }>(`titles?refs=${encodeURIComponent(batch.join(','))}`, controller.signal)
@@ -97,7 +99,7 @@ export function useTitleCache(refs: readonly string[]) {
       release()
       controller.abort()
     }
-  }, [key, remember])
+  }, [key, batchSize, remember])
 
   return useMemo(() => ({ cards, remember }), [cards, remember])
 }
@@ -112,6 +114,12 @@ const RECENT_ANSWERS = 24
 export function useAnswers<T>() {
   const [answers, setAnswers] = useState<ReadonlyMap<string, T>>(() => new Map())
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null)
+  // Fetch effects ask through this rather than depending on `answers`: as a
+  // dependency, every stored answer (a surprise pair, say) would restart the
+  // effect and abort the request still on its way for the current key.
+  const answersRef = useRef(answers)
+  answersRef.current = answers
+  const hasAnswer = useCallback((key: string) => answersRef.current.has(key), [])
 
   const store = useCallback((key: string, value: T) => {
     setAnswers((previous) => {
@@ -129,5 +137,5 @@ export function useAnswers<T>() {
   const fail = useCallback((key: string, message: string) => setFailure({ key, message }), [])
   const clearFailure = useCallback(() => setFailure(null), [])
 
-  return { answers, store, failure, fail, clearFailure }
+  return { answers, hasAnswer, store, failure, fail, clearFailure }
 }

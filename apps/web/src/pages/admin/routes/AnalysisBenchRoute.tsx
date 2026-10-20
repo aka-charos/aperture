@@ -51,13 +51,9 @@ import {
   Replay as ReplayIcon,
   Stop as StopIcon,
 } from '@mui/icons-material'
+import { useLibraryTitleSearch, type LibrarySearchHit } from '@/hooks/useLibraryTitleSearch'
 
-interface SearchHit {
-  id: string
-  title: string
-  year?: number | null
-  type: 'movie' | 'series'
-}
+type SearchHit = LibrarySearchHit
 
 interface ProviderGroup {
   provider: string
@@ -138,7 +134,7 @@ export default function AnalysisBenchRoute() {
   const { t } = useTranslation()
 
   const [queryText, setQueryText] = useState('')
-  const [hits, setHits] = useState<SearchHit[]>([])
+  const { hits } = useLibraryTitleSearch(queryText, { limit: 8 })
   const [picked, setPicked] = useState<SearchHit | null>(null)
 
   const [providers, setProviders] = useState<ProviderGroup[]>([])
@@ -201,34 +197,6 @@ export default function AnalysisBenchRoute() {
       .catch(() => setError(t('adminAnalysisBench.modelsFailed')))
     void loadRuns()
   }, [loadRuns, t])
-
-  // Debounced, and the in-flight response is dropped when the query moves on —
-  // otherwise a slow early request lands after a fast later one and the list
-  // shows results for something the operator has stopped typing.
-  useEffect(() => {
-    const term = queryText.trim()
-    if (term.length < 2) {
-      setHits([])
-      return
-    }
-    let cancelled = false
-    const timer = setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(term)}&type=all&limit=8`, {
-        credentials: 'include',
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((json: { results?: SearchHit[] } | null) => {
-          if (!cancelled) setHits(json?.results ?? [])
-        })
-        .catch(() => {
-          /* a failed lookup shows no results rather than a banner */
-        })
-    }, 250)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [queryText])
 
   // Poll while the run is live. The interval is cleared on every status change,
   // so a finished run stops polling without needing its own effect.
@@ -439,7 +407,6 @@ export default function AnalysisBenchRoute() {
                 selected={picked?.id === hit.id}
                 onClick={() => {
                   setPicked(hit)
-                  setHits([])
                   setQueryText('')
                 }}
               >

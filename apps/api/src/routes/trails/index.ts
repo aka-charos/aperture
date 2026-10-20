@@ -48,7 +48,7 @@ const trailsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/api/trails/limits',
     { preHandler: requireAuth, schema: { tags: ['trails'] } },
-    async () => ({ maxCommonTitles: MAX_COMMON_TITLES, maxSteps: MAX_TRAIL_STEPS })
+    async () => ({ maxCommonTitles: MAX_COMMON_TITLES, maxSteps: MAX_TRAIL_STEPS, maxTitleLookup: MAX_TITLE_LOOKUP })
   )
 
   /** GET /api/trails/titles?refs=movie:<id>,series:<id> — title cards, in scope only. */

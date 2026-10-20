@@ -34,12 +34,12 @@ interface CommonModeProps {
 export function CommonMode({ titles, cards, remember, onChange, maxTitles, onOpen, onFollow, onConnect }: CommonModeProps) {
   const { t } = useTranslation()
   const { role } = useTrailText()
-  const { answers, store, failure, fail, clearFailure } = useAnswers<CommonResponse>()
+  const { answers, hasAnswer, store, failure, fail, clearFailure } = useAnswers<CommonResponse>()
   const key = titles.length >= 2 ? titles.join(',') : null
   const failedHere = key != null && failure?.key === key
 
   useEffect(() => {
-    if (!key || answers.has(key) || failedHere) return
+    if (!key || hasAnswer(key) || failedHere) return
     const controller = new AbortController()
     clearFailure()
     fetchTrails<CommonResponse>(`common?titles=${encodeURIComponent(key)}`, controller.signal)
@@ -52,7 +52,7 @@ export function CommonMode({ titles, cards, remember, onChange, maxTitles, onOpe
         fail(key, t('trails.errors.load'))
       })
     return () => controller.abort()
-  }, [key, answers, failedHere, remember, store, fail, clearFailure, t])
+  }, [key, hasAnswer, failedHere, remember, store, fail, clearFailure, t])
 
   const full = maxTitles != null && titles.length >= maxTitles
   const response = key ? (answers.get(key) ?? null) : null
@@ -121,6 +121,10 @@ export function CommonMode({ titles, cards, remember, onChange, maxTitles, onOpe
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
           <CircularProgress />
         </Box>
+      )}
+
+      {response && response.titles.length < 2 && (
+        <Alert severity="info">{t('trails.common.tooFew')}</Alert>
       )}
 
       {response && response.links.length === 0 && response.titles.length >= 2 && (
