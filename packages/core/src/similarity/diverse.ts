@@ -4,6 +4,7 @@ import { getExplorationModelInstance } from '../lib/ai-provider.js'
 import { generateText } from 'ai'
 import type { SimilarityItem } from './index.js'
 import type { ConnectionReason } from './reasons.js'
+import { binderFor, libraryScopeSql, type LibraryScope } from '../lib/libraryScope.js'
 
 const logger = createChildLogger('similarity:diverse')
 
@@ -360,9 +361,19 @@ export function analyzeBubble(
 export async function findDiverseContent(
   centerItem: SimilarityItem,
   existingItems: SimilarityItem[],
-  options: { limit?: number; type?: 'movie' | 'series'; userId?: string } = {}
+  options: {
+    limit?: number
+    type?: 'movie' | 'series'
+    userId?: string
+    /**
+     * What the viewer may be shown. The model suggests titles from anywhere;
+     * only ones inside this scope may become nodes, or a library the media
+     * server hides from the viewer leaks onto their graph.
+     */
+    scope?: LibraryScope
+  } = {}
 ): Promise<DiverseResult> {
-  const { limit = 10, type = 'movie', userId: _userId } = options
+  const { limit = 10, type = 'movie', userId: _userId, scope } = options
   void _userId // Reserved for future locale-aware suggestions; title output stays English for library matching.
 
   // Build exclusion list (titles to avoid)
@@ -411,7 +422,7 @@ Focus on well-known, popular films that are likely to be in a home media library
     logger.debug({ suggestedTitles }, 'AI suggested titles')
 
     // Match suggestions to library
-    const matches = await matchTitlesToLibrary(suggestedTitles, type)
+    const matches = await matchTitlesToLibrary(suggestedTitles, type, scope)
 
     logger.info(
       { 
@@ -448,69 +459,77 @@ function parseTitles(content: string): string[] {
 }
 
 /**
- * Match AI-suggested titles to movies in the library using fuzzy matching
+ * Match AI-suggested titles to library rows, in one query.
+ *
+ * Through aperture_search_key, the fold library search uses, on both the
+ * localized and the original title, so accents and punctuation do not stop a
+ * film matching itself ("Amelie" finds "Amélie"). An exact key wins; a close
+ * trigram match is the fallback for a subtitle the model dropped. There is no
+ * substring match: "Up" would otherwise attach whatever title contains it.
+ * Filtered to `scope` when given, so a suggestion can only resolve to a title
+ * the viewer may open.
  */
 async function matchTitlesToLibrary(
   titles: string[],
-  type: 'movie' | 'series'
+  type: 'movie' | 'series',
+  scope?: LibraryScope
 ): Promise<SimilarityItem[]> {
   if (titles.length === 0) return []
 
   const table = type === 'movie' ? 'movies' : 'series'
-  const items: SimilarityItem[] = []
+  const params: unknown[] = [titles]
+  const inScope = scope ? libraryScopeSql(scope, 't', binderFor(params)) : 'TRUE'
+  const result = await query<{
+    id: string
+    title: string
+    year: number | null
+    poster_url: string | null
+    genres: string[]
+    directors: string[]
+    actors: unknown
+    collection_name: string | null
+    network: string | null
+    keywords: string[]
+    studios: unknown
+  }>(
+    `SELECT m.*
+     FROM unnest($1::text[]) WITH ORDINALITY AS c(title, i)
+     CROSS JOIN LATERAL (
+       SELECT t.id, t.title, t.year, t.poster_url, t.genres, t.directors, t.actors,
+              ${type === 'movie' ? 't.collection_name' : 'NULL::text AS collection_name'},
+              ${type === 'series' ? 't.network' : 'NULL::text AS network'},
+              t.keywords, t.studios
+       FROM ${table} t
+       WHERE (t.title_search_key = aperture_search_key(c.title)
+              OR t.original_title_search_key = aperture_search_key(c.title)
+              OR (t.title_search_key % aperture_search_key(c.title)
+                  AND similarity(t.title_search_key, aperture_search_key(c.title)) > 0.5))
+         AND ${inScope}
+       ORDER BY
+         CASE WHEN t.title_search_key = aperture_search_key(c.title)
+                OR t.original_title_search_key = aperture_search_key(c.title) THEN 0 ELSE 1 END,
+         similarity(t.title_search_key, aperture_search_key(c.title)) DESC,
+         t.id
+       LIMIT 1
+     ) m
+     ORDER BY c.i`,
+    params
+  )
 
-  for (const title of titles) {
-    // Try exact match first, then fuzzy
-    const result = await query<{
-      id: string
-      title: string
-      year: number | null
-      poster_url: string | null
-      genres: string[]
-      directors: string[]
-      actors: unknown
-      collection_name: string | null
-      network: string | null
-      keywords: string[]
-      studios: unknown
-    }>(
-      `SELECT 
-        id, title, year, poster_url, genres, directors, actors,
-        ${type === 'movie' ? 'collection_name' : 'NULL as collection_name'},
-        ${type === 'series' ? 'network' : 'NULL as network'},
-        keywords,
-        studios
-       FROM ${table}
-       WHERE LOWER(title) = LOWER($1)
-          OR title ILIKE $2
-          OR SIMILARITY(LOWER(title), LOWER($1)) > 0.5
-       ORDER BY 
-         CASE WHEN LOWER(title) = LOWER($1) THEN 0 ELSE 1 END,
-         SIMILARITY(LOWER(title), LOWER($1)) DESC
-       LIMIT 1`,
-      [title, `%${title}%`]
-    )
-
-    if (result.rows.length > 0) {
-      const row = result.rows[0]
-      items.push({
-        id: row.id,
-        title: row.title,
-        year: row.year,
-        poster_url: row.poster_url,
-        type,
-        genres: row.genres || [],
-        directors: row.directors || [],
-        actors: parseActors(row.actors),
-        collection_name: row.collection_name,
-        network: row.network,
-        keywords: row.keywords || [],
-        studios: parseStudios(row.studios),
-      })
-    }
-  }
-
-  return items
+  return result.rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    year: row.year,
+    poster_url: row.poster_url,
+    type,
+    genres: row.genres || [],
+    directors: row.directors || [],
+    actors: parseActors(row.actors),
+    collection_name: row.collection_name,
+    network: row.network,
+    keywords: row.keywords || [],
+    studios: parseStudios(row.studios),
+  }))
 }
 
 /**

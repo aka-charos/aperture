@@ -3,56 +3,74 @@ import { query } from '../../lib/db.js'
 import { clampRating } from '../shared/syncHelpers.js'
 import type { PreparedSeries } from './syncTypes.js'
 import {
-  pickTitleYearRow,
-  takeOverRow,
-  titleYearKey,
+  addToRebindIndex,
+  decideIncoming,
+  type RebindIndex,
   type TitleYearRow,
 } from '../shared/titleYearRebind.js'
+import { keepStoredJsonArray, keepStoredText, keepStoredTextArray, keepStoredValue } from '../shared/keepStored.js'
 
 const logger = createChildLogger('sync-series')
 
 export async function processSeriesBatch(
   seriesList: PreparedSeries[],
   existingProviderIds: Set<string>,
-  existingTitleYears: Map<string, TitleYearRow[]>,
+  rebindIndex: RebindIndex<TitleYearRow>,
   liveProviderIds: ReadonlySet<string>,
+  phase: 'listing' | 'final',
   _jobId: string
-): Promise<{ added: number; updated: number }> {
+): Promise<{ added: number; updated: number; deferred: PreparedSeries[] }> {
   // Separate into updates and inserts
   const toUpdate: PreparedSeries[] = []
   const toInsert: PreparedSeries[] = []
   // Series whose provider id is new but which match a stored row by title+year
-  // (the server re-issued the id). `previousId` is the row they take over.
+  // or, failing that, by external id (the server re-issued the id).
+  // `previousId` is the row they take over.
   const toUpdateByTitleYear: Array<PreparedSeries & { previousId: string }> = []
+  // Shows nothing claimed while libraries are still being listed; matched
+  // again, external ids included, once every library has answered.
+  const deferred: PreparedSeries[] = []
 
   for (const ps of seriesList) {
-    if (existingProviderIds.has(ps.series.id)) {
-      toUpdate.push(ps)
-      continue
-    }
     // Title+year alone is not an identity: two different shows can share both.
-    // A row is taken over only when no external id contradicts it
-    // (shared/titleYearRebind.ts); otherwise the show gets a row of its own.
-    const key = titleYearKey(ps.series.name, ps.series.year)
-    const row = key
-      ? pickTitleYearRow(existingTitleYears.get(key), ps.series, (id) => liveProviderIds.has(id))
-      : null
-    if (row) {
-      toUpdateByTitleYear.push({ ...ps, previousId: row.providerItemId })
-      takeOverRow(row, ps.series.id, ps.series)
+    // A row is taken over only when no external id contradicts it, and by
+    // external id only in the final phase, against a row whose own item is
+    // gone from the server (shared/titleYearRebind.ts).
+    const decision = decideIncoming(
+      rebindIndex,
+      existingProviderIds,
+      {
+        providerItemId: ps.series.id,
+        title: ps.series.name,
+        originalTitle: ps.series.originalTitle,
+        year: ps.series.year,
+        tmdbId: ps.series.tmdbId,
+        imdbId: ps.series.imdbId,
+        tvdbId: ps.series.tvdbId,
+      },
+      (id) => liveProviderIds.has(id),
+      phase
+    )
+    if (decision.kind === 'update') {
+      toUpdate.push(ps)
+    } else if (decision.kind === 'takeover') {
+      toUpdateByTitleYear.push({ ...ps, previousId: decision.match.previousId })
+    } else if (decision.kind === 'defer') {
+      deferred.push(ps)
     } else {
       toInsert.push(ps)
-      if (key) {
-        const entry: TitleYearRow = {
+      addToRebindIndex(
+        rebindIndex,
+        {
           providerItemId: ps.series.id,
           tmdbId: ps.series.tmdbId,
           imdbId: ps.series.imdbId,
           tvdbId: ps.series.tvdbId,
-        }
-        const list = existingTitleYears.get(key)
-        if (list) list.push(entry)
-        else existingTitleYears.set(key, [entry])
-      }
+          titles: [ps.series.name, ps.series.originalTitle],
+        },
+        ps.series.name,
+        ps.series.year
+      )
     }
   }
 
@@ -67,30 +85,30 @@ export async function processSeriesBatch(
       const result = await query(
         `UPDATE series SET
           title = data.title,
-          original_title = data.original_title,
+          original_title = ${keepStoredText('original_title', 'series')},
           sort_title = data.sort_title,
-          year = data.year,
-          end_year = data.end_year,
-          genres = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.genres)), '{}'),
-          overview = data.overview,
-          tagline = data.tagline,
-          community_rating = data.community_rating,
-          critic_rating = data.critic_rating,
-          content_rating = data.content_rating,
-          status = data.status,
-          total_seasons = data.total_seasons,
-          total_episodes = data.total_episodes,
+          year = ${keepStoredValue('year', 'series')},
+          end_year = ${keepStoredValue('end_year', 'series')},
+          genres = ${keepStoredTextArray('genres', 'series')},
+          overview = ${keepStoredText('overview', 'series')},
+          tagline = ${keepStoredText('tagline', 'series')},
+          community_rating = ${keepStoredValue('community_rating', 'series')},
+          critic_rating = ${keepStoredValue('critic_rating', 'series')},
+          content_rating = ${keepStoredText('content_rating', 'series')},
+          status = ${keepStoredText('status', 'series')},
+          total_seasons = ${keepStoredValue('total_seasons', 'series')},
+          total_episodes = ${keepStoredValue('total_episodes', 'series')},
           air_days = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.air_days)), '{}'),
-          network = data.network,
-          studios = data.studios,
-          directors = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.directors)), '{}'),
-          writers = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.writers)), '{}'),
-          actors = data.actors,
+          network = ${keepStoredText('network', 'series')},
+          studios = ${keepStoredJsonArray('studios', 'series')},
+          directors = ${keepStoredTextArray('directors', 'series')},
+          writers = ${keepStoredTextArray('writers', 'series')},
+          actors = ${keepStoredJsonArray('actors', 'series')},
           imdb_id = data.imdb_id,
           tmdb_id = data.tmdb_id,
           tvdb_id = data.tvdb_id,
           tags = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.tags)), '{}'),
-          production_countries = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.production_countries)), '{}'),
+          production_countries = ${keepStoredTextArray('production_countries', 'series')},
           awards = data.awards,
           poster_url = data.poster_url,
           backdrop_url = data.backdrop_url,
@@ -160,30 +178,30 @@ export async function processSeriesBatch(
         `UPDATE series SET
           provider_item_id = data.provider_item_id,
           title = data.title,
-          year = data.year,
-          original_title = data.original_title,
+          year = ${keepStoredValue('year', 'series')},
+          original_title = ${keepStoredText('original_title', 'series')},
           sort_title = data.sort_title,
-          end_year = data.end_year,
-          genres = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.genres)), '{}'),
-          overview = data.overview,
-          tagline = data.tagline,
-          community_rating = data.community_rating,
-          critic_rating = data.critic_rating,
-          content_rating = data.content_rating,
-          status = data.status,
-          total_seasons = data.total_seasons,
-          total_episodes = data.total_episodes,
+          end_year = ${keepStoredValue('end_year', 'series')},
+          genres = ${keepStoredTextArray('genres', 'series')},
+          overview = ${keepStoredText('overview', 'series')},
+          tagline = ${keepStoredText('tagline', 'series')},
+          community_rating = ${keepStoredValue('community_rating', 'series')},
+          critic_rating = ${keepStoredValue('critic_rating', 'series')},
+          content_rating = ${keepStoredText('content_rating', 'series')},
+          status = ${keepStoredText('status', 'series')},
+          total_seasons = ${keepStoredValue('total_seasons', 'series')},
+          total_episodes = ${keepStoredValue('total_episodes', 'series')},
           air_days = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.air_days)), '{}'),
-          network = data.network,
-          studios = data.studios,
-          directors = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.directors)), '{}'),
-          writers = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.writers)), '{}'),
-          actors = data.actors,
+          network = ${keepStoredText('network', 'series')},
+          studios = ${keepStoredJsonArray('studios', 'series')},
+          directors = ${keepStoredTextArray('directors', 'series')},
+          writers = ${keepStoredTextArray('writers', 'series')},
+          actors = ${keepStoredJsonArray('actors', 'series')},
           imdb_id = data.imdb_id,
           tmdb_id = data.tmdb_id,
           tvdb_id = data.tvdb_id,
           tags = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.tags)), '{}'),
-          production_countries = COALESCE(ARRAY(SELECT jsonb_array_elements_text(data.production_countries)), '{}'),
+          production_countries = ${keepStoredTextArray('production_countries', 'series')},
           awards = data.awards,
           poster_url = data.poster_url,
           backdrop_url = data.backdrop_url,
@@ -340,5 +358,5 @@ export async function processSeriesBatch(
     }
   }
 
-  return { added, updated }
+  return { added, updated, deferred }
 }

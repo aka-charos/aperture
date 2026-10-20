@@ -7,6 +7,7 @@ export interface ConnectionRecentWatchItem {
   year: number | null
   posterUrl: string | null
   genres: string[]
+  overview?: string | null
   lastWatched: string
   playCount: number
   lastEpisode?: { seasonNumber: number; episodeNumber: number }

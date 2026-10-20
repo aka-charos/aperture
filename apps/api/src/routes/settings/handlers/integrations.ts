@@ -8,8 +8,7 @@
  * - GET /api/settings/omdb - Get OMDb config
  * - PATCH /api/settings/omdb - Update OMDb config
  * - POST /api/settings/omdb/test - Test OMDb connection
- * - GET /api/settings/studio-logos - Get studio logos config
- * - PATCH /api/settings/studio-logos - Update studio logos config
+ * - GET /api/settings/studio-logos - How many studios and networks have a logo
  * - GET /api/settings/openai - Get OpenAI config (legacy)
  * - PATCH /api/settings/openai - Update OpenAI config (legacy)
  * - POST /api/settings/openai/test - Test OpenAI connection (legacy)
@@ -22,8 +21,6 @@ import {
   getOMDbConfig,
   setOMDbConfig,
   testOMDbConnection,
-  getStudioLogosConfig,
-  setStudioLogosConfig,
   getStudioLogoStats,
   hasOpenAIApiKey,
   setOpenAIApiKey,
@@ -38,7 +35,6 @@ import {
   updateOmdbConfigSchema,
   testOmdbSchema,
   studioLogosConfigSchema,
-  updateStudioLogosConfigSchema,
   openaiConfigSchema,
   updateOpenaiConfigSchema,
   testOpenaiSchema,
@@ -181,46 +177,24 @@ export function registerIntegrationHandlers(fastify: FastifyInstance) {
 
   /**
    * GET /api/settings/studio-logos
+   *
+   * Report only. There used to be a PATCH switching on an upload of TMDb logos
+   * to the media server; it replaced images the server already had and is
+   * gone (core enrichment/studioLogos.ts).
    */
   fastify.get('/api/settings/studio-logos', { preHandler: requireAdmin, schema: studioLogosConfigSchema }, async (_request, reply) => {
     try {
-      const [config, stats] = await Promise.all([
-        getStudioLogosConfig(),
-        getStudioLogoStats(),
-      ])
-
+      const stats = await getStudioLogoStats()
       return reply.send({
-        pushToEmby: config.pushToEmby,
         stats: {
           studios: stats.studios,
           networks: stats.networks,
-          pushedToEmby: stats.pushedToEmby,
+          mediaServerImages: stats.mediaServerImages,
         },
       })
     } catch (err) {
-      fastify.log.error({ err }, 'Failed to get studio logos config')
-      return reply.status(500).send({ error: 'Failed to get studio logos configuration' })
-    }
-  })
-
-  /**
-   * PATCH /api/settings/studio-logos
-   */
-  fastify.patch<{
-    Body: { pushToEmby?: boolean }
-  }>('/api/settings/studio-logos', { preHandler: requireAdmin, schema: updateStudioLogosConfigSchema }, async (request, reply) => {
-    try {
-      const { pushToEmby } = request.body
-
-      const config = await setStudioLogosConfig({ pushToEmby })
-
-      return reply.send({
-        pushToEmby: config.pushToEmby,
-        message: 'Studio logos configuration updated',
-      })
-    } catch (err) {
-      fastify.log.error({ err }, 'Failed to save studio logos config')
-      return reply.status(500).send({ error: 'Failed to save studio logos configuration' })
+      fastify.log.error({ err }, 'Failed to get studio logo stats')
+      return reply.status(500).send({ error: 'Failed to get studio logo statistics' })
     }
   })
 

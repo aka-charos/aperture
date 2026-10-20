@@ -23,7 +23,7 @@ import {
 import type { SyncSeriesResult, LibrarySeriesSyncResult, PreparedSeries, PreparedEpisode } from './syncTypes.js'
 import { reconcileRemovedSeries } from './reconcile.js'
 import { processSeriesBatch } from './seriesBatch.js'
-import { indexByTitleYear } from '../shared/titleYearRebind.js'
+import { buildRebindIndex, type TitleYearRow } from '../shared/titleYearRebind.js'
 import { processEpisodeBatch } from './episodeBatch.js'
 
 export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResult> {
@@ -164,17 +164,23 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
       query<{
         provider_item_id: string
         title: string
+        original_title: string | null
         year: number | null
         tmdb_id: string | null
         imdb_id: string | null
         tvdb_id: string | null
-      }>('SELECT provider_item_id, title, year, tmdb_id, imdb_id, tvdb_id FROM series'),
+      }>(
+        // Oldest first: when two stored rows tie for one re-issued show, the
+        // external-id fallback keeps the first, so the row with the longest
+        // history survives (shared/titleYearRebind.ts).
+        'SELECT provider_item_id, title, original_title, year, tmdb_id, imdb_id, tvdb_id FROM series ORDER BY created_at, id'
+      ),
       query<{ provider_item_id: string; series_id: string; season_number: number; episode_number: number }>(
         'SELECT provider_item_id, series_id, season_number, episode_number FROM episodes'
       ),
     ])
     const existingSeriesIds = new Set(existingSeriesResult.rows.map((s) => s.provider_item_id))
-    const existingSeriesTitleYears = indexByTitleYear(
+    const seriesRebindIndex = buildRebindIndex<TitleYearRow>(
       existingSeriesResult.rows.map((s) => ({
         providerItemId: s.provider_item_id,
         title: s.title,
@@ -182,6 +188,7 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         tmdbId: s.tmdb_id,
         imdbId: s.imdb_id,
         tvdbId: s.tvdb_id,
+        titles: [s.title, s.original_title],
       }))
     )
     // Track existing episodes by BOTH provider_item_id AND by series+season+episode composite key
@@ -204,10 +211,34 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
     let processedSeries = 0
     let processedEpisodes = 0
     const librarySyncResults: LibrarySeriesSyncResult[] = []
-    // Every series id the server has listed so far this run. A title+year
-    // match may not take over a row whose own id is in here
-    // (shared/titleYearRebind.ts).
+    // Every series id the server has listed so far this run. Each library is
+    // written as it is listed, matching by provider id or title+year; a show
+    // nothing claims is DEFERRED, and only once every library has answered
+    // (liveness complete) is it matched again with the external-id fallback
+    // allowed, then inserted if nothing takes it (shared/titleYearRebind.ts
+    // `decideIncoming`). So one library failing to list costs only the
+    // deferred shows, never the libraries before it.
     const liveSeriesIds = new Set<string>()
+    const deferredSeries: PreparedSeries[] = []
+
+    const processSeriesBatches = async (prepared: PreparedSeries[], phase: 'listing' | 'final') => {
+      for (let i = 0; i < prepared.length; i += DB_BATCH_SIZE) {
+        const batch = prepared.slice(i, i + DB_BATCH_SIZE)
+        const result = await processSeriesBatch(
+          batch,
+          existingSeriesIds,
+          seriesRebindIndex,
+          liveSeriesIds,
+          phase,
+          jobId
+        )
+        seriesAdded += result.added
+        seriesUpdated += result.updated
+        deferredSeries.push(...result.deferred)
+        processedSeries += batch.length - result.deferred.length
+        updateJobProgress(jobId, processedSeries, totalSeries, `${processedSeries}/${totalSeries} series`)
+      }
+    }
 
     // Step 3: Process series
     setJobStep(jobId, 2, 'Processing series', totalSeries)
@@ -261,21 +292,15 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         libraryId,
       }))
 
-      // Process in batches
-      for (let i = 0; i < preparedSeries.length; i += DB_BATCH_SIZE) {
-        const batch = preparedSeries.slice(i, i + DB_BATCH_SIZE)
-        const result = await processSeriesBatch(
-          batch,
-          existingSeriesIds,
-          existingSeriesTitleYears,
-          liveSeriesIds,
-          jobId
-        )
-        seriesAdded += result.added
-        seriesUpdated += result.updated
-        processedSeries += batch.length
-        updateJobProgress(jobId, processedSeries, totalSeries, `${processedSeries}/${totalSeries} series`)
-      }
+      await processSeriesBatches(preparedSeries, 'listing')
+    }
+
+    // Every library has answered: the shows nothing claimed get the
+    // external-id fallback, then a row of their own.
+    if (deferredSeries.length > 0) {
+      const finalPass = deferredSeries.splice(0)
+      addLog(jobId, 'info', `🔗 Matching ${finalPass.length} new series item(s) against stored rows by external id...`)
+      await processSeriesBatches(finalPass, 'final')
     }
 
     addLog(

@@ -10,9 +10,31 @@ import {
   buildGraphFromSemanticSearch,
   CONNECTION_COLORS,
   getValidationCacheStats,
+  clampGraphCount,
+  MAX_GRAPH_DEPTH,
+  MAX_GRAPH_LIMIT,
   type GraphSource,
 } from '@aperture/core'
 import { similaritySchemas } from './schemas.js'
+
+/**
+ * A count from the querystring: absent is `fallback`, anything that is not a
+ * whole number is refused (null), and a number is clamped to [1, max]. Every
+ * one of these sizes a loop of kNN queries, and depth sizes paid model calls,
+ * so none may be whatever the caller typed.
+ */
+function readCount(raw: string | undefined, fallback: number, max: number): number | null {
+  if (raw == null || raw === '') return fallback
+  if (!/^\d+$/.test(raw)) return null
+  return clampGraphCount(Number(raw), fallback, max)
+}
+
+/** 'true' or 'false' from the querystring; anything else is absent. */
+function readFlag(raw: string | undefined): boolean | undefined {
+  if (raw === 'true') return true
+  if (raw === 'false') return false
+  return undefined
+}
 
 const similarityRoutes: FastifyPluginAsync = async (fastify) => {
   // Register schemas
@@ -34,12 +56,17 @@ const similarityRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get<{
     Params: { id: string }
-    Querystring: { limit?: string; depth?: string }
+    Querystring: { limit?: string; depth?: string; hideWatched?: string }
   }>('/api/similarity/movie/:id', { preHandler: requireAuth, schema: { tags: ["similarity"] } }, async (request, reply) => {
     const { id } = request.params
     const currentUser = request.user as SessionUser
-    const limit = request.query.limit ? parseInt(request.query.limit, 10) : 12
-    const depth = request.query.depth ? parseInt(request.query.depth, 10) : 1
+    const limit = readCount(request.query.limit, 12, MAX_GRAPH_LIMIT)
+    const depth = readCount(request.query.depth, 1, MAX_GRAPH_DEPTH)
+    if (limit == null || depth == null) {
+      return reply.status(400).send({ error: 'limit and depth must be whole numbers' })
+    }
+    // The Explore switch, when sent; otherwise the stored preference applies.
+    const hideWatched = readFlag(request.query.hideWatched)
 
     // A title the viewer may not open answers like one that does not exist.
     if (!(await titleInScope(request, 'movies', id))) {
@@ -50,7 +77,7 @@ const similarityRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       // If depth > 1, return graph data for multi-level view
       if (depth > 1) {
-        const graphData = await getSimilarWithDepth(id, 'movie', { limit, depth, userId: currentUser.id, scope })
+        const graphData = await getSimilarWithDepth(id, 'movie', { limit, depth, userId: currentUser.id, scope, hideWatched })
         return reply.send(graphData)
       }
 
@@ -79,12 +106,17 @@ const similarityRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get<{
     Params: { id: string }
-    Querystring: { limit?: string; depth?: string }
+    Querystring: { limit?: string; depth?: string; hideWatched?: string }
   }>('/api/similarity/series/:id', { preHandler: requireAuth, schema: { tags: ["similarity"] } }, async (request, reply) => {
     const { id } = request.params
     const currentUser = request.user as SessionUser
-    const limit = request.query.limit ? parseInt(request.query.limit, 10) : 12
-    const depth = request.query.depth ? parseInt(request.query.depth, 10) : 1
+    const limit = readCount(request.query.limit, 12, MAX_GRAPH_LIMIT)
+    const depth = readCount(request.query.depth, 1, MAX_GRAPH_DEPTH)
+    if (limit == null || depth == null) {
+      return reply.status(400).send({ error: 'limit and depth must be whole numbers' })
+    }
+    // The Explore switch, when sent; otherwise the stored preference applies.
+    const hideWatched = readFlag(request.query.hideWatched)
 
     if (!(await titleInScope(request, 'series', id))) {
       return reply.status(404).send({ error: `Series not found: ${id}` })
@@ -94,7 +126,7 @@ const similarityRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       // If depth > 1, return graph data for multi-level view
       if (depth > 1) {
-        const graphData = await getSimilarWithDepth(id, 'series', { limit, depth, userId: currentUser.id, scope })
+        const graphData = await getSimilarWithDepth(id, 'series', { limit, depth, userId: currentUser.id, scope, hideWatched })
         return reply.send(graphData)
       }
 
@@ -122,7 +154,7 @@ const similarityRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get<{
     Params: { source: string }
-    Querystring: { limit?: string; crossMedia?: string }
+    Querystring: { limit?: string; crossMedia?: string; hideWatched?: string }
   }>('/api/similarity/graph/:source', { preHandler: requireAuth, schema: { tags: ["similarity"] } }, async (request, reply) => {
     const { source } = request.params
     const currentUser = request.user as SessionUser
@@ -141,14 +173,19 @@ const similarityRoutes: FastifyPluginAsync = async (fastify) => {
       })
     }
 
-    const limit = request.query.limit ? parseInt(request.query.limit, 10) : 20
+    const limit = readCount(request.query.limit, 20, MAX_GRAPH_LIMIT)
+    if (limit == null) {
+      return reply.status(400).send({ error: 'limit must be a whole number' })
+    }
     const includeCrossMedia = request.query.crossMedia === 'true'
+    const hideWatched = request.query.hideWatched === 'true'
 
     try {
       const result = await getGraphForSource(source as GraphSource, currentUser.id, {
         scope: await viewerScope(request),
         limit,
         includeCrossMedia,
+        hideWatched,
       })
       return reply.send(result)
     } catch (error) {
@@ -184,23 +221,29 @@ const similarityRoutes: FastifyPluginAsync = async (fastify) => {
       | 'movie'
       | 'series'
       | 'both'
-    const limit = limitStr ? parseInt(limitStr, 10) : 20
+    const limit = readCount(limitStr, 20, MAX_GRAPH_LIMIT)
+    if (limit == null) {
+      return reply.status(400).send({ error: 'limit must be a whole number' })
+    }
     const returnGraph = graph === 'true'
     const hideWatched = hideWatchedStr === 'true'
 
     try {
+      const scope = await viewerScope(request)
       const searchResult = await semanticSearch(searchQuery, {
         type: searchType,
         limit,
         hideWatched,
         userId: currentUser.id,
-        scope: await viewerScope(request),
+        scope,
       })
 
       if (returnGraph) {
-        // Build graph with connections between results
+        // Build graph with connections between results; the switch covers the
+        // titles discovered around the results too, not just the results.
         const graphData = await buildGraphFromSemanticSearch(searchResult, {
-          scope: await viewerScope(request),
+          scope,
+          hideWatchedFor: hideWatched ? currentUser.id : undefined,
         })
         return reply.send({
           query: searchResult.query,

@@ -4,7 +4,7 @@
  * GET /api/movies/:id - Get movie by ID with full metadata
  */
 import type { FastifyInstance } from 'fastify'
-import { resolveLocalizedSynopsis } from '@aperture/core'
+import { getStudioLogos, resolveLocalizedSynopsis, type StudioLogo } from '@aperture/core'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { titleInScope } from '../../../lib/viewerScope.js'
@@ -46,14 +46,22 @@ export function registerDetailHandler(fastify: FastifyInstance) {
       // A machine translation of the synopsis into the language the page is
       // shown in, when one exists for the text the title carries now. Null
       // otherwise, and never an error (core translation/store.ts).
-      const localized_synopsis = await resolveLocalizedSynopsis(
-        'movie',
-        id,
-        request.query.lang,
-        request.user!.id
-      )
+      //
+      // Logos for the studios the info card lists, looked up alongside. Never
+      // an error: a failed lookup costs the logos, not the page.
+      const studioNames = (movie.studios ?? []).map((st) => (typeof st === 'string' ? st : st.name))
+      const [localized_synopsis, studio_logos] = await Promise.all([
+        resolveLocalizedSynopsis('movie', id, request.query.lang, request.user!.id),
+        getStudioLogos(studioNames, 'studio').then(
+          (logos) => Object.fromEntries(logos) as Record<string, StudioLogo>,
+          (err: unknown) => {
+            request.log.warn({ err, movieId: id }, 'Studio logo lookup failed')
+            return {} as Record<string, StudioLogo>
+          }
+        ),
+      ])
 
-      return reply.send({ ...movie, localized_synopsis })
+      return reply.send({ ...movie, localized_synopsis, studio_logos })
     }
   )
 }

@@ -37,6 +37,7 @@ import {
   tmdbUrl,
   tvdbUrl,
 } from '../helpers'
+import { StudioLogo } from '../../../components/StudioLogo'
 
 interface MediaInfoCardProps {
   media: Media
@@ -492,10 +493,20 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
             <Stack direction="row" flexWrap="wrap" gap={0.5}>
               {studios.map((studio, idx) => {
                 const studioName = typeof studio === 'string' ? studio : studio.name
+                const logo = media.studio_logos?.[studioName]
                 return (
                   <Chip
                     key={`${studioName}-${idx}`}
-                    label={studioName}
+                    label={
+                      logo ? (
+                        <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+                          <StudioLogo logo={logo} name="" height={10} fallback={null} />
+                          {studioName}
+                        </Box>
+                      ) : (
+                        studioName
+                      )
+                    }
                     size="small"
                     variant="outlined"
                     component={RouterLink}

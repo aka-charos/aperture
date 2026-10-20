@@ -28,7 +28,7 @@ Free tier, no per-key quota that Aperture's usage would approach.
 | Consumer | What it uses |
 |----------|--------------|
 | **Metadata enrichment** (`enrich-metadata`, every 6 h) | Keywords, **collections** (franchises), crew, runtimes — for movies *and* series |
-| **Posters & artwork** | Poster proxying, studio logos (separate `enrich-studio-logos` job), person profiles |
+| **Posters & artwork** | Poster proxying, studio logos for the names your media server has no image for (separate `enrich-studio-logos` job), person profiles |
 | **Genre strips & Discovery tuning** | Both admin pages are **gated**: until TMDb is configured they are dimmed in the console's nav, with "Needs TMDB configured before this can do anything" on hover |
 | **Gap analysis** | TMDb collection membership vs your library (`/admin/library/gaps`) |
 | **Discovery & streaming rows** | External candidates, poster paths for JustWatch rows |

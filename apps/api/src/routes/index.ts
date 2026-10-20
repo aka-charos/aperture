@@ -26,6 +26,7 @@ import backupRoutes from './backup/index.js'
 import maintenanceRoutes from './maintenance/index.js'
 import apiErrorsRoutes from './apiErrors/index.js'
 import similarityRoutes from './similarity/index.js'
+import trailsRoutes from './trails/index.js'
 import graphPlaylistRoutes from './graphPlaylists/index.js'
 import favoritesRoutes from './favorites/index.js'
 import watchStatusRoutes from './watch-status/index.js'
@@ -124,6 +125,9 @@ const routes: FastifyPluginAsync = async (fastify) => {
 
   // Register similarity routes (for explore/similar features)
   await fastify.register(similarityRoutes)
+
+  // Trails: titles linked through the named things they share
+  await fastify.register(trailsRoutes)
 
   // Register graph playlist routes
   await fastify.register(graphPlaylistRoutes)

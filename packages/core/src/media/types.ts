@@ -323,3 +323,14 @@ export interface MediaServerTag {
   name: string
   id?: string
 }
+
+/** A studio image type Aperture reads (media/studioImages.ts). */
+export type StudioImageType = 'Thumb' | 'Primary'
+
+/** One studio or network the media server lists, with the image it holds. */
+export interface MediaServerStudio {
+  id: string
+  name: string
+  /** The image to show, or null when the server holds none. */
+  image: { type: StudioImageType; tag: string } | null
+}

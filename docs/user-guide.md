@@ -66,27 +66,28 @@ Find content that isn't in your library yet, and get it in.
 18. [My Requests](features/my-requests.md) - Track your requests, request anything by name, and report playback problems
 19. [Media Graph](features/explore.md) - Explore your library as a visual similarity graph
 20. [Related-Content Graphs](features/similarity-graphs.md) - See what connects a title to its neighbours
+21. [Trails](features/trails.md) - Follow a trail from title to title through the people, franchises and studios they share
 
 ---
 
 ## Organizing Content
 
-21. [Shows You Watch](features/shows-you-watch.md) - Track ongoing series and upcoming episodes
-22. [Playlists](features/playlists.md) - AI-generated personal playlists, written back to your media server
-23. [Collections](features/collections.md) - AI-generated collections, shared with everyone on the server
-24. [Virtual Libraries](features/virtual-libraries.md) - The older AI Picks and Top Picks libraries (legacy, being phased out)
+22. [Shows You Watch](features/shows-you-watch.md) - Track ongoing series and upcoming episodes
+23. [Playlists](features/playlists.md) - AI-generated personal playlists, written back to your media server
+24. [Collections](features/collections.md) - AI-generated collections, shared with everyone on the server
+25. [Virtual Libraries](features/virtual-libraries.md) - The older AI Picks and Top Picks libraries (legacy, being phased out)
 
 ---
 
 ## Sharing With Connections
 
-25. [Watch This](features/watch-this.md) - Recommend titles to the people you're connected to, and see what they sent you
+26. [Watch This](features/watch-this.md) - Recommend titles to the people you're connected to, and see what they sent you
 
 ---
 
 ## AI Assistant
 
-26. [AI Assistant (Encore)](features/ai-assistant.md) - Ask for content in plain language; answers are grounded in your library and the web
+27. [AI Assistant (Encore)](features/ai-assistant.md) - Ask for content in plain language; answers are grounded in your library and the web
 
 ---
 
@@ -94,23 +95,23 @@ Find content that isn't in your library yet, and get it in.
 
 Your settings open from the avatar menu, in up to four tabs: Recommendations, Display, Account (when it has something on it) and Emby home screen (Emby only). Your language is set from the flag in the top bar.
 
-27. [Recommendations](features/user-settings/recommendations.md) - Your taste (interests, genres, franchises, libraries), what may be recommended, and your own scoring weights
-28. [Display](features/user-settings/display.md) - Poster rating badges and the similarity graph, plus where the language setting lives
-29. [Account](features/user-settings/account.md) - Your email address, Trakt, and the legacy AI library names
-30. [Emby Home Screen](features/user-settings/home-screen.md) - The rows Aperture adds to your Emby home screen, and where they go
+28. [Recommendations](features/user-settings/recommendations.md) - Your taste (interests, genres, franchises, libraries), what may be recommended, and your own scoring weights
+29. [Display](features/user-settings/display.md) - Poster rating badges and the similarity graph, plus where the language setting lives
+30. [Account](features/user-settings/account.md) - Your email address, Trakt, and the legacy AI library names
+31. [Emby Home Screen](features/user-settings/home-screen.md) - The rows Aperture adds to your Emby home screen, and where they go
 
 ---
 
 ## Integrations
 
-31. [Trakt Integration](features/trakt-integration.md) - Two-way rating sync and extra Discover sources
+32. [Trakt Integration](features/trakt-integration.md) - Two-way rating sync and extra Discover sources
 
 ---
 
 ## UI Features
 
-32. [Collapsible Sidebar](features/collapsible-sidebar.md) - Save screen space
-33. [Grid & List Views](features/grid-list-views.md) - Per-page display modes, remembered per account
+33. [Collapsible Sidebar](features/collapsible-sidebar.md) - Save screen space
+34. [Grid & List Views](features/grid-list-views.md) - Per-page display modes, remembered per account
 
 ---
 
@@ -128,6 +129,7 @@ Your settings open from the avatar menu, in up to four tabs: Recommendations, Di
 | Read about how a film was made | [Title Analysis](features/title-analysis.md) |
 | Create a playlist or collection | [Playlists](features/playlists.md) / [Collections](features/collections.md) |
 | Explore similar content visually | [Media Graph](features/explore.md) |
+| Follow a trail from one title to the next through who made them | [Trails](features/trails.md) |
 | See my viewing statistics | [Watch Stats](features/watch-stats.md) |
 | Customize my recommendations | [Recommendations settings](features/user-settings/recommendations.md) |
 | Recommend something to someone | [Watch This](features/watch-this.md) |

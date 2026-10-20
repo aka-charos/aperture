@@ -20,6 +20,7 @@ interface DashboardRecommendation {
   year: number | null
   posterUrl: string | null
   genres: string[]
+  overview?: string | null
   matchScore: number | null
 }
 
@@ -30,6 +31,7 @@ interface DashboardTopPick {
   year: number | null
   posterUrl: string | null
   genres: string[]
+  overview?: string | null
   rank: number
   popularityScore: number
 }

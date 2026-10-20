@@ -38,11 +38,11 @@ import {
 } from '../SimilarityGraph'
 import { CreatePlaylistDialog } from '../CreatePlaylistDialog'
 
-// Extended breadcrumb type that supports 'search' in addition to 'movie' | 'series'
+// Extended breadcrumb type: a search or a browse graph, as well as a title
 export interface GraphBreadcrumbItem {
   id: string
   title: string
-  type: 'movie' | 'series' | 'search'
+  type: 'movie' | 'series' | 'search' | 'browse'
 }
 
 export interface GraphExplorerProps {
@@ -61,10 +61,10 @@ export interface GraphExplorerProps {
   onHistoryNavigate: (index: number) => void
   onStartOver: () => void
 
-  // Node interactions
-  onNodeClick: (node: GraphNode) => void
-  onNodeDoubleClick?: (node: GraphNode) => void
-  onNodeDetailsClick?: (node: GraphNode) => void
+  // Node interactions: a click shows the title, Shift+click (or the node's
+  // corner button, or a long press) re-centres the graph on it.
+  onNodeOpen: (node: GraphNode) => void
+  onNodeExplore?: (node: GraphNode) => void
 
   // Search (optional)
   showSearch?: boolean
@@ -91,6 +91,11 @@ export interface GraphExplorerProps {
 
   // Styling
   compact?: boolean
+  /**
+   * The connection-type legend under the graph. Off where the page shows its
+   * own (Explore's sidebar), so the same switches are not on screen twice.
+   */
+  showLegend?: boolean
 }
 
 export function GraphExplorer({
@@ -103,9 +108,8 @@ export function GraphExplorer({
   history,
   onHistoryNavigate,
   onStartOver,
-  onNodeClick,
-  onNodeDoubleClick,
-  onNodeDetailsClick,
+  onNodeOpen,
+  onNodeExplore,
   showSearch = false,
   searchQuery = '',
   onSearchChange,
@@ -123,6 +127,7 @@ export function GraphExplorer({
   sourceItemId,
   sourceItemType,
   compact = false,
+  showLegend = true,
 }: GraphExplorerProps) {
   const { t } = useTranslation()
   const [playlistDialogOpen, setPlaylistDialogOpen] = useState(false)
@@ -356,9 +361,8 @@ export function GraphExplorer({
           data={data}
           loading={loading}
           loadingStatus={loadingStatus || undefined}
-          onNodeClick={onNodeClick}
-          onNodeDoubleClick={onNodeDoubleClick}
-          onNodeDetailsClick={onNodeDetailsClick}
+          onNodeOpen={onNodeOpen}
+          onNodeExplore={onNodeExplore}
           compact={compact}
         />
       </Box>
@@ -378,16 +382,16 @@ export function GraphExplorer({
           gap: 1,
         }}
       >
-        <GraphLegend compact={compact} />
+        {showLegend ? <GraphLegend compact={compact} /> : <Box />}
         <Typography
           variant={compact ? 'caption' : 'body2'}
           color="text.secondary"
           sx={{ display: { xs: 'none', sm: 'block' } }}
         >
-          {t('graphExplorer.hintsDesktop')}
+          {t('graphExplorer.hintsDesktopOpen')}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', sm: 'none' } }}>
-          {t('graphExplorer.hintsMobile')}
+          {t('graphExplorer.hintsMobileOpen')}
         </Typography>
       </Box>
 

@@ -29,7 +29,8 @@ While the graph builds, the page narrates what it's doing — searching your lib
 - **Nodes** are posters; the center/primary items render larger. Node size does *not* encode similarity
 - **Edges** connect related items; hover an edge for the **similarity percentage**
 - **Hover a node** for title, year, type, and **"Connected via:"** reason chips
-- **Click a poster** to make it the new center (with breadcrumbs tracking your path); **click ⓘ** (or double-click) to open its detail page
+- **Click a poster** to open its details over the graph; close them and the graph is as you left it
+- **Shift+click a poster**, or click its corner button, to make it the new center (breadcrumbs track your path; from a browse list the first crumb takes you back to the list). On a touch screen, tap for details and long-press to re-center
 - **Drag** to reposition, **scroll** to zoom
 
 ### Connection Colors
@@ -46,7 +47,7 @@ While the graph builds, the page narrates what it's doing — searching your lib
 | **Gray** | AI similar (embedding similarity) |
 | **Emerald** | AI discovery (deliberately diverse picks) |
 
-The sidebar legend shows the same list live.
+The legend in the sidebar, and the one under the graph, also highlights: **hover a connection type** to preview its lines, **click it** to keep them highlighted (click several to combine them), and **Clear highlight** to go back. Highlighted lines are drawn strongly and everything else is dimmed; nothing moves and nothing disappears, so the graph keeps its shape. Lines are chosen by how alike two titles are, and the colour only names what they also share, so a highlight shows which links are explained by, say, the same director, not which titles are closest. The highlight applies to every graph on screen and clears when you leave the page.
 
 ---
 

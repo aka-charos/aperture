@@ -4,9 +4,10 @@ Studio pages collect what your library holds from a **production studio** (movie
 
 ## Accessing Studio Pages
 
-1. **Click a studio name** — from a movie detail page's info card
-2. **Watch Stats** — the Top Studios / Top Networks breakdowns include an **All titles** link to the studio's page
-3. **Direct URL** — `/studio/Studio%20Name`
+1. **Click a studio name** — from a movie or series detail page's info card, where a studio with a stored logo shows it beside its name
+2. **Click a series' network** — on a series detail page, next to the season count (its logo, or its name when there is none)
+3. **Watch Stats** — the Top Studios / Top Networks breakdowns include an **All titles** link to the studio's page
+4. **Direct URL** — `/studio/Studio%20Name`
 
 ---
 

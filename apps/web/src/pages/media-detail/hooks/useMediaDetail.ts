@@ -15,6 +15,7 @@ import type {
 import { DEFAULT_SIMILAR_MEDIA_LIMIT } from '../constants'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { onMovieWatched } from '@/lib/watchStatusEvents'
+import { readJsonWithRetry, type MediaLoadError } from '../loadFailure'
 
 export type WatchStats = MovieWatchStats | SeriesWatchStats
 
@@ -58,7 +59,10 @@ export interface UseMediaDetailReturn {
   userRating: number | null
   ratingLoading: boolean
   loading: boolean
-  error: string | null
+  /** Why the title is not shown: missing, or failed to load (loadFailure.ts). */
+  error: MediaLoadError | null
+  /** Load the title again after a failure. */
+  retry: () => void
   // Series-specific
   seasons: Record<number, Episode[]>
   seasonAvailability: SeasonAvailability[]
@@ -104,7 +108,10 @@ export function useMediaDetail(
   const { getRating: getSharedRating, setRating: setSharedRating } = useUserRatings()
   const userRating = id ? getSharedRating(mediaType, id) : null
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<MediaLoadError | null>(null)
+  // Bumped by `retry` to run the title load again.
+  const [reloadKey, setReloadKey] = useState(0)
+  const retry = useCallback(() => setReloadKey((k) => k + 1), [])
   const [watchStats, setWatchStats] = useState<WatchStats | null>(null)
   const [seerrTitleStatus, setSeerrTitleStatus] = useState<SeerrTitleStatus>(NO_SEERR_STATUS)
   // null until the media-server favorite status has loaded
@@ -139,49 +146,48 @@ export function useMediaDetail(
     setLoading(true)
     setError(null)
 
+    // The language the page is displayed in rides along, so the server can
+    // attach a machine translation of the synopsis in that language
+    // (`localized_synopsis`) — only the client knows which one it rendered.
+    const lang = encodeURIComponent(displayLanguage)
+
+    // Each request retries on its own (loadFailure.ts), so a title that
+    // answered is not asked again while its episodes are.
     const fetchMedia = async () => {
-      try {
-        // The language the page is displayed in rides along, so the server can
-        // attach a machine translation of the synopsis in that language
-        // (`localized_synopsis`) — only the client knows which one it rendered.
-        const lang = encodeURIComponent(displayLanguage)
+      const [title, episodes, server] = await Promise.all([
+        readJsonWithRetry<object>(`${base}?lang=${lang}`, { isLive: live }),
+        mediaType === 'series'
+          ? readJsonWithRetry<{ seasons?: Record<number, Episode[]>; seasonAvailability?: SeasonAvailability[] }>(
+              `/api/series/${id}/episodes`,
+              { isLive: live }
+            )
+          : Promise.resolve(null),
+        // Optional for the page (the play button and its colours), so its
+        // failure costs only that. It is awaited with the title, though, so
+        // the hero never paints first with no server and then switches.
+        readJsonWithRetry<MediaServerInfo>('/api/settings/media-server', { isLive: live }),
+      ])
+      if (!live() || !title) return
 
-        const fetchPromises: Promise<Response>[] = [
-          fetch(`${base}?lang=${lang}`, { credentials: 'include' }),
-          fetch('/api/settings/media-server', { credentials: 'include' }),
-        ]
-        if (mediaType === 'series') {
-          fetchPromises.push(fetch(`/api/series/${id}/episodes`, { credentials: 'include' }))
-        }
-
-        const [mediaResponse, mediaServerResponse, episodesResponse] = await Promise.all(fetchPromises)
-        if (!live()) return
-
-        if (mediaServerResponse.ok) {
-          const mediaServerData = await mediaServerResponse.json()
-          if (live()) setMediaServer(mediaServerData)
-        }
-
-        if (!mediaResponse.ok) {
-          if (live()) setError(`${mediaType === 'movie' ? 'Movie' : 'Series'} not found`)
-          return
-        }
-
-        const data = await mediaResponse.json()
-        if (!live()) return
-        setMedia({ ...data, type: mediaType } as Media)
-
-        if (mediaType === 'series' && episodesResponse?.ok) {
-          const episodesData = await episodesResponse.json()
-          if (!live()) return
-          setSeasons(episodesData.seasons || {})
-          setSeasonAvailability(episodesData.seasonAvailability || [])
-        }
-      } catch {
-        if (live()) setError('Could not connect to server')
-      } finally {
-        if (live()) setLoading(false)
+      // A series page without its seasons is not the page, so a failed
+      // episodes request fails the load the way a failed title does.
+      const failure = !title.ok ? title.error : episodes && !episodes.ok ? episodes.error : null
+      if (failure) {
+        // What the server actually answered, for whoever opens the console:
+        // the page shows the kind, not the request.
+        console.warn(`Could not load ${base}`, failure)
+        setError(failure)
+        setLoading(false)
+        return
       }
+
+      if (server?.ok) setMediaServer(server.data)
+      setMedia({ ...(title.ok ? title.data : {}), type: mediaType } as Media)
+      if (episodes?.ok) {
+        setSeasons(episodes.data.seasons || {})
+        setSeasonAvailability(episodes.data.seasonAvailability || [])
+      }
+      setLoading(false)
     }
 
     fetchMedia()
@@ -189,11 +195,12 @@ export function useMediaDetail(
     return () => {
       cancelled = true
     }
-  }, [mediaType, id, displayLanguage])
+  }, [mediaType, id, displayLanguage, reloadKey])
 
   // Everything else on the page: independent of the language, so it starts
   // with the title rather than after it and survives a language switch. Each
-  // part fails on its own and leaves its section empty, as each did before.
+  // part fails on its own (after the same retries as the title) and leaves
+  // its section empty.
   // The viewer's rating is not fetched here — it is read from the shared
   // ratings map (see `userRating` above).
   useEffect(() => {
@@ -210,9 +217,11 @@ export function useMediaDetail(
     setInsights(null)
     setWatchStatus(null)
 
+    // Retried like the title (loadFailure.ts); what still fails leaves its
+    // section empty, as before.
     const getJson = async <T,>(url: string): Promise<T | null> => {
-      const response = await fetch(url, { credentials: 'include' })
-      return response.ok ? ((await response.json()) as T) : null
+      const result = await readJsonWithRetry<T>(url, { isLive: live })
+      return result?.ok ? result.data : null
     }
 
     getJson<{ similar?: SimilarItem[] }>(`${base}/similar?limit=${DEFAULT_SIMILAR_MEDIA_LIMIT}`)
@@ -273,12 +282,11 @@ export function useMediaDetail(
     let cancelled = false
     setIsFavorite(null)
 
-    fetch(`/api/favorites/status?movieId=${id}`, { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { favorite?: boolean } | null) => {
-        if (!cancelled && data) setIsFavorite(data.favorite === true)
-      })
-      .catch(() => {})
+    readJsonWithRetry<{ favorite?: boolean }>(`/api/favorites/status?movieId=${id}`, {
+      isLive: () => !cancelled,
+    }).then((result) => {
+      if (!cancelled && result?.ok) setIsFavorite(result.data.favorite === true)
+    })
 
     return () => {
       cancelled = true
@@ -299,21 +307,19 @@ export function useMediaDetail(
     let cancelled = false
     // Seerr's own vocabulary for a show is 'tv', not 'series'.
     const path = mediaType === 'movie' ? 'movie' : 'tv'
-    fetch(`/api/seerr/status/${path}/${numericTmdbId}`, { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { canRequest?: boolean; canReportIssue?: boolean } | null) => {
-        // Absent reads as false in both directions — an older server that does
-        // not send a field cannot honour the action behind it either.
-        if (!cancelled) {
-          setSeerrTitleStatus({
-            canRequest: data?.canRequest === true,
-            canReportIssue: data?.canReportIssue === true,
-          })
-        }
+    readJsonWithRetry<{ canRequest?: boolean; canReportIssue?: boolean }>(
+      `/api/seerr/status/${path}/${numericTmdbId}`,
+      { isLive: () => !cancelled }
+    ).then((result) => {
+      if (cancelled) return
+      // Absent reads as false in both directions — an older server that does
+      // not send a field cannot honour the action behind it either.
+      const data = result?.ok ? result.data : null
+      setSeerrTitleStatus({
+        canRequest: data?.canRequest === true,
+        canReportIssue: data?.canReportIssue === true,
       })
-      .catch(() => {
-        if (!cancelled) setSeerrTitleStatus(NO_SEERR_STATUS)
-      })
+    })
 
     return () => {
       cancelled = true
@@ -427,6 +433,7 @@ export function useMediaDetail(
     ratingLoading,
     loading,
     error,
+    retry,
     seasons,
     seasonAvailability,
     clearWatchStatus,

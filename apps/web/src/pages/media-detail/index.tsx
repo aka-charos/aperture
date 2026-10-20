@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Box, Typography, CircularProgress, Grid } from '@mui/material'
+import { Box, Button, Typography, CircularProgress, Grid } from '@mui/material'
 import { useAuth } from '../../hooks/useAuth'
 import { useCapability } from '../../hooks/useCapability'
 import { useWatching } from '../../hooks/useWatching'
 import { useConnections } from '../../hooks/useConnections'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useMediaDetail } from './hooks'
+import { useStrongestLinks } from './hooks/useStrongestLinks'
+import { useTrailPath } from '../trails/useTrailPath'
 import {
   MediaBackdrop,
   MediaHero,
@@ -15,11 +17,13 @@ import {
   SeasonsList,
   MissingSeasonsCard,
   SimilarMedia,
+  StrongestLinks,
   MovieInsights,
   TitleAnalysis,
   RecommendToDialog,
 } from './components'
 import { insightsHaveDetail } from './helpers'
+import { titleRefFor } from '../trails/labels'
 import { isMovie, isSeries } from './types'
 import type { MediaType } from './types'
 
@@ -50,7 +54,7 @@ export function MediaDetailPage({
   const { id: routeId } = useParams<{ id: string }>()
   const id = idProp ?? routeId
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, checkAuth } = useAuth()
   // The server's answer, not `isAdmin || canManageWatchHistory` worked out
   // here — that is the admin-override half of a rule whose other half lives
   // in core, and two copies is how they come to disagree.
@@ -74,6 +78,7 @@ export function MediaDetailPage({
     ratingLoading,
     loading,
     error,
+    retry,
     seasons,
     seasonAvailability,
     clearWatchStatus,
@@ -88,6 +93,11 @@ export function MediaDetailPage({
   // Rewriting one explanation is a paid model call, so the button is the
   // operator's. The route also allows a viewer's own picks, as the bulk one does.
   const onRefreshExplanation = user?.isAdmin ? refreshExplanation : undefined
+
+  // Trails, from this title: the hero's link and the Strongest links card.
+  const trailRef = id ? titleRefFor(mediaType, id) : null
+  const trailPath = useTrailPath(trailRef)
+  const strongestLinks = useStrongestLinks(trailRef)
 
   // Reading why a title was scored is one of the getting-started steps, and
   // only the browser sees it happen. The panel draws only for a scored title
@@ -107,12 +117,47 @@ export function MediaDetailPage({
     )
   }
 
+  // A 401 is the session ending, not the title: asking again cannot help, so
+  // the button re-checks the session — which signs out to the login page, or,
+  // when an assumed account's lease ran out, returns to the admin's own view.
+  if (error?.kind === 'signedOut') {
+    return (
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <Typography color="error" variant="h6">
+          {t('mediaDetail.sessionEnded')}
+        </Typography>
+        <Button variant="outlined" onClick={() => void checkAuth()} sx={{ mt: 3 }}>
+          {t('mediaDetail.sessionContinue')}
+        </Button>
+      </Box>
+    )
+  }
+
+  // Only a 404 is "not found". Any other failure is a failure to load, said as
+  // such and offered again — it used to read as the title not existing.
+  if (error?.kind === 'failed') {
+    return (
+      <Box sx={{ textAlign: 'center', py: 8 }}>
+        <Typography color="error" variant="h6">
+          {t('mediaDetail.loadFailed')}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          {error.status == null
+            ? t('mediaDetail.loadFailedNoAnswer')
+            : t('mediaDetail.loadFailedStatus', { status: error.status })}
+        </Typography>
+        <Button variant="outlined" onClick={retry} sx={{ mt: 3 }}>
+          {t('mediaDetail.loadRetry')}
+        </Button>
+      </Box>
+    )
+  }
+
   if (error || !media) {
     return (
       <Box sx={{ textAlign: 'center', py: 8 }}>
         <Typography color="error" variant="h6">
-          {error ||
-            (mediaType === 'movie' ? t('mediaDetail.movieNotFound') : t('mediaDetail.seriesNotFound'))}
+          {mediaType === 'movie' ? t('mediaDetail.movieNotFound') : t('mediaDetail.seriesNotFound')}
         </Typography>
       </Box>
     )
@@ -161,6 +206,8 @@ export function MediaDetailPage({
         favoriteLoading={favoriteLoading}
         onFavoriteToggle={isMovie(media) && user?.id ? toggleFavorite : undefined}
         onRecommend={hasConnections && id ? () => setRecommendOpen(true) : undefined}
+        // Dropped once Trails has answered that the title links to nothing.
+        trailPath={strongestLinks.knownEmpty ? null : trailPath}
       />
 
       {id && hasConnections && (
@@ -214,6 +261,10 @@ export function MediaDetailPage({
                   up with and a line nobody can track. */}
               {id && <TitleAnalysis mediaType={mediaType} mediaId={id} />}
               <MediaInfoCard media={media} />
+              {/* The strongest named links out of this title, from Trails.
+                  Asked for only as it nears the screen; draws nothing until
+                  it has some. */}
+              {trailPath && <StrongestLinks state={strongestLinks} trailPath={trailPath} />}
               {/* Aired episodes missing from the server + Seerr requests (series only) */}
               {isSeries(media) && (
                 <MissingSeasonsCard

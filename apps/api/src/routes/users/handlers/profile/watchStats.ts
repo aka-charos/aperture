@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { resolveStudioLogo, studioLogoColumns, type StudioLogoRow } from '@aperture/core'
 import { query, queryOne } from '../../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
 import { requireSelfOrAdmin } from './shared.js'
@@ -260,9 +261,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           id: string | null
           name: string
           count: string
-          logo_path: string | null
-          logo_local_path: string | null
-        }>(
+        } & StudioLogoRow>(
           `WITH watched_movies AS (
              SELECT m.studios
              FROM watch_history wh
@@ -294,30 +293,26 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              sc.id,
              sc.name,
              sc.count,
-             sn.logo_path,
-             sn.logo_local_path
+             ${studioLogoColumns('sn')}
            FROM studio_counts sc
            LEFT JOIN studios_networks sn ON sn.name = sc.name AND sn.type = 'studio'
            ORDER BY sc.count DESC`,
           [id]
         )
 
-        // Construct studio image URLs - prefer local path, then TMDB, then Emby
-        const topStudios = studiosResult.rows.map(r => {
-          let thumb: string | null = null
-          if (r.logo_local_path) {
-            thumb = `/api/uploads/${r.logo_local_path}`
-          } else if (r.logo_path) {
-            thumb = `https://image.tmdb.org/t/p/w185${r.logo_path}`
-          } else if (mediaServerBaseUrl && r.id) {
-            thumb = `${mediaServerBaseUrl}/Items/${r.id}/Images/Thumb`
-          }
+        // Studio logos: the media server's image first, TMDb's otherwise
+        // (core resolveStudioLogo). The kind says how to draw it.
+        const topStudios = await Promise.all(studiosResult.rows.map(async r => {
+          // A studio no row has yet (synced since the job last ran) guesses
+          // through the id on the title's own studio entry.
+          const logo = await resolveStudioLogo({ ...r, emby_id: r.emby_id ?? r.id })
           return {
             name: r.name,
-            thumb,
+            thumb: logo?.url ?? null,
+            thumbKind: logo?.kind ?? null,
             count: parseInt(r.count)
           }
-        })
+        }))
 
         // Top networks (from series) - get the first studio ID matching the network name
         // Joins with studios_networks table to get TMDB logo data
@@ -325,9 +320,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
           id: string | null
           name: string
           count: string
-          logo_path: string | null
-          logo_local_path: string | null
-        }>(
+        } & StudioLogoRow>(
           `WITH network_data AS (
              SELECT DISTINCT 
                s.id as series_id,
@@ -359,30 +352,26 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
              nc.id,
              nc.name,
              nc.count,
-             sn.logo_path,
-             sn.logo_local_path
+             ${studioLogoColumns('sn')}
            FROM network_counts nc
            LEFT JOIN studios_networks sn ON sn.name = nc.name AND sn.type = 'network'
            ORDER BY nc.count DESC`,
           [id]
         )
 
-        // Construct network image URLs - prefer local path, then TMDB, then Emby
-        const topNetworks = networksResult.rows.map(r => {
-          let thumb: string | null = null
-          if (r.logo_local_path) {
-            thumb = `/api/uploads/${r.logo_local_path}`
-          } else if (r.logo_path) {
-            thumb = `https://image.tmdb.org/t/p/w185${r.logo_path}`
-          } else if (mediaServerBaseUrl && r.id) {
-            thumb = `${mediaServerBaseUrl}/Items/${r.id}/Images/Thumb`
-          }
+        // Network logos: the media server's image first, TMDb's otherwise
+        // (core resolveStudioLogo). The kind says how to draw it.
+        const topNetworks = await Promise.all(networksResult.rows.map(async r => {
+          // A studio no row has yet (synced since the job last ran) guesses
+          // through the id on the title's own studio entry.
+          const logo = await resolveStudioLogo({ ...r, emby_id: r.emby_id ?? r.id })
           return {
             name: r.name,
-            thumb,
+            thumb: logo?.url ?? null,
+            thumbKind: logo?.kind ?? null,
             count: parseInt(r.count)
           }
-        })
+        }))
 
         // Series genre distribution for comparison
         const seriesGenreResult = await query<{ genre: string; count: string }>(

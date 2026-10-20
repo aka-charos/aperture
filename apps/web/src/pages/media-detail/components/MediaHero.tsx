@@ -38,6 +38,7 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
 import ThumbUpIcon from '@mui/icons-material/ThumbUp'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
 import RecommendIcon from '@mui/icons-material/Recommend'
+import RouteOutlinedIcon from '@mui/icons-material/RouteOutlined'
 import type {
   Media,
   MediaServerInfo,
@@ -50,10 +51,11 @@ import { isMovie, isSeries } from '../types'
 import { useServerDisplayName } from '../../../hooks/useServerDisplayName'
 import { useWatchStatus } from '../../../hooks/useWatchStatus'
 import { formatRuntime } from '../hooks'
-import { hasCriticRatings, personPath } from '../helpers'
+import { hasCriticRatings, personPath, studioPath } from '../helpers'
 import { RatingBadges } from './RatingBadges'
 import { CommunityStrip } from './CommunityStrip'
 import { ReportIssueButton } from './ReportIssueButton'
+import { StudioLogo } from '../../../components/StudioLogo'
 import {
   StarRating,
   getProxiedImageUrl,
@@ -124,6 +126,11 @@ interface MediaHeroProps {
    * connections; the button is not drawn otherwise.
    */
   onRecommend?: () => void
+  /**
+   * Start a trail at this title, in Trails. Unset (no button) for a title
+   * Trails has answered links to nothing.
+   */
+  trailPath?: string | null
 }
 
 export function MediaHero({
@@ -147,6 +154,7 @@ export function MediaHero({
   favoriteLoading = false,
   onFavoriteToggle,
   onRecommend,
+  trailPath,
 }: MediaHeroProps) {
   const { t } = useTranslation()
   // The grid this page was opened from is still mounted behind it and reads the
@@ -655,9 +663,26 @@ export function MediaHero({
                 </Typography>
               </Box>
             )}
-            {/* Series network */}
+            {/* Series network: its logo where one is stored, the name
+                otherwise, and either way a link to everything it aired. */}
             {isSeries(media) && media.network && (
-              <Chip label={media.network} size="small" variant="outlined" />
+              <Tooltip title={media.network}>
+                <Box
+                  component={RouterLink}
+                  to={studioPath(media.network)}
+                  aria-label={media.network}
+                  sx={{ display: 'inline-flex', textDecoration: 'none', '&:hover': { opacity: 0.85 } }}
+                >
+                  <StudioLogo
+                    logo={media.network_logo}
+                    name={media.network}
+                    height={20}
+                    // Not `clickable`: the link around it is the control, and a
+                    // button inside a link is two tab stops for one action.
+                    fallback={<Chip label={media.network} size="small" variant="outlined" sx={{ cursor: 'pointer' }} />}
+                  />
+                </Box>
+              </Tooltip>
             )}
           </Box>
 
@@ -882,6 +907,21 @@ export function MediaHero({
                     {t('mediaDetail.hero.recommend')}
                   </Button>
                 </span>
+              </Tooltip>
+            )}
+            {/* Into Trails, starting from this title: the people, franchise,
+                companies and keywords it shares with the rest of the library. */}
+            {trailPath && (
+              <Tooltip title={t('trails.detail.followTooltip')}>
+                <Button
+                  variant="outlined"
+                  component={RouterLink}
+                  to={trailPath}
+                  startIcon={<RouteOutlinedIcon />}
+                  sx={actionBtnSx}
+                >
+                  {t('trails.detail.follow')}
+                </Button>
               </Tooltip>
             )}
             {/* Movie mark watched */}

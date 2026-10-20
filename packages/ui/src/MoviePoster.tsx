@@ -102,8 +102,8 @@ export interface MoviePosterProps {
   titleLines?: 1 | 2
   /**
    * Print the plot under the card instead of in the hover overlay, clamped to a
-   * few lines with a "more" control. The overlay is dropped in this mode: title,
-   * year and genres are already under the poster, so it would only repeat them.
+   * few lines with a "more" control. The overlay is dropped in this mode, since
+   * the plot is all it would carry and the card already prints it.
    *
    * Expansion is CONTROLLED, because a grid wants a whole row to open together
    * (one tall card beside three short ones leaves three holes). The labels come
@@ -242,7 +242,24 @@ export function MoviePoster({
   const [isOffRatio, setIsOffRatio] = useState(false)
   const theme = useTheme()
   const { hideLibraryRatingBadge, watchingLabels, genreLabel } = usePosterDisplaySettings()
-  const overview = useLocalizedOverview(titleRef, originalOverview)
+  // The hover overlay is the only place most cards show the plot, so its
+  // translation is asked for on the first hover rather than for every card on
+  // the page (a carousel mounts dozens nobody looks at, and a touch screen never
+  // hovers at all). A card printing the plot under itself shows it outright.
+  const [hoveredOnce, setHoveredOnce] = useState(false)
+  const overview = useLocalizedOverview(overviewBelow || hoveredOnce ? titleRef : undefined, originalOverview)
+  const hasOverview = !!overview?.trim()
+  // The title under the poster is clipped to `titleLines`; the overlay repeats
+  // it only when that clip actually cut something, measured at hover time
+  // since what fits depends on the card's width.
+  const titleElRef = useRef<HTMLElement | null>(null)
+  const [titleClipped, setTitleClipped] = useState(false)
+  const handleMouseEnter = () => {
+    const el = titleElRef.current
+    setTitleClipped(!!el && (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1))
+    setHoveredOnce(true)
+    setIsHovered(true)
+  }
   // Not per render: hover and rating state re-render the card constantly.
   const genres = useMemo(() => rawGenres?.map((g) => genreLabel(g)), [rawGenres, genreLabel])
   const dimensions = sizeConfig[size]
@@ -306,7 +323,7 @@ export function MoviePoster({
     >
       <Paper
         elevation={isHovered ? 8 : 3}
-        onMouseEnter={canHover ? () => setIsHovered(true) : undefined}
+        onMouseEnter={canHover ? handleMouseEnter : undefined}
         onMouseLeave={canHover ? () => setIsHovered(false) : undefined}
         sx={{
           position: 'relative',
@@ -481,9 +498,11 @@ export function MoviePoster({
         {/* Custom children (for badges like play count, favorite icon, etc.) */}
         {children}
 
-        {/* Hover overlay with details — not drawn when the plot sits under the
-            card, where everything it would show is already printed. */}
-        {!overviewBelow && (
+        {/* Hover overlay: the plot. Title, year and genres are printed under the
+            poster already, so repeating them here only covered the artwork with
+            a second copy; the title comes back only when its line under the
+            poster was clipped. With neither there is nothing to show. */}
+        {!overviewBelow && (hasOverview || titleClipped) && (
         <Box
           sx={{
             position: 'absolute',
@@ -501,35 +520,16 @@ export function MoviePoster({
             zIndex: 1,
           }}
         >
-          {/* Year badge */}
-          {year && (
+          {titleClipped && (
             <Typography
-              variant="caption"
-              sx={{
-                color: 'primary.main',
-                fontWeight: 700,
-                mb: 0.5,
-              }}
+              variant="body2"
+              fontWeight={700}
+              sx={{ color: 'white', lineHeight: 1.2, mb: hasOverview ? 0.5 : 0 }}
             >
-              {year}
+              {title}
             </Typography>
           )}
-
-          {/* Title */}
-          <Typography
-            variant="body2"
-            fontWeight={700}
-            sx={{
-              color: 'white',
-              lineHeight: 1.2,
-              mb: 0.5,
-            }}
-          >
-            {title}
-          </Typography>
-
-          {/* Overview */}
-          {overview && (
+          {hasOverview && (
             <Typography
               variant="caption"
               sx={{
@@ -543,20 +543,6 @@ export function MoviePoster({
               }}
             >
               {overview}
-            </Typography>
-          )}
-
-          {/* Genres */}
-          {genres && genres.length > 0 && (
-            <Typography
-              variant="caption"
-              sx={{
-                color: 'grey.500',
-                mt: 0.5,
-                fontSize: '0.65rem',
-              }}
-            >
-              {genres.slice(0, 3).join(' • ')}
             </Typography>
           )}
         </Box>
@@ -603,6 +589,7 @@ export function MoviePoster({
           const yearText = inlineYear ? `(${year})` : null
           return titleLines > 1 ? (
             <Typography
+              ref={titleElRef}
               variant="body2"
               fontWeight={500}
               title={yearText ? `${title} ${yearText}` : title}
@@ -633,7 +620,7 @@ export function MoviePoster({
               minWidth={0}
               title={yearText ? `${title} ${yearText}` : title}
             >
-              <Typography variant="body2" fontWeight={500} noWrap sx={{ lineHeight: 1.3, minWidth: 0 }}>
+              <Typography ref={titleElRef} variant="body2" fontWeight={500} noWrap sx={{ lineHeight: 1.3, minWidth: 0 }}>
                 {title}
               </Typography>
               {yearText && (

@@ -8,6 +8,7 @@ import {
 import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
 import { computeConnectionReasons, type ConnectionReason } from './reasons.js'
 import { selectWithCrossMediaSlots } from './crossMedia.js'
+import { getTopMovies, getTopSeries } from '../topPicks/popularity.js'
 
 const logger = createChildLogger('similarity')
 
@@ -77,6 +78,61 @@ export interface SimilarityOptions {
    * have no viewer.
    */
   scope?: LibraryScope
+  /**
+   * Leave titles `userId` has played off the graph. On the multi-level graph an
+   * explicit value overrides the stored preference (the Explore switch);
+   * absent falls back to it.
+   */
+  hideWatched?: boolean
+}
+
+/** Deepest multi-level graph built. maxNodes stops growing at 3 anyway. */
+export const MAX_GRAPH_DEPTH = 3
+/** Most neighbours asked for per title, and most centres per graph. */
+export const MAX_GRAPH_LIMIT = 50
+
+/**
+ * Clamp a requested count to [1, max], reading a missing or non-numeric value
+ * as `fallback`. Every loop and LIMIT below is sized by these numbers.
+ */
+export function clampGraphCount(value: number | undefined, fallback: number, max: number): number {
+  if (value == null || !Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(1, Math.floor(value)))
+}
+
+/**
+ * `fn` over `items` with at most `concurrency` in flight, results in input
+ * order. Each scoped kNN lookup holds a pooled connection for its transaction,
+ * so an unbounded Promise.all over twenty centres would take the whole pool.
+ */
+async function mapLimited<T, R>(items: readonly T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++
+      results[index] = await fn(items[index])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker))
+  return results
+}
+
+/** Concurrent neighbour lookups while building one graph. */
+const LOOKUP_CONCURRENCY = 4
+
+/** Neighbours of one title, by its media type. */
+function similarFor(
+  item: { id: string; type: 'movie' | 'series' },
+  options: SimilarityOptions
+): Promise<SimilarityResult> {
+  return item.type === 'movie' ? getSimilarMovies(item.id, options) : getSimilarSeries(item.id, options)
+}
+
+/** Every title of either type `userId` has played, for hide-watched filters. */
+async function getUserWatchedIds(userId: string): Promise<Set<string>> {
+  const [movies, series] = await Promise.all([getUserWatchedMovieIds(userId), getUserWatchedSeriesIds(userId)])
+  return new Set([...movies, ...series])
 }
 
 /**
@@ -192,13 +248,17 @@ interface SeriesSimilarityRow {
   similarity: number
 }
 
+/** A movie or series row without the kNN distance, for the source loaders. */
+type MovieRow = Omit<MovieSimilarityRow, 'similarity'>
+type SeriesRow = Omit<SeriesSimilarityRow, 'similarity'>
+
 const MOVIE_SIMILARITY_COLUMNS = `m.id, m.title, m.year, m.poster_url, m.genres, m.directors,
             m.actors, m.collection_name, m.keywords, m.studios`
 
 const SERIES_SIMILARITY_COLUMNS = `s.id, s.title, s.year, s.poster_url, s.genres, s.directors,
             s.actors, s.network, s.keywords, s.studios`
 
-function movieRowToItem(row: MovieSimilarityRow): SimilarityItem {
+function movieRowToItem(row: MovieRow): SimilarityItem {
   return {
     id: row.id,
     title: row.title,
@@ -215,7 +275,7 @@ function movieRowToItem(row: MovieSimilarityRow): SimilarityItem {
   }
 }
 
-function seriesRowToItem(row: SeriesSimilarityRow): SimilarityItem {
+function seriesRowToItem(row: SeriesRow): SimilarityItem {
   return {
     id: row.id,
     title: row.title,
@@ -557,13 +617,19 @@ export async function getSimilarWithDepth(
   itemType: 'movie' | 'series',
   options: SimilarityOptions = {}
 ): Promise<GraphData> {
-  const { limit = 6, depth = 1, userId } = options
+  const { userId } = options
+  const limit = clampGraphCount(options.limit, 6, MAX_GRAPH_LIMIT)
+  const depth = clampGraphCount(options.depth, 1, MAX_GRAPH_DEPTH)
   const scope = await resolveScope(options)
 
   // Fetch user preferences if userId provided
-  const prefs: SimilarityPreferences = userId
+  const stored: SimilarityPreferences = userId
     ? await getUserSimilarityPreferences(userId)
     : { fullFranchiseMode: false, hideWatched: false }
+  const prefs: SimilarityPreferences = {
+    ...stored,
+    hideWatched: options.hideWatched ?? stored.hideWatched,
+  }
 
   // Get watched content IDs if hiding watched
   const watchedIds: Set<string> =
@@ -837,6 +903,7 @@ export async function getSimilarWithDepth(
           limit: Math.max(4, limit - addedAtThisLevel),
           type: itemType,
           userId: userId ?? undefined,
+          scope,
         })
 
         for (const item of diverseResult.items) {
@@ -888,10 +955,14 @@ export async function getGraphForSource(
   userId: string,
   options: SimilarityOptions = {}
 ): Promise<GraphData> {
-  const { limit = 20, includeCrossMedia = false } = options
+  const { includeCrossMedia = false, hideWatched = false } = options
+  const limit = clampGraphCount(options.limit, 20, MAX_GRAPH_LIMIT)
   const connectionsPerNode = 3 // How many connections to show per center node
   // Always the viewer's: every source here is someone's graph.
   const scope = options.scope ?? (await getLibraryScopeForUser(userId))
+  // Centres stay whatever the source holds (Currently Watching is watched by
+  // definition); only the neighbours drawn around them are filtered.
+  const watchedIds = hideWatched ? await getUserWatchedIds(userId) : new Set<string>()
 
   let centerItems: SimilarityItem[] = []
 
@@ -948,20 +1019,17 @@ export async function getGraphForSource(
     })
   })
 
+  // Neighbour lists are independent, so they are fetched together; only the
+  // selection below depends on order (seenEdges), and it stays sequential.
+  // Hiding watched titles asks for more, since the filter runs after the query.
+  const fetchLimit = connectionsPerNode * (hideWatched ? 4 : 2)
+  const neighbourLists = await mapLimited(centerItems, LOOKUP_CONCURRENCY, (centerItem) =>
+    similarFor(centerItem, { limit: fetchLimit, includeCrossMedia, scope })
+  )
+
   // Get connections for each center node
-  for (const centerItem of centerItems) {
-    const result: SimilarityResult =
-      centerItem.type === 'movie'
-        ? await getSimilarMovies(centerItem.id, {
-            limit: connectionsPerNode * 2,
-            includeCrossMedia,
-            scope,
-          })
-        : await getSimilarSeries(centerItem.id, {
-            limit: connectionsPerNode * 2,
-            includeCrossMedia,
-            scope,
-          })
+  centerItems.forEach((centerItem, index) => {
+    const result = neighbourLists[index]
 
     // Rank: connections to other center nodes first (they tie the graph
     // together), then by similarity. Edges already drawn are dropped before
@@ -969,6 +1037,7 @@ export async function getGraphForSource(
     // slot and the node would come back with fewer connections than it has.
     const ranked = result.connections
       .filter((conn) => !seenEdges.has(edgeKey(centerItem.id, conn.item.id)))
+      .filter((conn) => nodes.get(conn.item.id)?.isCenter || !watchedIds.has(conn.item.id))
       .sort((a, b) => {
         const aIsCenter = nodes.get(a.item.id)?.isCenter ?? false
         const bIsCenter = nodes.get(b.item.id)?.isCenter ?? false
@@ -1013,7 +1082,7 @@ export async function getGraphForSource(
         reasons: conn.reasons,
       })
     }
-  }
+  })
 
   // Every browse source is one media type, so anything else on the graph
   // arrived through a reserved cross-media slot. With the toggle on this must
@@ -1080,7 +1149,8 @@ export async function semanticSearch(
   searchQuery: string,
   options: SemanticSearchOptions = {}
 ): Promise<SemanticSearchResult> {
-  const { type = 'both', limit = 20, hideWatched = false, userId } = options
+  const { type = 'both', hideWatched = false, userId } = options
+  const limit = clampGraphCount(options.limit, 20, MAX_GRAPH_LIMIT)
   const scope = await resolveScope(options)
 
   if (!searchQuery.trim()) {
@@ -1274,9 +1344,19 @@ export async function semanticSearch(
  */
 export async function buildGraphFromSemanticSearch(
   searchResults: SemanticSearchResult,
-  options: { useAI?: boolean; connectionsPerSeed?: number; scope?: LibraryScope } = {}
+  options: {
+    useAI?: boolean
+    connectionsPerSeed?: number
+    scope?: LibraryScope
+    /**
+     * Leave titles this user has played off the discovered ring. The seeds were
+     * already filtered by semanticSearch; without this, the neighbours drawn
+     * around them came back watched or not regardless of the switch.
+     */
+    hideWatchedFor?: string
+  } = {}
 ): Promise<GraphData> {
-  const { connectionsPerSeed = 3, scope } = options
+  const { connectionsPerSeed = 3, scope, hideWatchedFor } = options
 
   if (searchResults.results.length === 0) {
     return { nodes: [], edges: [] }
@@ -1287,6 +1367,7 @@ export async function buildGraphFromSemanticSearch(
   const edges: GraphEdge[] = []
   const seenEdges = new Set<string>()
   const seedIds = new Set(seedItems.map((s) => s.id))
+  const watchedIds = hideWatchedFor ? await getUserWatchedIds(hideWatchedFor) : new Set<string>()
 
   // Helper to add edge without duplicates
   const addEdge = (
@@ -1302,6 +1383,17 @@ export async function buildGraphFromSemanticSearch(
       return true
     }
     return false
+  }
+
+  /** A neighbour list, or none when the lookup fails; one bad seed costs only itself. */
+  const neighboursOf = async (item: { id: string; type: 'movie' | 'series' }, limit: number) => {
+    try {
+      const result = await similarFor(item, { limit, scope })
+      return result.connections.filter((conn) => !watchedIds.has(conn.item.id))
+    } catch (error) {
+      logger.debug({ id: item.id, error }, 'Failed to get similar items')
+      return []
+    }
   }
 
   // Add all search results as CENTER nodes (seeds)
@@ -1323,47 +1415,44 @@ export async function buildGraphFromSemanticSearch(
 
   // ============================================================================
   // PHASE 1: Branch out from each seed to find NEW content
-  // This is the key change - we discover MORE movies, not just connect seeds
+  // This is the key change - we discover MORE movies, not just connect seeds.
+  // The lists are fetched together; adding them stays sequential, in seed
+  // order, so which seed claims a shared neighbour does not depend on timing.
   // ============================================================================
   let discoveredCount = 0
+  // Over-fetched when hiding watched titles, since that filter runs after the query.
+  const seedFetchLimit = connectionsPerSeed * (hideWatchedFor ? 5 : 3)
+  const seedNeighbours = await mapLimited(seedItems, LOOKUP_CONCURRENCY, (seed) =>
+    neighboursOf(seed, seedFetchLimit)
+  )
 
-  for (const seed of seedItems) {
-    try {
-      // Find similar items for this seed
-      const similarResult =
-        seed.type === 'movie'
-          ? await getSimilarMovies(seed.id, { limit: connectionsPerSeed * 3, scope })
-          : await getSimilarSeries(seed.id, { limit: connectionsPerSeed * 3, scope })
+  seedItems.forEach((seed, index) => {
+    let addedForThisSeed = 0
 
-      let addedForThisSeed = 0
+    for (const conn of seedNeighbours[index]) {
+      if (addedForThisSeed >= connectionsPerSeed) break
 
-      for (const conn of similarResult.connections) {
-        if (addedForThisSeed >= connectionsPerSeed) break
+      // SKIP items that are already seeds - we want NEW content
+      if (seedIds.has(conn.item.id)) continue
 
-        // SKIP items that are already seeds - we want NEW content
-        if (seedIds.has(conn.item.id)) continue
-
-        // Add this discovered node if not already in graph
-        if (!nodes.has(conn.item.id)) {
-          nodes.set(conn.item.id, {
-            id: conn.item.id,
-            title: conn.item.title,
-            year: conn.item.year,
-            poster_url: conn.item.poster_url,
-            type: conn.item.type,
-            isCenter: false, // Discovered items are NOT centers
-          })
-          discoveredCount++
-        }
-
-        // Connect seed to discovered item
-        addEdge(seed.id, conn.item.id, conn.similarity, conn.reasons)
-        addedForThisSeed++
+      // Add this discovered node if not already in graph
+      if (!nodes.has(conn.item.id)) {
+        nodes.set(conn.item.id, {
+          id: conn.item.id,
+          title: conn.item.title,
+          year: conn.item.year,
+          poster_url: conn.item.poster_url,
+          type: conn.item.type,
+          isCenter: false, // Discovered items are NOT centers
+        })
+        discoveredCount++
       }
-    } catch (error) {
-      logger.debug({ seedId: seed.id, error }, 'Failed to get similar items for seed')
+
+      // Connect seed to discovered item
+      addEdge(seed.id, conn.item.id, conn.similarity, conn.reasons)
+      addedForThisSeed++
     }
-  }
+  })
 
   logger.info({ query: searchResults.query, discoveredCount }, 'Discovered new content from seeds')
 
@@ -1410,33 +1499,26 @@ export async function buildGraphFromSemanticSearch(
 
   let crossConnectionCount = 0
   const maxCrossConnections = Math.min(discoveredItems.length, 8)
+  const discoveredNeighbours = await mapLimited(discoveredItems, LOOKUP_CONCURRENCY, (node) =>
+    neighboursOf(node, 10)
+  )
 
   for (let i = 0; i < discoveredItems.length && crossConnectionCount < maxCrossConnections; i++) {
     const nodeA = discoveredItems[i]
 
-    // Find similar items for this discovered node
-    try {
-      const similarResult =
-        nodeA.type === 'movie'
-          ? await getSimilarMovies(nodeA.id, { limit: 10, scope })
-          : await getSimilarSeries(nodeA.id, { limit: 10, scope })
+    for (const conn of discoveredNeighbours[i]) {
+      if (crossConnectionCount >= maxCrossConnections) break
 
-      for (const conn of similarResult.connections) {
-        if (crossConnectionCount >= maxCrossConnections) break
-
-        // Only connect to other discovered nodes (not seeds)
-        if (nodes.has(conn.item.id) && !seedIds.has(conn.item.id) && conn.item.id !== nodeA.id) {
-          // Require meaningful connection (not just generic similarity)
-          const meaningfulReasons = conn.reasons.filter((r) => r.type !== 'similarity')
-          if (meaningfulReasons.length > 0) {
-            if (addEdge(nodeA.id, conn.item.id, conn.similarity, meaningfulReasons)) {
-              crossConnectionCount++
-            }
+      // Only connect to other discovered nodes (not seeds)
+      if (nodes.has(conn.item.id) && !seedIds.has(conn.item.id) && conn.item.id !== nodeA.id) {
+        // Require meaningful connection (not just generic similarity)
+        const meaningfulReasons = conn.reasons.filter((r) => r.type !== 'similarity')
+        if (meaningfulReasons.length > 0) {
+          if (addEdge(nodeA.id, conn.item.id, conn.similarity, meaningfulReasons)) {
+            crossConnectionCount++
           }
         }
       }
-    } catch {
-      // Skip if lookup fails
     }
   }
 
@@ -1447,40 +1529,30 @@ export async function buildGraphFromSemanticSearch(
 
   // ============================================================================
   // PHASE 4: Ensure minimum connectivity for orphan seeds
-  // If a seed has no connections, find its best match
+  // If a seed has no connections, link its best match. Phase 1 already holds
+  // that list, so nothing is asked again.
   // ============================================================================
-  for (const seed of seedItems) {
+  seedItems.forEach((seed, index) => {
     const hasConnection = edges.some((e) => e.source === seed.id || e.target === seed.id)
-    if (!hasConnection) {
-      // Find any similar item and add it
-      try {
-        const similarResult =
-          seed.type === 'movie'
-            ? await getSimilarMovies(seed.id, { limit: 5, scope })
-            : await getSimilarSeries(seed.id, { limit: 5, scope })
+    if (hasConnection) return
 
-        if (similarResult.connections.length > 0) {
-          const conn = similarResult.connections[0]
+    const conn = seedNeighbours[index][0]
+    if (!conn) return
 
-          // Add the discovered node
-          if (!nodes.has(conn.item.id)) {
-            nodes.set(conn.item.id, {
-              id: conn.item.id,
-              title: conn.item.title,
-              year: conn.item.year,
-              poster_url: conn.item.poster_url,
-              type: conn.item.type,
-              isCenter: false,
-            })
-          }
-
-          addEdge(seed.id, conn.item.id, conn.similarity, conn.reasons)
-        }
-      } catch {
-        // Skip if lookup fails
-      }
+    // Add the discovered node
+    if (!nodes.has(conn.item.id)) {
+      nodes.set(conn.item.id, {
+        id: conn.item.id,
+        title: conn.item.title,
+        year: conn.item.year,
+        poster_url: conn.item.poster_url,
+        type: conn.item.type,
+        isCenter: false,
+      })
     }
-  }
+
+    addEdge(seed.id, conn.item.id, conn.similarity, conn.reasons)
+  })
 
   logger.info(
     {
@@ -1503,96 +1575,46 @@ export async function buildGraphFromSemanticSearch(
 // Data Source Helpers
 // ============================================================================
 
+/**
+ * The selected picks of the viewer's NEWEST completed run, in the order the
+ * recommendations page shows them (selected_rank).
+ *
+ * Pinned to one run: pruneOldRecommendationRuns keeps the selected rows of
+ * superseded runs on purpose, so reading every run fills a graph larger than
+ * one run's picks with stale titles, and a film picked twice comes back twice.
+ * rc.rank is the position among everything scored and would bury the
+ * reserved-slot picks; selected_rank is what My Recommendations numbers.
+ */
+function latestPicksSql(mediaType: 'movie' | 'series', inScope: string): string {
+  const table = mediaType === 'movie' ? 'movies m ON m.id = rc.movie_id' : 'series s ON s.id = rc.series_id'
+  const columns = mediaType === 'movie' ? MOVIE_SIMILARITY_COLUMNS : SERIES_SIMILARITY_COLUMNS
+  return `SELECT ${columns}
+     FROM recommendation_candidates rc
+     JOIN ${table}
+     WHERE rc.run_id = (
+             SELECT id FROM recommendation_runs
+              WHERE user_id = $1 AND status = 'completed' AND media_type = '${mediaType}'
+              ORDER BY created_at DESC
+              LIMIT 1
+           )
+       AND rc.is_selected = true
+       AND ${inScope}
+     ORDER BY rc.selected_rank ASC NULLS LAST, rc.rank
+     LIMIT $2`
+}
+
 async function getUserAIMovies(userId: string, limit: number, scope: LibraryScope): Promise<SimilarityItem[]> {
   const params: unknown[] = [userId, limit]
   const inScope = libraryScopeSql(scope, 'm', binderFor(params))
-  const result = await query<{
-    id: string
-    title: string
-    year: number | null
-    poster_url: string | null
-    genres: string[]
-    directors: string[]
-    actors: unknown
-    collection_name: string | null
-    keywords: string[]
-    studios: unknown
-  }>(
-    `SELECT m.id, m.title, m.year, m.poster_url, m.genres, m.directors, 
-            m.actors, m.collection_name, m.keywords, m.studios
-     FROM recommendation_candidates rc
-     JOIN recommendation_runs rr ON rc.run_id = rr.id
-     JOIN movies m ON rc.movie_id = m.id
-     WHERE rr.user_id = $1 AND ${inScope} 
-       AND rr.media_type = 'movie'
-       AND rr.status = 'completed'
-       AND rc.is_selected = true
-       AND rc.movie_id IS NOT NULL
-     ORDER BY rr.created_at DESC, rc.rank
-     LIMIT $2`,
-    params
-  )
-
-  return result.rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    year: row.year,
-    poster_url: row.poster_url,
-    type: 'movie' as const,
-    genres: row.genres || [],
-    directors: row.directors || [],
-    actors: parseActors(row.actors),
-    collection_name: row.collection_name,
-    network: null,
-    keywords: row.keywords || [],
-    studios: parseStudios(row.studios),
-  }))
+  const result = await query<MovieRow>(latestPicksSql('movie', inScope), params)
+  return result.rows.map(movieRowToItem)
 }
 
 async function getUserAISeries(userId: string, limit: number, scope: LibraryScope): Promise<SimilarityItem[]> {
   const params: unknown[] = [userId, limit]
   const inScope = libraryScopeSql(scope, 's', binderFor(params))
-  const result = await query<{
-    id: string
-    title: string
-    year: number | null
-    poster_url: string | null
-    genres: string[]
-    directors: string[]
-    actors: unknown
-    network: string | null
-    keywords: string[]
-    studios: unknown
-  }>(
-    `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.directors, 
-            s.actors, s.network, s.keywords, s.studios
-     FROM recommendation_candidates rc
-     JOIN recommendation_runs rr ON rc.run_id = rr.id
-     JOIN series s ON rc.series_id = s.id
-     WHERE rr.user_id = $1 AND ${inScope} 
-       AND rr.media_type = 'series'
-       AND rr.status = 'completed'
-       AND rc.is_selected = true
-       AND rc.series_id IS NOT NULL
-     ORDER BY rr.created_at DESC, rc.rank
-     LIMIT $2`,
-    params
-  )
-
-  return result.rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    year: row.year,
-    poster_url: row.poster_url,
-    type: 'series' as const,
-    genres: row.genres || [],
-    directors: row.directors || [],
-    actors: parseActors(row.actors),
-    collection_name: null,
-    network: row.network,
-    keywords: row.keywords || [],
-    studios: parseStudios(row.studios),
-  }))
+  const result = await query<SeriesRow>(latestPicksSql('series', inScope), params)
+  return result.rows.map(seriesRowToItem)
 }
 
 async function getUserWatchingSeries(userId: string, limit: number, scope: LibraryScope): Promise<SimilarityItem[]> {
@@ -1636,85 +1658,48 @@ async function getUserWatchingSeries(userId: string, limit: number, scope: Libra
   }))
 }
 
-async function getTopPicksMovies(limit: number, scope: LibraryScope): Promise<SimilarityItem[]> {
-  const params: unknown[] = [limit]
-  const inScope = libraryScopeSql(scope, 'm', binderFor(params))
-  // Get top picks config to see what list/method is being used
-  const result = await query<{
-    id: string
-    title: string
-    year: number | null
-    poster_url: string | null
-    genres: string[]
-    directors: string[]
-    actors: unknown
-    collection_name: string | null
-    keywords: string[]
-    studios: unknown
-  }>(
-    `SELECT m.id, m.title, m.year, m.poster_url, m.genres, m.directors, 
-            m.actors, m.collection_name, m.keywords, m.studios
-     FROM movies m
-     WHERE m.community_rating IS NOT NULL AND ${inScope}
-     ORDER BY m.community_rating DESC, m.year DESC NULLS LAST
-     LIMIT $1`,
+/**
+ * Library rows for `ids`, in that order, as far as the viewer may open them.
+ * Top Picks is one server-wide list; like the Top Picks page, the graph shows
+ * it only within the viewer's scope and keeps its order.
+ */
+async function rowsInOrder<T>(
+  table: 'movies' | 'series',
+  ids: string[],
+  limit: number,
+  scope: LibraryScope
+): Promise<T[]> {
+  if (ids.length === 0) return []
+  const alias = table === 'movies' ? 'm' : 's'
+  const columns = table === 'movies' ? MOVIE_SIMILARITY_COLUMNS : SERIES_SIMILARITY_COLUMNS
+  const params: unknown[] = [ids, limit]
+  const inScope = libraryScopeSql(scope, alias, binderFor(params))
+  const result = await query<T>(
+    `SELECT ${columns}
+     FROM ${table} ${alias}
+     WHERE ${alias}.id = ANY($1::uuid[]) AND ${inScope}
+     ORDER BY array_position($1::uuid[], ${alias}.id)
+     LIMIT $2`,
     params
   )
+  return result.rows
+}
 
-  return result.rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    year: row.year,
-    poster_url: row.poster_url,
-    type: 'movie' as const,
-    genres: row.genres || [],
-    directors: row.directors || [],
-    actors: parseActors(row.actors),
-    collection_name: row.collection_name,
-    network: null,
-    keywords: row.keywords || [],
-    studios: parseStudios(row.studios),
-  }))
+/**
+ * The Top Picks list itself (getTopMovies, the source the Top Picks page and
+ * home rows read), not a stand-in. This used to rank by community_rating, so
+ * "Top Pick Movies" here named a different list from the page of that name.
+ */
+async function getTopPicksMovies(limit: number, scope: LibraryScope): Promise<SimilarityItem[]> {
+  const picks = await getTopMovies()
+  const rows = await rowsInOrder<MovieRow>('movies', picks.map((p) => p.movieId), limit, scope)
+  return rows.map(movieRowToItem)
 }
 
 async function getTopPicksSeries(limit: number, scope: LibraryScope): Promise<SimilarityItem[]> {
-  const params: unknown[] = [limit]
-  const inScope = libraryScopeSql(scope, 's', binderFor(params))
-  const result = await query<{
-    id: string
-    title: string
-    year: number | null
-    poster_url: string | null
-    genres: string[]
-    directors: string[]
-    actors: unknown
-    network: string | null
-    keywords: string[]
-    studios: unknown
-  }>(
-    `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.directors, 
-            s.actors, s.network, s.keywords, s.studios
-     FROM series s
-     WHERE s.community_rating IS NOT NULL AND ${inScope}
-     ORDER BY s.community_rating DESC, s.year DESC NULLS LAST
-     LIMIT $1`,
-    params
-  )
-
-  return result.rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    year: row.year,
-    poster_url: row.poster_url,
-    type: 'series' as const,
-    genres: row.genres || [],
-    directors: row.directors || [],
-    actors: parseActors(row.actors),
-    collection_name: null,
-    network: row.network,
-    keywords: row.keywords || [],
-    studios: parseStudios(row.studios),
-  }))
+  const picks = await getTopSeries()
+  const rows = await rowsInOrder<SeriesRow>('series', picks.map((p) => p.seriesId), limit, scope)
+  return rows.map(seriesRowToItem)
 }
 
 // ============================================================================

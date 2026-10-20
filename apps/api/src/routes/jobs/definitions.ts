@@ -241,7 +241,7 @@ export const jobDefinitions: JobDefinition[] = [
   // === Studio Logo Enrichment Job ===
   {
     name: 'enrich-studio-logos',
-    description: 'Fetch studio and network logos from TMDB',
+    description: 'Read studio and network images from the media server, fetch TMDb logos for the rest',
     cron: '0 5 * * *', // Daily at 5 AM
   },
   // === Ratings Refresh Job ===

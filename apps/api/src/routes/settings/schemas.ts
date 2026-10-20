@@ -1063,29 +1063,9 @@ export const testLldapSchema = {
 
 export const studioLogosConfigSchema = {
   tags: ['settings'],
-  summary: 'Get studio logos configuration',
-  description: 'Get studio logos feature configuration (admin only).',
-}
-
-export const updateStudioLogosConfigSchema = {
-  tags: ['settings'],
-  summary: 'Update studio logos configuration',
-  description: 'Update studio logos feature configuration (admin only).',
-  body: {
-    type: 'object' as const,
-    additionalProperties: true,
-    properties: {
-      enabled: { type: 'boolean' as const },
-      tmdbEnabled: { type: 'boolean' as const },
-      fanarttv: {
-        type: 'object' as const,
-        properties: {
-          enabled: { type: 'boolean' as const },
-          apiKey: { type: 'string' as const },
-        },
-      },
-    },
-  },
+  summary: 'Get studio logo statistics',
+  description:
+    'How many studios and networks have a logo, and how many of those come from the media server rather than TMDb (admin only).',
 }
 
 // =============================================================================

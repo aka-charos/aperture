@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import {
   Box,
   Typography,
@@ -33,18 +33,28 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import HistoryIcon from '@mui/icons-material/History'
 import {
+  GraphLegend,
   useGraphData,
   useSimilarityData,
   type GraphNode,
   type GraphData,
   type LoadingStatus,
 } from '../../components/SimilarityGraph'
-import { CONNECTION_COLORS, type ConnectionType } from '../../components/SimilarityGraph/types'
-import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 import { GraphExplorer } from '../../components/GraphExplorer'
 import { usePageHeader } from '@/hooks/usePageHeader'
+import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
+import { useOpenMedia } from '@/hooks/useOpenMedia'
 
 type GraphSource = 'ai-movies' | 'ai-series' | 'watching' | 'top-movies' | 'top-series'
+
+/** The heading of each browse graph, also its breadcrumb once the user drills in. */
+const BROWSE_SOURCE_KEYS: Record<GraphSource, string> = {
+  'ai-movies': 'mediaGraph.sourceAiMovies',
+  'ai-series': 'mediaGraph.sourceAiSeries',
+  watching: 'mediaGraph.sourceWatching',
+  'top-movies': 'mediaGraph.sourceTopMovies',
+  'top-series': 'mediaGraph.sourceTopSeries',
+}
 type MediaFilter = 'movie' | 'series' | 'both'
 
 const RECENT_SEARCHES_KEY = 'aperture_recent_searches'
@@ -61,6 +71,16 @@ function randomItem<T>(arr: T[]): T {
 }
 
 export function ExplorePage() {
+  // A poster opens over the graph, so closing it returns the reader to the
+  // graph exactly as they left it instead of routing away from it.
+  return (
+    <MediaDetailModalProvider>
+      <ExploreContent />
+    </MediaDetailModalProvider>
+  )
+}
+
+function ExploreContent() {
   const { t } = useTranslation()
   // No in-page block: the graph fills the viewport and breaks out of the
   // layout padding, so the bar is the only place a title fits.
@@ -68,7 +88,7 @@ export function ExplorePage() {
   const theme = useTheme()
   const isNarrow = useMediaQuery(theme.breakpoints.down('md'))
   const [controlsOpen, setControlsOpen] = useState(false)
-  const navigate = useNavigate()
+  const openMedia = useOpenMedia()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Get initial state from URL params
@@ -105,11 +125,12 @@ export function ExplorePage() {
     initialFocusParsed?.type || initialType || null
   )
 
-  // Breadcrumb history for drill-down navigation (tracks across search and focused modes)
+  // Breadcrumb history for drill-down navigation (tracks across search, browse
+  // and focused modes). A 'browse' crumb is the browse graph the user left.
   const [breadcrumbHistory, setBreadcrumbHistory] = useState<Array<{
     id: string
     title: string
-    type: 'movie' | 'series' | 'search'
+    type: 'movie' | 'series' | 'search' | 'browse'
   }>>([])
 
   // Semantic search state
@@ -241,23 +262,27 @@ export function ExplorePage() {
     })
   }, [])
 
-  // Fetch graph data for browse sources
+  // Fetch graph data for browse sources -- only once a source is chosen; the
+  // fallback name is never fetched on its own.
   const { data: browseData, loading: browseLoading, loadingStatus: browseLoadingStatus, refetch } = useGraphData(
     selectedBrowseSource || 'ai-movies',
     {
       limit: 20,
       crossMedia: crossMediaEnabled,
+      hideWatched,
+      enabled: selectedBrowseSource !== null,
     }
   )
 
-  // Fetch similarity data for a focused item (with rabbit-hole navigation)
+  // Fetch similarity data for a focused item (with rabbit-hole navigation).
+  // The page's Hide watched switch is sent, so it governs this graph too.
   const {
     data: focusedData,
     loading: focusedLoading,
     loadingStatus: focusedLoadingStatus,
     setFocusId,
     startOver,
-  } = useSimilarityData(focusedItemType || 'movie', focusedItemId, { limit: 15, depth: 3 })
+  } = useSimilarityData(focusedItemType || 'movie', focusedItemId, { limit: 15, depth: 3, hideWatched })
 
   // Determine what data to display
   const getDisplayData = (): { data: GraphData | null; loading: boolean; loadingStatus: LoadingStatus | null } => {
@@ -298,9 +323,24 @@ export function ExplorePage() {
     }
   }, [focusedItemId, focusedItemType, setSearchParams, searchParams])
 
+  // The search in flight, if any. A new search, choosing a browse source or
+  // clearing aborts it: an answer arriving after any of those would otherwise
+  // replace what the user moved on to (two quick searches: the older wins).
+  const semanticRequestRef = useRef<AbortController | null>(null)
+  const cancelSemanticSearch = useCallback(() => {
+    semanticRequestRef.current?.abort()
+    semanticRequestRef.current = null
+  }, [])
+  useEffect(() => cancelSemanticSearch, [cancelSemanticSearch])
+
   // Handle semantic search
   const handleSemanticSearch = useCallback(async (query: string) => {
     if (!query.trim()) return
+
+    cancelSemanticSearch()
+    const controller = new AbortController()
+    semanticRequestRef.current = controller
+    const isCurrent = () => semanticRequestRef.current === controller
 
     setSemanticSearch({ query, loading: true, results: null })
     startSemanticLoadingProgress()
@@ -322,6 +362,7 @@ export function ExplorePage() {
 
       const response = await fetch(`/api/similarity/search?${params}`, {
         credentials: 'include',
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -329,6 +370,8 @@ export function ExplorePage() {
       }
 
       const result = await response.json()
+      if (!isCurrent()) return
+      semanticRequestRef.current = null
       stopSemanticLoadingProgress()
       setSemanticSearch({
         query,
@@ -336,14 +379,19 @@ export function ExplorePage() {
         results: result.graph,
       })
     } catch (error) {
+      if (!isCurrent()) return
+      semanticRequestRef.current = null
       console.error('Semantic search failed:', error)
       stopSemanticLoadingProgress()
       setSemanticSearch({ query, loading: false, results: null })
     }
-  }, [mediaFilter, hideWatched, startSemanticLoadingProgress, stopSemanticLoadingProgress, saveRecentSearch])
+  }, [mediaFilter, hideWatched, cancelSemanticSearch, startSemanticLoadingProgress, stopSemanticLoadingProgress, saveRecentSearch])
 
   // Handle browse source selection
   const handleBrowseSourceSelect = (source: GraphSource) => {
+    cancelSemanticSearch()
+    stopSemanticLoadingProgress()
+    setBreadcrumbHistory([])
     setSelectedBrowseSource(source)
     setSemanticSearch({ query: '', loading: false, results: null })
     setFocusedItemId(null)
@@ -351,10 +399,13 @@ export function ExplorePage() {
     setSearchQuery('')
   }
 
-  // Handle node click (rabbit-hole navigation)
-  const handleNodeClick = useCallback(
+  // Re-centre the graph on a title (rabbit-hole navigation): Shift+click, the
+  // node's corner button, or a long press. A plain click opens the title.
+  const handleNodeExplore = useCallback(
     (node: GraphNode) => {
-      if (node.isCenter) return
+      // Only the focused title itself is a no-op. On the browse and search
+      // graphs every result is a centre, and those are what a user drills into.
+      if (focusedItemId && node.id === focusedItemId) return
 
       // Track the current state in breadcrumb history before navigating
       if (semanticSearch.results && semanticSearch.query) {
@@ -365,6 +416,14 @@ export function ExplorePage() {
           type: 'search',
         }])
         setSemanticSearch({ query: '', loading: false, results: null })
+      } else if (!focusedItemId && selectedBrowseSource) {
+        // Coming from a browse graph: its many centres are results, not where
+        // the user stood, so the crumb is the graph itself.
+        setBreadcrumbHistory([{
+          id: `browse:${selectedBrowseSource}`,
+          title: t(BROWSE_SOURCE_KEYS[selectedBrowseSource]),
+          type: 'browse',
+        }])
       } else if (displayData?.nodes) {
         // Coming from focused view - add current center to history
         const centerNode = displayData.nodes.find(n => n.isCenter)
@@ -381,14 +440,14 @@ export function ExplorePage() {
       setFocusedItemType(node.type)
       setFocusId(node.id, node.type)
     },
-    [semanticSearch.results, semanticSearch.query, displayData, setFocusId]
+    [focusedItemId, selectedBrowseSource, semanticSearch.results, semanticSearch.query, displayData, setFocusId, t]
   )
 
-  const handleNodeDoubleClick = useCallback(
+  const handleNodeOpen = useCallback(
     (node: GraphNode) => {
-      navigate(`/${node.type === 'movie' ? 'movies' : 'series'}/${node.id}`)
+      openMedia(node.type, node.id)
     },
-    [navigate]
+    [openMedia]
   )
 
   // Handle history navigation (breadcrumb click)
@@ -402,6 +461,11 @@ export function ExplorePage() {
         const searchQuery = item.title.replace(/^"|"$/g, '') // Remove quotes
         handleSemanticSearch(searchQuery)
         setBreadcrumbHistory([])
+      } else if (item.type === 'browse') {
+        // Back to the browse graph, which is still loaded behind the focus
+        setBreadcrumbHistory([])
+        setFocusedItemId(null)
+        setFocusedItemType(null)
       } else {
         // Go back to a specific item
         setFocusedItemId(item.id)
@@ -429,11 +493,13 @@ export function ExplorePage() {
 
   // Handle clearing the search (clears results too)
   const handleSearchClear = useCallback(() => {
+    cancelSemanticSearch()
+    stopSemanticLoadingProgress()
     setSemanticSearch({ query: '', loading: false, results: null })
     setFocusedItemId(null)
     setFocusedItemType(null)
     setBreadcrumbHistory([])
-  }, [])
+  }, [cancelSemanticSearch, stopSemanticLoadingProgress])
 
   // Clear recent search
   const clearRecentSearch = (query: string) => {
@@ -461,14 +527,7 @@ export function ExplorePage() {
       return t('mediaGraph.titleSearch', { query: semanticSearch.query })
     }
     if (selectedBrowseSource) {
-      const sourceKeys: Record<GraphSource, string> = {
-        'ai-movies': 'mediaGraph.sourceAiMovies',
-        'ai-series': 'mediaGraph.sourceAiSeries',
-        watching: 'mediaGraph.sourceWatching',
-        'top-movies': 'mediaGraph.sourceTopMovies',
-        'top-series': 'mediaGraph.sourceTopSeries',
-      }
-      return t(sourceKeys[selectedBrowseSource])
+      return t(BROWSE_SOURCE_KEYS[selectedBrowseSource])
     }
     return t('mediaGraph.titleDefault')
   }, [semanticSearch.query, selectedBrowseSource, t])
@@ -643,23 +702,10 @@ export function ExplorePage() {
         <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
           {t('mediaGraph.connectionTypesHeading')}
         </Typography>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-          {(Object.keys(CONNECTION_COLORS) as ConnectionType[]).map((type) => (
-            <Box key={type} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box
-                sx={{
-                  width: 14,
-                  height: 3,
-                  bgcolor: CONNECTION_COLORS[type],
-                  borderRadius: 1,
-                }}
-              />
-              <Typography variant="caption" sx={{ fontSize: '10px' }}>
-                {connectionTypeLabel(type, t)}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
+        <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
+          {t('mediaGraph.connectionTypesHighlightHint')}
+        </Typography>
+        <GraphLegend orientation="column" />
       </Box>
 
       <Divider />
@@ -732,9 +778,8 @@ export function ExplorePage() {
           history={breadcrumbHistory}
           onHistoryNavigate={handleHistoryNavigate}
           onStartOver={handleStartOver}
-          onNodeClick={handleNodeClick}
-          onNodeDoubleClick={handleNodeDoubleClick}
-          onNodeDetailsClick={handleNodeDoubleClick}
+          onNodeOpen={handleNodeOpen}
+          onNodeExplore={handleNodeExplore}
           showSearch
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -744,6 +789,9 @@ export function ExplorePage() {
           searchLoading={semanticSearch.loading}
           searchExamples={searchExamples}
           showCreatePlaylist
+          // The sidebar carries the legend on a wide screen; on a narrow one it
+          // is behind the controls button, so the graph keeps its own.
+          showLegend={isNarrow}
           showRefresh={showRefreshButton}
           onRefresh={handleRefresh}
           // In the header, beside Create playlist: floating over the graph it

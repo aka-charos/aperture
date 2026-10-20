@@ -13,11 +13,12 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
-import { MoviePoster, BaseCarousel, CarouselItem, getProxiedImageUrl } from '@aperture/ui'
+import { MoviePoster, BaseCarousel, CarouselItem } from '@aperture/ui'
 import { useUserRatings } from '../hooks/useUserRatings'
 import { useWatchStatus } from '../hooks/useWatchStatus'
 import { useWatching } from '../hooks/useWatching'
 import { RotatingBackdrop } from '../components/RotatingBackdrop'
+import { StudioLogo } from '../components/StudioLogo'
 
 interface ContentItem {
   id: string
@@ -31,7 +32,10 @@ interface ContentItem {
 
 interface StudioData {
   name: string
+  /** The logo, decided by the server: the media server's image first, TMDb's otherwise. */
   imageUrl: string | null
+  /** How it is drawn: a media-server tile as it is, a TMDb mark on a plate. */
+  imageKind: 'tile' | 'mark' | null
   movies: ContentItem[]
   series: ContentItem[]
   stats: {
@@ -50,7 +54,6 @@ export function StudioDetailPage() {
   const [data, setData] = useState<StudioData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [imageError, setImageError] = useState(false)
 
   useEffect(() => {
     const fetchStudio = async () => {
@@ -104,7 +107,6 @@ export function StudioDetailPage() {
   }
 
   const decodedName = decodeURIComponent(name || '')
-  const proxiedImageUrl = data.imageUrl ? getProxiedImageUrl(data.imageUrl, '') : null
 
   return (
     <Box>
@@ -140,34 +142,27 @@ export function StudioDetailPage() {
 
           <Box display="flex" alignItems="center" gap={{ xs: 2, sm: 3 }}>
             {/* Studio Logo */}
-            {proxiedImageUrl && !imageError ? (
-              <Box
-                component="img"
-                src={proxiedImageUrl}
-                alt={`${decodedName} logo`}
-                onError={() => setImageError(true)}
-                sx={{
-                  height: 64,
-                  maxWidth: { xs: 110, sm: 180 },
-                  objectFit: 'contain',
-                  borderRadius: 1,
-                  filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.5))',
-                }}
-              />
-            ) : (
-              <Avatar
-                variant="rounded"
-                sx={{
-                  width: 64,
-                  height: 64,
-                  bgcolor: '#f97316',
-                  fontSize: '1.25rem',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-                }}
-              >
-                {decodedName.substring(0, 2).toUpperCase()}
-              </Avatar>
-            )}
+            <StudioLogo
+              logo={data.imageUrl && data.imageKind ? { url: data.imageUrl, kind: data.imageKind } : null}
+              name={`${decodedName} logo`}
+              height={56}
+              // Narrower on a phone, where the name and counts share the row.
+              maxWidth={{ xs: 96, sm: 166 }}
+              fallback={
+                <Avatar
+                  variant="rounded"
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    bgcolor: '#f97316',
+                    fontSize: '1.25rem',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                  }}
+                >
+                  {decodedName.substring(0, 2).toUpperCase()}
+                </Avatar>
+              }
+            />
 
             {/* Studio Info */}
             <Box flex={1} minWidth={0}>

@@ -38,6 +38,7 @@ import WhatshotIcon from '@mui/icons-material/Whatshot'
 import InsightsIcon from '@mui/icons-material/Insights'
 import AddToQueueIcon from '@mui/icons-material/AddToQueue'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
+import RouteOutlinedIcon from '@mui/icons-material/RouteOutlined'
 import ExploreIcon from '@mui/icons-material/Explore'
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
@@ -123,6 +124,7 @@ const baseUserMenuItems: NavItem[] = [
   { textKey: 'nav.playlists', icon: <PlaylistPlayIcon />, path: '/playlists', feature: null },
   { textKey: 'nav.collections', icon: <CollectionsBookmarkIcon />, path: '/collections', feature: null, capability: 'collections' },
   { textKey: 'nav.explore', icon: <HubOutlinedIcon />, path: '/explore', feature: null },
+  { textKey: 'nav.trails', icon: <RouteOutlinedIcon />, path: '/trails', feature: null },
   { textKey: 'nav.discover', icon: <ExploreIcon />, path: '/discovery', feature: null, capability: 'discover' },
   { textKey: 'nav.myRequests', icon: <PlaylistAddCheckIcon />, path: '/my-requests', feature: null },
   { textKey: 'nav.browse', icon: <VideoLibraryIcon />, path: '/browse', feature: null },
