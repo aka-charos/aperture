@@ -15,11 +15,13 @@ import {
   SeasonsList,
   MissingSeasonsCard,
   SimilarMedia,
+  StrongestLinks,
   MovieInsights,
   TitleAnalysis,
   RecommendToDialog,
 } from './components'
 import { insightsHaveDetail } from './helpers'
+import { titleRefFor } from '../trails/labels'
 import { isMovie, isSeries } from './types'
 import type { MediaType } from './types'
 
@@ -154,6 +156,8 @@ export function MediaDetailPage({
     )
   }
 
+  const trailRef = id ? titleRefFor(mediaType, id) : null
+
   return (
     <Box>
       {/* Backdrop */}
@@ -197,6 +201,9 @@ export function MediaDetailPage({
         favoriteLoading={favoriteLoading}
         onFavoriteToggle={isMovie(media) && user?.id ? toggleFavorite : undefined}
         onRecommend={hasConnections && id ? () => setRecommendOpen(true) : undefined}
+        // Only a dialog passes onBack, and only a dialog needs closing as the
+        // reader leaves for Trails (see MediaHero's onLeave).
+        onLeave={onBack}
       />
 
       {id && hasConnections && (
@@ -250,6 +257,9 @@ export function MediaDetailPage({
                   up with and a line nobody can track. */}
               {id && <TitleAnalysis mediaType={mediaType} mediaId={id} />}
               <MediaInfoCard media={media} />
+              {/* The strongest named links out of this title, from Trails.
+                  Draws nothing until it has some. */}
+              {trailRef && <StrongestLinks titleRef={trailRef} onLeave={onBack} />}
               {/* Aired episodes missing from the server + Seerr requests (series only) */}
               {isSeries(media) && (
                 <MissingSeasonsCard

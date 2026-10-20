@@ -138,3 +138,19 @@ export function stepTrail(trail: readonly string[], ref: string): string[] {
   if (at >= 0) return trail.slice(0, at + 1)
   return [...trail, ref].slice(-MAX_TRAIL_LENGTH)
 }
+
+/** A library title's ref, or null for an id Trails would not accept. */
+export function titleRefFor(type: 'movie' | 'series', id: string): string | null {
+  const ref = `${type}:${id}`.toLowerCase()
+  return isTitleRef(ref) ? ref : null
+}
+
+/**
+ * The Trails address that follows the threads out of one title, for links into
+ * the page from elsewhere (a title's detail page). Built through
+ * `writeTrailsUrl` so it reads back exactly as the page writes its own state.
+ */
+export function threadsPathFor(ref: string): string {
+  const params = writeTrailsUrl({ mode: 'threads', from: null, to: null, trail: [ref], titles: [] })
+  return `/trails?${params.toString()}`
+}

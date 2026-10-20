@@ -1,6 +1,6 @@
 # Trails
 
-Trails (sidebar: **Trails**, route icon) shows how the titles in your library are linked through the things they actually share: the people who made them, a franchise, a studio or network, an uncommon keyword. Every link has a name, and every link says how many titles in your library share it, so you can tell a rare connection from a common one at a glance.
+Trails (sidebar: **Trails**, route icon; or **Follow its threads** on any title's page) shows how the titles in your library are linked through the things they actually share: the people who made them, a franchise, a studio or network, an uncommon keyword. Every link has a name, and every link says how many titles in your library share it, so you can tell a rare connection from a common one at a glance.
 
 It is a separate page from the [Media Graph](explore.md). The Media Graph draws titles that an AI model judges similar and labels the lines afterwards; Trails draws no line that is not a named, shared credit.
 
@@ -36,6 +36,12 @@ Press the **corner button** on any poster to follow that thread: that title beco
 Add two or more titles (up to the limit the page states) to see what they share: the people, franchises, companies and keywords at least two of them carry. Links shared by more of the chosen titles come first, and rarer links first among those. The small posters beside each link show which of your titles carry it; hover one for the role.
 
 If the titles share nothing, **Find a trail between the first two** takes you to *Connect two titles*.
+
+## From a title's page
+
+Every movie and series page has a **Follow its threads** button beside its other actions. It opens Trails in *Follow a thread*, starting from that title. Pressed from a title opened over another page, it closes the title's details and goes to Trails.
+
+Further down, below the cast and crew, a **Strongest links** card names the title's three strongest threads: who or what each is, what it is in this title ("Director here", "This title's franchise"), and how many titles in your library share it. **See all threads in Trails** opens the full list. A title with no named links, or one Trails can't read, simply has no card.
 
 ---
 

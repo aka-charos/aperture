@@ -7,6 +7,8 @@ import {
   readTrailsUrl,
   stepCaption,
   stepTrail,
+  threadsPathFor,
+  titleRefFor,
   writeTrailsUrl,
 } from './labels'
 
@@ -72,4 +74,15 @@ test('stepping back onto the trail cuts it there, and a long trail drops its old
   assert.equal(next.length, MAX_TRAIL_LENGTH)
   assert.equal(next[next.length - 1], A)
   assert.equal(next[0], long[1])
+})
+
+test('a link from a detail page opens Follow a thread on that title, and reads back the same', () => {
+  const ref = titleRefFor('movie', '00000000-0000-4000-8000-00000000000A')
+  assert.equal(ref, 'movie:00000000-0000-4000-8000-00000000000a')
+  const path = threadsPathFor(ref!)
+  assert.equal(path, '/trails?mode=threads&trail=movie%3A00000000-0000-4000-8000-00000000000a')
+  const state = readTrailsUrl(new URLSearchParams(path.slice(path.indexOf('?') + 1)), 8)
+  assert.equal(state.mode, 'threads')
+  assert.deepEqual(state.trail, [ref])
+  assert.equal(titleRefFor('series', 'not-a-uuid'), null)
 })

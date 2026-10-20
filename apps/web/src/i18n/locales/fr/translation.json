@@ -6750,6 +6750,14 @@
       "onlyTwo": "Only these two in your library",
       "count_one": "{{count}} title in your library",
       "count_other": "{{count}} titles in your library"
+    },
+    "detail": {
+      "follow": "Follow its threads",
+      "followTooltip": "Open Trails on this title: the people, franchise, companies and keywords it shares with the rest of your library",
+      "title": "Strongest links",
+      "description": "The rarest named things this title shares with the rest of your library.",
+      "seeAll_one": "See its thread in Trails",
+      "seeAll_other": "See all {{count}} threads in Trails"
     }
   }
 }
