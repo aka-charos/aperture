@@ -32,7 +32,6 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import {
   SimilarityGraph,
   GraphLegend,
-  useFilteredGraph,
   type GraphData,
   type GraphNode,
   type LoadingStatus,
@@ -148,11 +147,7 @@ export function GraphExplorer({
   // Get current center node title
   const resolvedSearchPlaceholder = searchPlaceholder ?? t('graphExplorer.searchPlaceholderDefault')
   const currentTitle = data?.nodes.find((n) => n.isCenter)?.title || title || t('graphExplorer.fallbackTitle')
-  // What the connection-type filter leaves on screen: the count and a playlist
-  // made from the graph describe the posters the viewer can see, not the ones
-  // they switched off.
-  const shownData = useFilteredGraph(data)
-  const displayItemCount = itemCount ?? shownData?.nodes.length ?? 0
+  const displayItemCount = itemCount ?? data?.nodes.length ?? 0
 
   const handleSearchSubmit = useCallback(() => {
     if (localSearchQuery.trim() && onSearch) {
@@ -340,7 +335,7 @@ export function GraphExplorer({
                 variant="outlined"
                 startIcon={<PlaylistAddIcon />}
                 onClick={() => setPlaylistDialogOpen(true)}
-                disabled={!shownData || shownData.nodes.length === 0}
+                disabled={!data || data.nodes.length === 0}
                 sx={{
                   fontSize: { xs: '0.75rem', md: '0.875rem' },
                   whiteSpace: 'nowrap',
@@ -405,7 +400,7 @@ export function GraphExplorer({
         open={playlistDialogOpen}
         onClose={() => setPlaylistDialogOpen(false)}
         nodes={
-          shownData?.nodes.map((n) => ({
+          data?.nodes.map((n) => ({
             id: n.id,
             title: n.title,
             year: n.year,

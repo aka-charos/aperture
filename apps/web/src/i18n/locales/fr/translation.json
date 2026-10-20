@@ -3025,10 +3025,9 @@
     "hintsDesktopOpen": "Click a poster for details • Shift+click or its corner button to explore from it • Drag to move • Scroll to zoom",
     "hintsMobileOpen": "Tap for details • Long press to explore from it",
     "exploreFromHere": "Explore from here (Shift+click)",
-    "connectionFilterLabel": "Connection types shown",
-    "connectionFilterTooltip": "Click to hide or show • Shift+click to show only this",
-    "connectionFilterLastShown": "At least one connection type stays shown",
-    "connectionFilterShowAll": "Show all"
+    "connectionHighlightLabel": "Highlight connections",
+    "connectionHighlightTooltip": "Hover to preview • Click to keep these connections highlighted",
+    "connectionHighlightClear": "Clear highlight"
   },
   "mediaGraph": {
     "searchPlaceholder": "Recherchez par humeur, thème ou description…",
@@ -3073,7 +3072,7 @@
     "crossMediaUnavailable": "Applies to the Browse views only. Clear the search or press Start over to use it.",
     "crossMediaHelpAria": "About cross-media connections",
     "controlsButton": "Filtres et sources",
-    "connectionTypesHint": "Choose which connections the graph draws."
+    "connectionTypesHighlightHint": "Hover or click a type to highlight its connections. Nothing moves or disappears."
   },
   "seasonRequest": {
     "dialogTitle": "Demander une série",

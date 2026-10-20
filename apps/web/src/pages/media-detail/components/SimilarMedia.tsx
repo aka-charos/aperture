@@ -31,7 +31,6 @@ import {
   SimilarityGraph,
   GraphLegend,
   useSimilarityData,
-  useFilteredGraph,
   CONNECTION_COLORS,
 } from '../../../components/SimilarityGraph'
 import type { GraphNode, ConnectionReason, ConnectionType } from '../../../components/SimilarityGraph'
@@ -143,8 +142,6 @@ export function SimilarMedia({
     limit: FULLSCREEN_SIMILAR_GRAPH_LIMIT,
     depth: 3,
   })
-  // The count in the fullscreen subtitle is of what the connection filter shows.
-  const shownFullscreenData = useFilteredGraph(fullscreenGraphData)
 
   // View mode intentionally always starts on 'list' and is not persisted:
   // every item view should open with the List, Graph is a per-visit choice.
@@ -409,7 +406,7 @@ export function SimilarMedia({
                   : t('mediaDetail.similar.titleSeries')
               }
               subtitle={t('mediaDetail.similar.expandedSubtitle', {
-                count: shownFullscreenData?.nodes.length || 0,
+                count: fullscreenGraphData?.nodes.length || 0,
               })}
               history={fullscreenHistory}
               onHistoryNavigate={(index) =>

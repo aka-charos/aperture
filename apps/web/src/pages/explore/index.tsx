@@ -703,7 +703,7 @@ function ExploreContent() {
           {t('mediaGraph.connectionTypesHeading')}
         </Typography>
         <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
-          {t('mediaGraph.connectionTypesHint')}
+          {t('mediaGraph.connectionTypesHighlightHint')}
         </Typography>
         <GraphLegend orientation="column" />
       </Box>

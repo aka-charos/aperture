@@ -25,7 +25,7 @@ The section shows a fixed set of the strongest connections (10 docked; the fulls
 
 ### Connection colors
 
-One edge, one color — the strongest reason wins. The legend under the graph is also a filter: click a type to hide or show it, Shift+click to show it alone (the same choice as on [Explore](explore.md)):
+One edge, one color — the strongest reason wins. The legend under the graph also highlights: hover a type to preview its lines, click it to keep them highlighted, and everything else dims without moving (the same as on [Explore](explore.md)):
 
 | Color | Connection |
 |-------|-----------|

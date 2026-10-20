@@ -4181,10 +4181,9 @@
     "hintsDesktopOpen": "Click a poster for details • Shift+click or its corner button to explore from it • Drag to move • Scroll to zoom",
     "hintsMobileOpen": "Tap for details • Long press to explore from it",
     "exploreFromHere": "Explore from here (Shift+click)",
-    "connectionFilterLabel": "Connection types shown",
-    "connectionFilterTooltip": "Click to hide or show • Shift+click to show only this",
-    "connectionFilterLastShown": "At least one connection type stays shown",
-    "connectionFilterShowAll": "Show all",
+    "connectionHighlightLabel": "Highlight connections",
+    "connectionHighlightTooltip": "Hover to preview • Click to keep these connections highlighted",
+    "connectionHighlightClear": "Clear highlight",
     "playlistCreated": "Playlist created successfully!"
   },
   "mediaGraph": {
@@ -4208,7 +4207,7 @@
     "browseBy": "Browse by",
     "recentSearches": "Recent searches",
     "connectionTypesHeading": "Connection types",
-    "connectionTypesHint": "Choose which connections the graph draws.",
+    "connectionTypesHighlightHint": "Hover or click a type to highlight its connections. Nothing moves or disappears.",
     "crossMedia": "Show cross-media connections",
     "crossMediaHelp": "Off, a film only connects to other films and a series only to other series. On, each item also reaches across: a film can link to a series that resembles it, and the other way round.",
     "crossMediaHelpSlots": "One connection per item is held for the other media type, so a cross-media match still appears when same-media matches score higher.",

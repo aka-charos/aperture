@@ -1,8 +1,8 @@
 import { Box, ButtonBase, Link, Tooltip, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { CONNECTION_COLORS } from './types'
-import { CONNECTION_TYPES } from './connectionFilter'
-import { useHiddenConnectionTypes } from './connectionFilterStore'
+import { CONNECTION_TYPES } from './connectionHighlight'
+import { useConnectionHighlight } from './connectionHighlightStore'
 import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 
 interface GraphLegendProps {
@@ -12,19 +12,22 @@ interface GraphLegendProps {
 }
 
 /**
- * The connection colours, and the switch for each: click a type to hide or
- * show its lines, Shift+click to show it alone. Every legend and every graph
- * share one selection (connectionFilterStore.ts).
+ * The connection colours, and a highlight for each: hover a type to preview
+ * its lines, click it to keep them highlighted (several may be), Clear to go
+ * back. Nothing is removed and nothing moves; every legend and every graph on
+ * screen share one highlight (connectionHighlightStore.ts).
  */
 export function GraphLegend({ compact = false, orientation = 'row' }: GraphLegendProps) {
   const { t } = useTranslation()
-  const { hidden, toggle, showOnly, showAll } = useHiddenConnectionTypes()
+  const { highlighted, toggle, clear, setPreview } = useConnectionHighlight()
   const fontSize = orientation === 'column' ? '11px' : compact ? '9px' : '10px'
+  const anyChosen = highlighted.size > 0
 
   return (
     <Box
       role="group"
-      aria-label={t('graphExplorer.connectionFilterLabel')}
+      aria-label={t('graphExplorer.connectionHighlightLabel')}
+      onPointerLeave={() => setPreview(null)}
       sx={{
         display: 'flex',
         flexDirection: orientation === 'column' ? 'column' : 'row',
@@ -35,19 +38,20 @@ export function GraphLegend({ compact = false, orientation = 'row' }: GraphLegen
       }}
     >
       {CONNECTION_TYPES.map((type) => {
-        const shown = !hidden.has(type)
-        // The store refuses to hide the last shown type; say so rather than
-        // let the click look broken.
-        const lastShown = shown && hidden.size === CONNECTION_TYPES.length - 1
+        const chosen = highlighted.has(type)
+        // Faded only while something else is chosen, so at rest the legend
+        // reads as a plain key.
+        const faded = anyChosen && !chosen
         return (
-          <Tooltip
-            key={type}
-            title={t(lastShown ? 'graphExplorer.connectionFilterLastShown' : 'graphExplorer.connectionFilterTooltip')}
-            enterDelay={lastShown ? 0 : 600}
-          >
+          <Tooltip key={type} title={t('graphExplorer.connectionHighlightTooltip')} enterDelay={700}>
             <ButtonBase
-              aria-pressed={shown}
-              onClick={(event) => (event.shiftKey ? showOnly(type) : toggle(type))}
+              aria-pressed={chosen}
+              onClick={() => toggle(type)}
+              // Mouse only: a tap fires pointerenter and never pointerleave, and
+              // a preview left behind would override what the tap chose.
+              onPointerEnter={(event) => {
+                if (event.pointerType === 'mouse') setPreview(type)
+              }}
               sx={{
                 display: 'flex',
                 alignItems: 'center',
@@ -56,25 +60,26 @@ export function GraphLegend({ compact = false, orientation = 'row' }: GraphLegen
                 px: 0.75,
                 py: orientation === 'column' ? 0.5 : 0.25,
                 borderRadius: 1,
-                opacity: shown ? 1 : 0.45,
-                '&:hover': { bgcolor: 'action.hover' },
+                opacity: faded ? 0.45 : 1,
+                bgcolor: chosen ? 'action.selected' : 'transparent',
+                '&:hover': { bgcolor: chosen ? 'action.selected' : 'action.hover' },
                 '&.Mui-focusVisible': { outline: 2, outlineColor: 'primary.main' },
               }}
             >
               <Box
                 sx={{
                   width: 14,
-                  height: 3,
+                  height: chosen ? 4 : 3,
                   borderRadius: 1,
-                  bgcolor: shown ? CONNECTION_COLORS[type] : 'transparent',
-                  border: shown ? 'none' : `1px solid ${CONNECTION_COLORS[type]}`,
+                  bgcolor: CONNECTION_COLORS[type],
                   flexShrink: 0,
                 }}
               />
               <Typography
                 variant="caption"
-                color={shown ? 'text.primary' : 'text.secondary'}
-                sx={{ fontSize, textDecoration: shown ? 'none' : 'line-through' }}
+                color={faded ? 'text.secondary' : 'text.primary'}
+                fontWeight={chosen ? 600 : 400}
+                sx={{ fontSize }}
               >
                 {connectionTypeLabel(type, t)}
               </Typography>
@@ -82,14 +87,14 @@ export function GraphLegend({ compact = false, orientation = 'row' }: GraphLegen
           </Tooltip>
         )
       })}
-      {hidden.size > 0 && (
+      {anyChosen && (
         <Link
           component="button"
           variant="caption"
-          onClick={showAll}
+          onClick={clear}
           sx={{ fontSize, px: 0.75, alignSelf: orientation === 'column' ? 'flex-start' : 'center' }}
         >
-          {t('graphExplorer.connectionFilterShowAll')}
+          {t('graphExplorer.connectionHighlightClear')}
         </Link>
       )}
     </Box>

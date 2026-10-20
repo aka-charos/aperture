@@ -2150,10 +2150,9 @@
     "hintsDesktopOpen": "Κλικ σε αφίσα για λεπτομέρειες • Shift+κλικ ή το κουμπί στη γωνία της για εξερεύνηση από εκεί • Σύρετε για μετακίνηση • Κυλήστε για ζουμ",
     "hintsMobileOpen": "Πατήστε για λεπτομέρειες • Παρατεταμένο πάτημα για εξερεύνηση από εκεί",
     "exploreFromHere": "Εξερεύνηση από εδώ (Shift+κλικ)",
-    "connectionFilterLabel": "Είδη συνδέσεων που εμφανίζονται",
-    "connectionFilterTooltip": "Κλικ για απόκρυψη ή εμφάνιση • Shift+κλικ για να εμφανίζεται μόνο αυτό",
-    "connectionFilterLastShown": "Τουλάχιστον ένα είδος σύνδεσης μένει ορατό",
-    "connectionFilterShowAll": "Εμφάνιση όλων",
+    "connectionHighlightLabel": "Επισήμανση συνδέσεων",
+    "connectionHighlightTooltip": "Περάστε τον δείκτη για προεπισκόπηση • Κλικ για να μείνουν επισημασμένες αυτές οι συνδέσεις",
+    "connectionHighlightClear": "Καθαρισμός επισήμανσης",
     "playlistCreated": "Η λίστα δημιουργήθηκε!"
   },
   "settingsChannelsWebExpand": {
@@ -3012,7 +3011,7 @@
     "browseBy": "Περιήγηση ανά",
     "recentSearches": "Πρόσφατες αναζητήσεις",
     "connectionTypesHeading": "Είδη συνδέσεων",
-    "connectionTypesHint": "Διαλέξτε ποιες συνδέσεις σχεδιάζει ο χάρτης.",
+    "connectionTypesHighlightHint": "Περάστε τον δείκτη ή κάντε κλικ σε ένα είδος για να επισημανθούν οι συνδέσεις του. Τίποτα δεν μετακινείται ούτε χάνεται.",
     "crossMedia": "Συνδέσεις ανάμεσα σε ταινίες και σειρές",
     "semanticSearchingMsg1": "Ψάχνω στη βιβλιοθήκη σας…",
     "semanticSearchingMsg2": "Βρίσκω τίτλους που ταιριάζουν…",

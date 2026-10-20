@@ -6,8 +6,8 @@ import { alpha } from '@mui/material/styles'
 import { getProxiedImageUrl } from '@aperture/ui'
 import type { GraphNode, GraphEdge, GraphData, ConnectionReason, LoadingStatus, ConnectionType } from './types'
 import { CONNECTION_COLORS } from './types'
-import { primaryConnectionType } from './connectionFilter'
-import { useFilteredGraph } from './connectionFilterStore'
+import { edgeColorType, edgeIsLit, litNodeIds } from './connectionHighlight'
+import { useConnectionHighlight } from './connectionHighlightStore'
 import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 import { palette } from '@/theme'
 
@@ -24,6 +24,22 @@ const PRIMARY_LABEL_HEIGHT = 16
 const LONG_PRESS_MS = 500
 /** Movement allowed during a long press before it counts as a drag instead. */
 const LONG_PRESS_SLOP_PX = 8
+/** Line opacity at rest, when highlighted, and when dimmed by a highlight elsewhere. */
+const EDGE_OPACITY = { rest: 0.6, lit: 0.9, dim: 0.06 }
+/** Poster opacity when a highlight does not reach it. */
+const DIMMED_NODE_OPACITY = 0.18
+/**
+ * Pull toward the middle. Small, so a linked cluster keeps its own shape; it is
+ * what stops clusters with no link between them drifting apart until the
+ * layout fills a canvas many screens wide.
+ */
+const CENTRE_PULL = 0.06
+/** Ticks run before the first paint, so the graph appears close to settled. */
+const PRESETTLE_TICKS = 120
+/** Space left round the graph when it is fitted to the view. */
+const FIT_PADDING = 40
+/** Furthest a fit zooms out; past this a poster is a coloured dot. */
+const MIN_ZOOM = 0.15
 /** @mui/icons-material Hub, on a 24px grid: the explore-from-here button. */
 const HUB_ICON_PATH =
   'M8.4 18.2c.38.5.6 1.12.6 1.8 0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3c.44 0 .85.09 1.23.26l1.41-1.77c-.92-1.03-1.29-2.39-1.09-3.69l-2.03-.68c-.54.83-1.46 1.38-2.52 1.38-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3c0 .07 0 .14-.01.21l2.03.68c.64-1.21 1.82-2.09 3.22-2.32V5.91C9.96 5.57 9 4.4 9 3c0-1.66 1.34-3 3-3s3 1.34 3 3c0 1.4-.96 2.57-2.25 2.91v2.16c1.4.23 2.58 1.11 3.22 2.32L18 9.71V9.5c0-1.66 1.34-3 3-3s3 1.34 3 3-1.34 3-3 3c-1.06 0-1.98-.55-2.52-1.37l-2.03.68c.2 1.29-.16 2.65-1.09 3.69l1.41 1.77Q17.34 17 18 17c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3c0-.68.22-1.3.6-1.8l-1.41-1.77c-1.35.75-3.01.76-4.37 0z'
@@ -55,7 +71,7 @@ interface SimilarityGraphProps {
 }
 
 export const SimilarityGraph = memo(function SimilarityGraph({
-  data: allData,
+  data,
   loading = false,
   loadingStatus,
   onNodeOpen,
@@ -85,14 +101,15 @@ export const SimilarityGraph = memo(function SimilarityGraph({
     onNodeExploreRef.current = onNodeExplore
   }, [onNodeExplore])
 
-  // Only the connection types the viewer has left switched on, and the posters
-  // they still reach (connectionFilter.ts). Everything below draws this.
-  const data = useFilteredGraph(allData)
+  // The highlighted connection types (connectionHighlight.ts). They only change
+  // how lines and posters are drawn, never what is laid out, so they live in a
+  // ref the drawing reads and do not re-run the simulation.
+  const { effective: highlight } = useConnectionHighlight()
+  const highlightRef = useRef(highlight)
+  const applyHighlightRef = useRef<((animate: boolean) => void) | null>(null)
 
   // Create a stable key for data to prevent unnecessary re-renders: only when
-  // the nodes or the edges actually drawn change, not when object references
-  // do. The edges are in it because a connection-type toggle can change them
-  // and leave every node in place.
+  // the nodes or the edges change, not when object references do.
   const dataKey = useMemo(() => {
     if (!data) return ''
     const nodeIds = data.nodes.map(n => n.id).sort().join(',')
@@ -165,9 +182,6 @@ export const SimilarityGraph = memo(function SimilarityGraph({
     return () => observer.disconnect()
   }, [propWidth, propHeight])
 
-  // Edge colour: the strongest reason left after the filter (connectionFilter.ts)
-  const getPrimaryConnectionType = primaryConnectionType
-
   // D3 force simulation
   useEffect(() => {
     const graphData = dataRef.current
@@ -198,10 +212,14 @@ export const SimilarityGraph = memo(function SimilarityGraph({
     const getNodeStroke = (d: GraphNode) => d.isCenter ? palette.secondary.main : (d.isPrimary ? palette.warning.main : '#333')
     const getNodeStrokeWidth = (d: GraphNode) => d.isCenter ? 2 : (d.isPrimary ? 2 : 1)
 
-    // Create zoom behavior
+    // Create zoom behavior. A zoom the viewer made themselves carries the
+    // pointer or wheel event that caused it; a fit has none. Once they have
+    // moved the view, it is theirs and no later fit takes it back.
+    let viewerMovedView = false
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.3, 3])
+      .scaleExtent([MIN_ZOOM, 3])
       .on('zoom', (event) => {
+        if (event.sourceEvent) viewerMovedView = true
         container.attr('transform', event.transform)
       })
 
@@ -210,6 +228,12 @@ export const SimilarityGraph = memo(function SimilarityGraph({
     // Container for zoom/pan
     const container = svg.append('g')
 
+    const edgeOpacity = (d: GraphEdge) => {
+      const current = highlightRef.current
+      if (current.size === 0) return EDGE_OPACITY.rest
+      return edgeIsLit(d.reasons, current) ? EDGE_OPACITY.lit : EDGE_OPACITY.dim
+    }
+
     // Create edges
     const edges = container
       .append('g')
@@ -217,16 +241,16 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       .selectAll<SVGLineElement, GraphEdge>('line')
       .data(graphData.edges)
       .join('line')
-      .attr('stroke', (d) => CONNECTION_COLORS[getPrimaryConnectionType(d.reasons)])
       .attr('stroke-width', (d) => Math.max(1, d.similarity * 4))
-      .attr('stroke-opacity', 0.6)
       .style('cursor', 'pointer')
       .on('mouseenter', function (_event, d) {
         d3.select(this).attr('stroke-opacity', 1).attr('stroke-width', Math.max(2, d.similarity * 6))
         setHoveredEdge(d)
       })
       .on('mouseleave', function (_event, d) {
-        d3.select(this).attr('stroke-opacity', 0.6).attr('stroke-width', Math.max(1, d.similarity * 4))
+        d3.select(this)
+          .attr('stroke-opacity', edgeOpacity(d))
+          .attr('stroke-width', Math.max(1, d.similarity * 4))
         setHoveredEdge(null)
       })
 
@@ -444,6 +468,27 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       node.y = height / 2 + radius * Math.sin(angle)
     })
 
+    // Draw the current highlight: colour and strength per line, dimming per
+    // poster. Positions are not touched, so a highlight never moves anything.
+    const applyHighlight = (animate: boolean) => {
+      const current = highlightRef.current
+      const lit = litNodeIds(graphData.nodes, graphData.edges, current)
+      // A zero-length transition when drawing for the first time: one code path,
+      // and it lands before the graph fades in.
+      const duration = animate ? 180 : 0
+      edges
+        .transition()
+        .duration(duration)
+        .attr('stroke', (d) => CONNECTION_COLORS[edgeColorType(d.reasons, current)])
+        .attr('stroke-opacity', (d) => edgeOpacity(d))
+      nodes
+        .transition()
+        .duration(duration)
+        .style('opacity', (d) => (lit === null || lit.has(d.id) ? 1 : DIMMED_NODE_OPACITY))
+    }
+    applyHighlight(false)
+    applyHighlightRef.current = applyHighlight
+
     // Start with container hidden, fade in after initial settling
     container.style('opacity', 0)
     
@@ -466,6 +511,8 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       )
       .force('charge', d3.forceManyBody().strength(-650))
       .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('x', d3.forceX<GraphNode>(width / 2).strength(CENTRE_PULL))
+      .force('y', d3.forceY<GraphNode>(height / 2).strength(CENTRE_PULL))
       .force('collision', d3.forceCollide().radius((d) => {
         const gn = d as GraphNode
         const nodeW = gn.isCenter ? centerNodeWidth : (gn.isPrimary ? primaryNodeWidth : nodeWidth)
@@ -473,16 +520,8 @@ export const SimilarityGraph = memo(function SimilarityGraph({
       }))
 
     simulationRef.current = simulation
-    
-    // Fade in after brief settling period
-    setTimeout(() => {
-      container.transition().duration(400).style('opacity', 1)
-    }, 150)
 
-    // Track if we've centered on the initial node
-    let hasCentered = false
-
-    simulation.on('tick', () => {
+    const drawPositions = () => {
       edges
         .attr('x1', (d) => (d.source as GraphNode).x || 0)
         .attr('y1', (d) => (d.source as GraphNode).y || 0)
@@ -490,52 +529,76 @@ export const SimilarityGraph = memo(function SimilarityGraph({
         .attr('y2', (d) => (d.target as GraphNode).y || 0)
 
       nodes.attr('transform', (d) => `translate(${d.x || 0},${d.y || 0})`)
-    })
+    }
 
-    // Center on the center node after simulation settles (no zoom change, just pan)
+    /**
+     * Zoom and pan so every poster is on screen, never past natural size (a
+     * small graph stays at 100% rather than being blown up). Skipped once the
+     * viewer has zoomed or panned.
+     */
+    const fitToView = (duration: number) => {
+      if (viewerMovedView) return
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+      for (const node of graphData.nodes) {
+        if (node.x === undefined || node.y === undefined) continue
+        const halfWidth = getNodeWidth(node) / 2
+        minX = Math.min(minX, node.x - halfWidth)
+        maxX = Math.max(maxX, node.x + halfWidth)
+        minY = Math.min(minY, node.y - getNodeHeight(node) / 2)
+        maxY = Math.max(maxY, node.y + getNodeHeight(node) / 2 + getNodeTitleHeight(node))
+      }
+      if (!Number.isFinite(minX)) return
+      const boxWidth = maxX - minX + FIT_PADDING * 2
+      const boxHeight = maxY - minY + FIT_PADDING * 2
+      const scale = Math.max(MIN_ZOOM, Math.min(1, width / boxWidth, height / boxHeight))
+      const target = d3.zoomIdentity
+        .translate(width / 2, height / 2)
+        .scale(scale)
+        .translate(-(minX + maxX) / 2, -(minY + maxY) / 2)
+      if (duration > 0) svg.transition().duration(duration).call(zoom.transform, target)
+      else svg.call(zoom.transform, target)
+    }
+
+    // Most of the settling happens before the first paint, so the graph
+    // appears nearly in place and already fitted instead of drifting in from
+    // its starting circle. Manual ticks dispatch no tick event, hence the draw.
+    simulation.tick(PRESETTLE_TICKS)
+    drawPositions()
+    fitToView(0)
+
+    // Fade in after brief settling period
+    const fadeTimer = setTimeout(() => {
+      container.transition().duration(400).style('opacity', 1)
+    }, 150)
+
+    simulation.on('tick', drawPositions)
+
+    // Fit again once settled, gently: the last of the settling can still move
+    // the edges of the graph. Once only, so dragging a poster later (which
+    // reheats the simulation) never moves the camera under the viewer.
+    let settledFitDone = false
     simulation.on('end', () => {
-      if (hasCentered) return
-      hasCentered = true
-      
-      const centerNode = graphData.nodes.find((n: GraphNode) => n.isCenter) as GraphNode | undefined
-      if (centerNode && centerNode.x !== undefined && centerNode.y !== undefined) {
-        // Pan to center without changing zoom level (scale = 1)
-        const translateX = width / 2 - centerNode.x
-        const translateY = height / 2 - centerNode.y
-        
-        svg.transition()
-          .duration(300)
-          .call(
-            zoom.transform,
-            d3.zoomIdentity.translate(translateX, translateY)
-          )
-      }
+      if (settledFitDone) return
+      settledFitDone = true
+      fitToView(400)
     })
-
-    // Also center after a short delay in case simulation ends quickly
-    setTimeout(() => {
-      if (hasCentered) return
-      hasCentered = true
-      
-      const centerNode = graphData.nodes.find((n: GraphNode) => n.isCenter) as GraphNode | undefined
-      if (centerNode && centerNode.x !== undefined && centerNode.y !== undefined) {
-        const translateX = width / 2 - centerNode.x
-        const translateY = height / 2 - centerNode.y
-        
-        svg.transition()
-          .duration(300)
-          .call(
-            zoom.transform,
-            d3.zoomIdentity.translate(translateX, translateY)
-          )
-      }
-    }, 500)
 
     return () => {
       cancelLongPress()
+      clearTimeout(fadeTimer)
       simulation.stop()
+      applyHighlightRef.current = null
     }
-  }, [dataKey, dimensions, compact, getPrimaryConnectionType, t])
+  }, [dataKey, dimensions, compact, t])
+
+  // A new highlight restyles what is already drawn and moves nothing.
+  useEffect(() => {
+    highlightRef.current = highlight
+    applyHighlightRef.current?.(true)
+  }, [highlight])
 
   if (loading) {
     return (
