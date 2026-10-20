@@ -17,9 +17,9 @@ It is a separate page from the [Media Graph](explore.md). The Media Graph draws 
 
 ## Follow a trail
 
-Pick a title to start from, or press **Surprise me** for a well-connected title chosen at random. Trails lists every named thread leading out of it, strongest first: each person, franchise, company or keyword it shares with the rest of your library, what it is in this title ("Director here"), how many titles carry it, and the titles that thread leads to (a person's titles are shown oldest first, like a filmography).
+Pick a title to start from, or press **Surprise me** for a well-connected title chosen at random (under your filters, so it always has threads to show). Trails lists every named thread leading out of it, strongest first: each person, franchise, company or keyword it shares with the rest of your library, what it is in this title ("Director here"), how many titles carry it, and the titles that thread leads to (a person's titles are shown oldest first, like a filmography).
 
-Press the **corner button** on any poster to follow that thread: that title becomes the next stop, and its own threads appear. A thread that leads to more titles than fit ends with "and 8 more"; **Show all** opens its whole list in place (a director's whole filmography here, say), and **Show fewer** closes it again.
+Press the **corner button** on any poster to follow that thread: that title becomes the next stop, and its own threads appear. A thread that leads to more titles than fit ends with "and 8 more"; **Show all** opens its whole list in place (a director's whole filmography here, say; a very long thread still stops after 200 titles and says how many more there are), and **Show fewer** closes it again.
 
 ### Your trail
 
@@ -31,7 +31,7 @@ Once you have taken a step, the titles you followed appear above the threads as 
 
 ### Filters
 
-- **Hide what I've watched** leaves out the titles you have finished (the ones with a watched tick), and any thread that then leads nowhere. A show you are partway through still appears. How many titles carry a thread is not changed by it: hiding what you have seen does not make a link rarer.
+- **Hide what I've watched** leaves out the titles you have finished (the ones with a watched tick), and any thread that then leads nowhere. A show you are partway through still appears, and a title you mark watched while the filter is on drops off the threads already showing. How many titles carry a thread is not changed by it: hiding what you have seen does not make a link rarer.
 - **Threads through** shows only the kinds you pick: **People**, **Franchises**, **Studios & networks**, **Keywords**. Pick none (or **Show every kind**) to see them all. *Take me on a trail* follows the same kinds.
 
 ---

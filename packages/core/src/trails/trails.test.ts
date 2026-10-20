@@ -8,6 +8,7 @@ import {
   linkCap,
   maskCost,
   normalizeName,
+  parseEntityKinds,
   parseTitleRef,
   rarity,
   roleBit,
@@ -20,6 +21,7 @@ import {
   buildTrailIndex,
   createView,
   describeIndex,
+  pickWellConnected,
   sharedLinks,
   titleThread,
   titleThreads,
@@ -375,4 +377,52 @@ test('production meta-keywords are not links, whatever their casing', () => {
     source.credits.map((credit) => credit.name),
     ['heist']
   )
+})
+
+test('a summary with no members counts what a full thread would list, without listing it', () => {
+  const { index, at, heat, insider } = library()
+  const view = createView(index, null)
+  const exclude = new Uint8Array(index.titles.length)
+  exclude[at(insider)] = 1
+  for (const options of [{}, { exclude }]) {
+    const full = titleThreads(view, at(heat), options)
+    const summary = titleThreads(view, at(heat), { ...options, perThread: 0 })
+    assert.deepEqual(
+      summary.map((thread) => [thread.entity, thread.others.length, thread.more]),
+      full.map((thread) => [thread.entity, 0, thread.others.length + thread.more])
+    )
+  }
+})
+
+test('a random start honours the kinds and the watched titles the page hides', () => {
+  const { index, at, heat, confidential, insider, collateral } = library()
+  const view = createView(index, null)
+  // Only Heat and L.A. Confidential carry a company that links (Warner Bros.).
+  const companies = new Set(['company'] as const)
+  let seed = 0
+  const random = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280)
+  for (let i = 0; i < 20; i += 1) {
+    const picked = pickWellConnected(view, random, { kinds: companies })
+    assert.ok(picked === at(heat) || picked === at(confidential))
+  }
+  // With L.A. Confidential watched, Heat's studio leads nowhere, and so does Confidential's.
+  const exclude = new Uint8Array(index.titles.length)
+  exclude[at(confidential)] = 1
+  exclude[at(heat)] = 1
+  assert.equal(pickWellConnected(view, random, { kinds: companies, exclude }), null)
+  // A watched title is never the start either.
+  exclude.fill(0)
+  exclude[at(insider)] = 1
+  exclude[at(collateral)] = 1
+  for (let i = 0; i < 20; i += 1) {
+    const picked = pickWellConnected(view, random, { exclude })
+    assert.ok(picked !== at(insider) && picked !== at(collateral))
+  }
+})
+
+test('kinds from a request: unknown ones dropped, repeats once, none means every kind', () => {
+  assert.deepEqual(parseEntityKinds('keyword,nonsense,person,keyword'), ['keyword', 'person'])
+  assert.equal(parseEntityKinds('nonsense'), null)
+  assert.equal(parseEntityKinds(''), null)
+  assert.equal(parseEntityKinds(undefined), null)
 })

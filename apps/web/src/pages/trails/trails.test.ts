@@ -12,6 +12,7 @@ import {
   stepCaption,
   stepTrail,
   titleRefFor,
+  trailLookupNeeded,
   trailPathFor,
   writeTrailsUrl,
 } from './labels'
@@ -105,4 +106,18 @@ test('following from on top of the Trails page keeps the filters and restarts th
 test('a detail page counts the OTHER titles sharing a thread, never "these two"', () => {
   assert.deepEqual(sharedWithOthers(2), { key: 'trails.detail.sharedWith', count: 1 })
   assert.deepEqual(sharedWithOthers(9), { key: 'trails.detail.sharedWith', count: 8 })
+})
+
+test('a trail is looked up only while a title or a side-by-side pair is unknown, never for a title that is gone', () => {
+  const cards = new Set([A, C])
+  const links = new Set([pairKey(A, C)])
+  const hasCard = (ref: string) => cards.has(ref)
+  const hasLink = (key: string) => links.has(key)
+  // B was asked about and not returned: A and C sit side by side and are linked.
+  assert.equal(trailLookupNeeded([A, B, C], hasCard, hasLink, new Set([B])), false)
+  // Before the answer B is simply unknown.
+  assert.equal(trailLookupNeeded([A, B, C], hasCard, hasLink, new Set()), true)
+  // A missing pair still asks.
+  assert.equal(trailLookupNeeded([C, A], hasCard, hasLink, new Set()), true)
+  assert.equal(trailLookupNeeded([A], hasCard, hasLink, new Set()), false)
 })

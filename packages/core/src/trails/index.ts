@@ -34,6 +34,7 @@ import { formatTitleRef, rolesOf, type EntityKind, type LinkRole, type TitleRef 
 
 export {
   LINK_ROLES,
+  parseEntityKinds,
   parseTitleRef,
   formatTitleRef,
   type EntityKind,
@@ -377,13 +378,18 @@ export async function getTrail(
   return { titles: kept.map((title) => titleView(view.index.titles[title])), links }
 }
 
-/** A random well-connected title in scope to start a trail from, or null when the library has none. */
+/**
+ * A random well-connected title in scope to start a trail from, chosen under
+ * the page's filters so it has threads the page will show; null when none is
+ * found.
+ */
 export async function getTrailStart(
   scope: LibraryScope,
+  filter: TrailFilter = {},
   random: () => number = Math.random
 ): Promise<TrailTitle | null> {
   const view = await viewFor(scope)
-  const title = pickWellConnected(view, random)
+  const title = pickWellConnected(view, random, await threadFilter(view, filter))
   return title == null ? null : titleView(view.index.titles[title])
 }
 

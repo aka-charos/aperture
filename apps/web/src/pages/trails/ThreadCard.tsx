@@ -8,8 +8,16 @@ import { KIND_COLOR, rarityText } from './labels'
 import { useTrailText } from './useTrailText'
 import type { Thread, ThreadMember, TrailTitle } from './types'
 
-/** A thread opened in full: loading, its whole list, or a failure. */
-export type OpenedThread = { status: 'loading' } | { status: 'open'; members: ThreadMember[] } | { status: 'failed' }
+/**
+ * A thread opened in full: loading, its list (with how many past the API's cap
+ * did not fit), nothing left to show (everything on it hidden now, or no longer
+ * linked), or a failure.
+ */
+export type OpenedThread =
+  | { status: 'loading' }
+  | { status: 'open'; members: ThreadMember[]; more: number }
+  | { status: 'empty' }
+  | { status: 'failed' }
 
 interface ThreadCardProps {
   thread: Thread
@@ -33,6 +41,8 @@ export function ThreadCard({ thread, opened, onOpenAll, onClose, onOpen, onFollo
   const rarity = rarityText(thread.titleCount)
   const all = opened?.status === 'open' ? opened.members : null
   const members = all ?? thread.others
+  // What is still left out: the list as loaded, or past the cap once opened.
+  const leftOut = opened?.status === 'open' ? opened.more : thread.more
   const total = thread.others.length + thread.more
 
   return (
@@ -74,6 +84,11 @@ export function ThreadCard({ thread, opened, onOpenAll, onClose, onOpen, onFollo
           {t('trails.thread.loadFailed')}
         </Typography>
       )}
+      {opened?.status === 'empty' && (
+        <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 1 }}>
+          {t('trails.thread.nothingLeft')}
+        </Typography>
+      )}
       <Box
         sx={
           all
@@ -90,10 +105,10 @@ export function ThreadCard({ thread, opened, onOpenAll, onClose, onOpen, onFollo
             width={all ? '100%' : 104}
           />
         ))}
-        {!all && thread.more > 0 && (
+        {leftOut > 0 && (
           <Box sx={{ alignSelf: 'center', px: 1, flexShrink: 0 }}>
             <Typography variant="body2" color="text.secondary">
-              {t('trails.threads.more', { count: thread.more })}
+              {t('trails.threads.more', { count: leftOut })}
             </Typography>
           </Box>
         )}

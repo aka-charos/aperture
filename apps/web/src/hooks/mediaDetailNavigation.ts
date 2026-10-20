@@ -6,7 +6,7 @@
  * a studio, the franchise) routes the page underneath, and left open the
  * dialog would cover the very page the reader asked for. A change of query
  * alone closes it too, unless it REPLACED the entry: a link to the same page
- * with other parameters (Follow its threads from a title opened over Trails)
+ * with other parameters (Follow a trail from a title opened over Trails)
  * is a request for that page, while a page writing its own state back into
  * the address in place (Explore's focus, Browse's filters) is not, and may
  * happen while the dialog is open.

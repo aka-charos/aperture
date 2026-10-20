@@ -16,11 +16,11 @@ import {
   getTrailStart,
   walkFrom,
   parseTitleRef,
+  parseTrailEntityKinds,
   MAX_TRAIL_THREADS,
   MAX_TRAIL_TITLES,
   TRAIL_THREAD_MEMBERS,
   TRAIL_WALK_STEPS,
-  type TrailEntityKind,
   type TrailFilter,
   type TrailTitleRef,
 } from '@aperture/core'
@@ -39,15 +39,6 @@ function readRefs(raw: string | undefined, max: number): TrailTitleRef[] | null 
   return refs
 }
 
-const KINDS: readonly TrailEntityKind[] = ['person', 'franchise', 'company', 'keyword']
-
-/** Comma-separated entity kinds; unknown ones are dropped, and none means every kind. */
-function readKinds(raw: string | undefined): TrailEntityKind[] | null {
-  if (!raw) return null
-  const kinds = raw.split(',').filter((kind): kind is TrailEntityKind => KINDS.includes(kind as TrailEntityKind))
-  return kinds.length > 0 ? [...new Set(kinds)] : null
-}
-
 interface FilterQuery {
   /** `1` hides what the viewer has watched. */
   unwatched?: string
@@ -57,7 +48,7 @@ interface FilterQuery {
 function readFilter(request: FastifyRequest<{ Querystring: FilterQuery }>): TrailFilter {
   return {
     hideWatchedFor: request.query.unwatched === '1' ? request.user?.id : null,
-    kinds: readKinds(request.query.kinds),
+    kinds: parseTrailEntityKinds(request.query.kinds),
   }
 }
 
@@ -164,12 +155,23 @@ const trailsRoutes: FastifyPluginAsync = async (fastify) => {
     }
   )
 
-  /** GET /api/trails/start — a random well-connected title to start a trail from. */
-  fastify.get('/api/trails/start', { preHandler: requireAuth, schema: { tags: ['trails'] } }, async (request, reply) => {
-    const title = await getTrailStart(await viewerScope(request))
-    if (!title) return reply.status(404).send({ error: 'No title with enough links to start from' })
-    return { title }
-  })
+  /**
+   * GET /api/trails/start[?unwatched=1][&kinds=…] — a random well-connected
+   * title to start a trail from, chosen under the page's filters so it has
+   * threads the page will show (and is not itself hidden).
+   */
+  fastify.get<{ Querystring: FilterQuery }>(
+    '/api/trails/start',
+    {
+      preHandler: requireAuth,
+      schema: { tags: ['trails'], querystring: { type: 'object', properties: { ...FILTER_PROPERTIES } } },
+    },
+    async (request, reply) => {
+      const title = await getTrailStart(await viewerScope(request), readFilter(request))
+      if (!title) return reply.status(404).send({ error: 'No title with enough links to start from' })
+      return { title }
+    }
+  )
 
   /**
    * GET /api/trails/walk?title=movie:<id>[&visited=…][&kinds=…] — "Take me on
@@ -193,7 +195,7 @@ const trailsRoutes: FastifyPluginAsync = async (fastify) => {
       const result = await walkFrom(await viewerScope(request), ref, {
         visited,
         userId,
-        kinds: readKinds(request.query.kinds),
+        kinds: parseTrailEntityKinds(request.query.kinds),
       })
       if (!result) return reply.status(404).send(NOT_FOUND)
       return result

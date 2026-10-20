@@ -2063,6 +2063,7 @@ export {
   THREAD_MEMBERS as TRAIL_THREAD_MEMBERS,
   WALK_STEPS as TRAIL_WALK_STEPS,
   LINK_ROLES,
+  parseEntityKinds as parseTrailEntityKinds,
   parseTitleRef,
   formatTitleRef,
   type TrailTitle,

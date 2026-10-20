@@ -42,6 +42,22 @@
 
 export type EntityKind = 'person' | 'franchise' | 'company' | 'keyword'
 
+export const ENTITY_KINDS: readonly EntityKind[] = ['person', 'franchise', 'company', 'keyword']
+
+/**
+ * A comma-separated kind list from a request: unknown kinds dropped, repeats
+ * once, in the order given; null for none, which means every kind.
+ */
+export function parseEntityKinds(raw: unknown): EntityKind[] | null {
+  if (typeof raw !== 'string' || raw === '') return null
+  const kinds: EntityKind[] = []
+  for (const part of raw.split(',')) {
+    const kind = part.trim() as EntityKind
+    if (ENTITY_KINDS.includes(kind) && !kinds.includes(kind)) kinds.push(kind)
+  }
+  return kinds.length > 0 ? kinds : null
+}
+
 export type LinkRole =
   | 'franchise'
   | 'director'

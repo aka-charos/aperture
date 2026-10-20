@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { pairKey } from './labels'
+import { pairKey, trailLookupNeeded } from './labels'
 import type { TrailLink, TrailResponse, TrailTitle } from './types'
 
 export class TrailsRequestError extends Error {
@@ -54,10 +54,13 @@ export function useTrailData(trail: readonly string[], maxTrail: number | null) 
   const [cards, setCards] = useState<ReadonlyMap<string, TrailTitle>>(() => new Map())
   const [links, setLinks] = useState<ReadonlyMap<string, TrailLink | null>>(() => new Map())
   const asked = useRef(new Set<string>())
+  // Refs a lookup asked about and the API did not return: out of scope or
+  // deleted. See trailLookupNeeded for why they must be remembered.
+  const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set())
   // Read through refs so knowledge arriving from elsewhere does not restart
   // (and abort) a lookup already on its way.
-  const known = useRef({ cards, links })
-  known.current = { cards, links }
+  const known = useRef({ cards, links, gone })
+  known.current = { cards, links, gone }
 
   const remember = useCallback((titles: readonly TrailTitle[]) => {
     if (titles.length === 0) return
@@ -80,16 +83,27 @@ export function useTrailData(trail: readonly string[], maxTrail: number | null) 
   const key = trail.join(',')
   useEffect(() => {
     if (!key || maxTrail == null) return
-    const refs = key.split(',')
-    const { cards: knownCards, links: knownLinks } = known.current
-    const missing =
-      refs.some((ref) => !knownCards.has(ref)) ||
-      refs.slice(1).some((ref, i) => !knownLinks.has(pairKey(refs[i], ref)))
+    const refs = key.split(',').slice(-maxTrail)
+    const { cards: knownCards, links: knownLinks, gone: knownGone } = known.current
+    const missing = trailLookupNeeded(
+      refs,
+      (ref) => knownCards.has(ref),
+      (pair) => knownLinks.has(pair),
+      knownGone
+    )
     if (!missing || asked.current.has(key)) return
     asked.current.add(key)
     const controller = new AbortController()
-    fetchTrails<TrailResponse>(`trail?refs=${encodeURIComponent(refs.slice(-maxTrail).join(','))}`, controller.signal)
+    fetchTrails<TrailResponse>(`trail?refs=${encodeURIComponent(refs.join(','))}`, controller.signal)
       .then((response) => {
+        const returned = new Set(response.titles.map((title) => title.ref))
+        const missingRefs = refs.filter((ref) => !returned.has(ref))
+        if (missingRefs.length > 0) {
+          setGone((current) => {
+            if (missingRefs.every((ref) => current.has(ref))) return current
+            return new Set([...current, ...missingRefs])
+          })
+        }
         remember(response.titles)
         response.links.forEach((link, i) => {
           rememberLink(response.titles[i].ref, response.titles[i + 1].ref, link, false)

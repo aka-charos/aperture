@@ -331,6 +331,16 @@ function membersOf(view: TrailView, title: number, entity: number, exclude?: Uin
   )
 }
 
+/** How many other titles in scope carrying `entity` are not excluded: membersOf's length, without building or sorting it. */
+function memberCount(view: TrailView, title: number, entity: number, exclude?: Uint8Array | null): number {
+  const { allowed } = view
+  let counted = 0
+  for (const other of view.index.entities[entity].titles) {
+    if (other !== title && allowed[other] && !exclude?.[other]) counted += 1
+  }
+  return counted
+}
+
 function threadAt(
   view: TrailView,
   title: number,
@@ -340,9 +350,16 @@ function threadAt(
 ): Thread | null {
   const entity = view.index.titleEntities[title][position]
   const mask = view.index.titleMasks[title][position]
+  const carried = view.count(entity)
+  if (perThread <= 0) {
+    // A summary (the detail page's Strongest links) names no titles, so the
+    // members are counted, never collected and sorted.
+    const counted = memberCount(view, title, entity, exclude)
+    if (counted === 0) return null
+    return { entity, mask, count: carried, cost: threadCost(mask, carried), others: [], more: counted }
+  }
   const members = membersOf(view, title, entity, exclude)
   if (members.length === 0) return null
-  const carried = view.count(entity)
   const others = members.slice(0, perThread).sort((a, b) => byRelease(view, a.title, b.title))
   return { entity, mask, count: carried, cost: threadCost(mask, carried), others, more: members.length - others.length }
 }
@@ -498,23 +515,41 @@ export function weightedPick(count: number, random: () => number): number {
 // A random place to start
 // ---------------------------------------------------------------------------
 
-/** How many of a title's entities link anything in this scope. */
-export function linkedThreadCount(view: TrailView, title: number): number {
+/**
+ * How many of a title's entities link anything in this scope; with a filter,
+ * only those of the kinds kept that still lead to a title not excluded — the
+ * threads the page would actually show.
+ */
+export function linkedThreadCount(view: TrailView, title: number, filter: ThreadFilter = {}): number {
   let linked = 0
-  for (const entity of view.index.titleEntities[title]) if (view.links(entity)) linked += 1
+  for (const entity of view.index.titleEntities[title]) {
+    if (!view.links(entity)) continue
+    if (filter.kinds && !filter.kinds.has(view.index.entities[entity].kind)) continue
+    if (filter.exclude && memberCount(view, title, entity, filter.exclude) === 0) continue
+    linked += 1
+  }
   return linked
 }
 
+/** Threads a random start should have: four with every kind, one when the page shows only some kinds. */
+export const WELL_CONNECTED_THREADS = 4
+
 /**
- * A random title in scope with at least `minThreads` threads, or null when a
- * bounded number of draws finds none (a library with almost no credits).
+ * A random title in scope with enough threads the page would show under
+ * `filter`, or null when a bounded number of draws finds none (a library with
+ * almost no credits, or a filter nothing satisfies). With a kind filter one
+ * thread is enough: a title carries one franchise, so four would almost never
+ * be met and the button would answer nothing.
  */
-export function pickWellConnected(view: TrailView, random: () => number, minThreads = 4): number | null {
+export function pickWellConnected(view: TrailView, random: () => number, filter: ThreadFilter = {}): number | null {
   const total = view.index.titles.length
   if (total === 0 || view.titleCount === 0) return null
+  const minThreads = filter.kinds ? 1 : WELL_CONNECTED_THREADS
   for (let attempt = 0; attempt < 400; attempt += 1) {
     const title = Math.floor(random() * total)
-    if (view.allowed[title] && linkedThreadCount(view, title) >= minThreads) return title
+    if (view.allowed[title] && !filter.exclude?.[title] && linkedThreadCount(view, title, filter) >= minThreads) {
+      return title
+    }
   }
   return null
 }

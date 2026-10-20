@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -20,6 +20,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import { PageHeading } from '@/components/PageHeading'
 import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
 import { useOpenMedia } from '@/hooks/useOpenMedia'
+import { useWatchStatus } from '@/hooks/useWatchStatus'
 import { TitlePicker } from './TitlePicker'
 import { TitleTile } from './TitleTile'
 import { TrailStrip } from './TrailStrip'
@@ -81,9 +82,27 @@ function FollowATrail() {
     (patch: Partial<TrailsUrlState>) => setParams(writeTrailsUrl({ ...state, ...patch })),
     [state, setParams]
   )
+  // What the page holds NOW, for an answer that arrives after the click that
+  // asked for it: building on the state captured at the click would put back
+  // a filter switched or a step taken while the request was out.
+  const latest = useRef(state)
+  latest.current = state
   const { trail } = state
   const current = trail.length > 0 ? trail[trail.length - 1] : null
   const filters = filterQuery(state)
+
+  // A title marked watched while Hide what I've watched is on (in the dialog,
+  // say) must leave the threads already loaded, so the answers are keyed by a
+  // revision that moves when the viewer's watched set does — after it first
+  // loads, which is not a change.
+  const { watchedMovies, loading: watchLoading } = useWatchStatus()
+  const [watchRevision, setWatchRevision] = useState(0)
+  const seenWatched = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    if (watchLoading) return
+    if (seenWatched.current && seenWatched.current !== watchedMovies) setWatchRevision((revision) => revision + 1)
+    seenWatched.current = watchedMovies
+  }, [watchedMovies, watchLoading])
 
   const { cards, links, remember, rememberLink } = useTrailData(trail, maxTrail)
   const { answers, hasAnswer, store, failure, fail, clearFailure } = useAnswers<ThreadsResponse>()
@@ -93,7 +112,7 @@ function FollowATrail() {
 
   // Threads are asked per title AND filters: the same title hiding what was
   // watched is a different answer.
-  const answerKey = current ? `${current}${filters}` : null
+  const answerKey = current ? `${current}${filters}${state.hideWatched ? `#${watchRevision}` : ''}` : null
   const failedHere = answerKey != null && failure?.key === answerKey
 
   useEffect(() => {
@@ -122,7 +141,7 @@ function FollowATrail() {
   const startFrom = (title: TrailTitle) => {
     remember([title])
     setNotice(null)
-    update({ trail: [title.ref] })
+    setParams(writeTrailsUrl({ ...latest.current, trail: [title.ref] }))
   }
 
   const follow = (title: TrailTitle, thread: Thread, member: ThreadMember) => {
@@ -145,7 +164,8 @@ function FollowATrail() {
   const surprise = () => {
     setBusy('start')
     setNotice(null)
-    fetchTrails<{ title: TrailTitle }>('start')
+    // Chosen under the page's filters, so the start has threads to show.
+    fetchTrails<{ title: TrailTitle }>(`start${filters ? `?${filters.slice(1)}` : ''}`)
       .then((response) => startFrom(response.title))
       .catch(() => setNotice({ severity: 'warning', message: t('trails.start.surpriseFailed') }))
       .finally(() => setBusy(null))
@@ -167,8 +187,13 @@ function FollowATrail() {
           rememberLink(from, step.title.ref, step.via)
           from = step.title.ref
         }
+        // The viewer stepped elsewhere while the walk was out: it no longer
+        // starts where they are, so it is not added.
+        const now = latest.current
+        if (now.trail[now.trail.length - 1] !== response.start.ref) return
         if (response.steps.length > 0) {
-          update({ trail: extendTrail(trail, response.steps.map((step) => step.title.ref), limits.maxTrailLength) })
+          const walked = response.steps.map((step) => step.title.ref)
+          setParams(writeTrailsUrl({ ...now, trail: extendTrail(now.trail, walked, limits.maxTrailLength) }))
         }
         if (response.steps.length === 0) setNotice({ severity: 'info', message: t('trails.walk.none') })
         else if (response.steps.length < limits.walkSteps) {
@@ -190,7 +215,9 @@ function FollowATrail() {
         setOpened((previous) =>
           new Map(previous).set(
             key,
-            response.thread ? { status: 'open', members: response.thread.others } : { status: 'failed' }
+            response.thread
+              ? { status: 'open', members: response.thread.others, more: response.thread.more }
+              : { status: 'empty' }
           )
         )
       )

@@ -151,6 +151,25 @@ export function extendTrail(trail: readonly string[], refs: readonly string[], m
   return refs.reduce<string[]>((current, ref) => stepTrail(current, ref, max), [...trail])
 }
 
+/**
+ * Whether the page must ask `/trail` about a trail: some title on it has no
+ * card yet, or two titles that sit side by side once the unknown ones are left
+ * out have no link yet. `gone` holds the refs a lookup asked about and the API
+ * did not return (out of scope, deleted): the strip leaves them out and links
+ * the titles either side, so they are neither a missing card nor a missing pair
+ * — or every later step would ask about the whole trail again.
+ */
+export function trailLookupNeeded(
+  refs: readonly string[],
+  hasCard: (ref: string) => boolean,
+  hasLink: (key: string) => boolean,
+  gone: ReadonlySet<string>
+): boolean {
+  const kept = refs.filter((ref) => !gone.has(ref))
+  if (kept.some((ref) => !hasCard(ref))) return true
+  return kept.slice(1).some((ref, i) => !hasLink(pairKey(kept[i], ref)))
+}
+
 /** The key a link between two consecutive titles of a trail is remembered by. */
 export function pairKey(from: string, to: string): string {
   return `${from}>${to}`
