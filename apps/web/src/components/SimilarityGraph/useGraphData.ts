@@ -7,6 +7,28 @@ type GraphSource = 'ai-movies' | 'ai-series' | 'watching' | 'top-movies' | 'top-
 interface UseGraphDataOptions {
   limit?: number
   crossMedia?: boolean
+  hideWatched?: boolean
+  /** False while nobody is looking at the browse graph: nothing is fetched. */
+  enabled?: boolean
+}
+
+/**
+ * One in-flight request per hook. Starting a request aborts the one before it,
+ * and a superseded request may not touch state: a slow answer for the previous
+ * source or focus would otherwise land after the current one and replace it,
+ * and its `finally` would clear the loading state of the request still running.
+ */
+function useLatestRequest() {
+  const currentRef = useRef<AbortController | null>(null)
+  useEffect(() => () => currentRef.current?.abort(), [])
+  const begin = useCallback(() => {
+    currentRef.current?.abort()
+    const controller = new AbortController()
+    currentRef.current = controller
+    return controller
+  }, [])
+  const isCurrent = useCallback((controller: AbortController) => currentRef.current === controller, [])
+  return { begin, isCurrent }
 }
 
 interface UseGraphDataReturn {
@@ -86,9 +108,13 @@ export function useGraphData(
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const phaseStartRef = useRef<number>(0)
 
-  const { limit = 20, crossMedia = false } = options
+  const { limit = 20, crossMedia = false, hideWatched = false, enabled = true } = options
+  const { begin, isCurrent } = useLatestRequest()
 
   const startLoadingProgress = useCallback(() => {
+    // A second start before the first stop would otherwise orphan an interval
+    // that fires every 300 ms until the page unmounts.
+    if (loadingTimerRef.current) clearInterval(loadingTimerRef.current)
     phaseStartRef.current = Date.now()
     setLoadingStatus({
       phase: 'fetching',
@@ -145,6 +171,7 @@ export function useGraphData(
   }, [])
 
   const fetchData = useCallback(async () => {
+    const controller = begin()
     setLoading(true)
     setError(null)
     startLoadingProgress()
@@ -153,10 +180,12 @@ export function useGraphData(
       const params = new URLSearchParams({
         limit: String(limit),
         crossMedia: String(crossMedia),
+        hideWatched: String(hideWatched),
       })
 
       const response = await fetch(`/api/similarity/graph/${source}?${params}`, {
         credentials: 'include',
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -165,20 +194,30 @@ export function useGraphData(
       }
 
       const graphData = await response.json()
-      setData(graphData)
+      if (isCurrent(controller)) setData(graphData)
     } catch (err) {
+      if (!isCurrent(controller)) return
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError(message)
       console.error('Error fetching graph data:', err)
     } finally {
-      setLoading(false)
-      stopLoadingProgress()
+      if (isCurrent(controller)) {
+        setLoading(false)
+        stopLoadingProgress()
+      }
     }
-  }, [source, limit, crossMedia, startLoadingProgress, stopLoadingProgress])
+  }, [source, limit, crossMedia, hideWatched, begin, isCurrent, startLoadingProgress, stopLoadingProgress])
 
   useEffect(() => {
+    if (!enabled) {
+      // Not on the browse view: fetch nothing, and drop whatever was in flight.
+      begin()
+      setLoading(false)
+      stopLoadingProgress()
+      return
+    }
     fetchData()
-  }, [fetchData])
+  }, [enabled, fetchData, begin, stopLoadingProgress])
 
   return { data, loading, loadingStatus, error, refetch: fetchData }
 }
@@ -193,7 +232,12 @@ function randomItem<T>(arr: T[]): T {
 export function useSimilarityData(
   initialType: 'movie' | 'series',
   initialId: string | null,
-  options: { limit?: number; depth?: number } = {}
+  options: {
+    limit?: number
+    depth?: number
+    /** Sent to the API when given; otherwise the viewer's stored preference applies. */
+    hideWatched?: boolean
+  } = {}
 ): UseSimilarityDataReturn {
   const { t } = useTranslation()
   const [data, setData] = useState<GraphData | null>(null)
@@ -212,7 +256,8 @@ export function useSimilarityData(
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const phaseStartRef = useRef<number>(0)
 
-  const { limit = 12, depth = 1 } = options
+  const { limit = 12, depth = 1, hideWatched } = options
+  const { begin, isCurrent } = useLatestRequest()
 
   // Update focus when initial ID changes (e.g., navigating to a new detail page)
   useEffect(() => {
@@ -226,6 +271,9 @@ export function useSimilarityData(
   // Progress simulation for loading phases
   // In production, this could be replaced with SSE for real progress
   const startLoadingProgress = useCallback(() => {
+    // A second start before the first stop would otherwise orphan an interval
+    // that fires every 300 ms until the page unmounts.
+    if (loadingTimerRef.current) clearInterval(loadingTimerRef.current)
     phaseStartRef.current = Date.now()
     
     // Start with fetching phase
@@ -298,8 +346,11 @@ export function useSimilarityData(
   }, [])
 
   const fetchData = useCallback(async () => {
+    const controller = begin()
     if (!focusId) {
       setData(null)
+      setLoading(false)
+      stopLoadingProgress()
       return
     }
 
@@ -308,12 +359,14 @@ export function useSimilarityData(
     startLoadingProgress()
 
     try {
-      const params = new URLSearchParams({ 
+      const params = new URLSearchParams({
         limit: String(limit),
         depth: String(depth),
       })
+      if (hideWatched !== undefined) params.set('hideWatched', String(hideWatched))
       const response = await fetch(`/api/similarity/${focusType}/${focusId}?${params}`, {
         credentials: 'include',
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -322,6 +375,7 @@ export function useSimilarityData(
       }
 
       const result = await response.json()
+      if (!isCurrent(controller)) return
 
       // When depth > 1, the API returns GraphData directly
       if (depth > 1) {
@@ -361,14 +415,17 @@ export function useSimilarityData(
 
       setData(graphData)
     } catch (err) {
+      if (!isCurrent(controller)) return
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError(message)
       console.error('Error fetching similarity data:', err)
     } finally {
-      setLoading(false)
-      stopLoadingProgress()
+      if (isCurrent(controller)) {
+        setLoading(false)
+        stopLoadingProgress()
+      }
     }
-  }, [focusType, focusId, limit, depth, startLoadingProgress, stopLoadingProgress])
+  }, [focusType, focusId, limit, depth, hideWatched, begin, isCurrent, startLoadingProgress, stopLoadingProgress])
 
   useEffect(() => {
     fetchData()

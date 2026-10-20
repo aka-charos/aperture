@@ -38,11 +38,11 @@ import {
 } from '../SimilarityGraph'
 import { CreatePlaylistDialog } from '../CreatePlaylistDialog'
 
-// Extended breadcrumb type that supports 'search' in addition to 'movie' | 'series'
+// Extended breadcrumb type: a search or a browse graph, as well as a title
 export interface GraphBreadcrumbItem {
   id: string
   title: string
-  type: 'movie' | 'series' | 'search'
+  type: 'movie' | 'series' | 'search' | 'browse'
 }
 
 export interface GraphExplorerProps {
