@@ -44,6 +44,17 @@ import {
   loadAnalysisGrounding,
   type AnalysisGroundingPart,
 } from '../../analysis/grounding.js'
+import {
+  explanationFingerprint,
+  splitReusable,
+  type StoredExplanation,
+} from '../shared/explanationReuse.js'
+import {
+  explanationWriterKey,
+  loadStoredExplanations,
+  rememberExplanations,
+  type ExplanationReuseOptions,
+} from '../explanationCache.js'
 
 const logger = createChildLogger('explanations')
 
@@ -157,6 +168,12 @@ export interface MovieWithEvidence extends MovieForExplanation {
 export interface ExplanationResult {
   movieId: string
   explanation: string
+  /**
+   * The inputs' fingerprint, set only on text a model wrote (now or on an
+   * earlier run). Absent on the template written when a call fails, which is
+   * never remembered for reuse.
+   */
+  fingerprint?: string
 }
 
 export interface UserTasteContext {
@@ -194,7 +211,7 @@ async function fetchEvidenceForRecommendations(
      JOIN recommendation_candidates rc ON rc.id = re.candidate_id
      JOIN movies m ON m.id = re.similar_movie_id
      WHERE rc.run_id = $1 AND rc.movie_id = ANY($2)
-     ORDER BY rc.movie_id, re.similarity DESC`,
+     ORDER BY rc.movie_id, re.similarity DESC, re.similar_movie_id`,
     [runId, movieIds]
   )
 
@@ -253,6 +270,10 @@ export async function getUserTasteContext(userId: string): Promise<UserTasteCont
   // after two minutes — so a genre someone bounced off repeatedly could be
   // presented to the model as one of their favourites.
 
+  // Every ORDER BY here ends on a unique key: this block is part of each
+  // explanation's reuse fingerprint (shared/explanationReuse.ts), and a tie
+  // resolved differently on the next run would rewrite every pick for nothing.
+
   // Get top genres by watch frequency
   const genreResult = await query<{ genre: string }>(
     `SELECT unnest(m.genres) as genre, COUNT(*) as count
@@ -260,7 +281,7 @@ export async function getUserTasteContext(userId: string): Promise<UserTasteCont
      JOIN movies m ON m.id = wh.movie_id
      WHERE wh.user_id = $1 AND ${WATCH_HISTORY_TASTE_SQL}
      GROUP BY genre
-     ORDER BY count DESC
+     ORDER BY count DESC, genre
      LIMIT 8`,
     [userId]
   )
@@ -275,7 +296,7 @@ export async function getUserTasteContext(userId: string): Promise<UserTasteCont
      FROM watch_history wh
      JOIN movies m ON m.id = wh.movie_id
      WHERE wh.user_id = $1 AND ${WATCH_HISTORY_TASTE_SQL}
-     ORDER BY wh.is_favorite DESC, wh.play_count DESC, wh.last_played_at DESC NULLS LAST
+     ORDER BY wh.is_favorite DESC, wh.play_count DESC, wh.last_played_at DESC NULLS LAST, m.id
      LIMIT 15`,
     [userId]
   )
@@ -346,7 +367,8 @@ export async function generateExplanations(
    * rather than at the end of the user. Optional because the single-user paths
    * have no job to cancel; every batch caller passes one.
    */
-  shouldCancel?: () => boolean
+  shouldCancel: (() => boolean) | undefined,
+  options: ExplanationReuseOptions
 ): Promise<ExplanationResult[]> {
   if (recommendations.length === 0) {
     return []
@@ -387,43 +409,84 @@ export async function generateExplanations(
     twinSharedTitles: twinSharedTitles.get(r.movieId),
   }))
 
+  // Each pick's block is rendered once, here, and that same string is both
+  // hashed and sent, so the fingerprint cannot describe a prompt other than the
+  // one the model reads.
+  const system = buildMovieSystemPrompt(aiLocale)
+  const userContext = buildMovieUserContext(tasteContext)
+  const writer = await explanationWriterKey()
+  const prepared: PreparedMovie[] = moviesWithEvidence.map((movie) => {
+    const block = renderMovieBlock(movie, titleContext)
+    return {
+      movie,
+      block,
+      fingerprint: explanationFingerprint({ writer, system, userContext, pick: block }),
+    }
+  })
+
+  const stored = options.reuse
+    ? await loadStoredExplanations(userId, 'movie', movieIds)
+    : new Map<string, StoredExplanation>()
+  const { reused, toWrite } = splitReusable(
+    prepared,
+    (p) => p.movie.movieId,
+    (p) => p.fingerprint,
+    stored
+  )
+  const written = new Map<string, ExplanationResult>()
+  for (const { pick, explanation } of reused) {
+    written.set(pick.movie.movieId, {
+      movieId: pick.movie.movieId,
+      explanation,
+      fingerprint: pick.fingerprint,
+    })
+  }
+  if (options.reuse) {
+    logger.info(
+      { runId, reused: reused.length, toWrite: toWrite.length },
+      '♻️ Reusing explanations whose inputs are unchanged'
+    )
+  }
+
   // Generate explanations in batches - size depends on provider context window
   const { batchSize, maxTokens } = await getExplanationBatchSize()
-  logger.info({ batchSize, maxTokens }, 'Using explanation batch settings based on provider')
+  if (toWrite.length > 0) {
+    logger.info({ batchSize, maxTokens }, 'Using explanation batch settings based on provider')
+  }
 
-  const results: ExplanationResult[] = []
-
-  for (let i = 0; i < moviesWithEvidence.length; i += batchSize) {
+  for (let i = 0; i < toWrite.length; i += batchSize) {
     if (shouldCancel?.()) {
       logger.info(
-        { generated: results.length, expected: moviesWithEvidence.length },
+        { generated: written.size, expected: prepared.length },
         '🛑 Explanation generation cancelled between batches'
       )
       break
     }
-    const batch = moviesWithEvidence.slice(i, i + batchSize)
-    const batchResults = await generateBatchExplanations(
-      batch,
-      tasteContext,
-      titleContext,
-      maxTokens,
-      aiLocale
-    )
-    results.push(...batchResults)
+    const batch = toWrite.slice(i, i + batchSize)
+    const batchResults = await generateBatchExplanations(batch, system, userContext, maxTokens)
+    for (const result of batchResults) written.set(result.movieId, result)
   }
 
-  logger.info({ generated: results.length }, '✅ AI explanations generated')
+  // In list order, whichever way each pick got its text.
+  const results = prepared
+    .map((p) => written.get(p.movie.movieId))
+    .filter((r): r is ExplanationResult => r !== undefined)
+
+  logger.info(
+    { generated: results.length - reused.length, reused: reused.length },
+    '✅ AI explanations generated'
+  )
   return results
 }
 
-async function generateBatchExplanations(
-  movies: MovieWithEvidence[],
-  tasteContext: UserTasteContext,
-  titleContext: Map<string, TitleContext>,
-  maxOutputTokens: number = 3000,
-  aiLocale: AppLocaleCode = DEFAULT_LOCALE
-): Promise<ExplanationResult[]> {
-  // Build user context string
+/** One pick ready to send: its rendered block and that block's fingerprint. */
+interface PreparedMovie {
+  movie: MovieWithEvidence
+  block: string
+  fingerprint: string
+}
+
+function buildMovieUserContext(tasteContext: UserTasteContext): string {
   const userContextLines = [
     `Top genres: ${tasteContext.topGenres.join(', ')}`,
     '',
@@ -437,73 +500,68 @@ async function generateBatchExplanations(
     userContextLines.unshift(`Taste Profile: ${tasteContext.tasteSynopsis}`, '')
   }
 
-  const userContext = userContextLines.join('\n')
+  return userContextLines.join('\n')
+}
 
-  // Build movie list with evidence
-  //
-  // The similarity percentages that used to sit on each evidence line are gone.
-  // They were raw cosines, which inside one library occupy a band roughly 0.04
-  // wide — so 74 and 69 are not the meaningfully different numbers they look
-  // like, and there is nothing useful a model can do with either except repeat
-  // it as though it were a grade. The list is ordered closest-first, which is
-  // the only part of that signal it can actually use.
-  const movieList = movies
-    .map((m, i) => {
-      const evidenceStr =
-        m.evidence.length > 0
-          ? m.evidence
-              .map((e) => {
-                const typeLabel =
-                  e.evidenceType === 'favorite'
-                    ? '⭐ a favorite of theirs'
-                    : e.evidenceType === 'highly_rated'
-                      ? '🔥 rewatched often'
-                      : 'watched'
-                const plot = clip(e.overview, EVIDENCE_PLOT_CHARS)
-                return `      - "${e.title}" (${e.year || 'N/A'}, ${typeLabel})${plot ? `: ${plot}` : ''}`
-              })
-              .join('\n')
-          : '      (none — say so by writing about the film itself, not about a connection)'
+/**
+ * One pick's block, without its position in the batch: the position is added
+ * when the batch is assembled, and leaving it out here is what lets the same
+ * pick hash alike whichever batch it lands in.
+ *
+ * The similarity percentages that used to sit on each evidence line are gone.
+ * They were raw cosines, which inside one library occupy a band roughly 0.04
+ * wide — so 74 and 69 are not the meaningfully different numbers they look
+ * like, and there is nothing useful a model can do with either except repeat
+ * it as though it were a grade. The list is ordered closest-first, which is
+ * the only part of that signal it can actually use.
+ */
+function renderMovieBlock(m: MovieWithEvidence, titleContext: Map<string, TitleContext>): string {
+  const evidenceStr =
+    m.evidence.length > 0
+      ? m.evidence
+          .map((e) => {
+            const typeLabel =
+              e.evidenceType === 'favorite'
+                ? '⭐ a favorite of theirs'
+                : e.evidenceType === 'highly_rated'
+                  ? '🔥 rewatched often'
+                  : 'watched'
+            const plot = clip(e.overview, EVIDENCE_PLOT_CHARS)
+            return `      - "${e.title}" (${e.year || 'N/A'}, ${typeLabel})${plot ? `: ${plot}` : ''}`
+          })
+          .join('\n')
+      : '      (none — say so by writing about the film itself, not about a connection)'
 
-      // One builder for all three markers, shared with the series generator so
-      // a rule cannot exist in one prompt and not the other.
-      const slotLines = buildSlotLines(m, MOVIE_NOUNS)
+  // One builder for all three markers, shared with the series generator so
+  // a rule cannot exist in one prompt and not the other.
+  const slotLines = buildSlotLines(m, MOVIE_NOUNS)
 
-      const context = titleContext.get(m.movieId)
-      const directors = context?.directors?.length
-        ? `\n   Director: ${context.directors.slice(0, 3).join(', ')}`
-        : ''
-      const keywords = context?.keywords?.length
-        ? `\n   Themes: ${context.keywords.slice(0, KEYWORD_LIMIT).join(', ')}`
-        : ''
-      // Sits directly under the plot, which is the other material about the
-      // film itself. The evidence below is about the VIEWER, and keeping the
-      // two visually apart is part of what stops the reason drifting into a
-      // description of the film. Empty string when there is no analysis, so
-      // the block is byte-identical to what it was.
-      const analysisLines = formatAnalysisGrounding(context?.analysis ?? []) ?? ''
+  const context = titleContext.get(m.movieId)
+  const directors = context?.directors?.length
+    ? `\n   Director: ${context.directors.slice(0, 3).join(', ')}`
+    : ''
+  const keywords = context?.keywords?.length
+    ? `\n   Themes: ${context.keywords.slice(0, KEYWORD_LIMIT).join(', ')}`
+    : ''
+  // Sits directly under the plot, which is the other material about the
+  // film itself. The evidence below is about the VIEWER, and keeping the
+  // two visually apart is part of what stops the reason drifting into a
+  // description of the film. Empty string when there is no analysis, so
+  // the block is byte-identical to what it was.
+  const analysisLines = formatAnalysisGrounding(context?.analysis ?? []) ?? ''
 
-      return `${i + 1}. "${m.title}" (${m.year || 'N/A'})
+  return `"${m.title}" (${m.year || 'N/A'})
    Genres: ${m.genres.join(', ')}${directors}${keywords}
    Novelty: ${m.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${m.ratingScore > 0.7 ? 'highly acclaimed' : m.ratingScore > 0.5 ? 'well received' : 'mixed'}${slotLines}
    Plot: ${clip(m.overview, PICK_PLOT_CHARS) ?? 'No overview available'}${analysisLines}
 ${evidenceHeading(m, MOVIE_NOUNS, evidenceSupportsCause(m.evidence))}
 ${evidenceStr}`
-    })
-    .join('\n\n')
+}
 
+function buildMovieSystemPrompt(aiLocale: AppLocaleCode = DEFAULT_LOCALE): string {
   const langBlock = `\n\n${buildAiLanguageInstruction(aiLocale)}`
 
-  try {
-    const model = await getTextGenerationModelInstance()
-    // A reasoning model bills its scratchpad from the SAME allowance as these
-    // explanations, which is what `explanationBatchSettings` buys headroom for.
-    // Absent unless an operator chose one, so the request is unchanged by default.
-    const reasoning = await getReasoningProviderOptions('textGeneration')
-    const { text, finishReason } = await generateText({
-      model,
-      ...(reasoning ? { providerOptions: reasoning } : {}),
-      system: `You are an expert film curator writing personalized recommendation explanations. You have access to:
+  return `You are an expert film curator writing personalized recommendation explanations. You have access to:
 1. The user's taste profile and favorite films
 2. For each recommendation, the SPECIFIC watched movies it's most similar to (via AI embedding analysis), with a short synopsis of each
 
@@ -519,7 +577,28 @@ CRITICAL: Some of these films will be obscure and you will not recognise them. T
 
 Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.
 
-CRITICAL: Never write a double quote inside the explanation text. Titles are shown in quotes above for readability, but repeating that in your answer breaks the JSON - write film titles as plain text, or in single quotes.${langBlock}`,
+CRITICAL: Never write a double quote inside the explanation text. Titles are shown in quotes above for readability, but repeating that in your answer breaks the JSON - write film titles as plain text, or in single quotes.${langBlock}`
+}
+
+async function generateBatchExplanations(
+  batch: PreparedMovie[],
+  system: string,
+  userContext: string,
+  maxOutputTokens: number = 3000
+): Promise<ExplanationResult[]> {
+  const movies = batch.map((p) => p.movie)
+  const movieList = batch.map((p, i) => `${i + 1}. ${p.block}`).join('\n\n')
+
+  try {
+    const model = await getTextGenerationModelInstance()
+    // A reasoning model bills its scratchpad from the SAME allowance as these
+    // explanations, which is what `explanationBatchSettings` buys headroom for.
+    // Absent unless an operator chose one, so the request is unchanged by default.
+    const reasoning = await getReasoningProviderOptions('textGeneration')
+    const { text, finishReason } = await generateText({
+      model,
+      ...(reasoning ? { providerOptions: reasoning } : {}),
+      system,
       prompt: `=== USER'S TASTE PROFILE ===
 ${userContext}
 
@@ -565,11 +644,15 @@ Generate personalized explanations referencing the specific similar movies shown
     }
 
     // 1-based, matching how the prompt numbers them. A missing entry gets the
-    // template, so a partial response costs only the items it left out.
-    return movies.map((m, i) => ({
-      movieId: m.movieId,
-      explanation: byIndex.get(i + 1) ?? generateFallbackExplanation(m),
-    }))
+    // template, so a partial response costs only the items it left out. Only
+    // the model's own text carries a fingerprint, so a template is never
+    // remembered and handed back on the next run.
+    return batch.map((p, i) => {
+      const written = byIndex.get(i + 1)
+      return written !== undefined
+        ? { movieId: p.movie.movieId, explanation: written, fingerprint: p.fingerprint }
+        : { movieId: p.movie.movieId, explanation: generateFallbackExplanation(p.movie) }
+    })
   } catch (error) {
     // Extract meaningful error information - AI SDK errors don't serialize well
     const errorInfo = {
@@ -656,6 +739,16 @@ export async function storeExplanations(
      FROM unnest($2::uuid[], $3::text[]) AS t(movie_id, explanation)
      WHERE rc.run_id = $1 AND rc.movie_id = t.movie_id AND rc.is_selected = true`,
     [runId, explanations.map((e) => e.movieId), explanations.map((e) => e.explanation)]
+  )
+
+  await rememberExplanations(
+    runId,
+    'movie',
+    explanations.flatMap((e) =>
+      e.fingerprint
+        ? [{ itemId: e.movieId, fingerprint: e.fingerprint, explanation: e.explanation }]
+        : []
+    )
   )
 
   logger.info({ runId, count: explanations.length }, 'Stored AI explanations')

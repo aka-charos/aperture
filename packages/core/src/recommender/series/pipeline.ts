@@ -1615,12 +1615,14 @@ export async function generateSeriesRecommendationsForUser(
         }))
 
         // Generate explanations using embedding-based evidence
-        // Same seam as the movie side: batched paid calls, so Stop lands here.
+        // Same seam as the movie side: batched paid calls, so Stop lands here,
+        // and unchanged picks reuse their last explanation as they do there.
         const explanations = await generateSeriesExplanations(
           runId,
           user.id,
           seriesForExplanation,
-          options.shouldCancel
+          options.shouldCancel,
+          { reuse: true }
         )
         await storeSeriesExplanations(runId, explanations)
         logger.info({ runId, count: explanations.length }, '✅ AI explanations stored')

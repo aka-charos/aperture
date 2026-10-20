@@ -92,9 +92,12 @@ export async function purgeMovieDatabase(): Promise<PurgeResult> {
   }
 
   // Resolved before the transaction opens, so a missing table can never abort it.
-  const existingTables = await getExistingTables(
-    EMBEDDING_BASE_TABLES.flatMap(embeddingTableNames)
-  )
+  const existingTables = await getExistingTables([
+    ...EMBEDDING_BASE_TABLES.flatMap(embeddingTableNames),
+    // Checked like the embedding tables: a database behind the image (0211 not
+    // applied) would otherwise abort the whole purge transaction here.
+    'recommendation_explanation_cache',
+  ])
 
   await transaction(async (client) => {
     const deleteEmbeddings = async (baseTable: EmbeddingBaseTable): Promise<number> => {
@@ -105,6 +108,12 @@ export async function purgeMovieDatabase(): Promise<PurgeResult> {
         deleted += res.rowCount || 0
       }
       return deleted
+    }
+
+    // 0. Explanations kept for reuse by the next regeneration: written about
+    // titles and histories this purge deletes.
+    if (existingTables.has('recommendation_explanation_cache')) {
+      await client.query('DELETE FROM recommendation_explanation_cache')
     }
 
     // 1. Delete assistant messages (FK to conversations)

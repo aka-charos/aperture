@@ -1038,12 +1038,16 @@ export async function generateRecommendationsForUser(
 
         // Generate explanations using embedding-based evidence
         // The explanations are the only paid part of a run and they go out in
-        // batches, so this is the seam where Stop saves real money.
+        // batches, so this is the seam where Stop saves real money. A pick whose
+        // inputs are unchanged since its last explanation reuses that text
+        // (shared/explanationReuse.ts): a regenerate mostly lands on the picks
+        // it had before, and rewording them was most of its cost.
         const explanations = await generateExplanations(
           runId,
           user.id,
           moviesForExplanation,
-          options.shouldCancel
+          options.shouldCancel,
+          { reuse: true }
         )
         await storeExplanations(runId, explanations)
         logger.info({ runId, count: explanations.length }, '✅ AI explanations stored')

@@ -484,7 +484,12 @@ async function refreshMovieRun(
     }
   })
 
-  const explanations = await generateExplanations(runId, userId, movies, shouldCancel)
+  // Never reuse here: rewriting the text is what the refresh job and the
+  // Rewrite button are for. What they write is remembered, so the next
+  // regenerate reuses the rewritten text rather than the one it replaced.
+  const explanations = await generateExplanations(runId, userId, movies, shouldCancel, {
+    reuse: false,
+  })
   // Stored even when the generation was cut short: a partial rewrite leaves the
   // remaining picks on their previous text, which is a strictly better state
   // than throwing away the explanations already paid for.
@@ -570,7 +575,10 @@ async function refreshSeriesRun(
     }
   })
 
-  const explanations = await generateSeriesExplanations(runId, userId, seriesList, shouldCancel)
+  // Never reuse: see refreshMovieRun.
+  const explanations = await generateSeriesExplanations(runId, userId, seriesList, shouldCancel, {
+    reuse: false,
+  })
   await storeSeriesExplanations(runId, explanations)
   return explanations.length
 }

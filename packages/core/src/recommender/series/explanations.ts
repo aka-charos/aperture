@@ -49,6 +49,17 @@ import {
   loadAnalysisGrounding,
   type AnalysisGroundingPart,
 } from '../../analysis/grounding.js'
+import {
+  explanationFingerprint,
+  splitReusable,
+  type StoredExplanation,
+} from '../shared/explanationReuse.js'
+import {
+  explanationWriterKey,
+  loadStoredExplanations,
+  rememberExplanations,
+  type ExplanationReuseOptions,
+} from '../explanationCache.js'
 
 const logger = createChildLogger('series-explanations')
 
@@ -141,6 +152,8 @@ export interface SeriesWithEvidence extends SeriesForExplanation {
 export interface SeriesExplanationResult {
   seriesId: string
   explanation: string
+  /** See ExplanationResult in the movie generator: model-written text only. */
+  fingerprint?: string
 }
 
 export interface UserSeriesTasteContext {
@@ -178,7 +191,7 @@ async function fetchSeriesEvidenceForRecommendations(
      JOIN recommendation_candidates rc ON rc.id = re.candidate_id
      JOIN series s ON s.id = re.similar_series_id
      WHERE rc.run_id = $1 AND rc.series_id = ANY($2)
-     ORDER BY rc.series_id, re.similarity DESC`,
+     ORDER BY rc.series_id, re.similarity DESC, re.similar_series_id`,
     [runId, seriesIds]
   )
 
@@ -225,6 +238,9 @@ export async function getUserSeriesTasteContext(userId: string): Promise<UserSer
   // count let shows the viewer sampled and abandoned outrank ones they finished.
   // Matches taste-profile/builder.ts and series/pipeline.ts.
 
+  // Every ORDER BY ends on a unique key, as in the movie generator: this block
+  // is part of each explanation's reuse fingerprint.
+
   // Get top genres by watch frequency from series watch history
   const genreResult = await query<{ genre: string }>(
     `SELECT unnest(s.genres) as genre, COUNT(*) as count
@@ -233,7 +249,7 @@ export async function getUserSeriesTasteContext(userId: string): Promise<UserSer
      JOIN series s ON s.id = e.series_id
      WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND ${WATCH_HISTORY_TASTE_SQL}
      GROUP BY genre
-     ORDER BY count DESC
+     ORDER BY count DESC, genre
      LIMIT 8`,
     [userId]
   )
@@ -252,7 +268,7 @@ export async function getUserSeriesTasteContext(userId: string): Promise<UserSer
      JOIN series s ON s.id = e.series_id
      WHERE wh.user_id = $1 AND wh.media_type = 'episode' AND ${WATCH_HISTORY_TASTE_SQL}
      GROUP BY s.id, s.title, s.year, s.genres, s.network
-     ORDER BY episodes_watched DESC, MAX(wh.last_played_at) DESC NULLS LAST
+     ORDER BY episodes_watched DESC, MAX(wh.last_played_at) DESC NULLS LAST, s.id
      LIMIT 15`,
     [userId]
   )
@@ -320,7 +336,8 @@ export async function generateSeriesExplanations(
   userId: string,
   recommendations: SeriesForExplanation[],
   /** See the movie generator: checked between batches so Cancel lands quickly. */
-  shouldCancel?: () => boolean
+  shouldCancel: (() => boolean) | undefined,
+  options: ExplanationReuseOptions
 ): Promise<SeriesExplanationResult[]> {
   if (recommendations.length === 0) {
     return []
@@ -358,43 +375,81 @@ export async function generateSeriesExplanations(
     twinSharedTitles: twinSharedTitles.get(r.seriesId),
   }))
 
+  // Mirrors the movie generator: each block rendered once, hashed and sent.
+  const system = buildSeriesSystemPrompt(aiLocale)
+  const userContext = buildSeriesUserContext(tasteContext)
+  const writer = await explanationWriterKey()
+  const prepared: PreparedSeries[] = seriesWithEvidence.map((series) => {
+    const block = renderSeriesBlock(series, titleContext)
+    return {
+      series,
+      block,
+      fingerprint: explanationFingerprint({ writer, system, userContext, pick: block }),
+    }
+  })
+
+  const stored = options.reuse
+    ? await loadStoredExplanations(userId, 'series', seriesIds)
+    : new Map<string, StoredExplanation>()
+  const { reused, toWrite } = splitReusable(
+    prepared,
+    (p) => p.series.seriesId,
+    (p) => p.fingerprint,
+    stored
+  )
+  const written = new Map<string, SeriesExplanationResult>()
+  for (const { pick, explanation } of reused) {
+    written.set(pick.series.seriesId, {
+      seriesId: pick.series.seriesId,
+      explanation,
+      fingerprint: pick.fingerprint,
+    })
+  }
+  if (options.reuse) {
+    logger.info(
+      { runId, reused: reused.length, toWrite: toWrite.length },
+      '♻️ Reusing series explanations whose inputs are unchanged'
+    )
+  }
+
   // Generate explanations in batches - size depends on provider context window
   const { batchSize, maxTokens } = await getExplanationBatchSize()
-  logger.info({ batchSize, maxTokens }, 'Using explanation batch settings based on provider')
+  if (toWrite.length > 0) {
+    logger.info({ batchSize, maxTokens }, 'Using explanation batch settings based on provider')
+  }
 
-  const results: SeriesExplanationResult[] = []
-
-  for (let i = 0; i < seriesWithEvidence.length; i += batchSize) {
+  for (let i = 0; i < toWrite.length; i += batchSize) {
     if (shouldCancel?.()) {
       logger.info(
-        { generated: results.length, expected: seriesWithEvidence.length },
+        { generated: written.size, expected: prepared.length },
         '🛑 Series explanation generation cancelled between batches'
       )
       break
     }
-    const batch = seriesWithEvidence.slice(i, i + batchSize)
-    const batchResults = await generateBatchSeriesExplanations(
-      batch,
-      tasteContext,
-      titleContext,
-      maxTokens,
-      aiLocale
-    )
-    results.push(...batchResults)
+    const batch = toWrite.slice(i, i + batchSize)
+    const batchResults = await generateBatchSeriesExplanations(batch, system, userContext, maxTokens)
+    for (const result of batchResults) written.set(result.seriesId, result)
   }
 
-  logger.info({ generated: results.length }, '✅ Series AI explanations generated')
+  const results = prepared
+    .map((p) => written.get(p.series.seriesId))
+    .filter((r): r is SeriesExplanationResult => r !== undefined)
+
+  logger.info(
+    { generated: results.length - reused.length, reused: reused.length },
+    '✅ Series AI explanations generated'
+  )
   return results
 }
 
-async function generateBatchSeriesExplanations(
-  seriesList: SeriesWithEvidence[],
-  tasteContext: UserSeriesTasteContext,
-  titleContext: Map<string, SeriesTitleContext>,
-  maxOutputTokens: number = 3000,
-  aiLocale: AppLocaleCode = DEFAULT_LOCALE
-): Promise<SeriesExplanationResult[]> {
-  // Build user context string
+/** Mirrors PreparedMovie. */
+interface PreparedSeries {
+  series: SeriesWithEvidence
+  block: string
+  fingerprint: string
+}
+
+function buildSeriesUserContext(tasteContext: UserSeriesTasteContext): string {
   const userContextLines = [
     `Top genres: ${tasteContext.topGenres.join(', ')}`,
     '',
@@ -411,63 +466,59 @@ async function generateBatchSeriesExplanations(
     userContextLines.unshift(`Taste Profile: ${tasteContext.tasteSynopsis}`, '')
   }
 
-  const userContext = userContextLines.join('\n')
+  return userContextLines.join('\n')
+}
 
-  // Build series list with evidence
-  //
-  // Mirrors the movie generator, including dropping the raw cosine percentages:
-  // they sit in a band a few points wide, so they read as grades while carrying
-  // almost no information. Order is the usable part and is preserved.
-  const seriesListStr = seriesList
-    .map((s, i) => {
-      const evidenceStr =
-        s.evidence.length > 0
-          ? s.evidence
-              .map((e) => {
-                const typeLabel =
-                  e.evidenceType === 'favorite'
-                    ? '⭐ a favorite of theirs'
-                    : e.evidenceType === 'highly_rated'
-                      ? '🔥 binged'
-                      : 'watched'
-                const plot = clip(e.overview, EVIDENCE_PLOT_CHARS)
-                return `      - "${e.title}" (${e.year || 'N/A'}, ${typeLabel})${plot ? `: ${plot}` : ''}`
-              })
-              .join('\n')
-          : '      (none — say so by writing about the show itself, not about a connection)'
+/**
+ * One pick's block, without its position in the batch (see renderMovieBlock).
+ *
+ * Mirrors the movie generator, including dropping the raw cosine percentages:
+ * they sit in a band a few points wide, so they read as grades while carrying
+ * almost no information. Order is the usable part and is preserved.
+ */
+function renderSeriesBlock(
+  s: SeriesWithEvidence,
+  titleContext: Map<string, SeriesTitleContext>
+): string {
+  const evidenceStr =
+    s.evidence.length > 0
+      ? s.evidence
+          .map((e) => {
+            const typeLabel =
+              e.evidenceType === 'favorite'
+                ? '⭐ a favorite of theirs'
+                : e.evidenceType === 'highly_rated'
+                  ? '🔥 binged'
+                  : 'watched'
+            const plot = clip(e.overview, EVIDENCE_PLOT_CHARS)
+            return `      - "${e.title}" (${e.year || 'N/A'}, ${typeLabel})${plot ? `: ${plot}` : ''}`
+          })
+          .join('\n')
+      : '      (none — say so by writing about the show itself, not about a connection)'
 
-      // Shared with the movie generator; see explanationPrompt.ts.
-      const slotLines = buildSlotLines(s, SERIES_NOUNS)
+  // Shared with the movie generator; see explanationPrompt.ts.
+  const slotLines = buildSlotLines(s, SERIES_NOUNS)
 
-      const context = titleContext.get(s.seriesId)
-      const keywords = context?.keywords
-      const themes = keywords?.length
-        ? `\n   Themes: ${keywords.slice(0, KEYWORD_LIMIT).join(', ')}`
-        : ''
-      // Mirrors the movie generator exactly: under the plot, above the evidence.
-      const analysisLines = formatAnalysisGrounding(context?.analysis ?? []) ?? ''
+  const context = titleContext.get(s.seriesId)
+  const keywords = context?.keywords
+  const themes = keywords?.length
+    ? `\n   Themes: ${keywords.slice(0, KEYWORD_LIMIT).join(', ')}`
+    : ''
+  // Mirrors the movie generator exactly: under the plot, above the evidence.
+  const analysisLines = formatAnalysisGrounding(context?.analysis ?? []) ?? ''
 
-      return `${i + 1}. "${s.title}" (${s.year || 'N/A'})
+  return `"${s.title}" (${s.year || 'N/A'})
    Genres: ${s.genres.join(', ')}${s.network ? `\n   Network: ${s.network}` : ''}${s.status ? `\n   Status: ${s.status}` : ''}${themes}
    Novelty: ${s.novelty > 0.5 ? 'expands taste' : 'familiar'} | Rating: ${s.ratingScore > 0.7 ? 'critically acclaimed' : s.ratingScore > 0.5 ? 'well received' : 'mixed'}${slotLines}
    Plot: ${clip(s.overview, PICK_PLOT_CHARS) ?? 'No overview available'}${analysisLines}
 ${evidenceHeading(s, SERIES_NOUNS, evidenceSupportsCause(s.evidence))}
 ${evidenceStr}`
-    })
-    .join('\n\n')
+}
 
+function buildSeriesSystemPrompt(aiLocale: AppLocaleCode = DEFAULT_LOCALE): string {
   const langBlock = `\n\n${buildAiLanguageInstruction(aiLocale)}`
 
-  try {
-    const model = await getTextGenerationModelInstance()
-    // A reasoning model bills its scratchpad from the SAME allowance as these
-    // explanations, which is what `explanationBatchSettings` buys headroom for.
-    // Absent unless an operator chose one, so the request is unchanged by default.
-    const reasoning = await getReasoningProviderOptions('textGeneration')
-    const { text, finishReason } = await generateText({
-      model,
-      ...(reasoning ? { providerOptions: reasoning } : {}),
-      system: `You are an expert TV curator writing personalized recommendation explanations for TV series. You have access to:
+  return `You are an expert TV curator writing personalized recommendation explanations for TV series. You have access to:
 1. The user's taste profile and favorite series
 2. For each recommendation, the SPECIFIC watched series it's most similar to (via AI embedding analysis), with a short synopsis of each
 
@@ -484,7 +535,28 @@ CRITICAL: Some of these shows will be obscure and you will not recognise them. T
 
 Format: Return JSON with an "explanations" array containing objects with "index" (1-based) and "explanation" fields.
 
-CRITICAL: Never write a double quote inside the explanation text. Titles are shown in quotes above for readability, but repeating that in your answer breaks the JSON - write series titles as plain text, or in single quotes.${langBlock}`,
+CRITICAL: Never write a double quote inside the explanation text. Titles are shown in quotes above for readability, but repeating that in your answer breaks the JSON - write series titles as plain text, or in single quotes.${langBlock}`
+}
+
+async function generateBatchSeriesExplanations(
+  batch: PreparedSeries[],
+  system: string,
+  userContext: string,
+  maxOutputTokens: number = 3000
+): Promise<SeriesExplanationResult[]> {
+  const seriesList = batch.map((p) => p.series)
+  const seriesListStr = batch.map((p, i) => `${i + 1}. ${p.block}`).join('\n\n')
+
+  try {
+    const model = await getTextGenerationModelInstance()
+    // A reasoning model bills its scratchpad from the SAME allowance as these
+    // explanations, which is what `explanationBatchSettings` buys headroom for.
+    // Absent unless an operator chose one, so the request is unchanged by default.
+    const reasoning = await getReasoningProviderOptions('textGeneration')
+    const { text, finishReason } = await generateText({
+      model,
+      ...(reasoning ? { providerOptions: reasoning } : {}),
+      system,
       prompt: `=== USER'S TV TASTE PROFILE ===
 ${userContext}
 
@@ -526,10 +598,12 @@ Generate personalized explanations referencing the specific similar series shown
 
     // 1-based, matching how the prompt numbers them. A missing entry gets the
     // template, so a partial response costs only the items it left out.
-    return seriesList.map((s, i) => ({
-      seriesId: s.seriesId,
-      explanation: byIndex.get(i + 1) ?? generateFallbackSeriesExplanation(s),
-    }))
+    return batch.map((p, i) => {
+      const written = byIndex.get(i + 1)
+      return written !== undefined
+        ? { seriesId: p.series.seriesId, explanation: written, fingerprint: p.fingerprint }
+        : { seriesId: p.series.seriesId, explanation: generateFallbackSeriesExplanation(p.series) }
+    })
   } catch (error) {
     // Extract meaningful error information - AI SDK errors don't serialize well
     const errorInfo = {
@@ -613,6 +687,16 @@ export async function storeSeriesExplanations(
      FROM unnest($2::uuid[], $3::text[]) AS t(series_id, explanation)
      WHERE rc.run_id = $1 AND rc.series_id = t.series_id AND rc.is_selected = true`,
     [runId, explanations.map((e) => e.seriesId), explanations.map((e) => e.explanation)]
+  )
+
+  await rememberExplanations(
+    runId,
+    'series',
+    explanations.flatMap((e) =>
+      e.fingerprint
+        ? [{ itemId: e.seriesId, fingerprint: e.fingerprint, explanation: e.explanation }]
+        : []
+    )
   )
 
   logger.info({ runId, count: explanations.length }, 'Stored series AI explanations')
