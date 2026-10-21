@@ -15,8 +15,11 @@
  *   ("Also worth checking", "From your taste profile", library search, etc.).
  *   The carousel makes every card in a row the same height, so this one grows
  *   to whatever its text needs and the row follows the tallest.
- * - 'list': full-width card used in the vertical recommendation lists (web
- *   search, and the user's own AI recommendations).
+ * - 'list': fluid card used in the recommendation grids (web search, the
+ *   user's own AI recommendations, and any section shown in a tab).
+ *
+ * Only an episode card has a Play action: for a film or show, Details opens the
+ * title page and playing starts there.
  *
  * The SYNOPSIS is the only clamped text, in both variants — it exists in full on
  * the detail page, so a disclosure costs the reader nothing. The "why it fits"
@@ -53,9 +56,8 @@ import type { ContentItem } from './types'
 
 interface ContentCardProps {
   item: ContentItem
-  /** 'compact' = fixed-width carousel card; 'list' = full-width card. */
+  /** 'compact' = fixed-width carousel card; 'list' = fluid grid card. */
   variant?: 'compact' | 'list'
-  onPlay?: (id: string, href: string) => void
   isFavorite?: boolean
   favoritePending?: boolean
   onToggleFavorite?: (item: ContentItem) => void
@@ -130,7 +132,6 @@ function splitMeta(subtitle?: string): { year?: string; rest?: string } {
 export function ContentCard({
   item,
   variant = 'compact',
-  onPlay,
   isFavorite,
   favoritePending,
   onToggleFavorite,
@@ -141,7 +142,10 @@ export function ContentCard({
   const isList = variant === 'list'
 
   const detailsAction = item.actions?.find(a => a.id === 'details')
-  const playAction = item.actions?.find(a => a.id === 'play')
+  // Details covers playback for a film or a show: the title page it opens has
+  // the media server's Play button. An episode is the exception — Details opens
+  // its show, not the episode — so its card keeps a direct Play.
+  const episodePlayAction = item.episode ? item.actions?.find(a => a.id === 'play') : undefined
 
   const { year, rest: genreLine } = splitMeta(item.subtitle)
 
@@ -205,16 +209,6 @@ export function ContentCard({
       return
     }
     navigate(detailsAction.href)
-  }
-
-  const handlePlay = () => {
-    if (playAction?.href) {
-      if (onPlay) {
-        onPlay(item.id, playAction.href)
-      } else {
-        window.open(playAction.href, '_blank')
-      }
-    }
   }
 
   return (
@@ -525,15 +519,15 @@ export function ContentCard({
           >
             {t('assistantToolUi.details')}
           </Button>
-          {playAction && (
+          {episodePlayAction?.href && (
             <Button
               size="small"
               variant="contained"
               startIcon={<PlayArrowIcon sx={{ fontSize: 14 }} />}
-              onClick={(e) => {
-                e.stopPropagation()
-                handlePlay()
-              }}
+              href={episodePlayAction.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
               sx={{
                 minWidth: 0,
                 px: 1,
@@ -548,7 +542,6 @@ export function ContentCard({
               {t('assistantToolUi.play')}
             </Button>
           )}
-
           {/* Favorite toggle. In the action row rather than floating on the
               poster: as a 16px outline in the artwork's corner it read as part
               of the image and went unnoticed. */}

@@ -1636,6 +1636,7 @@
   "assistantToolUi": {
     "noImage": "No Image",
     "createPlaylist": "Create playlist",
+    "sectionUntitled": "Results",
     "favorite": "Add to favorites",
     "removeFavorite": "Remove from favorites",
     "favoriteAdded": "Added to your favorites",

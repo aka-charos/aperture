@@ -4,6 +4,7 @@
 export * from './types'
 export { ContentCard } from './ContentCard'
 export { ContentCarousel } from './ContentCarousel'
+export { SectionTabs } from './SectionTabs'
 export { ContentDetail } from './ContentDetail'
 export { AnalysisCard } from './AnalysisCard'
 export { PersonResult } from './PersonCard'

@@ -20,11 +20,13 @@ import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import { ContentCard } from './ContentCard'
 import { CreatePlaylistFromSuggestionsDialog } from './CreatePlaylistFromSuggestionsDialog'
 import { COMPACT_THREAD, chatText } from '../density'
+import { useCarouselHeaderText } from './carouselHeader'
 import type { ContentCarouselData, ContentItem } from './types'
 
 interface ContentCarouselProps {
   data: ContentCarouselData
-  onPlay?: (id: string, href: string) => void
+  /** Leave the heading out: a tab above the section already names it. */
+  hideTitle?: boolean
 }
 
 /**
@@ -47,31 +49,14 @@ const favoriteKey = (item: Pick<ContentItem, 'id' | 'type'>) => `${item.type}:${
  */
 const LIST_CARD_MIN_WIDTH = 380
 
-function useCarouselHeaderText(data: ContentCarouselData) {
-  const { t } = useTranslation()
-  const title = data.titleKey
-    ? t(`assistantToolUi.${data.titleKey}`, {
-        ...(data.titleParams ?? {}),
-        defaultValue: data.title,
-      })
-    : data.title
-  const description = data.descriptionKey
-    ? t(`assistantToolUi.${data.descriptionKey}`, {
-        ...(data.descriptionParams ?? {}),
-        defaultValue: data.description,
-      })
-    : data.description
-  const resolvedTitle = typeof title === 'string' && title.length > 0 ? title : undefined
-  const resolvedDescription = typeof description === 'string' && description.length > 0 ? description : undefined
-  return { resolvedTitle, resolvedDescription }
-}
-
-export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
+export function ContentCarousel({ data, hideTitle = false }: ContentCarouselProps) {
   const { t } = useTranslation()
   const theme = useTheme()
   const rtl = theme.direction === 'rtl'
   const scrollRef = useRef<HTMLDivElement>(null)
-  const { resolvedTitle, resolvedDescription } = useCarouselHeaderText(data)
+  const header = useCarouselHeaderText(data)
+  const resolvedTitle = hideTitle ? undefined : header.resolvedTitle
+  const { resolvedDescription } = header
 
   // 'list' = vertical rich cards (anything with per-card reasons). Anything
   // else = carousel.
@@ -312,7 +297,6 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
               key={item.id}
               item={item}
               variant="list"
-              onPlay={onPlay}
               isFavorite={favorited.has(item.id)}
               favoritePending={pendingFavorites.has(item.id)}
               onToggleFavorite={handleToggleFavorite}
@@ -398,12 +382,11 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
               //
               // It matters more now that the reason is never clamped: card
               // height follows a model-written sentence, so without this a row
-              // reads as a ragged staircase and the Details/Play buttons sit at
+              // reads as a ragged staircase and the Details button and heart sit at
               // a different height on every card.
               <Box key={item.id} sx={{ scrollSnapAlign: 'start', flexShrink: 0, display: 'flex' }}>
                 <ContentCard
                   item={item}
-                  onPlay={onPlay}
                   isFavorite={favorited.has(item.id)}
                   favoritePending={pendingFavorites.has(item.id)}
                   onToggleFavorite={handleToggleFavorite}

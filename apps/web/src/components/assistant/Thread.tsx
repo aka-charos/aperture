@@ -27,6 +27,7 @@ import {
 import type { TextMessagePartProps, ToolCallMessagePartProps } from '@assistant-ui/react'
 import {
   ContentCarousel,
+  SectionTabs,
   AnalysisCard,
   ContentDetail,
   PersonResult,
@@ -145,13 +146,7 @@ function renderToolResult(toolName: string, result: unknown): React.ReactNode {
 
   // Multi-carousel result (discovery: web "Recommendations" + embeddings "Also worth checking")
   if ('carousels' in data && Array.isArray(data.carousels)) {
-    return (
-      <>
-        {(data.carousels as ContentCarouselData[]).map((c) => (
-          <ContentCarousel key={c.id} data={c} />
-        ))}
-      </>
-    )
+    return <SectionTabs carousels={data.carousels as ContentCarouselData[]} />
   }
 
   // Content carousel tools (search, similar, recommendations, history, ratings, unwatched, top rated)

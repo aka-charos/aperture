@@ -3883,6 +3883,7 @@
   "assistantToolUi": {
     "noImage": "Χωρίς εικόνα",
     "createPlaylist": "Δημιουργία λίστας",
+    "sectionUntitled": "Αποτελέσματα",
     "favorite": "Προσθήκη στα αγαπημένα",
     "removeFavorite": "Αφαίρεση από τα αγαπημένα",
     "favoriteAdded": "Προστέθηκε στα αγαπημένα σας",
