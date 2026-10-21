@@ -197,6 +197,7 @@ function GuideDoc({ slug }: { slug: string }) {
           linkTarget={linkTarget}
           codeRoute={appPathIn}
           textLinkHint={t('userGuide.link.outside')}
+          onThisPageLabel={t('userGuide.page.onThisPage')}
           onOpenPage={openPage}
           onNavigate={openRoute}
           onAnchor={toAnchor}

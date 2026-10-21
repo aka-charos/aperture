@@ -188,6 +188,7 @@ function GuideDoc({ slug }: { slug: string }) {
           linkTarget={linkTarget}
           codeRoute={consolePathIn}
           textLinkHint={t('adminDocs.link.outside')}
+          onThisPageLabel={t('adminDocs.page.onThisPage')}
           onOpenPage={openDoc}
           onNavigate={openRoute}
           onAnchor={toAnchor}

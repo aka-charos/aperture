@@ -15,6 +15,8 @@ export interface DocDrawerLabels {
   openInNewTab: string
   close: string
   textLinkHint: string
+  /** Heading of the strip of section links on a long page. */
+  onThisPage?: string
 }
 
 interface DocDrawerProps {
@@ -202,6 +204,7 @@ export function DocDrawer({
               linkTarget={linkTarget}
               codeRoute={codeRoute}
               textLinkHint={labels.textLinkHint}
+              onThisPageLabel={labels.onThisPage}
               onOpenPage={openPage}
               onNavigate={goTo}
               onAnchor={scrollTo}
