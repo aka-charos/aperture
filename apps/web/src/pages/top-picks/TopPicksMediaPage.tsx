@@ -294,7 +294,7 @@ export function TopPicksMediaPage({ mediaType }: TopPicksMediaPageProps) {
                     height: { xs: 90, sm: 120 },
                     objectFit: 'cover',
                     borderRadius: 1,
-                    backgroundColor: 'grey.800',
+                    backgroundColor: 'surface.fill',
                     flexShrink: 0,
                   }}
                 />

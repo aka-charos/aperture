@@ -10,7 +10,6 @@ import TvIcon from '@mui/icons-material/Tv'
 import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useOpenMedia } from '@/hooks/useOpenMedia'
-import { extraColors } from '@/theme'
 import { ToolResultError } from '../ToolResultError'
 import type { Person, PersonResultData } from './types'
 
@@ -55,7 +54,7 @@ function PersonCardSingle({ person }: PersonCardProps) {
           <PersonIcon />
         </Avatar>
         <Box>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ color: '#fff' }}>
+          <Typography variant="subtitle1" fontWeight={600} sx={{ color: 'text.primary' }}>
             {person.name}
           </Typography>
           <Chip
@@ -90,10 +89,10 @@ function PersonCardSingle({ person }: PersonCardProps) {
                 sx={{
                   height: 24,
                   bgcolor: theme.palette.divider,
-                  color: '#e4e4e7',
+                  color: 'text.primary',
                   cursor: 'pointer',
                   '&:hover': {
-                    bgcolor: extraColors.subtleBorder,
+                    bgcolor: theme.palette.surface.subtleBorder,
                   },
                 }}
               />
@@ -125,10 +124,10 @@ function PersonCardSingle({ person }: PersonCardProps) {
                 sx={{
                   height: 24,
                   bgcolor: theme.palette.divider,
-                  color: '#e4e4e7',
+                  color: 'text.primary',
                   cursor: 'pointer',
                   '&:hover': {
-                    bgcolor: extraColors.subtleBorder,
+                    bgcolor: theme.palette.surface.subtleBorder,
                   },
                 }}
               />

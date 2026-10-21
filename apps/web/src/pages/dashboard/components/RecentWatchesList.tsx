@@ -82,7 +82,7 @@ function WatchItemRow({ item, onClick, t }: { item: WatchItem; onClick: () => vo
           objectFit: 'cover',
           borderRadius: 1,
           flexShrink: 0,
-          backgroundColor: 'grey.800',
+          backgroundColor: 'surface.fill',
         }}
       />
       <Box sx={{ flex: 1, minWidth: 0 }}>

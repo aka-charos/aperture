@@ -99,7 +99,7 @@ export function TopPicksMovieListItem({
               alignSelf: 'stretch',
               flexShrink: 0,
               overflow: 'hidden',
-              bgcolor: 'grey.900',
+              bgcolor: 'surface.fillDeep',
             }}
           >
             <Box

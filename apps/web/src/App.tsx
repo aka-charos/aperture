@@ -19,6 +19,7 @@ import { AdminShell } from './components/AdminShell'
 import { AssistantModal } from './components/AssistantModal'
 import { useCapability } from './hooks/useCapability'
 import { LoginPage } from './pages/Login'
+import { DarkStage } from './components/DarkStage'
 import { SetupPage } from './pages/setup'
 import { DashboardPage } from './pages/dashboard'
 import { MyRecommendationsPage } from './pages/MyRecommendations'
@@ -186,7 +187,9 @@ function AppRoutes() {
       <Route
         path="/login"
         element={
-          <LoginPage />
+          <DarkStage>
+            <LoginPage />
+          </DarkStage>
         }
       />
 

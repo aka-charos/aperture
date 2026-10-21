@@ -44,7 +44,7 @@ import { ToolResultError } from './ToolResultError'
 import { useUnwatchedOnly, setUnwatchedOnly } from './unwatchedPreference'
 import { useStatusPhase, setStatusPhase } from './assistantStatus'
 import { NARROW_THREAD, COMPACT_THREAD, chatText, scaleChatTypography } from './density'
-import { gradients, extraColors } from '@/theme'
+import { gradients } from '@/theme'
 
 /** Shared avatar geometry; it shrinks on a compact thread and goes on a narrow one. */
 const avatarSx = {
@@ -218,7 +218,7 @@ function UserMessage() {
             <MessagePrimitive.Content />
           </Typography>
         </Paper>
-        <Avatar sx={{ ...avatarSx, bgcolor: extraColors.subtleBorder }}>
+        <Avatar sx={{ ...avatarSx, bgcolor: theme.palette.surface.subtleBorder }}>
           <PersonIcon fontSize="small" />
         </Avatar>
       </Box>
@@ -258,7 +258,7 @@ function AssistantMessageError() {
   return (
     <Box
       sx={{
-        bgcolor: 'rgba(26, 26, 26, 0.7)',
+        bgcolor: 'surface.glass',
         borderRadius: 2,
         my: 1,
         ...bubbleSx('90%'),
@@ -342,7 +342,7 @@ function AssistantTextPart({ text }: TextMessagePartProps) {
       sx={{
         ...bubbleSx('90%'),
         ...partGapSx,
-        bgcolor: 'rgba(26, 26, 26, 0.7)',
+        bgcolor: theme.palette.surface.glass,
         borderRadius: 2,
         borderStartStartRadius: 0,
       }}
@@ -371,20 +371,20 @@ function AssistantTextPart({ text }: TextMessagePartProps) {
           },
           '& hr': {
             border: 'none',
-            borderTop: `1px solid ${extraColors.subtleBorder}`,
+            borderTop: `1px solid ${theme.palette.surface.subtleBorder}`,
             my: 2.5,
           },
           '& blockquote': {
             borderInlineStart: `3px solid ${theme.palette.primary.main}`,
             pl: 2,
             my: 1.5,
-            color: '#a1a1aa',
+            color: 'text.secondary',
             fontStyle: 'italic',
           },
           '& h1, & h2, & h3, & h4': {
             mt: 2,
             mb: 1,
-            color: '#e4e4e7',
+            color: 'text.primary',
           },
         }}
       >
@@ -539,13 +539,13 @@ function ThreadWelcome({ suggestions }: { suggestions: string[] }) {
             sx={{
               px: 2,
               py: 1,
-              bgcolor: 'rgba(26, 26, 26, 0.7)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              bgcolor: theme.palette.surface.glass,
+              border: `1px solid ${theme.palette.surface.hairline}`,
               borderRadius: 2,
               cursor: 'pointer',
               transition: 'all 0.2s',
               '&:hover': {
-                bgcolor: '#252525',
+                bgcolor: theme.palette.surface.raisedHover,
                 borderColor: theme.palette.primary.main,
               },
             }}
@@ -607,7 +607,7 @@ function LoadingIndicator() {
       <Paper
         sx={{
           ...bubbleSx('80%'),
-          bgcolor: 'rgba(26, 26, 26, 0.7)',
+          bgcolor: 'surface.glass',
           borderRadius: 2,
           borderStartStartRadius: 0,
         }}
@@ -642,7 +642,7 @@ function Composer() {
 
   return (
     <ComposerPrimitive.Root>
-      <Box sx={{ px: 1.5, py: 1.25, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+      <Box sx={{ px: 1.5, py: 1.25, borderTop: `1px solid ${theme.palette.surface.hairline}` }}>
         {/* Applies to every message in every conversation until turned off —
             it is a standing preference, not a per-message option. */}
         <Tooltip title={t('assistant.unwatchedOnlyHint')} placement="top-start">
@@ -653,11 +653,11 @@ function Composer() {
                 size="small"
                 checked={unwatchedOnly}
                 onChange={(e) => setUnwatchedOnly(e.target.checked)}
-                sx={{ p: 0.5, mr: 0.75, color: '#71717a', '&.Mui-checked': { color: theme.palette.primary.main } }}
+                sx={{ p: 0.5, mr: 0.75, color: 'text.secondary', '&.Mui-checked': { color: theme.palette.primary.main } }}
               />
             }
             label={
-              <Typography variant="caption" sx={{ color: unwatchedOnly ? '#a5b4fc' : '#a1a1aa' }}>
+              <Typography variant="caption" sx={{ color: unwatchedOnly ? 'primary.light' : 'text.secondary' }}>
                 {t('assistant.unwatchedOnly')}
               </Typography>
             }
@@ -673,13 +673,13 @@ function Composer() {
               onKeyDown={handleKeyDown}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  bgcolor: 'rgba(26, 26, 26, 0.7)',
+                  bgcolor: theme.palette.surface.glass,
                   borderRadius: 3,
                   '& fieldset': {
                     borderColor: theme.palette.divider,
                   },
                   '&:hover fieldset': {
-                    borderColor: extraColors.subtleBorder,
+                    borderColor: theme.palette.surface.subtleBorder,
                   },
                   '&.Mui-focused fieldset': {
                     borderColor: theme.palette.primary.main,
@@ -704,7 +704,7 @@ function Composer() {
                     bgcolor: theme.palette.primary.dark,
                   },
                   '&:disabled': {
-                    bgcolor: extraColors.subtleBorder,
+                    bgcolor: theme.palette.surface.subtleBorder,
                     color: '#666',
                   },
                 }}
@@ -793,7 +793,7 @@ function HistoricalUserMessage({ message }: { message: HistoricalMessage }) {
           {message.content}
         </Typography>
       </Paper>
-      <Avatar sx={{ ...avatarSx, bgcolor: extraColors.subtleBorder }}>
+      <Avatar sx={{ ...avatarSx, bgcolor: theme.palette.surface.subtleBorder }}>
         <PersonIcon fontSize="small" />
       </Avatar>
     </Box>
@@ -808,7 +808,7 @@ function HistoricalText({ text }: { text: string }) {
       sx={{
         ...bubbleSx('90%'),
         ...partGapSx,
-        bgcolor: 'rgba(26, 26, 26, 0.7)',
+        bgcolor: 'surface.glass',
         borderRadius: 2,
         borderStartStartRadius: 0,
       }}
@@ -860,7 +860,7 @@ function HistoricalAssistantMessage({ message }: { message: HistoricalMessage })
             sx={{
               ...bubbleSx('90%'),
               ...partGapSx,
-              bgcolor: 'rgba(26, 26, 26, 0.7)',
+              bgcolor: 'surface.glass',
               borderRadius: 2,
               borderStartStartRadius: 0,
             }}
@@ -1087,10 +1087,10 @@ function ThreadScrollControls({ viewportRef }: { viewportRef: RefObject<HTMLDivE
   if (!showAnswerButton && atBottom) return null
 
   const fabSx = {
-    bgcolor: 'rgba(26, 26, 26, 0.92)',
+    bgcolor: theme.palette.surface.glassStrong,
     color: 'text.secondary',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    '&:hover': { bgcolor: '#252525', color: theme.palette.primary.light },
+    border: `1px solid ${theme.palette.surface.hairline}`,
+    '&:hover': { bgcolor: theme.palette.surface.raisedHover, color: theme.palette.primary.light },
   }
 
   return (

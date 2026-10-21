@@ -495,7 +495,7 @@ export function MediaHero({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                bgcolor: 'grey.800',
+                bgcolor: 'surface.fill',
               }}
             >
               {isMovie(media) ? (
@@ -593,7 +593,7 @@ export function MediaHero({
               sx={{
                 flex: '0 1 auto',
                 minWidth: 0,
-                textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+                textShadow: theme.palette.surface.heroTextShadow,
                 // h3 is 3rem, which fits about eight characters a line on a
                 // phone; one long word would push the page sideways.
                 fontSize: { xs: '2rem', sm: '3rem' },
@@ -746,8 +746,8 @@ export function MediaHero({
                         : unexplored
                           ? { borderColor: 'info.main', color: 'info.main' }
                           : {
-                              bgcolor: 'rgba(255,255,255,0.1)',
-                              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
+                              bgcolor: alpha(theme.palette.text.primary, 0.1),
+                              '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.15) },
                             }
                     }
                   />

@@ -10,6 +10,7 @@ import { edgeColorType, edgeIsLit, litNodeIds } from './connectionHighlight'
 import { useEffectiveHighlight } from './connectionHighlightStore'
 import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 import { palette } from '@/theme'
+import { DarkStage } from '../DarkStage'
 
 // Node dimensions (2:3 poster ratio)
 const NODE_WIDTH = 100
@@ -76,7 +77,7 @@ interface SimilarityGraphProps {
   height?: number
 }
 
-export const SimilarityGraph = memo(function SimilarityGraph({
+const SimilarityGraphCanvas = memo(function SimilarityGraphCanvas({
   data,
   loading = false,
   loadingStatus,
@@ -940,3 +941,16 @@ function truncateTitle(title: string, maxLength: number): string {
   return title.slice(0, maxLength - 1) + '…'
 }
 
+
+/**
+ * The graph is a dark canvas in both modes: its node labels, edges and halos
+ * are drawn for a night-sky background, so in the light mode it sits on the
+ * page as a dark viewport rather than being recoloured.
+ */
+export const SimilarityGraph = memo(function SimilarityGraph(props: SimilarityGraphProps) {
+  return (
+    <DarkStage>
+      <SimilarityGraphCanvas {...props} />
+    </DarkStage>
+  )
+})

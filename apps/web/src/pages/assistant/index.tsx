@@ -43,10 +43,10 @@ export function AssistantPage() {
           xs: 'calc(100dvh - var(--aperture-chrome-top, 64px) - 32px)',
           sm: 'calc(100dvh - var(--aperture-chrome-top, 64px) - 48px)',
         },
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: `1px solid ${theme.palette.surface.hairline}`,
         borderRadius: 3,
         overflow: 'hidden',
-        bgcolor: 'rgba(15, 15, 15, 0.5)',
+        bgcolor: theme.palette.surface.panel,
       }}
     >
       <AssistantChatSurface chat={chat} sidebarInline={sidebarInline} showHeader={!sidebarInline} />

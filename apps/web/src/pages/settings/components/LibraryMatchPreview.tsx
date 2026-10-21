@@ -97,7 +97,7 @@ export function LibraryMatchPreview({
             sx={{ 
               height: 6, 
               borderRadius: 3,
-              bgcolor: alpha('#fff', 0.1),
+              bgcolor: alpha(theme.palette.text.primary, 0.1),
               '& .MuiLinearProgress-bar': {
                 borderRadius: 3,
                 background: matchPercentage === 100
@@ -145,7 +145,7 @@ export function LibraryMatchPreview({
             size="small"
             variant="outlined"
             sx={{
-              borderColor: alpha('#fff', 0.2),
+              borderColor: alpha(theme.palette.text.primary, 0.2),
               color: 'text.secondary',
               fontWeight: 500,
             }}
@@ -192,7 +192,7 @@ export function LibraryMatchPreview({
                 maxHeight: 200, 
                 overflow: 'auto', 
                 py: 0,
-                bgcolor: alpha('#000', 0.2),
+                bgcolor: theme.palette.mode === 'light' ? 'action.hover' : alpha('#000', 0.2),
               }}
             >
               {data.missing.map((item, idx) => (
@@ -201,7 +201,7 @@ export function LibraryMatchPreview({
                   sx={{ 
                     py: 0.5,
                     borderBottom: idx < data.missing.length - 1 ? '1px solid' : 'none',
-                    borderColor: alpha('#fff', 0.05),
+                    borderColor: alpha(theme.palette.text.primary, 0.05),
                   }}
                 >
                   <ListItemText 

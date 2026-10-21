@@ -115,7 +115,7 @@ export function EvidenceList({
                     sx={{ width: 48, height: 72 }}
                   />
                 ) : (
-                  <Avatar variant="rounded" sx={{ width: 48, height: 72, bgcolor: 'grey.800' }}>
+                  <Avatar variant="rounded" sx={{ width: 48, height: 72, bgcolor: 'surface.fill' }}>
                     <MovieIcon />
                   </Avatar>
                 )}

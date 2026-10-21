@@ -544,7 +544,7 @@ export function PersonDetailPage() {
                 fontWeight={700} 
                 mb={1}
                 sx={{
-                  textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                  textShadow: (t) => t.palette.surface.heroTextShadow,
                   fontSize: { xs: '1.6rem', sm: '2.125rem' },
                   overflowWrap: 'anywhere',
                 }}
@@ -555,7 +555,7 @@ export function PersonDetailPage() {
               {birthDateText && (
                 <Typography
                   variant="body2"
-                  sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)', opacity: 0.9 }}
+                  sx={{ textShadow: (t) => t.palette.surface.heroTextShadow, opacity: 0.9 }}
                 >
                   {currentAge != null
                     ? t('personDetail.bornAge', { date: birthDateText, age: currentAge })
@@ -566,7 +566,7 @@ export function PersonDetailPage() {
               {!birthDateText && data.birthPlace && (
                 <Typography
                   variant="body2"
-                  sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)', opacity: 0.9 }}
+                  sx={{ textShadow: (t) => t.palette.surface.heroTextShadow, opacity: 0.9 }}
                 >
                   {data.birthPlace}
                 </Typography>
@@ -574,7 +574,7 @@ export function PersonDetailPage() {
               {deathDateText && (
                 <Typography
                   variant="body2"
-                  sx={{ textShadow: '0 2px 8px rgba(0,0,0,0.5)', opacity: 0.9 }}
+                  sx={{ textShadow: (t) => t.palette.surface.heroTextShadow, opacity: 0.9 }}
                 >
                   {ageAtDeath != null
                     ? t('personDetail.diedAge', { date: deathDateText, age: ageAtDeath })
@@ -608,13 +608,13 @@ export function PersonDetailPage() {
                   icon={<MovieIcon />}
                   label={`${data.stats.totalMovies} Movies`}
                   size="small"
-                  sx={{ bgcolor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
+                  sx={{ bgcolor: (t) => alpha(t.palette.background.paper, 0.6), backdropFilter: 'blur(4px)' }}
                 />
                 <Chip
                   icon={<TvIcon />}
                   label={`${data.stats.totalSeries} Series`}
                   size="small"
-                  sx={{ bgcolor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
+                  sx={{ bgcolor: (t) => alpha(t.palette.background.paper, 0.6), backdropFilter: 'blur(4px)' }}
                 />
               </Box>
             </Box>

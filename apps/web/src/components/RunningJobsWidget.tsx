@@ -13,6 +13,7 @@ import {
   Chip,
   Divider,
   useTheme,
+  alpha,
 } from '@mui/material'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
@@ -141,11 +142,11 @@ export function RunningJobsWidget() {
           py: 0.75,
           mr: { xs: 0.5, sm: 1 },
           borderRadius: 2,
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          backgroundColor: alpha(theme.palette.text.primary, 0.1),
           cursor: 'pointer',
           transition: 'background-color 0.2s',
           '&:hover': {
-            backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            backgroundColor: alpha(theme.palette.text.primary, 0.15),
           },
           // On a phone the bar has no room for a name and a bar; the
           // percentage alone still says work is running, and a tap opens the
@@ -157,7 +158,7 @@ export function RunningJobsWidget() {
           <Typography
             variant="caption"
             sx={{
-              color: 'white',
+              color: 'text.primary',
               fontWeight: 500,
               display: 'block',
               whiteSpace: 'nowrap',
@@ -176,7 +177,7 @@ export function RunningJobsWidget() {
             sx={{
               height: 4,
               borderRadius: 2,
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              backgroundColor: alpha(theme.palette.text.primary, 0.2),
               '& .MuiLinearProgress-bar': {
                 borderRadius: 2,
                 background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 50%, ${theme.palette.primary.main} 100%)`,
@@ -193,7 +194,7 @@ export function RunningJobsWidget() {
         <Typography
           variant="caption"
           sx={{
-            color: 'white',
+            color: 'text.primary',
             fontWeight: 600,
             fontSize: '0.8rem',
             minWidth: 36,

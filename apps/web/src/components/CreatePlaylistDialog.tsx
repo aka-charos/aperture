@@ -391,11 +391,11 @@ export function CreatePlaylistDialog({
                 height: 6,
               },
               '&::-webkit-scrollbar-track': {
-                bgcolor: 'rgba(255,255,255,0.1)',
+                bgcolor: 'action.selected',
                 borderRadius: 3,
               },
               '&::-webkit-scrollbar-thumb': {
-                bgcolor: 'rgba(255,255,255,0.3)',
+                bgcolor: 'surface.subtleBorder',
                 borderRadius: 3,
               },
             }}
@@ -409,7 +409,7 @@ export function CreatePlaylistDialog({
                     height: 90,
                     borderRadius: 1,
                     overflow: 'hidden',
-                    bgcolor: 'rgba(0,0,0,0.3)',
+                    bgcolor: 'surface.fillDeep',
                   }}
                 >
                   {node.poster_url ? (
@@ -449,7 +449,7 @@ export function CreatePlaylistDialog({
                   width: 60,
                   height: 90,
                   borderRadius: 1,
-                  bgcolor: 'rgba(255,255,255,0.1)',
+                  bgcolor: 'action.selected',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

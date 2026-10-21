@@ -962,7 +962,7 @@ function WatchHistoryTab({ userId }: { userId: string }) {
                           height: 60,
                           objectFit: 'cover',
                           borderRadius: 0.5,
-                          backgroundColor: 'grey.800',
+                          backgroundColor: 'surface.fill',
                         }}
                       />
                       <Box>

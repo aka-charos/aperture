@@ -51,10 +51,11 @@ export function MediaDetailModal({ target, onClose, onOpenMedia }: MediaDetailMo
         sx: {
           height: fullScreen ? '100%' : '95vh',
           maxHeight: fullScreen ? '100%' : '90vh',
-          bgcolor: 'rgba(15, 15, 15, 0.96)',
+          bgcolor: 'surface.glassStrong',
           backgroundImage: 'none',
           borderRadius: fullScreen ? 0 : 3,
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          border: 1,
+          borderColor: 'surface.hairline',
         },
       }}
     >

@@ -83,7 +83,7 @@ export function TitlePicker({
               src={getProxiedImageUrl(option.posterUrl)}
               alt=""
               loading="lazy"
-              sx={{ width: 28, height: 42, objectFit: 'cover', borderRadius: 0.5, flexShrink: 0, bgcolor: 'grey.900' }}
+              sx={{ width: 28, height: 42, objectFit: 'cover', borderRadius: 0.5, flexShrink: 0, bgcolor: 'surface.fillDeep' }}
             />
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="body2" noWrap>

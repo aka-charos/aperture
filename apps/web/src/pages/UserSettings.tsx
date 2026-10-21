@@ -13,6 +13,7 @@ import { EmailNotificationsCard } from './UserSettings/EmailNotificationsCard'
 import { AiLibraryNamesCard } from './UserSettings/AiLibraryNamesCard'
 import { SimilarityGraphPrefsCard } from './UserSettings/SimilarityGraphPrefsCard'
 import { PosterDisplayCard } from './UserSettings/PosterDisplayCard'
+import { AppearanceCard } from './UserSettings/AppearanceCard'
 import { TipsCard } from './UserSettings/TipsCard'
 import { TraktIntegrationCard } from './UserSettings/TraktIntegrationCard'
 import { SettingsGrid } from './UserSettings/SettingsCard'
@@ -255,6 +256,7 @@ export function UserSettingsPage() {
 
           <TabPanel value={tab} tab="display">
             <SettingsGrid stretch>
+              <AppearanceCard />
               <PosterDisplayCard />
               <SimilarityGraphPrefsCard />
               <TipsCard />

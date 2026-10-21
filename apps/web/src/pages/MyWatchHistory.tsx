@@ -892,7 +892,7 @@ export function MyWatchHistoryPage() {
                               height: 3,
                               borderRadius: 1,
                               mt: 0.5,
-                              backgroundColor: 'grey.800',
+                              backgroundColor: 'surface.fill',
                               '& .MuiLinearProgress-bar': {
                                 backgroundColor: item.total_episodes > 0 && item.episodes_watched === item.total_episodes ? 'success.main' : 'primary.main',
                               },

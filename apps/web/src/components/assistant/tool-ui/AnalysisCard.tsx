@@ -26,7 +26,6 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
-import { extraColors } from '@/theme'
 import { chatText } from '../density'
 import type { AnalysisData, AnalysisSegmentData } from './types'
 
@@ -123,7 +122,7 @@ export function AnalysisCard({ data }: AnalysisCardProps) {
   if (analysis.status === 'notInLibrary') {
     return (
       <Paper sx={{ my: 2, p: 1.75, bgcolor: theme.palette.background.paper, borderRadius: 2 }}>
-        <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           {t('assistantToolUi.analysisNotInLibrary', { title: analysis.query })}
         </Typography>
       </Paper>
@@ -175,10 +174,10 @@ export function AnalysisCard({ data }: AnalysisCardProps) {
               {t('assistantToolUi.analysisHeading')}
             </Typography>
           </Box>
-          <Typography variant="body2" fontWeight={600} sx={{ color: '#fff' }}>
+          <Typography variant="body2" fontWeight={600} sx={{ color: 'text.primary' }}>
             {title}
             {analysis.year && (
-              <Box component="span" sx={{ color: '#a1a1aa', fontWeight: 400 }}>
+              <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>
                 {' '}
                 ({analysis.year})
               </Box>
@@ -189,7 +188,7 @@ export function AnalysisCard({ data }: AnalysisCardProps) {
               must not be handed links it would then cite as if it read them. */}
           {analysis.status === 'available' && analysis.sourceCount != null && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5, flexWrap: 'wrap' }}>
-              <Typography variant="caption" sx={{ color: '#71717a' }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                 {t('assistantToolUi.analysisSources', { count: analysis.sourceCount })}
               </Typography>
               {analysis.sourceGrade && (
@@ -219,8 +218,8 @@ export function AnalysisCard({ data }: AnalysisCardProps) {
                 px: 1,
                 py: 0.25,
                 fontSize: chatText(11),
-                borderColor: extraColors.subtleBorder,
-                color: '#a1a1aa',
+                borderColor: theme.palette.surface.subtleBorder,
+                color: 'text.secondary',
                 '&:hover': {
                   borderColor: theme.palette.primary.main,
                   bgcolor: alpha(theme.palette.primary.main, 0.1),
@@ -238,7 +237,7 @@ export function AnalysisCard({ data }: AnalysisCardProps) {
       {analysis.status === 'available' ? (
         analysis.segments.map((segment, i) => <SegmentBlock key={i} segment={segment} />)
       ) : (
-        <Typography variant="body2" sx={{ color: '#a1a1aa' }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           {analysis.status === 'declined'
             ? t('assistantToolUi.analysisDeclined')
             : t('assistantToolUi.analysisNotYet')}

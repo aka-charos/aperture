@@ -302,14 +302,14 @@ export function AssistantChatSurface({
             alignItems: 'center',
             gap: 1,
             p: 1,
-            bgcolor: 'rgba(26, 26, 26, 0.6)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            bgcolor: theme.palette.surface.glass,
+            border: `1px solid ${theme.palette.surface.hairline}`,
             borderRadius: 2,
             color: theme.palette.text.primary,
             cursor: 'pointer',
             transition: 'all 0.2s',
             '&:hover': {
-              bgcolor: 'rgba(37, 37, 37, 0.8)',
+              bgcolor: theme.palette.surface.raisedHover,
               borderColor: theme.palette.primary.main,
             },
           }}
@@ -321,7 +321,7 @@ export function AssistantChatSurface({
         </Box>
       </Box>
 
-      <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+      <Divider sx={{ borderColor: theme.palette.surface.hairline }} />
 
       {/* Conversations List */}
       <Box sx={{ flex: 1, overflow: 'auto' }}>
@@ -422,7 +422,7 @@ export function AssistantChatSurface({
                         [NO_HOVER_MEDIA]: { fontSize: 16 },
                       },
                       '& .MuiOutlinedInput-root': {
-                        bgcolor: 'rgba(26, 26, 26, 0.6)',
+                        bgcolor: theme.palette.surface.glass,
                       },
                     }}
                   />
@@ -517,7 +517,7 @@ export function AssistantChatSurface({
 
       {/* Saving indicator */}
       {savingMessages && (
-        <Box sx={{ p: 1, borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ p: 1, borderTop: `1px solid ${theme.palette.surface.hairline}`, display: 'flex', alignItems: 'center', gap: 1 }}>
           <CircularProgress size={12} />
           <Typography variant="caption" color="text.secondary">
             {t('assistant.saving')}
@@ -540,7 +540,7 @@ export function AssistantChatSurface({
               // what it takes out of the answer beside it.
               width: { md: 232, lg: 280 },
               flexShrink: 0,
-              borderInlineEnd: '1px solid rgba(255, 255, 255, 0.1)',
+              borderInlineEnd: `1px solid ${theme.palette.surface.hairline}`,
             }}
           >
             {sidebarContent}
@@ -558,7 +558,7 @@ export function AssistantChatSurface({
               justifyContent: 'space-between',
               px: 1.5,
               py: 1,
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              borderBottom: `1px solid ${theme.palette.surface.hairline}`,
               background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.15)} 0%, ${alpha(theme.palette.secondary.main, 0.15)} 100%)`,
             }}
           >
@@ -647,7 +647,7 @@ export function AssistantChatSurface({
           sx: {
             width: 300,
             maxWidth: '85vw',
-            bgcolor: 'rgba(15, 15, 15, 0.95)',
+            bgcolor: theme.palette.surface.glassStrong,
             backgroundImage: 'none',
           },
         }}

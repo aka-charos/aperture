@@ -438,7 +438,7 @@ export function CreatePlaylistFromSuggestionsDialog({
                   px: 1,
                   py: 0.5,
                   cursor: 'pointer',
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
+                  '&:hover': { bgcolor: 'action.hover' },
                 }}
               >
                 <Checkbox checked={checked} size="small" sx={{ p: 0.5 }} />
@@ -449,7 +449,7 @@ export function CreatePlaylistFromSuggestionsDialog({
                     flexShrink: 0,
                     borderRadius: 0.5,
                     overflow: 'hidden',
-                    bgcolor: 'rgba(0,0,0,0.3)',
+                    bgcolor: 'surface.fillDeep',
                   }}
                 >
                   {item.image && (

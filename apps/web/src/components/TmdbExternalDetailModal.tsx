@@ -369,8 +369,8 @@ export function TmdbExternalDetailModal({
                             label={genre.name}
                             size="small"
                             sx={{
-                              bgcolor: alpha('#fff', 0.1),
-                              '&:hover': { bgcolor: alpha('#fff', 0.15) },
+                              bgcolor: alpha(theme.palette.text.primary, 0.1),
+                              '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.15) },
                             }}
                           />
                         ))}
@@ -535,7 +535,7 @@ export function TmdbExternalDetailModal({
                                 cursor: 'pointer',
                                 transition: 'background-color 0.2s',
                                 '&:hover': {
-                                  bgcolor: alpha('#fff', 0.05),
+                                  bgcolor: alpha(theme.palette.text.primary, 0.05),
                                 },
                               }}
                             >

@@ -171,7 +171,7 @@ export function StudioDetailPage() {
                 fontWeight={700} 
                 mb={1}
                 sx={{
-                  textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                  textShadow: (t) => t.palette.surface.heroTextShadow,
                   fontSize: { xs: '1.6rem', sm: '2.125rem' },
                   overflowWrap: 'anywhere',
                 }}

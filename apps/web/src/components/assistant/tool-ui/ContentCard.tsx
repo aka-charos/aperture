@@ -48,7 +48,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { RankBadge, WatchedBadge, getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
-import { gradients, extraColors } from '@/theme'
+import { gradients } from '@/theme'
 import { COMPACT_THREAD, chatText } from '../density'
 import type { ContentItem } from './types'
 
@@ -235,7 +235,7 @@ export function ContentCard({
               border: '1px solid transparent',
               transition: 'background-color 0.2s, border-color 0.2s',
               '&:hover': {
-                bgcolor: '#212121',
+                bgcolor: theme.palette.surface.raised,
                 borderColor: alpha(theme.palette.primary.main, 0.35),
               },
             }
@@ -246,7 +246,7 @@ export function ContentCard({
               maxWidth: 340,
               transition: 'all 0.2s',
               '&:hover': {
-                bgcolor: '#252525',
+                bgcolor: theme.palette.surface.raisedHover,
                 transform: 'translateY(-2px)',
               },
             }),
@@ -349,7 +349,7 @@ export function ContentCard({
         {genreLine && (
           <Typography
             variant="caption"
-            sx={{ color: '#71717a', fontSize: chatText(10), lineHeight: 1.35, ...clampLines(2) }}
+            sx={{ color: 'text.secondary', fontSize: chatText(10), lineHeight: 1.35, ...clampLines(2) }}
           >
             {genreLine}
           </Typography>
@@ -369,11 +369,11 @@ export function ContentCard({
           <Typography
             variant="body2"
             fontWeight={600}
-            sx={{ color: '#fff', flex: 1, minWidth: 0, ...clampLines(2) }}
+            sx={{ color: 'text.primary', flex: 1, minWidth: 0, ...clampLines(2) }}
           >
             {item.name}
             {year && (
-              <Box component="span" sx={{ color: '#a1a1aa', fontWeight: 400 }}>
+              <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>
                 {' '}
                 ({year})
               </Box>
@@ -402,8 +402,8 @@ export function ContentCard({
         {/* Director (movies) / creator (series) — the same DB column serves both */}
         {item.director && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
-            <MovieCreationOutlinedIcon sx={{ fontSize: 12, color: '#71717a', flexShrink: 0 }} />
-            <Typography variant="caption" noWrap sx={{ color: '#a1a1aa', minWidth: 0 }}>
+            <MovieCreationOutlinedIcon sx={{ fontSize: 12, color: 'text.secondary', flexShrink: 0 }} />
+            <Typography variant="caption" noWrap sx={{ color: 'text.secondary', minWidth: 0 }}>
               {item.type === 'movie'
                 ? t('assistantToolUi.directedBy', { name: item.director })
                 : t('assistantToolUi.createdBy', { name: item.director })}
@@ -419,7 +419,7 @@ export function ContentCard({
             ref={overviewRef}
             variant="caption"
             sx={{
-              color: '#a1a1aa',
+              color: 'text.secondary',
               lineHeight: 1.45,
               ...(expanded ? {} : clampLines(overviewLines)),
             }}
@@ -514,8 +514,8 @@ export function ContentCard({
               px: 1,
               py: 0.25,
               fontSize: chatText(11),
-              borderColor: extraColors.subtleBorder,
-              color: '#a1a1aa',
+              borderColor: theme.palette.surface.subtleBorder,
+              color: 'text.secondary',
               '&:hover': {
                 borderColor: theme.palette.primary.main,
                 bgcolor: alpha(theme.palette.primary.main, 0.1),
@@ -576,7 +576,7 @@ export function ContentCard({
                     p: 0.5,
                     borderRadius: 1,
                     border: '1px solid',
-                    borderColor: isFavorite ? 'rgba(236, 72, 153, 0.5)' : extraColors.subtleBorder,
+                    borderColor: isFavorite ? 'rgba(236, 72, 153, 0.5)' : theme.palette.surface.subtleBorder,
                     bgcolor: isFavorite ? 'rgba(236, 72, 153, 0.12)' : 'transparent',
                     '&:hover': {
                       borderColor: '#ec4899',
@@ -589,7 +589,7 @@ export function ContentCard({
                   ) : isFavorite ? (
                     <FavoriteIcon sx={{ fontSize: 15, color: '#ec4899' }} />
                   ) : (
-                    <FavoriteBorderIcon sx={{ fontSize: 15, color: '#a1a1aa' }} />
+                    <FavoriteBorderIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
                   )}
                 </IconButton>
               </Box>

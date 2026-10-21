@@ -62,7 +62,7 @@ export function PreviewItemCard({
         borderRadius: 2,
         border: '1px solid transparent',
         transition: 'background-color 0.2s, border-color 0.2s',
-        '&:hover': { bgcolor: '#212121', borderColor: alpha(theme.palette.primary.main, 0.35) },
+        '&:hover': { bgcolor: theme.palette.surface.raised, borderColor: alpha(theme.palette.primary.main, 0.35) },
       }}
     >
       {/* Meta rail: poster + specs */}
@@ -111,7 +111,7 @@ export function PreviewItemCard({
         {item.genres.length > 0 && (
           <Typography
             variant="caption"
-            sx={{ color: '#71717a', fontSize: 10, lineHeight: 1.35, ...clampLines(2) }}
+            sx={{ color: 'text.secondary', fontSize: 10, lineHeight: 1.35, ...clampLines(2) }}
           >
             {item.genres.map((g) => genreLabel(g)).join(', ')}
           </Typography>
@@ -135,7 +135,7 @@ export function PreviewItemCard({
               column of its own that only lines up while every card is the same height. */}
           <Typography
             variant="body2"
-            sx={{ color: '#71717a', fontWeight: 600, flexShrink: 0, mt: '1px' }}
+            sx={{ color: 'text.secondary', fontWeight: 600, flexShrink: 0, mt: '1px' }}
           >
             {rank}
           </Typography>
@@ -151,7 +151,7 @@ export function PreviewItemCard({
           >
             {item.title}
             {item.year && (
-              <Box component="span" sx={{ color: '#a1a1aa', fontWeight: 400 }}>
+              <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>
                 {' '}
                 ({item.year})
               </Box>
@@ -200,7 +200,7 @@ export function PreviewItemCard({
         </Box>
 
         {item.runtime ? (
-          <Typography variant="caption" sx={{ color: '#71717a' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             {pt('previewRuntimeMinutes', { minutes: item.runtime })}
           </Typography>
         ) : null}
@@ -208,7 +208,7 @@ export function PreviewItemCard({
         {item.overview && (
           <Typography
             variant="caption"
-            sx={{ color: '#a1a1aa', lineHeight: 1.45, ...clampLines(OVERVIEW_LINES) }}
+            sx={{ color: 'text.secondary', lineHeight: 1.45, ...clampLines(OVERVIEW_LINES) }}
           >
             {item.overview}
           </Typography>
@@ -239,7 +239,7 @@ export function PreviewItemCard({
 
         {/* Seeds get the one explanation a model shouldn't be asked to write. */}
         {item.isSeed && !item.reason && (
-          <Typography variant="caption" sx={{ color: '#71717a', fontStyle: 'italic' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
             {pt('previewSeedReason')}
           </Typography>
         )}

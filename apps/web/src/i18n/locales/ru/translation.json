@@ -6810,5 +6810,14 @@
       "noStart": "Pick a title to start from. Once you've finished something, your latest is chosen for you.",
       "nothing": "Nothing new to suggest after {{title}}: you've seen everything close to it."
     }
+  },
+  "colorMode": {
+    "label": "Appearance",
+    "light": "Light",
+    "dark": "Dark",
+    "switchToLight": "Switch to the light appearance",
+    "switchToDark": "Switch to the dark appearance",
+    "cardTitle": "Appearance",
+    "cardDescription": "Light is a calm gray canvas with white panels; dark is easier on the eyes in a dim room. Remembered in this browser."
   }
 }

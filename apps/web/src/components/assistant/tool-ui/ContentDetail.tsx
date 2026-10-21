@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
-import { gradients, extraColors } from '@/theme'
+import { gradients } from '@/theme'
 import { chatText } from '../density'
 import type { ContentDetailData } from './types'
 import { genreLabel } from '@/lib/genreLabel'
@@ -93,7 +93,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {/* Title and type */}
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 0.5 }}>
-            <Typography variant="h6" fontWeight={700} sx={{ color: '#fff' }}>
+            <Typography variant="h6" fontWeight={700} sx={{ color: 'text.primary' }}>
               {data.name}
             </Typography>
             <Chip
@@ -179,7 +179,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
                   sx={{
                     height: 22,
                     bgcolor: theme.palette.divider,
-                    color: '#a1a1aa',
+                    color: 'text.secondary',
                   }}
                 />
               ))}
@@ -219,8 +219,8 @@ export function ContentDetail({ data }: ContentDetailProps) {
               startIcon={<InfoIcon />}
               onClick={handleDetails}
               sx={{
-                borderColor: extraColors.subtleBorder,
-                color: '#a1a1aa',
+                borderColor: theme.palette.surface.subtleBorder,
+                color: 'text.secondary',
                 '&:hover': {
                   borderColor: theme.palette.primary.main,
                   bgcolor: alpha(theme.palette.primary.main, 0.1),

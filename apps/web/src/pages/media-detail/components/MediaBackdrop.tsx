@@ -3,6 +3,7 @@ import { Box, IconButton } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
+import { backdropFootFade, backdropImageFilter, backdropPlaceholder } from '@/theme'
 
 interface MediaBackdropProps {
   backdropUrl: string | null
@@ -36,7 +37,7 @@ export function MediaBackdrop({ backdropUrl, title, onBack }: MediaBackdropProps
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            filter: 'brightness(0.6)',
+            filter: backdropImageFilter,
           }}
         />
       ) : (
@@ -44,21 +45,20 @@ export function MediaBackdrop({ backdropUrl, title, onBack }: MediaBackdropProps
           sx={{
             width: '100%',
             height: '100%',
-            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+            background: backdropPlaceholder,
           }}
         />
       )}
 
       {/* Gradient overlay */}
       <Box
-        sx={{
+        sx={(theme) => ({
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          height: '60%',
-          background: 'linear-gradient(to top, rgba(18,18,18,1) 0%, rgba(18,18,18,0) 100%)',
-        }}
+          ...backdropFootFade(theme),
+        })}
       />
 
       {/* Back button */}

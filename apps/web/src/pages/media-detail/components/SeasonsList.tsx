@@ -293,7 +293,7 @@ function EpisodeRow({
         <Avatar
           variant="rounded"
           src={getProxiedImageUrl(episode.poster_url)}
-          sx={{ width: 80, height: 45, bgcolor: 'grey.800' }}
+          sx={{ width: 80, height: 45, bgcolor: 'surface.fill' }}
         >
           <TvIcon />
         </Avatar>

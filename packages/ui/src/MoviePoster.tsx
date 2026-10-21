@@ -337,7 +337,7 @@ export function MoviePoster({
           height: responsive ? 'auto' : dimensions.height,
           borderRadius: 2,
           overflow: 'hidden',
-          backgroundColor: 'grey.900',
+          backgroundColor: 'surface.fillDeep',
           transition: 'transform 0.3s ease, box-shadow 0.3s ease',
           transform: isHovered ? 'scale(1.05)' : 'scale(1)',
         }}

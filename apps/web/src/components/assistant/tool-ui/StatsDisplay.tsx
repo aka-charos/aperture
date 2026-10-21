@@ -38,7 +38,7 @@ export function StatsDisplay({ data }: StatsDisplayProps) {
             <MovieIcon sx={{ color: theme.palette.primary.light }} />
             <Typography variant="caption" color="text.secondary">{t('assistantToolUi.movies')}</Typography>
           </Box>
-          <Typography variant="h4" fontWeight={700} sx={{ color: '#fff' }}>
+          <Typography variant="h4" fontWeight={700} sx={{ color: 'text.primary' }}>
             {data.movieCount.toLocaleString()}
           </Typography>
         </Paper>
@@ -49,7 +49,7 @@ export function StatsDisplay({ data }: StatsDisplayProps) {
             <TvIcon sx={{ color: '#10b981' }} />
             <Typography variant="caption" color="text.secondary">{t('assistantToolUi.tvSeries')}</Typography>
           </Box>
-          <Typography variant="h4" fontWeight={700} sx={{ color: '#fff' }}>
+          <Typography variant="h4" fontWeight={700} sx={{ color: 'text.primary' }}>
             {data.seriesCount.toLocaleString()}
           </Typography>
           {data.episodeCount !== undefined && (
@@ -66,7 +66,7 @@ export function StatsDisplay({ data }: StatsDisplayProps) {
               <AccessTimeIcon sx={{ color: theme.palette.warning.main }} />
               <Typography variant="caption" color="text.secondary">{t('assistantToolUi.totalRuntime')}</Typography>
             </Box>
-            <Typography variant="body1" fontWeight={600} sx={{ color: '#fff' }}>
+            <Typography variant="body1" fontWeight={600} sx={{ color: 'text.primary' }}>
               {data.totalRuntimeFormatted}
             </Typography>
           </Paper>
@@ -79,7 +79,7 @@ export function StatsDisplay({ data }: StatsDisplayProps) {
               <StarIcon sx={{ color: '#ffc107' }} />
               <Typography variant="caption" color="text.secondary">{t('assistantToolUi.avgRating')}</Typography>
             </Box>
-            <Typography variant="h4" fontWeight={700} sx={{ color: '#fff' }}>
+            <Typography variant="h4" fontWeight={700} sx={{ color: 'text.primary' }}>
               {Number(data.averageRating).toFixed(1)}
             </Typography>
           </Paper>
@@ -89,7 +89,7 @@ export function StatsDisplay({ data }: StatsDisplayProps) {
       {/* User activity */}
       {data.watchStats && (
         <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper, borderRadius: 2, mb: 2 }}>
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, color: '#e4e4e7' }}>
+          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, color: 'text.primary' }}>
             {t('assistantToolUi.yourActivity')}
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
@@ -126,14 +126,14 @@ export function StatsDisplay({ data }: StatsDisplayProps) {
       {/* Top genres */}
       {data.topGenres && data.topGenres.length > 0 && (
         <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper, borderRadius: 2 }}>
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, color: '#e4e4e7' }}>
+          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, color: 'text.primary' }}>
             {t('assistantToolUi.topGenres')}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {data.topGenres.slice(0, 5).map((genre) => (
               <Box key={genre.genre}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                  <Typography variant="caption" sx={{ color: '#e4e4e7' }}>
+                  <Typography variant="caption" sx={{ color: 'text.primary' }}>
                     {genre.genre}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
@@ -173,14 +173,14 @@ export function StudiosDisplay({ data }: StudiosDisplayProps) {
     <Box sx={{ my: 2 }}>
       {data.studios && data.studios.length > 0 && (
         <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper, borderRadius: 2, mb: 2 }}>
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, color: '#e4e4e7' }}>
+          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, color: 'text.primary' }}>
             {t('assistantToolUi.topMovieStudios')}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             {data.studios.map((studio) => (
               <Box key={studio.name}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" fontWeight={600} sx={{ color: '#fff' }}>
+                  <Typography variant="body2" fontWeight={600} sx={{ color: 'text.primary' }}>
                     {studio.name}
                   </Typography>
                   <Chip
@@ -206,14 +206,14 @@ export function StudiosDisplay({ data }: StudiosDisplayProps) {
 
       {data.networks && data.networks.length > 0 && (
         <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper, borderRadius: 2 }}>
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, color: '#e4e4e7' }}>
+          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, color: 'text.primary' }}>
             {t('assistantToolUi.topTvNetworks')}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             {data.networks.map((network) => (
               <Box key={network.name}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2" fontWeight={600} sx={{ color: '#fff' }}>
+                  <Typography variant="body2" fontWeight={600} sx={{ color: 'text.primary' }}>
                     {network.name}
                   </Typography>
                   <Chip

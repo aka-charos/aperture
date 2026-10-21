@@ -58,6 +58,7 @@ import { AdminSearchProvider } from '@/hooks/AdminSearchProvider'
 import { GlobalSearch } from './GlobalSearch'
 import { UserHelpButton } from './UserHelpButton'
 import { LanguageMenuButton } from './LanguageMenuButton'
+import { ColorModeButton } from './ColorModeButton'
 import { AppBarPageHeading } from './PageHeading'
 import { PageHeaderProvider } from '@/hooks/PageHeaderProvider'
 import { UserHelpProvider } from '@/hooks/UserHelpProvider'
@@ -479,11 +480,16 @@ function AppShell() {
                 sx={{
                   justifyContent: labels ? 'flex-start' : 'center',
                   px: labels ? 3 : 2,
+                  '&.Mui-selected': {
+                    bgcolor: 'nav.selectedBg',
+                    color: 'nav.selectedText',
+                    '&:hover': { bgcolor: 'nav.selectedHoverBg' },
+                  },
                 }}
               >
                 <ListItemIcon
                   sx={{
-                    color: isPathActive(item.path) ? 'primary.main' : 'text.secondary',
+                    color: isPathActive(item.path) ? 'nav.selectedIcon' : 'text.secondary',
                     minWidth: labels ? 40 : 0,
                     mr: labels ? 1 : 0,
                   }}
@@ -705,6 +711,9 @@ function AppShell() {
 
           {/* Help for the screen you are on: its user guide pages in a drawer. */}
           <UserHelpButton />
+
+          {/* Light or dark, for this browser. */}
+          <ColorModeButton />
 
           {/* Language: the app's, and the one AI writes in. Beside the avatar
               because it is a choice about the person, not the library. */}

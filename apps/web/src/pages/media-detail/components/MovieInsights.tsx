@@ -112,7 +112,7 @@ function ScoreMeters({
               sx={{
                 height: 4,
                 borderRadius: 1,
-                bgcolor: 'grey.800',
+                bgcolor: 'surface.fill',
                 '& .MuiLinearProgress-bar': { bgcolor: `${color}.main` },
               }}
             />
@@ -944,7 +944,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
                         bgcolor: 'background.default',
                       }}
                     >
-                      <Box sx={{ height: 124, bgcolor: 'grey.800', position: 'relative' }}>
+                      <Box sx={{ height: 124, bgcolor: 'surface.fill', position: 'relative' }}>
                         <Box
                           component="img"
                           src={getProxiedImageUrl(row.poster_url)}

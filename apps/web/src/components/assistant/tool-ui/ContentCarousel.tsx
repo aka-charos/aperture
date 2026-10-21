@@ -20,7 +20,6 @@ import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import { ContentCard } from './ContentCard'
 import { CreatePlaylistFromSuggestionsDialog } from './CreatePlaylistFromSuggestionsDialog'
 import { COMPACT_THREAD, chatText } from '../density'
-import { extraColors } from '@/theme'
 import type { ContentCarouselData, ContentItem } from './types'
 
 interface ContentCarouselProps {
@@ -224,7 +223,7 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
     >
       <Box sx={{ minWidth: 0 }}>
         {resolvedTitle && (
-          <Typography variant="subtitle1" fontWeight={600} sx={{ color: '#e4e4e7' }}>
+          <Typography variant="subtitle1" fontWeight={600} sx={{ color: 'text.primary' }}>
             {resolvedTitle}
           </Typography>
         )}
@@ -245,8 +244,8 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
             fontSize: chatText(11),
             py: 0.25,
             whiteSpace: 'nowrap',
-            borderColor: extraColors.subtleBorder,
-            color: '#a1a1aa',
+            borderColor: theme.palette.surface.subtleBorder,
+            color: 'text.secondary',
             '&:hover': { borderColor: theme.palette.primary.main, bgcolor: alpha(theme.palette.primary.main, 0.1) },
           }}
         >
@@ -262,7 +261,7 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
       <Box sx={{ my: 2, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
         <Box sx={{ mb: 1.5 }}>
           {resolvedTitle && (
-            <Typography variant="subtitle1" fontWeight={600} sx={{ color: '#e4e4e7' }}>
+            <Typography variant="subtitle1" fontWeight={600} sx={{ color: 'text.primary' }}>
               {resolvedTitle}
             </Typography>
           )}

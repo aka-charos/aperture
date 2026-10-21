@@ -304,7 +304,7 @@ export function MyRecommendationsPage() {
         sx={{
           height: 6,
           borderRadius: 3,
-          backgroundColor: 'grey.800',
+          backgroundColor: 'surface.fill',
           '& .MuiLinearProgress-bar': {
             backgroundColor: color,
             borderRadius: 3,
@@ -668,7 +668,7 @@ export function MyRecommendationsPage() {
                         alignSelf: 'stretch',
                         flexShrink: 0,
                         overflow: 'hidden',
-                        bgcolor: 'grey.900',
+                        bgcolor: 'surface.fillDeep',
                       }}
                     >
                       <Box
@@ -958,7 +958,7 @@ export function MyRecommendationsPage() {
                           sx={{
                             height: 4,
                             borderRadius: 2,
-                            backgroundColor: 'grey.800',
+                            backgroundColor: 'surface.fill',
                             '& .MuiLinearProgress-bar': {
                               backgroundColor: theme.palette.primary.main,
                               borderRadius: 2,
@@ -981,7 +981,7 @@ export function MyRecommendationsPage() {
                           sx={{
                             height: 4,
                             borderRadius: 2,
-                            backgroundColor: 'grey.800',
+                            backgroundColor: 'surface.fill',
                             '& .MuiLinearProgress-bar': {
                               backgroundColor: '#10b981',
                               borderRadius: 2,
@@ -1004,7 +1004,7 @@ export function MyRecommendationsPage() {
                           sx={{
                             height: 4,
                             borderRadius: 2,
-                            backgroundColor: 'grey.800',
+                            backgroundColor: 'surface.fill',
                             '& .MuiLinearProgress-bar': {
                               backgroundColor: theme.palette.warning.main,
                               borderRadius: 2,

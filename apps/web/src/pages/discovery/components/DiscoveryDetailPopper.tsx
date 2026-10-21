@@ -426,8 +426,8 @@ export function DiscoveryDetailPopper({
                         label={resolveGenreName(genre.id, genre.name)}
                         size="small"
                         sx={{
-                          bgcolor: alpha('#fff', 0.1),
-                          '&:hover': { bgcolor: alpha('#fff', 0.15) },
+                          bgcolor: alpha(theme.palette.text.primary, 0.1),
+                          '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.15) },
                         }}
                       />
                     ))}
@@ -490,7 +490,7 @@ export function DiscoveryDetailPopper({
 
                 {/* Match score (AI discovery only; hidden for streaming chart rows) */}
                 {!hideAiMatchSection && (
-                  <Box sx={{ mt: 'auto', pt: 2, borderTop: 1, borderColor: alpha('#fff', 0.1) }}>
+                  <Box sx={{ mt: 'auto', pt: 2, borderTop: 1, borderColor: alpha(theme.palette.text.primary, 0.1) }}>
                     <Grid container spacing={2}>
                       <Grid item xs={6}>
                         <Typography variant="body2" color="text.secondary">
@@ -557,7 +557,7 @@ export function DiscoveryDetailPopper({
                       // Exactly one rule above the footer: the score block draws
                       // its own, so this only adds one when that block is absent.
                       ...(hideAiMatchSection
-                        ? { borderTop: 1, borderColor: alpha('#fff', 0.1) }
+                        ? { borderTop: 1, borderColor: alpha(theme.palette.text.primary, 0.1) }
                         : {}),
                     }}
                   >
@@ -638,7 +638,7 @@ export function DiscoveryDetailPopper({
                               cursor: 'pointer',
                               transition: 'background-color 0.2s',
                               '&:hover': {
-                                bgcolor: alpha('#fff', 0.05),
+                                bgcolor: alpha(theme.palette.text.primary, 0.05),
                               },
                             }}
                           >

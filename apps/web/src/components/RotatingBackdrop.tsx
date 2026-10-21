@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Box } from '@mui/material'
 import { getProxiedImageUrl } from '@aperture/ui'
+import { backdropFullFade } from '@/theme'
 
 interface RotatingBackdropProps {
   /** Array of backdrop URLs to cycle through */
@@ -201,7 +202,7 @@ export function RotatingBackdrop({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 70%, rgba(18,18,18,1) 100%)',
+          background: backdropFullFade,
           zIndex: 1,
         }}
       />

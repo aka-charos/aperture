@@ -125,7 +125,7 @@ export function BrowseSeriesListItem({
             alignSelf: 'stretch',
             flexShrink: 0,
             overflow: 'hidden',
-            bgcolor: 'grey.900',
+            bgcolor: 'surface.fillDeep',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

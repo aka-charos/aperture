@@ -285,12 +285,12 @@ export function AssistantModal() {
           sx: {
             height: isSmDown ? '100%' : '95vh',
             maxHeight: isSmDown ? '100%' : '90vh',
-            bgcolor: 'rgba(15, 15, 15, 0.5)',
+            bgcolor: theme.palette.surface.panel,
             backdropFilter: 'blur(10px)',
             backgroundImage: 'none',
             borderRadius: isSmDown ? 0 : 3,
             overflow: 'hidden',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            border: `1px solid ${theme.palette.surface.hairline}`,
           },
         }}
       >
@@ -309,10 +309,10 @@ export function AssistantModal() {
           sx: {
             width: dockWidth,
             maxWidth: '100vw',
-            bgcolor: 'rgba(15, 15, 15, 0.85)',
+            bgcolor: theme.palette.surface.glassStrong,
             backdropFilter: 'blur(16px)',
             backgroundImage: 'none',
-            borderInlineStart: '1px solid rgba(255, 255, 255, 0.1)',
+            borderInlineStart: `1px solid ${theme.palette.surface.hairline}`,
           },
         }}
       >
