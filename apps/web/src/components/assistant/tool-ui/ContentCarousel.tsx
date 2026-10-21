@@ -4,10 +4,10 @@
  * Renders either:
  * - a horizontal scrollable carousel (default) — the secondary "Also worth
  *   checking" strip and plain library/search results; or
- * - a vertical stack of rich cards (when `data.layout === 'list'`) — every list
+ * - a responsive grid of rich cards (when `data.layout === 'list'`) — every list
  *   whose cards carry a synopsis and a written "why it fits": the web-search
  *   "Recommendations" and the two "Your AI Recommendations" lists. A reason is
- *   what earns the vertical form; without one a card is a poster and belongs in
+ *   what earns the grid form; without one a card is a poster and belongs in
  *   the scroller.
  */
 import { useEffect, useRef, useState } from 'react'
@@ -39,6 +39,13 @@ interface ContentCarouselProps {
 const favoriteStatusCache = new Map<string, boolean>()
 
 const favoriteKey = (item: Pick<ContentItem, 'id' | 'type'>) => `${item.type}:${item.id}`
+
+/**
+ * Narrowest a rich card may get before the grid drops a column. The card spends
+ * a fixed 84px on its poster rail, so below this the text column is too narrow
+ * for the reason to read as a sentence.
+ */
+const LIST_CARD_MIN_WIDTH = 380
 
 function useCarouselHeaderText(data: ContentCarouselData) {
   const { t } = useTranslation()
@@ -281,8 +288,25 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
       {renderHeader()}
 
       {isList ? (
-        /* Vertical stacked list of rich cards (recommendations with reasons) */
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, [COMPACT_THREAD]: { gap: 1 } }}>
+        /* Grid of rich cards (recommendations with reasons). Sized off the
+           thread's own width, never a window breakpoint: the same list renders
+           in the 420px dock, the dialog and the full /assistant page, so one
+           card per row in the dock and three or four on a wide page.
+           `auto-fit` rather than `auto-fill`: a one- or two-card answer fills
+           the row instead of sitting in a quarter of it beside empty tracks,
+           and `min(…, 100%)` lets a single column shrink below the minimum
+           rather than overflow. Cards align to the top of their row rather
+           than stretching: a stretched row would hand every neighbour a blank
+           band each time one card's synopsis is expanded. */
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(auto-fit, minmax(min(${LIST_CARD_MIN_WIDTH}px, 100%), 1fr))`,
+            alignItems: 'start',
+            gap: 1.25,
+            [COMPACT_THREAD]: { gap: 1 },
+          }}
+        >
           {data.items.map((item) => (
             <ContentCard
               key={item.id}

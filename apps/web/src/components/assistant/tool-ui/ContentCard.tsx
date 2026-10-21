@@ -72,10 +72,12 @@ const POSTER_HEIGHT = 126
  * dock and ~86 in a 720px one — so a fixed line count quietly hands a narrow
  * panel a third of the text under the same rule. Converting a character budget
  * to lines at the measured width keeps the amount of prose roughly steady and
- * pays for it in card height, which costs nothing in a vertical list where no
- * two cards have to line up.
+ * pays for it in card height. List cards sit in a grid now, usually ~280px of
+ * text column beside the rail, and 320 characters came to the full eight lines
+ * on every card there; 180 lands at five, still more than a carousel card gets,
+ * with the rest a "Show more" (or the detail page) away.
  */
-const LIST_OVERVIEW_CHARS = 320
+const LIST_OVERVIEW_CHARS = 180
 /**
  * Average glyph advance at caption size, off the rendered cards: 6.5px was
  * measured at MUI's 12px caption, and the chat now renders that variant
@@ -86,7 +88,7 @@ const LIST_OVERVIEW_CHARS = 320
  */
 const CAPTION_CHAR_PX = chatText(6.5)
 const LIST_OVERVIEW_MIN_LINES = 4
-const LIST_OVERVIEW_MAX_LINES = 8
+const LIST_OVERVIEW_MAX_LINES = 6
 /**
  * Carousel cards are a fixed width everywhere, so their clamp can be fixed too.
  *
@@ -154,7 +156,7 @@ export function ContentCard({
   const overviewLines = isList ? listOverviewLines : COMPACT_OVERVIEW_LINES
 
   // Measured, not estimated from a character count (the PersonDetail bio
-  // approach): the same card renders ~600px wide in the vertical list and
+  // approach): the same card renders 380px to full thread width in the list grid and
   // ~200px wide in a carousel, so no single threshold fits both. Skipped while
   // expanded — nothing is clamped then, and the last known value is what keeps
   // the "show less" control on screen.
@@ -227,9 +229,9 @@ export function ContentCard({
         ...(isList
           ? {
               width: '100%',
-              // A list card is as wide as the thread, so on a compact one its
-              // padding is the difference between reading two cards at a time
-              // and reading one.
+              // A compact thread is narrow enough to hold one card per row, so
+              // there its padding is the difference between reading two cards
+              // at a time and reading one.
               [COMPACT_THREAD]: { p: 1.25, gap: 1.25 },
               border: '1px solid transparent',
               transition: 'background-color 0.2s, border-color 0.2s',
