@@ -493,7 +493,7 @@ async function refreshMovieRun(
   // Stored even when the generation was cut short: a partial rewrite leaves the
   // remaining picks on their previous text, which is a strictly better state
   // than throwing away the explanations already paid for.
-  await storeExplanations(runId, explanations)
+  await storeExplanations(runId, userId, explanations)
   return explanations.length
 }
 
@@ -579,7 +579,7 @@ async function refreshSeriesRun(
   const explanations = await generateSeriesExplanations(runId, userId, seriesList, shouldCancel, {
     reuse: false,
   })
-  await storeSeriesExplanations(runId, explanations)
+  await storeSeriesExplanations(runId, userId, explanations)
   return explanations.length
 }
 

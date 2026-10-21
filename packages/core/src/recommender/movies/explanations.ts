@@ -46,12 +46,15 @@ import {
 } from '../../analysis/grounding.js'
 import {
   explanationFingerprint,
-  splitReusable,
-  type StoredExplanation,
+  numberBlocks,
+  readBatchAnswers,
+  templateAnswers,
+  type PreparedPick,
+  type WrittenExplanation,
 } from '../shared/explanationReuse.js'
 import {
+  explainWithReuse,
   explanationWriterKey,
-  loadStoredExplanations,
   rememberExplanations,
   type ExplanationReuseOptions,
 } from '../explanationCache.js'
@@ -415,76 +418,33 @@ export async function generateExplanations(
   const system = buildMovieSystemPrompt(aiLocale)
   const userContext = buildMovieUserContext(tasteContext)
   const writer = await explanationWriterKey()
-  const prepared: PreparedMovie[] = moviesWithEvidence.map((movie) => {
-    const block = renderMovieBlock(movie, titleContext)
+  const prepared: PreparedMovie[] = moviesWithEvidence.map((item) => {
+    const block = renderMovieBlock(item, titleContext)
     return {
-      movie,
+      item,
+      id: item.movieId,
       block,
       fingerprint: explanationFingerprint({ writer, system, userContext, pick: block }),
     }
   })
 
-  const stored = options.reuse
-    ? await loadStoredExplanations(userId, 'movie', movieIds)
-    : new Map<string, StoredExplanation>()
-  const { reused, toWrite } = splitReusable(
-    prepared,
-    (p) => p.movie.movieId,
-    (p) => p.fingerprint,
-    stored
-  )
-  const written = new Map<string, ExplanationResult>()
-  for (const { pick, explanation } of reused) {
-    written.set(pick.movie.movieId, {
-      movieId: pick.movie.movieId,
-      explanation,
-      fingerprint: pick.fingerprint,
-    })
-  }
-  if (options.reuse) {
-    logger.info(
-      { runId, reused: reused.length, toWrite: toWrite.length },
-      '♻️ Reusing explanations whose inputs are unchanged'
-    )
-  }
-
   // Generate explanations in batches - size depends on provider context window
   const { batchSize, maxTokens } = await getExplanationBatchSize()
-  if (toWrite.length > 0) {
-    logger.info({ batchSize, maxTokens }, 'Using explanation batch settings based on provider')
-  }
-
-  for (let i = 0; i < toWrite.length; i += batchSize) {
-    if (shouldCancel?.()) {
-      logger.info(
-        { generated: written.size, expected: prepared.length },
-        '🛑 Explanation generation cancelled between batches'
-      )
-      break
-    }
-    const batch = toWrite.slice(i, i + batchSize)
-    const batchResults = await generateBatchExplanations(batch, system, userContext, maxTokens)
-    for (const result of batchResults) written.set(result.movieId, result)
-  }
-
-  // In list order, whichever way each pick got its text.
-  const results = prepared
-    .map((p) => written.get(p.movie.movieId))
-    .filter((r): r is ExplanationResult => r !== undefined)
-
-  logger.info(
-    { generated: results.length - reused.length, reused: reused.length },
-    '✅ AI explanations generated'
-  )
-  return results
+  const results = await explainWithReuse({
+    runId,
+    userId,
+    mediaType: 'movie',
+    prepared,
+    options,
+    batchSize,
+    writeBatch: (batch) => generateBatchExplanations(batch, system, userContext, maxTokens),
+    shouldCancel,
+  })
+  return results.map((r) => ({ movieId: r.id, explanation: r.explanation, fingerprint: r.fingerprint }))
 }
 
 /** One pick ready to send: its rendered block and that block's fingerprint. */
-interface PreparedMovie {
-  movie: MovieWithEvidence
-  block: string
-  fingerprint: string
-}
+type PreparedMovie = PreparedPick<MovieWithEvidence>
 
 function buildMovieUserContext(tasteContext: UserTasteContext): string {
   const userContextLines = [
@@ -585,9 +545,9 @@ async function generateBatchExplanations(
   system: string,
   userContext: string,
   maxOutputTokens: number = 3000
-): Promise<ExplanationResult[]> {
-  const movies = batch.map((p) => p.movie)
-  const movieList = batch.map((p, i) => `${i + 1}. ${p.block}`).join('\n\n')
+): Promise<WrittenExplanation[]> {
+  const movies = batch.map((p) => p.item)
+  const movieList = numberBlocks(batch)
 
   try {
     const model = await getTextGenerationModelInstance()
@@ -647,12 +607,7 @@ Generate personalized explanations referencing the specific similar movies shown
     // template, so a partial response costs only the items it left out. Only
     // the model's own text carries a fingerprint, so a template is never
     // remembered and handed back on the next run.
-    return batch.map((p, i) => {
-      const written = byIndex.get(i + 1)
-      return written !== undefined
-        ? { movieId: p.movie.movieId, explanation: written, fingerprint: p.fingerprint }
-        : { movieId: p.movie.movieId, explanation: generateFallbackExplanation(p.movie) }
-    })
+    return readBatchAnswers(batch, byIndex, generateFallbackExplanation)
   } catch (error) {
     // Extract meaningful error information - AI SDK errors don't serialize well
     const errorInfo = {
@@ -661,10 +616,7 @@ Generate personalized explanations referencing the specific similar movies shown
       cause: error instanceof Error && error.cause ? String(error.cause) : undefined,
     }
     logger.error({ error: errorInfo }, 'Failed to generate explanations')
-    return movies.map((m) => ({
-      movieId: m.movieId,
-      explanation: generateFallbackExplanation(m),
-    }))
+    return templateAnswers(batch, generateFallbackExplanation)
   }
 }
 
@@ -728,6 +680,7 @@ function generateFallbackExplanation(movie: MovieWithEvidence): string {
  */
 export async function storeExplanations(
   runId: string,
+  userId: string,
   explanations: ExplanationResult[]
 ): Promise<void> {
   if (explanations.length === 0) return
@@ -742,13 +695,10 @@ export async function storeExplanations(
   )
 
   await rememberExplanations(
+    userId,
     runId,
     'movie',
-    explanations.flatMap((e) =>
-      e.fingerprint
-        ? [{ itemId: e.movieId, fingerprint: e.fingerprint, explanation: e.explanation }]
-        : []
-    )
+    explanations.map((e) => ({ id: e.movieId, explanation: e.explanation, fingerprint: e.fingerprint }))
   )
 
   logger.info({ runId, count: explanations.length }, 'Stored AI explanations')

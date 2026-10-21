@@ -2,8 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   explanationFingerprint,
+  explanationTally,
+  numberBlocks,
+  readBatchAnswers,
   splitReusable,
+  templateAnswers,
   type ExplanationInputs,
+  type PreparedPick,
   type StoredExplanation,
 } from './explanationReuse.js'
 
@@ -93,4 +98,43 @@ test('the split keeps list order on both sides', () => {
     toWrite.map((p) => p.id),
     ['a', 'c']
   )
+})
+
+const prepared = (id: string): PreparedPick<string> => ({
+  item: id,
+  id,
+  block: `"${id}" (2001)`,
+  fingerprint: `fp-${id}`,
+})
+
+test('the batch number is added around the block, never inside it', () => {
+  const batch = [prepared('a'), prepared('b')]
+  assert.equal(numberBlocks(batch), '1. "a" (2001)\n\n2. "b" (2001)')
+  // The same pick in another position keeps the same block, so it hashes alike.
+  assert.equal(numberBlocks([prepared('b')]), '1. "b" (2001)')
+  for (const p of batch) assert.doesNotMatch(p.block, /^\d+\. /)
+})
+
+test('model text carries the fingerprint; a template never does', () => {
+  const batch = [prepared('a'), prepared('b')]
+  const answers = readBatchAnswers(batch, new Map([[1, 'Because of Heat.']]), (id) => `template ${id}`)
+  assert.deepEqual(answers, [
+    { id: 'a', explanation: 'Because of Heat.', fingerprint: 'fp-a' },
+    { id: 'b', explanation: 'template b' },
+  ])
+  for (const r of templateAnswers(batch, (id) => `template ${id}`)) {
+    assert.equal(r.fingerprint, undefined, 'a failed batch must not be remembered')
+  }
+})
+
+test('the tally separates reused, written and template text', () => {
+  const tally = explanationTally(
+    [
+      { id: 'a', explanation: 'Reused.', fingerprint: 'fa' },
+      { id: 'b', explanation: 'Written.', fingerprint: 'fb' },
+      { id: 'c', explanation: 'Template.' },
+    ],
+    new Set(['a'])
+  )
+  assert.deepEqual(tally, { reused: 1, written: 1, templates: 1 })
 })

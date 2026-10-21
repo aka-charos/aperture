@@ -27,6 +27,12 @@ Explanations are generated in batches of 10 during `generate-movie/series-recomm
 - **Changes apply from the next run onward** — the UI says so, and it means it
 - **Turning the setting back on does not backfill** — runs generated while explanations were off keep empty explanation fields forever; use the manual **`refresh-recommendation-explanations`** job (cancellable) to write them for the newest completed run without re-scoring
 
+## When an Explanation Is Written Again
+
+A regeneration usually lands on most of the picks it had before, so Aperture keeps each pick's last explanation and reuses it when everything the model was shown for that pick is unchanged: the pick's own details and evidence titles, the viewer's taste profile and favourites, the AI language, and the Text Generation model, endpoint and reasoning setting. Anything that changes one of those writes the explanation again. This applies to the scheduled run, a viewer's **Regenerate**, and both full-reset jobs.
+
+To rewrite explanations anyway, run **`refresh-recommendation-explanations`**, or use **Rewrite** on a single pick's explanation. Neither reuses anything, and what they write becomes the text later runs keep.
+
 ## Checking What They Say
 
 An explanation is written from the pick's own data and the titles in the user's history closest to it. When a [decision model](decision-model.md) is configured, it decides whether those titles are presented as the reason or only as context, and the writer is told which. The same card can check the finished explanations for unsupported claims, invented facts and spoilers (`check-recommendation-explanations`); that check changes nothing viewers see.

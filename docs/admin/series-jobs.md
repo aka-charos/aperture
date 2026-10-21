@@ -23,7 +23,7 @@ Jobs are **not chained** — the staggering is for load-spreading, not sequencin
 
 ## Full Reset
 
-`full-reset-series-recommendations` deletes **all** series recommendations and rebuilds from scratch — **manual-only**, with a warning dialog before it runs. It re-scores everything (minutes of model calls); reserve it for embedding-model or algorithm changes, and prefer per-user regeneration otherwise.
+`full-reset-series-recommendations` deletes **all** series recommendations and rebuilds from scratch — **manual-only**, with a warning dialog before it runs. It re-scores everything (minutes of model calls); reserve it for embedding-model or algorithm changes, and prefer per-user regeneration otherwise. Explanations are the exception: one whose inputs are unchanged (the same pick, evidence, taste profile, language and Text Generation model) is kept rather than written again — see [AI explanations](ai-explanations.md#when-an-explanation-is-written-again).
 
 ## Episode Embeddings
 

@@ -53,6 +53,80 @@ export function explanationFingerprint(inputs: ExplanationInputs): string {
   return hash.digest('hex')
 }
 
+/** One pick ready to explain: its rendered block and that block's fingerprint. */
+export interface PreparedPick<T> {
+  item: T
+  id: string
+  /** The pick's block WITHOUT its batch number; see numberBlocks. */
+  block: string
+  fingerprint: string
+}
+
+/**
+ * An explanation and where it came from. `fingerprint` is set only on text a
+ * model wrote (now or on an earlier run); a template written after a failed call
+ * carries none, which is what keeps it from ever being remembered and reused.
+ */
+export interface WrittenExplanation {
+  id: string
+  explanation: string
+  fingerprint?: string
+}
+
+/**
+ * A batch's pick list as the prompt shows it. The number is added here and
+ * never inside a block, so a pick hashes alike whichever batch it lands in.
+ */
+export function numberBlocks(batch: readonly PreparedPick<unknown>[]): string {
+  return batch.map((p, i) => `${i + 1}. ${p.block}`).join('\n\n')
+}
+
+/**
+ * Read a batch's answers back onto its picks. The model numbers them from 1,
+ * as the prompt does; a pick it left out gets the template, without a
+ * fingerprint.
+ */
+export function readBatchAnswers<T>(
+  batch: readonly PreparedPick<T>[],
+  byIndex: ReadonlyMap<number, string>,
+  fallback: (item: T) => string
+): WrittenExplanation[] {
+  return batch.map((p, i) => {
+    const written = byIndex.get(i + 1)
+    return written !== undefined
+      ? { id: p.id, explanation: written, fingerprint: p.fingerprint }
+      : { id: p.id, explanation: fallback(p.item) }
+  })
+}
+
+/** Every pick of a failed batch gets the template, without a fingerprint. */
+export function templateAnswers<T>(
+  batch: readonly PreparedPick<T>[],
+  fallback: (item: T) => string
+): WrittenExplanation[] {
+  return batch.map((p) => ({ id: p.id, explanation: fallback(p.item) }))
+}
+
+/**
+ * How a run's explanations were produced, for the job log: reused, written by
+ * the model now, or the template. Counting templates as written is what made a
+ * failed run read as a paid one.
+ */
+export function explanationTally(
+  results: readonly WrittenExplanation[],
+  reusedIds: ReadonlySet<string>
+): { reused: number; written: number; templates: number } {
+  let reused = 0
+  let written = 0
+  let templates = 0
+  for (const r of results) {
+    if (reusedIds.has(r.id)) reused++
+    else if (r.fingerprint) written++
+    else templates++
+  }
+  return { reused, written, templates }
+}
+
 /** A stored explanation and the fingerprint it was written under. */
 export interface StoredExplanation {
   fingerprint: string

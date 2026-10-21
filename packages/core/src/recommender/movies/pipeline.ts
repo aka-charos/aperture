@@ -1049,7 +1049,7 @@ export async function generateRecommendationsForUser(
           options.shouldCancel,
           { reuse: true }
         )
-        await storeExplanations(runId, explanations)
+        await storeExplanations(runId, user.id, explanations)
         logger.info({ runId, count: explanations.length }, '✅ AI explanations stored')
       } catch (explanationError) {
         // Don't fail the whole run if explanations fail

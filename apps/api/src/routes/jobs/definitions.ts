@@ -40,7 +40,8 @@ export const jobDefinitions: JobDefinition[] = [
   },
   {
     name: 'full-reset-movie-recommendations',
-    description: 'Deletes ALL movie recommendations, then rebuilds from scratch. Use after major algorithm or embedding model changes.',
+    description:
+      'Deletes ALL movie recommendations, then rebuilds from scratch. Use after major algorithm or embedding model changes. An explanation whose inputs are unchanged is kept rather than written again; to rewrite them all, run Refresh Recommendation Explanations.',
     cron: null,
     manualOnly: true,
   },
@@ -73,7 +74,8 @@ export const jobDefinitions: JobDefinition[] = [
   },
   {
     name: 'full-reset-series-recommendations',
-    description: 'Deletes ALL series recommendations, then rebuilds from scratch. Use after major algorithm or embedding model changes.',
+    description:
+      'Deletes ALL series recommendations, then rebuilds from scratch. Use after major algorithm or embedding model changes. An explanation whose inputs are unchanged is kept rather than written again; to rewrite them all, run Refresh Recommendation Explanations.',
     cron: null,
     manualOnly: true,
   },
@@ -87,7 +89,7 @@ export const jobDefinitions: JobDefinition[] = [
   {
     name: 'refresh-recommendation-explanations',
     description:
-      "Rewrites the AI explanation on everyone's current recommendations without re-scoring anything. Use after changing the Text Generation model, or to repair explanations that fell back to generic text.",
+      "Rewrites the AI explanation on everyone's current recommendations without re-scoring anything. Use after changing the Text Generation model, to repair explanations that fell back to generic text, or to rewrite ones a regeneration kept because nothing they were written from had changed.",
     cron: null,
     manualOnly: true,
   },

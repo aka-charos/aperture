@@ -23,7 +23,7 @@ Jobs are **not chained** — schedules overlap deliberately and each job claims 
 
 ## Full Reset
 
-`full-reset-movie-recommendations` deletes **all** movie recommendations and rebuilds from scratch. It is **manual-only** and shows a warning dialog before running — it discards the current run's candidates and evidence and re-scores everything, which is minutes of paid model calls. Use it after meaningful changes (embedding model, algorithm weights, taste-profile rebuild), not on a schedule.
+`full-reset-movie-recommendations` deletes **all** movie recommendations and rebuilds from scratch. It is **manual-only** and shows a warning dialog before running — it discards the current run's candidates and evidence and re-scores everything, which is minutes of paid model calls. Use it after meaningful changes (embedding model, algorithm weights, taste-profile rebuild), not on a schedule. Explanations are the exception: one whose inputs are unchanged (the same pick, evidence, taste profile, language and Text Generation model) is kept rather than written again — see [AI explanations](ai-explanations.md#when-an-explanation-is-written-again).
 
 ## Reading the Results
 
