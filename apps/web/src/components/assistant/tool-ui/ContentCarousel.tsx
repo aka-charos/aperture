@@ -44,8 +44,9 @@ const favoriteKey = (item: Pick<ContentItem, 'id' | 'type'>) => `${item.type}:${
 
 /**
  * Narrowest a rich card may get before the grid drops a column. The card spends
- * a fixed 84px on its poster rail, so below this the text column is too narrow
- * for the reason to read as a sentence.
+ * a fixed 100px on its poster, and the title, director and synopsis share the
+ * column beside it; at 380px that column is about 240px, below which titles
+ * wrap to two lines so often that the synopsis beside the poster all but goes.
  */
 const LIST_CARD_MIN_WIDTH = 380
 
