@@ -45,6 +45,7 @@ export const ROUTE_DOCS: readonly RouteDocs[] = [
   // No hint: Explore fills the viewport, and a line above it would push the graph off the bottom.
   { path: '/explore', docs: ['explore'], tour: 'explore' },
   { path: '/trails', docs: ['trails'] },
+  { path: '/next', docs: ['next-from-here'] },
   { path: '/discovery', docs: ['discovery'], hint: 'discovery' },
   { path: '/my-requests', docs: ['my-requests'] },
   { path: '/history', docs: ['watch-history'] },

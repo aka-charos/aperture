@@ -2078,3 +2078,17 @@ export {
   type LinkRole as TrailLinkRole,
   type TitleRef as TrailTitleRef,
 } from './trails/index.js'
+
+// Next from here (./nextFromHere): what to watch after a title, from how
+// close it feels (embedding neighbours) and who made it (the Trails credits),
+// with credits weighed by the viewer's own record rather than by rarity.
+export {
+  getNextFromHere,
+  NEXT_CLOSE_ITEMS,
+  NEXT_DIFFERENT_ITEMS,
+  NEXT_STARTS_OFFERED,
+  type NextFromHere,
+  type NextItem,
+  type NextReason,
+  type NextQuadrant,
+} from './nextFromHere/index.js'

@@ -41,6 +41,7 @@ import { PersonDetailPage } from './pages/PersonDetail'
 import { StudioDetailPage } from './pages/StudioDetail'
 import { ExplorePage } from './pages/explore'
 import { TrailsPage } from './pages/trails'
+import { NextFromHerePage } from './pages/next'
 import { AssistantPage } from './pages/assistant'
 import { DiscoveryPage } from './pages/discovery'
 import { MyRequestsPage } from './pages/MyRequests'
@@ -213,6 +214,7 @@ function AppRoutes() {
         <Route path="collections" element={<CollectionsPage />} />
         <Route path="explore" element={<ExplorePage />} />
         <Route path="trails" element={<TrailsPage />} />
+        <Route path="next" element={<NextFromHerePage />} />
         <Route path="discovery" element={<DiscoveryPage />} />
         <Route path="my-requests" element={<MyRequestsPage />} />
         <Route path="browse" element={<BrowsePage />} />

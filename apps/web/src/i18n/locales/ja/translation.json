@@ -53,7 +53,8 @@
     "sharedWithMeBadge_other": "新着 {{count}} 件",
     "watchThis": "これ見て",
     "userMenu": "Account menu",
-    "trails": "Trails"
+    "trails": "Trails",
+    "nextFromHere": "Next from here"
   },
   "admin": {
     "title": "管理",
@@ -6750,6 +6751,52 @@
       "showFewer": "Show fewer",
       "loadFailed": "Couldn't load the whole list. Try again.",
       "nothingLeft": "Nothing more to show on this thread with your filters."
+    }
+  },
+  "next": {
+    "title": "Next from here",
+    "description": "What to watch after a title: what feels closest to it, and what its people made that feels different, each with the reasons it is here.",
+    "after": "After",
+    "picker": {
+      "label": "Start from",
+      "recent": "Recently watched:"
+    },
+    "sections": {
+      "close": {
+        "title": "Close in feel",
+        "description": "The titles nearest this one in tone and subject, among those you haven't seen."
+      },
+      "different": {
+        "title": "Same people, a different feel",
+        "description": "Made by people from this one, but unlike it: what closeness alone would never suggest."
+      }
+    },
+    "reason": {
+      "sharedSame": "{{role}} of both: {{name}}",
+      "sharedDiffers": "{{name}}: {{there}} on {{start}}, {{here}} here",
+      "franchise": "Same franchise: {{name}}",
+      "favouriteRated_one": "{{role}}: {{name}}. You liked {{count}} of their titles, and your ratings of them average {{average}}",
+      "favouriteRated_other": "{{role}}: {{name}}. You liked {{count}} of their titles, and your ratings of them average {{average}}",
+      "favourite_one": "{{role}}: {{name}}. You finished and liked {{count}} of their titles",
+      "favourite_other": "{{role}}: {{name}}. You finished and liked {{count}} of their titles",
+      "companyMovies": "{{name}}: you finish {{ratio}}× as many of its films as your library would suggest ({{count}} so far)",
+      "companySeries": "{{name}}: you finish {{ratio}}× as many of its shows as your library would suggest ({{count}} so far)",
+      "feelClosestMovie": "The closest film in feel to {{start}} in your library",
+      "feelClosestSeries": "The closest show in feel to {{start}} in your library",
+      "feelMovie": "Among the films closest in feel to {{start}} (#{{rank}})",
+      "feelSeries": "Among the shows closest in feel to {{start}} (#{{rank}})"
+    },
+    "actions": {
+      "from": "Next from {{title}}",
+      "retry": "Try again"
+    },
+    "errors": {
+      "load": "Couldn't load suggestions. Try again.",
+      "notFound": "That title isn't in your library."
+    },
+    "empty": {
+      "noStart": "Pick a title to start from. Once you've finished something, your latest is chosen for you.",
+      "nothing": "Nothing new to suggest after {{title}}: you've seen everything close to it."
     }
   }
 }

@@ -134,7 +134,7 @@ async function buildView(index: TrailIndex, scope: LibraryScope): Promise<TrailV
   return createView(index, allowed)
 }
 
-async function viewFor(scope: LibraryScope, forceRebuild = false): Promise<TrailView> {
+export async function viewFor(scope: LibraryScope, forceRebuild = false): Promise<TrailView> {
   const current = await currentIndex(forceRebuild)
   const key = scopeKey(scope)
   let view = current.views.get(key)
@@ -170,7 +170,10 @@ async function anyTitleExists(refs: readonly TitleRef[]): Promise<boolean> {
  * has it the index is rebuilt early (at most every few minutes) before giving
  * up on it.
  */
-async function resolve(scope: LibraryScope, refs: readonly TitleRef[]): Promise<{ view: TrailView; titles: (number | null)[] }> {
+export async function resolve(
+  scope: LibraryScope,
+  refs: readonly TitleRef[]
+): Promise<{ view: TrailView; titles: (number | null)[] }> {
   let view = await viewFor(scope)
   const unknown = refs.filter((ref) => !view.index.byRef.has(formatTitleRef(ref)))
   if (
@@ -250,7 +253,7 @@ export interface TrailFilter {
   kinds?: readonly EntityKind[] | null
 }
 
-function titleView(title: IndexedTitle): TrailTitle {
+export function titleView(title: IndexedTitle): TrailTitle {
   return {
     ref: formatTitleRef(title),
     type: title.type,
@@ -261,7 +264,7 @@ function titleView(title: IndexedTitle): TrailTitle {
   }
 }
 
-function entityView(view: TrailView, entity: number): TrailEntity {
+export function entityView(view: TrailView, entity: number): TrailEntity {
   const record = view.index.entities[entity]
   return {
     key: record.key,
