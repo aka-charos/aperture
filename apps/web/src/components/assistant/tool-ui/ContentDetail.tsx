@@ -13,7 +13,6 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
-import { gradients } from '@/theme'
 import { chatText } from '../density'
 import type { ContentDetailData } from './types'
 import { genreLabel } from '@/lib/genreLabel'
@@ -235,7 +234,7 @@ export function ContentDetail({ data }: ContentDetailProps) {
                 startIcon={<PlayArrowIcon />}
                 onClick={handlePlay}
                 sx={{
-                  background: gradients.primaryToSecondary,
+                  background: theme.palette.gradient.primaryToSecondary,
                   '&:hover': {
                     background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
                   },

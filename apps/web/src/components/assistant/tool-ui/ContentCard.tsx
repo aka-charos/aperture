@@ -48,7 +48,6 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { RankBadge, WatchedBadge, getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
-import { gradients } from '@/theme'
 import { COMPACT_THREAD, chatText } from '../density'
 import type { ContentItem } from './types'
 
@@ -538,7 +537,7 @@ export function ContentCard({
                 px: 1,
                 py: 0.25,
                 fontSize: chatText(11),
-                background: gradients.primaryToSecondary,
+                background: theme.palette.gradient.primaryToSecondary,
                 '&:hover': {
                   background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
                 },

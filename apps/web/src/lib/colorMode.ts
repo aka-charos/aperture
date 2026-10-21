@@ -51,7 +51,7 @@ function applyToDocument() {
   document.documentElement.style.colorScheme = shown
   document.documentElement.dataset.colorMode = shown
   const meta = document.querySelector('meta[name="theme-color"]')
-  meta?.setAttribute('content', shown === 'light' ? '#ffffff' : '#0f0f0f')
+  meta?.setAttribute('content', shown === 'light' ? '#fbf6f1' : '#0f0f0f')
 }
 applyToDocument()
 

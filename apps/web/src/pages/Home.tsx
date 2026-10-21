@@ -29,7 +29,6 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import Markdown from 'react-markdown'
 import { MoviePoster } from '@aperture/ui'
 import { useAuth } from '@/hooks/useAuth'
-import { gradients } from '@/theme'
 
 interface Recommendation {
   movie_id: string
@@ -447,7 +446,7 @@ export function HomePage() {
                           width: 48,
                           height: 48,
                           borderRadius: 2,
-                          background: gradients.primaryToSecondary,
+                          background: theme.palette.gradient.primaryToSecondary,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',

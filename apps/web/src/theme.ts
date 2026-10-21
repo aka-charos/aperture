@@ -1,4 +1,4 @@
-import { createTheme, alpha, type Theme, type ThemeOptions, type Shadows } from '@mui/material/styles'
+import { createTheme, alpha, lighten, darken, type Theme, type ThemeOptions, type Shadows } from '@mui/material/styles'
 
 /** The two appearances. Dark is the original; light is the calm, bordered one. */
 export type ColorMode = 'light' | 'dark'
@@ -33,6 +33,8 @@ export interface SurfaceTokens {
   fill: string
   /** A deeper fill behind posters while they load. */
   fillDeep: string
+  /** The gradient shown where a hero has no image. */
+  placeholder: string
 }
 
 /** The main sidebar's selected entry. */
@@ -49,29 +51,53 @@ export interface MediaTypeTokens {
   series: string
 }
 
+/** Brand gradients on avatars, badges and CTAs, built from that mode's primary and secondary. */
+export interface GradientTokens {
+  primaryToSecondary: string
+  primary: string
+  secondary: string
+}
+
 declare module '@mui/material/styles' {
   interface Palette {
     surface: SurfaceTokens
     nav: NavTokens
     mediaType: MediaTypeTokens
+    gradient: GradientTokens
   }
   interface PaletteOptions {
     surface?: SurfaceTokens
     nav?: NavTokens
     mediaType?: MediaTypeTokens
+    gradient?: GradientTokens
+  }
+  // The monospace face. An sx `fontFamily: 'monospace'` (or `fontFamily="monospace"`)
+  // is looked up on the typography as `monospace` and then `fontFamilyMonospace`,
+  // so every existing use resolves to this without being touched.
+  interface TypographyVariants {
+    fontFamilyMonospace: string
+  }
+  interface TypographyVariantsOptions {
+    fontFamilyMonospace?: string
   }
 }
 
 /**
+ * IBM Plex Mono: button labels, IDs, keys, code and logs, in both modes. Loaded
+ * from Google Fonts in index.html beside Inter.
+ */
+export const MONO_FONT = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+
+/**
  * Single source of truth for the app's brand colors. `buildThemeOptions()` below is
  * built from this, and any module that can't call `useTheme()` (plain constants files,
- * non-component code) can import `palette`/`gradients` directly instead of retyping a
+ * non-component code) can import `palette` directly instead of retyping a
  * hex value — so a future recolor only means editing this file.
  *
  * `primary`/`secondary` are admin-configurable (Settings → System → Appearance) and
  * mutated in place by `applyThemeColorOverrides` below, so this object is intentionally
  * NOT `as const`/frozen — every reader (this module's own `buildThemeOptions`, and the
- * handful of files that import `palette`/`gradients` directly) reads live values.
+ * handful of files that import `palette` directly) reads live values.
  *
  * Everything apart from the two brand colours is the DARK mode's. A direct reader
  * gets dark values whatever the mode, which is right only for surfaces that are a
@@ -130,105 +156,159 @@ export const palette = {
   },
 }
 
-/** Brand gradients repeated across cards/badges/avatars/CTAs. Recomputed whenever the palette changes. */
-export const gradients = {
-  primaryToSecondary: '',
-  primary: '',
-  secondary: '',
+/**
+ * The light mode: warm and restrained. Ink is the primary colour, one accent
+ * (the secondary) carries emphasis, status keeps its meaning, and an admin's
+ * own brand colour replaces ink and accent when one is set. Depth comes from
+ * borders and the canvas-against-sheet contrast rather than from shadows.
+ * Every neutral comes from ONE scheme object, so nothing else in the light
+ * mode names a colour of its own.
+ */
+interface LightScheme {
+  /** Text, the primary colour and the selected-page pill. */
+  ink: string
+  /** The pill and filled toggles under the pointer. */
+  inkHover: string
+  /** Secondary text. */
+  muted: string
+  /** Behind everything. */
+  canvas: string
+  /** Cards, panels, the sidebar and the app bar. */
+  sheet: string
+  /** Inputs and cards sitting inside a panel. */
+  raised: string
+  /** A row or card under the pointer. */
+  raisedHover: string
+  /** Dividers and card outlines. */
+  border: string
+  /** Input and outlined-control outlines. */
+  borderStrong: string
+  tableHead: string
+  /** Progress-bar tracks, an empty thumbnail. */
+  fill: string
+  /** Behind posters while they load. */
+  fillDeep: string
+  scrollbar: string
+  /** The accent: the secondary colour when no brand colour is set. */
+  secondary: string
+  /** Information, and the series label: the one cool note in a warm scheme. */
+  info: string
+  /** The two ends of the gradient shown where a hero has no image. */
+  placeholder: [string, string]
 }
-
-function recomputeGradients(): void {
-  gradients.primaryToSecondary = `linear-gradient(135deg, ${palette.primary.main} 0%, ${palette.secondary.main} 100%)`
-  gradients.primary = `linear-gradient(135deg, ${palette.primary.main} 0%, ${palette.primary.dark} 100%)`
-  gradients.secondary = `linear-gradient(135deg, ${palette.secondary.main} 0%, ${palette.secondary.dark} 100%)`
-}
-recomputeGradients()
 
 /**
- * The light mode. A soft-gray canvas, white working surfaces, a near-black ink
- * with a faint warm tint, thin neutral borders, and colour kept for meaning
- * (status, the brand's own accents) rather than decoration. Depth comes from
- * borders and the canvas-vs-surface contrast, not from shadows.
- *
- * The status colours are darker than the dark mode's, because they are also
- * used as TEXT, and the dark mode's bright green and amber are under 3:1 on white.
+ * Rosewood, after a rosewood-and-sand moodboard: espresso ink on sand and
+ * blush, paper-white sheets, a burnt-orange accent and slate teal for
+ * information.
  */
-const INK = '#221b1f'
-const lightPalette = {
-  background: {
-    default: '#f4f5f6',
-    paper: '#ffffff',
-  },
-  text: {
-    primary: INK,
-    secondary: '#5f585c',
-    disabled: alpha(INK, 0.38),
-  },
-  divider: '#d9dcdf',
-  action: {
-    active: alpha(INK, 0.6),
-    hover: alpha(INK, 0.045),
-    selected: alpha(INK, 0.08),
-    focus: alpha(INK, 0.12),
-    disabled: alpha(INK, 0.3),
-    disabledBackground: alpha(INK, 0.08),
-  },
-  error: {
-    main: '#d23a3a',
-    light: '#e06464',
-    dark: '#b02a2a',
-  },
-  warning: {
-    main: '#a86708',
-    light: '#c98a1f',
-    dark: '#8a5306',
-  },
-  success: {
-    main: '#1b7e44',
-    light: '#2e9d5a',
-    dark: '#156436',
-  },
-  info: {
-    main: '#2563eb',
-    light: '#3b82f6',
-    dark: '#1d4ed8',
-  },
+const LIGHT_SCHEME: LightScheme = {
+  ink: '#2a1c16',
+  inkHover: '#45312a',
+  muted: '#6a574d',
+  canvas: '#ecdfd3',
+  sheet: '#fbf6f1',
+  raised: '#ffffff',
+  raisedHover: '#f6ede5',
+  border: '#e0cfc0',
+  borderStrong: '#c6ad98',
+  tableHead: '#f6ece3',
+  fill: '#e4d3c4',
+  fillDeep: '#eadcd0',
+  scrollbar: '#cbb29d',
+  secondary: '#a9541f',
+  info: '#4f6164',
+  placeholder: ['#e6d2c1', '#d2b59d'],
 }
 
-const SURFACES: Record<ColorMode, SurfaceTokens> = {
-  dark: {
-    raised: '#212121',
-    raisedHover: '#252525',
-    glass: 'rgba(26, 26, 26, 0.7)',
-    glassStrong: 'rgba(15, 15, 15, 0.95)',
-    panel: 'rgba(15, 15, 15, 0.5)',
-    hairline: 'rgba(255, 255, 255, 0.1)',
-    subtleBorder: '#3a3a3a',
-    heroFade: '#121212',
-    heroTextShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)',
-    fill: '#424242',
-    fillDeep: '#212121',
-  },
-  light: {
-    raised: '#ffffff',
-    raisedHover: '#f9fafb',
-    glass: 'rgba(255, 255, 255, 0.86)',
+/**
+ * The status colours: muted and darker than the dark mode's, because they are
+ * also used as TEXT, and the dark mode's bright green and amber are under 3:1
+ * on a light surface. Shared by every scheme.
+ */
+const LIGHT_STATUS = {
+  error: { main: '#b8383a', light: '#cf5f61', dark: '#952a2c' },
+  warning: { main: '#8a5a12', light: '#a8772e', dark: '#6e470c' },
+  success: { main: '#2f6b47', light: '#4c8762', dark: '#225236' },
+}
+
+function lightPaletteFor(s: LightScheme) {
+  return {
+    background: { default: s.canvas, paper: s.sheet },
+    text: { primary: s.ink, secondary: s.muted, disabled: alpha(s.ink, 0.4) },
+    divider: s.border,
+    action: {
+      active: alpha(s.ink, 0.62),
+      hover: alpha(s.ink, 0.05),
+      selected: alpha(s.ink, 0.08),
+      focus: alpha(s.ink, 0.12),
+      disabled: alpha(s.ink, 0.32),
+      disabledBackground: alpha(s.ink, 0.08),
+    },
+    ...LIGHT_STATUS,
+    info: { main: s.info, light: lighten(s.info, 0.25), dark: darken(s.info, 0.25) },
+  }
+}
+
+/**
+ * The light mode's brand colours: monochrome unless an admin has set their
+ * own, in which case that colour is the operator's decision and wins.
+ */
+function lightBrand(s: LightScheme) {
+  const ink = { main: s.ink, light: lighten(s.ink, 0.3), dark: darken(s.ink, 0.3), contrastText: '#ffffff' }
+  const gray = { main: s.secondary, light: lighten(s.secondary, 0.25), dark: darken(s.secondary, 0.25), contrastText: '#ffffff' }
+  return {
+    primary: palette.primary.main === DEFAULT_PRIMARY.main ? ink : { ...palette.primary },
+    secondary: palette.secondary.main === DEFAULT_SECONDARY.main ? gray : { ...palette.secondary },
+  }
+}
+
+/** The brand gradients for one mode's primary and secondary. */
+function gradientTokens(primary: { main: string; dark: string }, secondary: { main: string; dark: string }): GradientTokens {
+  return {
+    primaryToSecondary: `linear-gradient(135deg, ${primary.main} 0%, ${secondary.main} 100%)`,
+    primary: `linear-gradient(135deg, ${primary.main} 0%, ${primary.dark} 100%)`,
+    secondary: `linear-gradient(135deg, ${secondary.main} 0%, ${secondary.dark} 100%)`,
+  }
+}
+
+const DARK_SURFACES: SurfaceTokens = {
+  raised: '#212121',
+  raisedHover: '#252525',
+  glass: 'rgba(26, 26, 26, 0.7)',
+  glassStrong: 'rgba(15, 15, 15, 0.95)',
+  panel: 'rgba(15, 15, 15, 0.5)',
+  hairline: 'rgba(255, 255, 255, 0.1)',
+  subtleBorder: '#3a3a3a',
+  heroFade: '#121212',
+  heroTextShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)',
+  fill: '#424242',
+  fillDeep: '#212121',
+  placeholder: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+}
+
+function lightSurfaces(s: LightScheme): SurfaceTokens {
+  return {
+    raised: s.raised,
+    raisedHover: s.raisedHover,
+    glass: alpha(s.sheet, 0.88),
     // The canvas colour exactly: a title page opened in a dialog fades its
     // backdrop into heroFade, and any other tone here leaves a band.
-    glassStrong: lightPalette.background.default,
-    panel: 'rgba(255, 255, 255, 0.78)',
-    hairline: alpha(INK, 0.1),
-    subtleBorder: '#d3d6d9',
-    heroFade: lightPalette.background.default,
-    heroTextShadow: '0 1px 2px rgba(255, 255, 255, 0.7)',
-    fill: '#e3e5e8',
-    fillDeep: '#eceef0',
-  },
+    glassStrong: s.canvas,
+    panel: alpha(s.sheet, 0.8),
+    hairline: alpha(s.ink, 0.1),
+    subtleBorder: s.borderStrong,
+    heroFade: s.canvas,
+    heroTextShadow: `0 1px 2px ${alpha(s.sheet, 0.7)}`,
+    fill: s.fill,
+    fillDeep: s.fillDeep,
+    placeholder: `linear-gradient(135deg, ${s.placeholder[0]} 0%, ${s.placeholder[1]} 100%)`,
+  }
 }
 
-function navTokens(mode: ColorMode): NavTokens {
-  return mode === 'light'
-    ? { selectedBg: INK, selectedHoverBg: '#3a3236', selectedText: '#ffffff', selectedIcon: '#ffffff' }
+function navTokens(mode: ColorMode, s?: LightScheme): NavTokens {
+  return mode === 'light' && s
+    ? { selectedBg: s.ink, selectedHoverBg: s.inkHover, selectedText: '#ffffff', selectedIcon: '#ffffff' }
     : {
         selectedBg: alpha(palette.primary.main, 0.12),
         selectedHoverBg: alpha(palette.primary.main, 0.18),
@@ -240,15 +320,15 @@ function navTokens(mode: ColorMode): NavTokens {
 /**
  * Barely-there lift for the light mode: a hairline shadow at rest, growing only
  * for things that genuinely float (menus at 8, dialogs at 24). MUI's own light
- * shadows read heavy on a gray canvas that already separates every surface.
+ * shadows read heavy on a canvas that already separates every surface.
  */
-function lightShadows(): Shadows {
+function lightShadows(ink: string): Shadows {
   const shadows = ['none']
   for (let i = 1; i <= 24; i++) {
     const y = Math.max(1, Math.round(i * 0.6))
     const blur = Math.round(i * 1.8)
-    const a = Math.min(0.14, 0.03 + i * 0.0045).toFixed(3)
-    shadows.push(`0 1px 2px ${alpha(INK, 0.04)}, 0 ${y}px ${blur}px rgba(34, 27, 31, ${a})`)
+    const a = Math.min(0.14, 0.03 + i * 0.0045)
+    shadows.push(`0 1px 2px ${alpha(ink, 0.04)}, 0 ${y}px ${blur}px ${alpha(ink, a)}`)
   }
   return shadows as Shadows
 }
@@ -270,10 +350,11 @@ function deriveShades(main: string): { main: string; light: string; dark: string
 }
 
 /**
- * Applies admin-selected brand colors on top of the defaults, mutating `palette`/
- * `gradients` in place. Called once from `lib/branding.ts` on load and again after an
- * admin saves — never from component render (mutating shared state there would run
- * twice under StrictMode and race with concurrent rendering).
+ * Applies admin-selected brand colors on top of the defaults, mutating `palette`
+ * in place; the gradients are built from it per mode, on the theme. Called once from
+ * `lib/branding.ts` on load and again after an admin saves — never from component
+ * render (mutating shared state there would run twice under StrictMode and race
+ * with concurrent rendering). In the light mode a set colour replaces the ink.
  *
  * Only `main` is admin-supplied; light/dark/contrastText are derived so the picker
  * only ever needs one value per color.
@@ -293,62 +374,85 @@ export function applyThemeColorOverrides(overrides: ThemeColorOverrides | null |
     palette.secondary,
     secondaryMain === DEFAULT_SECONDARY.main ? DEFAULT_SECONDARY : deriveShades(secondaryMain)
   )
-  recomputeGradients()
 }
 
-function buildThemeOptions(mode: ColorMode): ThemeOptions {
-  return mode === 'light' ? buildLightOptions() : buildDarkOptions()
+function buildThemeOptions(mode: ColorMode, scheme: LightScheme): ThemeOptions {
+  return mode === 'light' ? buildLightOptions(scheme) : buildDarkOptions()
 }
 
+const SANS_FONT = '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+
+/**
+ * One type system for both modes, so switching never reflows a page: Inter for
+ * reading, IBM Plex Mono for button labels, IDs and code. The button size is a
+ * step down from MUI's 14px because a monospace label sets wider than Inter at
+ * the same size.
+ */
 const TYPOGRAPHY: ThemeOptions['typography'] = {
-  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+  fontFamily: SANS_FONT,
+  fontFamilyMonospace: MONO_FONT,
   h1: { fontWeight: 700, fontSize: '2.5rem' },
   h2: { fontWeight: 700, fontSize: '2rem' },
   h3: { fontWeight: 600, fontSize: '1.75rem' },
   h4: { fontWeight: 600, fontSize: '1.5rem' },
   h5: { fontWeight: 600, fontSize: '1.25rem' },
   h6: { fontWeight: 600, fontSize: '1rem' },
-  button: { textTransform: 'none', fontWeight: 500 },
+  button: { fontFamily: MONO_FONT, textTransform: 'none', fontWeight: 500, fontSize: '0.8125rem', letterSpacing: 0 },
 }
+
+/** Code-shaped markup in the monospace face, in both modes. */
+const MONO_ELEMENTS = { 'code, kbd, pre, samp': { fontFamily: MONO_FONT } }
+
+/** Small and large buttons, a step down for the same reason as the medium size. */
+const BUTTON_SIZES = { sizeSmall: { fontSize: '0.75rem' }, sizeLarge: { fontSize: '0.875rem' } }
+
+/**
+ * Tabs read their type from the button variant, so without this every tab bar
+ * would turn monospace. They are navigation, which stays in Inter at its old size.
+ */
+const TAB_TYPE = { fontFamily: SANS_FONT, fontSize: '0.875rem', letterSpacing: '0.02857em' }
 
 /**
  * The light mode's look, after the "calm corporate" reference: crisper 6px
- * corners, every working surface a white sheet with a 1px border on the gray
- * canvas, a solid ink pill for the selected page, gray table headers, and
- * transitions on colour only. Same type scale and spacing as the dark mode, so
- * switching never reflows a page.
+ * corners, every working surface an off-white sheet with a 1px border on a
+ * mid-gray canvas, ink as the primary colour, a solid ink pill for the
+ * selected page, gray table headers, and transitions on colour only.
  */
-function buildLightOptions(): ThemeOptions {
-  const border = lightPalette.divider
-  const softLift = `0 1px 2px ${alpha(INK, 0.05)}`
+function buildLightOptions(s: LightScheme): ThemeOptions {
+  const border = s.border
+  const softLift = `0 1px 2px ${alpha(s.ink, 0.06)}`
+  const brand = lightBrand(s)
+  const lightPalette = lightPaletteFor(s)
   return {
     palette: {
       mode: 'light',
-      primary: { ...palette.primary },
-      secondary: { ...palette.secondary },
+      ...brand,
       ...lightPalette,
-      surface: SURFACES.light,
-      nav: navTokens('light'),
-      // Darker than the dark mode's pair: these are TEXT on white (5:1 or better).
-      mediaType: { movie: palette.primary.dark, series: '#0f766e' },
+      surface: lightSurfaces(s),
+      nav: navTokens('light', s),
+      // TEXT on a light surface, so darker than the dark mode's pair; slate
+      // rather than teal for series, the one hue a monochrome page keeps.
+      mediaType: { movie: brand.primary.main, series: lightPalette.info.main },
+      gradient: gradientTokens(brand.primary, brand.secondary),
     },
     typography: TYPOGRAPHY,
     shape: { borderRadius: 6 },
-    shadows: lightShadows(),
+    shadows: lightShadows(s.ink),
     components: {
       MuiCssBaseline: {
         styleOverrides: {
           body: {
             WebkitFontSmoothing: 'antialiased',
             MozOsxFontSmoothing: 'grayscale',
-            scrollbarColor: `#c4c8cc transparent`,
+            scrollbarColor: `${s.scrollbar} transparent`,
             '&::-webkit-scrollbar, & *::-webkit-scrollbar': { width: 8, height: 8 },
             '&::-webkit-scrollbar-thumb, & *::-webkit-scrollbar-thumb': {
               borderRadius: 8,
-              backgroundColor: '#c4c8cc',
+              backgroundColor: s.scrollbar,
             },
             '&::-webkit-scrollbar-track, & *::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
           },
+          ...MONO_ELEMENTS,
           '@media (prefers-reduced-motion: no-preference)': {
             'a, button': { transition: 'color 150ms ease, background-color 150ms ease, border-color 150ms ease' },
           },
@@ -357,9 +461,10 @@ function buildLightOptions(): ThemeOptions {
       MuiButton: {
         styleOverrides: {
           root: { borderRadius: 6 },
+          ...BUTTON_SIZES,
           contained: { boxShadow: 'none', '&:hover': { boxShadow: 'none' } },
           outlined: ({ ownerState }) =>
-            ownerState.color === 'inherit' ? { borderColor: '#b7babe' } : {},
+            ownerState.color === 'inherit' ? { borderColor: s.borderStrong } : {},
         },
       },
       MuiCard: {
@@ -402,7 +507,7 @@ function buildLightOptions(): ThemeOptions {
           root: {
             backgroundColor: lightPalette.background.paper,
             backgroundImage: 'none',
-            color: INK,
+            color: s.ink,
             boxShadow: 'none',
             border: 0,
             borderBottom: `1px solid ${border}`,
@@ -415,9 +520,9 @@ function buildLightOptions(): ThemeOptions {
             borderRadius: 6,
             marginInline: 8,
             '&.Mui-selected': {
-              backgroundColor: alpha(INK, 0.07),
-              '&:hover': { backgroundColor: alpha(INK, 0.1) },
-              '&.Mui-focusVisible': { backgroundColor: alpha(INK, 0.12) },
+              backgroundColor: alpha(s.ink, 0.07),
+              '&:hover': { backgroundColor: alpha(s.ink, 0.1) },
+              '&.Mui-focusVisible': { backgroundColor: alpha(s.ink, 0.12) },
             },
           },
         },
@@ -425,12 +530,12 @@ function buildLightOptions(): ThemeOptions {
       MuiTableCell: {
         styleOverrides: {
           root: { borderBottomColor: border },
-          head: { backgroundColor: '#eceef0', fontWeight: 600, color: INK },
+          head: { backgroundColor: s.tableHead, fontWeight: 600, color: s.ink },
         },
       },
       MuiTableRow: {
         styleOverrides: {
-          root: { '&.MuiTableRow-hover:hover': { backgroundColor: '#e9ebed' } },
+          root: { '&.MuiTableRow-hover:hover': { backgroundColor: s.raisedHover } },
         },
       },
       MuiChip: {
@@ -439,40 +544,40 @@ function buildLightOptions(): ThemeOptions {
       MuiOutlinedInput: {
         styleOverrides: {
           root: {
-            backgroundColor: lightPalette.background.paper,
-            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#b7babe' },
-            '&:hover:not(.Mui-focused):not(.Mui-disabled) .MuiOutlinedInput-notchedOutline': { borderColor: '#8e888b' },
+            backgroundColor: s.raised,
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: s.borderStrong },
+            '&:hover:not(.Mui-focused):not(.Mui-disabled) .MuiOutlinedInput-notchedOutline': { borderColor: '#7d777a' },
           },
         },
       },
       MuiTooltip: {
         styleOverrides: {
-          tooltip: { backgroundColor: alpha(INK, 0.94), fontSize: '0.75rem' },
-          arrow: { color: alpha(INK, 0.94) },
+          tooltip: { backgroundColor: alpha(s.ink, 0.94), fontSize: '0.75rem' },
+          arrow: { color: alpha(s.ink, 0.94) },
         },
       },
       MuiBackdrop: {
         styleOverrides: {
           // Leave the invisible backdrops (menus, popovers) alone.
-          root: { '&:not(.MuiBackdrop-invisible)': { backgroundColor: alpha(INK, 0.4) } },
+          root: { '&:not(.MuiBackdrop-invisible)': { backgroundColor: alpha(s.ink, 0.4) } },
         },
       },
       MuiDivider: {
         styleOverrides: { root: { borderColor: border } },
       },
       MuiTab: {
-        styleOverrides: { root: { '&.Mui-selected': { fontWeight: 600 } } },
+        styleOverrides: { root: { ...TAB_TYPE, '&.Mui-selected': { fontWeight: 600 } } },
       },
       // The active side of a segmented control is filled, the same ink as the
-      // selected page in the sidebar; a faint tint is lost on a white sheet.
+      // selected page in the sidebar; a faint tint is lost on a light sheet.
       MuiToggleButton: {
         styleOverrides: {
           root: {
-            borderColor: '#b7babe',
+            borderColor: s.borderStrong,
             '&.Mui-selected': {
-              backgroundColor: INK,
+              backgroundColor: s.ink,
               color: '#ffffff',
-              '&:hover': { backgroundColor: '#3a3236' },
+              '&:hover': { backgroundColor: s.inkHover },
             },
           },
         },
@@ -486,41 +591,12 @@ function buildDarkOptions(): ThemeOptions {
     palette: {
       mode: 'dark',
       ...palette,
-      surface: SURFACES.dark,
+      surface: DARK_SURFACES,
       nav: navTokens('dark'),
       mediaType: { movie: palette.primary.light, series: '#10b981' },
+      gradient: gradientTokens(palette.primary, palette.secondary),
     },
-    typography: {
-      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-      h1: {
-        fontWeight: 700,
-        fontSize: '2.5rem',
-      },
-      h2: {
-        fontWeight: 700,
-        fontSize: '2rem',
-      },
-      h3: {
-        fontWeight: 600,
-        fontSize: '1.75rem',
-      },
-      h4: {
-        fontWeight: 600,
-        fontSize: '1.5rem',
-      },
-      h5: {
-        fontWeight: 600,
-        fontSize: '1.25rem',
-      },
-      h6: {
-        fontWeight: 600,
-        fontSize: '1rem',
-      },
-      button: {
-        textTransform: 'none',
-        fontWeight: 500,
-      },
-    },
+    typography: TYPOGRAPHY,
     shape: {
       borderRadius: 8,
     },
@@ -528,26 +604,31 @@ function buildDarkOptions(): ThemeOptions {
       MuiCssBaseline: {
         styleOverrides: {
           body: {
-            scrollbarColor: `${SURFACES.dark.subtleBorder} ${palette.background.paper}`,
+            scrollbarColor: `${DARK_SURFACES.subtleBorder} ${palette.background.paper}`,
             '&::-webkit-scrollbar, & *::-webkit-scrollbar': {
               width: 8,
               height: 8,
             },
             '&::-webkit-scrollbar-thumb, & *::-webkit-scrollbar-thumb': {
               borderRadius: 8,
-              backgroundColor: SURFACES.dark.subtleBorder,
+              backgroundColor: DARK_SURFACES.subtleBorder,
             },
             '&::-webkit-scrollbar-track, & *::-webkit-scrollbar-track': {
               backgroundColor: palette.background.paper,
             },
           },
+          ...MONO_ELEMENTS,
         },
+      },
+      MuiTab: {
+        styleOverrides: { root: TAB_TYPE },
       },
       MuiButton: {
         styleOverrides: {
           root: {
             borderRadius: 8,
           },
+          ...BUTTON_SIZES,
           contained: {
             boxShadow: 'none',
             '&:hover': {
@@ -651,9 +732,7 @@ export function backdropFullFade(theme: Theme): string {
 
 /** Shown where a hero has no image at all. */
 export function backdropPlaceholder(theme: Theme): string {
-  return theme.palette.mode === 'light'
-    ? 'linear-gradient(135deg, #e6e8ea 0%, #d6dade 100%)'
-    : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
+  return theme.palette.surface.placeholder
 }
 
 /** The soft glow in the middle of a full-page stage (the setup wizard). */
@@ -663,7 +742,7 @@ export function stageGlow(theme: Theme): string {
 }
 
 export function createAppTheme(direction: 'ltr' | 'rtl', mode: ColorMode = 'dark'): Theme {
-  return createTheme({ ...buildThemeOptions(mode), direction })
+  return createTheme({ ...buildThemeOptions(mode, LIGHT_SCHEME), direction })
 }
 
 /** @deprecated Prefer `createAppTheme('ltr')` from RtlProviders; kept for Storybook or tests. */

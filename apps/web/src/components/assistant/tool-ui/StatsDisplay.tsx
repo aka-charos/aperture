@@ -9,7 +9,6 @@ import TvIcon from '@mui/icons-material/Tv'
 import StarIcon from '@mui/icons-material/Star'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import { useTranslation } from 'react-i18next'
-import { gradients } from '@/theme'
 import type { StatsData, StudiosData } from './types'
 
 interface StatsDisplayProps {
@@ -149,7 +148,7 @@ export function StatsDisplay({ data }: StatsDisplayProps) {
                     bgcolor: theme.palette.divider,
                     '& .MuiLinearProgress-bar': {
                       borderRadius: 3,
-                      background: gradients.primaryToSecondary,
+                      background: theme.palette.gradient.primaryToSecondary,
                     },
                   }}
                 />

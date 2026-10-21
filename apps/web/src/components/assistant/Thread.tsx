@@ -44,7 +44,6 @@ import { ToolResultError } from './ToolResultError'
 import { useUnwatchedOnly, setUnwatchedOnly } from './unwatchedPreference'
 import { useStatusPhase, setStatusPhase } from './assistantStatus'
 import { NARROW_THREAD, COMPACT_THREAD, chatText, scaleChatTypography } from './density'
-import { gradients } from '@/theme'
 
 /** Shared avatar geometry; it shrinks on a compact thread and goes on a narrow one. */
 const avatarSx = {
@@ -106,7 +105,7 @@ function MarkdownLink({ href, children }: { href?: string; children?: ReactNode 
         rel="noopener noreferrer"
         sx={{
           mt: 1,
-          background: gradients.primaryToSecondary,
+          background: theme.palette.gradient.primaryToSecondary,
           textTransform: 'none',
           '&:hover': {
             background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
@@ -465,7 +464,7 @@ function AssistantMessage() {
         <Avatar
           sx={{
             ...avatarSx,
-            background: gradients.primaryToSecondary,
+            background: (t) => t.palette.gradient.primaryToSecondary,
           }}
         >
           <SmartToyIcon fontSize="small" />
@@ -518,7 +517,7 @@ function ThreadWelcome({ suggestions }: { suggestions: string[] }) {
           width: 64,
           height: 64,
           mb: 2,
-          background: gradients.primaryToSecondary,
+          background: theme.palette.gradient.primaryToSecondary,
         }}
       >
         <SmartToyIcon sx={{ fontSize: 36 }} />
@@ -599,7 +598,7 @@ function LoadingIndicator() {
       <Avatar
         sx={{
           ...avatarSx,
-          background: gradients.primaryToSecondary,
+          background: (t) => t.palette.gradient.primaryToSecondary,
         }}
       >
         <SmartToyIcon fontSize="small" />
@@ -834,7 +833,7 @@ function HistoricalAssistantMessage({ message }: { message: HistoricalMessage })
       <Avatar
         sx={{
           ...avatarSx,
-          background: gradients.primaryToSecondary,
+          background: (t) => t.palette.gradient.primaryToSecondary,
         }}
       >
         <SmartToyIcon fontSize="small" />

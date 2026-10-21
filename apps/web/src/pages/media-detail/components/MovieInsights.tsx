@@ -28,7 +28,6 @@ import GroupsIcon from '@mui/icons-material/Groups'
 import EditNoteIcon from '@mui/icons-material/EditNote'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
-import { gradients } from '@/theme'
 import { insightsHaveDetail } from '../helpers'
 import { buildClosestRow, twinMarking } from '../closestRow'
 import { readInterestPick } from '../interestPick'
@@ -609,7 +608,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
                 height: 48,
                 borderRadius: 2,
                 background: isPick
-                  ? gradients.primaryToSecondary
+                  ? theme.palette.gradient.primaryToSecondary
                   : alpha(theme.palette.text.primary, 0.08),
                 display: 'flex',
                 alignItems: 'center',

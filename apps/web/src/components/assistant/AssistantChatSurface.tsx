@@ -31,7 +31,6 @@ import { getUnwatchedOnly } from './unwatchedPreference'
 import { setStatusPhase } from './assistantStatus'
 import { AICapabilityBanner } from '../AICapabilityBanner'
 import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
-import { gradients } from '@/theme'
 import { NO_HOVER_MEDIA } from '@/lib/touch'
 import type { AssistantChatState, BackendMessage } from './useAssistantChat'
 
@@ -571,7 +570,7 @@ export function AssistantChatSurface({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  background: gradients.primaryToSecondary,
+                  background: theme.palette.gradient.primaryToSecondary,
                   flexShrink: 0,
                 }}
               >

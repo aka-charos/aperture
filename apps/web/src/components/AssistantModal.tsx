@@ -21,7 +21,6 @@ import WebAssetIcon from '@mui/icons-material/WebAsset'
 import { AssistantChatSurface } from './assistant/AssistantChatSurface'
 import { useAssistantChat } from './assistant/useAssistantChat'
 import { useAssistantDock } from '@/hooks/useAssistantDock'
-import { gradients } from '@/theme'
 import { FAB_SCROLL_DEADBAND_PX, FAB_TOP_ZONE_PX, nextFabVisible } from './assistant/fabVisibility'
 
 // Surface the assistant renders in: blocking dialog or persistent side panel
@@ -263,7 +262,7 @@ export function AssistantModal() {
               bottom: 12,
               insetInlineEnd: 12,
               zIndex: 1000,
-              background: gradients.primaryToSecondary,
+              background: theme.palette.gradient.primaryToSecondary,
               '&:hover': {
                 background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
               },
