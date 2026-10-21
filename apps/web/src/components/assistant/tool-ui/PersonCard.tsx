@@ -109,7 +109,7 @@ function PersonCardSingle({ person }: PersonCardProps) {
       {series.length > 0 && (
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-            <TvIcon sx={{ fontSize: 16, color: '#10b981' }} />
+            <TvIcon sx={{ fontSize: 16, color: 'mediaType.series' }} />
             <Typography variant="caption" fontWeight={600} color="text.secondary">
               {t('assistantToolUi.tvSeriesHeading', { count: series.length })}
             </Typography>

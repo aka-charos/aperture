@@ -11,6 +11,7 @@ import { usePosterDisplaySettings } from './posterDisplaySettings.js'
 import { useLocalizedOverview, type TitleRef } from './localizedText.js'
 import { WatchedBadge } from './poster-overlays/WatchedBadge.js'
 import { EpisodeProgressBadge } from './poster-overlays/EpisodeProgressBadge.js'
+import { neutralFillDeep } from './themeFills.js'
 
 const StarIcon = Star as unknown as React.ComponentType<{ fontSize?: string }>
 const AddToQueueIcon = AddToQueue as unknown as React.ComponentType<{ fontSize?: 'small' | 'medium' | 'large' }>
@@ -337,7 +338,7 @@ export function MoviePoster({
           height: responsive ? 'auto' : dimensions.height,
           borderRadius: 2,
           overflow: 'hidden',
-          backgroundColor: 'surface.fillDeep',
+          backgroundColor: neutralFillDeep,
           transition: 'transform 0.3s ease, box-shadow 0.3s ease',
           transform: isHovered ? 'scale(1.05)' : 'scale(1)',
         }}

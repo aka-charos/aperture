@@ -35,20 +35,41 @@ function readStored(): ColorMode {
 
 let mode: ColorMode = typeof window === 'undefined' ? DEFAULT_COLOR_MODE : readStored()
 const listeners = new Set<() => void>()
+/** Full-page dark stages on screen (the sign-in page); see `holdDarkDocument`. */
+let darkHolds = 0
 
 /**
  * What the browser chrome and native controls are told: the page colour for
  * the mobile address bar, and `color-scheme` so form controls and scrollbars
- * the theme does not style match the page.
+ * the theme does not style match the page. A full-page dark stage wins over
+ * the chosen mode, or a light choice puts a white address bar and light native
+ * controls on a page that is dark from edge to edge.
  */
-function applyToDocument(next: ColorMode) {
+function applyToDocument() {
   if (typeof document === 'undefined') return
-  document.documentElement.style.colorScheme = next
-  document.documentElement.dataset.colorMode = next
+  const shown: ColorMode = darkHolds > 0 ? 'dark' : mode
+  document.documentElement.style.colorScheme = shown
+  document.documentElement.dataset.colorMode = shown
   const meta = document.querySelector('meta[name="theme-color"]')
-  meta?.setAttribute('content', next === 'light' ? '#ffffff' : '#0f0f0f')
+  meta?.setAttribute('content', shown === 'light' ? '#ffffff' : '#0f0f0f')
 }
-applyToDocument(mode)
+applyToDocument()
+
+function adopt(next: ColorMode) {
+  if (next === mode) return
+  mode = next
+  applyToDocument()
+  for (const listener of listeners) listener()
+}
+
+// Another tab's choice. `storage` fires in every OTHER tab of this origin, so
+// without it two open tabs disagree, and the next press in the stale one flips
+// from the wrong side.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === STORAGE_KEY || event.key === null) adopt(readStored())
+  })
+}
 
 export function getColorMode(): ColorMode {
   return mode
@@ -56,14 +77,29 @@ export function getColorMode(): ColorMode {
 
 export function setColorMode(next: ColorMode): void {
   if (next === mode) return
-  mode = next
   try {
     localStorage.setItem(STORAGE_KEY, next)
   } catch {
     // Not remembered, but still applied for this visit.
   }
-  applyToDocument(next)
-  for (const listener of listeners) listener()
+  adopt(next)
+}
+
+/**
+ * Tell the browser the whole page is dark while a full-page dark stage is
+ * mounted, whatever the chosen mode. Returns the release; holds are counted,
+ * so overlapping stages release cleanly.
+ */
+export function holdDarkDocument(): () => void {
+  darkHolds++
+  applyToDocument()
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    darkHolds--
+    applyToDocument()
+  }
 }
 
 function subscribe(listener: () => void) {

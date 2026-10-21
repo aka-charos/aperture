@@ -58,7 +58,7 @@ import { AdminSearchProvider } from '@/hooks/AdminSearchProvider'
 import { GlobalSearch } from './GlobalSearch'
 import { UserHelpButton } from './UserHelpButton'
 import { LanguageMenuButton } from './LanguageMenuButton'
-import { ColorModeButton } from './ColorModeButton'
+import { ColorModeButton, ColorModeMenuItem } from './ColorModeButton'
 import { AppBarPageHeading } from './PageHeading'
 import { PageHeaderProvider } from '@/hooks/PageHeaderProvider'
 import { UserHelpProvider } from '@/hooks/UserHelpProvider'
@@ -484,6 +484,10 @@ function AppShell() {
                     bgcolor: 'nav.selectedBg',
                     color: 'nav.selectedText',
                     '&:hover': { bgcolor: 'nav.selectedHoverBg' },
+                    // MUI's own selected+focused rule carries one more class
+                    // than the line above and would paint a pale tint under
+                    // the light mode's white label.
+                    '&.Mui-focusVisible': { bgcolor: 'nav.selectedHoverBg' },
                   },
                 }}
               >
@@ -712,8 +716,11 @@ function AppShell() {
           {/* Help for the screen you are on: its user guide pages in a drawer. */}
           <UserHelpButton />
 
-          {/* Light or dark, for this browser. */}
-          <ColorModeButton />
+          {/* Light or dark, for this browser. Not on a phone, where the bar
+              has no room for it; the user menu carries it there instead. */}
+          <Box sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
+            <ColorModeButton />
+          </Box>
 
           {/* Language: the app's, and the one AI writes in. Beside the avatar
               because it is a choice about the person, not the library. */}
@@ -771,6 +778,11 @@ function AppShell() {
                       {t(item.textKey)}
                     </MenuItem>
                   ))}
+                {/* The app bar's light/dark button is hidden on a phone. */}
+                <ColorModeMenuItem
+                  onDone={handleUserMenuClose}
+                  sx={{ display: { xs: 'flex', sm: 'none' } }}
+                />
                 <Divider />
                 {/* No My Watch History here: it is a sidebar destination
                     (nav.watchHistory, /history), and this menu is for the

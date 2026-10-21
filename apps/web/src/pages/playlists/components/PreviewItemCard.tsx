@@ -179,8 +179,8 @@ export function PreviewItemCard({
               mt: '1px',
               height: 18,
               bgcolor:
-                item.mediaType === 'movie' ? alpha(theme.palette.primary.main, 0.15) : 'rgba(16, 185, 129, 0.15)',
-              color: item.mediaType === 'movie' ? theme.palette.primary.light : '#10b981',
+                item.mediaType === 'movie' ? alpha(theme.palette.primary.main, 0.15) : alpha(theme.palette.mediaType.series, 0.15),
+              color: item.mediaType === 'movie' ? theme.palette.mediaType.movie : theme.palette.mediaType.series,
               '& .MuiChip-label': { px: 0.625, fontSize: 10 },
             }}
           />

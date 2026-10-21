@@ -1,4 +1,5 @@
 import { Box, Card, CardContent, Stepper, Step, StepLabel, Typography, IconButton, Tooltip, useTheme } from '@mui/material'
+import { stageGlow } from '@/theme'
 import CloseIcon from '@mui/icons-material/Close'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useSetupWizard } from './hooks/useSetupWizard'
@@ -66,7 +67,7 @@ export function SetupPage() {
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: 'background.default',
-        backgroundImage: `radial-gradient(circle at 50% 50%, #1a1a2e 0%, ${theme.palette.background.default} 100%)`,
+        backgroundImage: stageGlow(theme),
         p: 2,
         position: 'relative',
       }}

@@ -15,6 +15,7 @@ import Favorite from '@mui/icons-material/Favorite'
 import PlayArrow from '@mui/icons-material/PlayArrow'
 import ThumbUp from '@mui/icons-material/ThumbUp'
 import { getProxiedImageUrl } from './imageUtils.js'
+import { neutralFill } from './themeFills.js'
 
 // Type workaround for MUI icons with NodeNext module resolution
 type IconComponent = React.ComponentType<{ fontSize?: string }>
@@ -115,7 +116,7 @@ export function EvidenceList({
                     sx={{ width: 48, height: 72 }}
                   />
                 ) : (
-                  <Avatar variant="rounded" sx={{ width: 48, height: 72, bgcolor: 'surface.fill' }}>
+                  <Avatar variant="rounded" sx={{ width: 48, height: 72, bgcolor: neutralFill }}>
                     <MovieIcon />
                   </Avatar>
                 )}

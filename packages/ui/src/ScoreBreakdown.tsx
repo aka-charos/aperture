@@ -1,5 +1,6 @@
 import React from 'react'
 import { Box, Typography, LinearProgress, Paper } from '@mui/material'
+import { neutralFill } from './themeFills.js'
 
 export interface ScoreItem {
   label: string
@@ -69,7 +70,7 @@ export function ScoreBreakdown({
                 sx={{
                   height: 8,
                   borderRadius: 4,
-                  backgroundColor: 'surface.fill',
+                  backgroundColor: neutralFill,
                 }}
               />
             </Box>

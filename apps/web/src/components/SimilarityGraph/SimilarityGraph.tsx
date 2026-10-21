@@ -947,10 +947,10 @@ function truncateTitle(title: string, maxLength: number): string {
  * are drawn for a night-sky background, so in the light mode it sits on the
  * page as a dark viewport rather than being recoloured.
  */
-export const SimilarityGraph = memo(function SimilarityGraph(props: SimilarityGraphProps) {
+export function SimilarityGraph(props: SimilarityGraphProps) {
   return (
     <DarkStage>
       <SimilarityGraphCanvas {...props} />
     </DarkStage>
   )
-})
+}

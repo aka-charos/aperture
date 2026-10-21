@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { CacheProvider } from '@emotion/react'
 import createCache from '@emotion/cache'
 import { ThemeProvider } from '@mui/material/styles'
@@ -7,8 +7,7 @@ import rtlPlugin from 'stylis-plugin-rtl'
 import { prefixer } from 'stylis'
 import { useTranslation } from 'react-i18next'
 import { isRtlLocale } from './i18n/localeDirection'
-import { createAppTheme } from './theme'
-import { useThemeColorOverrides } from './lib/branding'
+import { useAppTheme } from './lib/useAppTheme'
 import { useColorMode } from './lib/colorMode'
 
 const cacheLtr = createCache({ key: 'mui', prepend: true })
@@ -32,13 +31,7 @@ export function RtlProviders({ children }: { children: ReactNode }) {
     }
   }, [i18n])
 
-  // theme.ts's palette is mutated in place by branding.ts as overrides load, so
-  // createAppTheme(dir) rereads the same input either way — the lint rule can't see
-  // that dependency. Subscribing here is what turns the mutation into a re-render.
-  const themeColorOverrides = useThemeColorOverrides()
-  const colorMode = useColorMode()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const theme = useMemo(() => createAppTheme(dir, colorMode), [dir, colorMode, themeColorOverrides])
+  const theme = useAppTheme(dir, useColorMode())
   const cache = dir === 'rtl' ? cacheRtl : cacheLtr
 
   return (

@@ -43,14 +43,22 @@ export interface NavTokens {
   selectedIcon: string
 }
 
+/** The accent that says "film" or "series" on a card, readable as text on that mode's surfaces. */
+export interface MediaTypeTokens {
+  movie: string
+  series: string
+}
+
 declare module '@mui/material/styles' {
   interface Palette {
     surface: SurfaceTokens
     nav: NavTokens
+    mediaType: MediaTypeTokens
   }
   interface PaletteOptions {
     surface?: SurfaceTokens
     nav?: NavTokens
+    mediaType?: MediaTypeTokens
   }
 }
 
@@ -205,7 +213,9 @@ const SURFACES: Record<ColorMode, SurfaceTokens> = {
     raised: '#ffffff',
     raisedHover: '#f9fafb',
     glass: 'rgba(255, 255, 255, 0.86)',
-    glassStrong: 'rgba(250, 250, 251, 0.97)',
+    // The canvas colour exactly: a title page opened in a dialog fades its
+    // backdrop into heroFade, and any other tone here leaves a band.
+    glassStrong: lightPalette.background.default,
     panel: 'rgba(255, 255, 255, 0.78)',
     hairline: alpha(INK, 0.1),
     subtleBorder: '#d3d6d9',
@@ -319,6 +329,8 @@ function buildLightOptions(): ThemeOptions {
       ...lightPalette,
       surface: SURFACES.light,
       nav: navTokens('light'),
+      // Darker than the dark mode's pair: these are TEXT on white (5:1 or better).
+      mediaType: { movie: palette.primary.dark, series: '#0f766e' },
     },
     typography: TYPOGRAPHY,
     shape: { borderRadius: 6 },
@@ -405,6 +417,7 @@ function buildLightOptions(): ThemeOptions {
             '&.Mui-selected': {
               backgroundColor: alpha(INK, 0.07),
               '&:hover': { backgroundColor: alpha(INK, 0.1) },
+              '&.Mui-focusVisible': { backgroundColor: alpha(INK, 0.12) },
             },
           },
         },
@@ -475,6 +488,7 @@ function buildDarkOptions(): ThemeOptions {
       ...palette,
       surface: SURFACES.dark,
       nav: navTokens('dark'),
+      mediaType: { movie: palette.primary.light, series: '#10b981' },
     },
     typography: {
       fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
@@ -640,6 +654,12 @@ export function backdropPlaceholder(theme: Theme): string {
   return theme.palette.mode === 'light'
     ? 'linear-gradient(135deg, #e6e8ea 0%, #d6dade 100%)'
     : 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
+}
+
+/** The soft glow in the middle of a full-page stage (the setup wizard). */
+export function stageGlow(theme: Theme): string {
+  const centre = theme.palette.mode === 'light' ? alpha(theme.palette.primary.main, 0.08) : '#1a1a2e'
+  return `radial-gradient(circle at 50% 50%, ${centre} 0%, ${theme.palette.background.default} 100%)`
 }
 
 export function createAppTheme(direction: 'ltr' | 'rtl', mode: ColorMode = 'dark'): Theme {

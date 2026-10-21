@@ -101,8 +101,8 @@ export function ContentDetail({ data }: ContentDetailProps) {
               size="small"
               sx={{
                 height: 20,
-                bgcolor: data.type === 'movie' ? alpha(theme.palette.primary.main, 0.15) : 'rgba(16, 185, 129, 0.15)',
-                color: data.type === 'movie' ? theme.palette.primary.light : '#10b981',
+                bgcolor: data.type === 'movie' ? alpha(theme.palette.primary.main, 0.15) : alpha(theme.palette.mediaType.series, 0.15),
+                color: data.type === 'movie' ? theme.palette.mediaType.movie : theme.palette.mediaType.series,
               }}
             />
           </Box>
@@ -160,9 +160,9 @@ export function ContentDetail({ data }: ContentDetailProps) {
                 size="small"
                 sx={{
                   height: 24,
-                  bgcolor: 'rgba(16, 185, 129, 0.15)',
-                  color: '#10b981',
-                  '& .MuiChip-icon': { color: '#10b981' },
+                  bgcolor: (t) => alpha(t.palette.mediaType.series, 0.15),
+                  color: 'mediaType.series',
+                  '& .MuiChip-icon': { color: 'mediaType.series' },
                 }}
               />
             )}

@@ -46,7 +46,7 @@ export function StatsDisplay({ data }: StatsDisplayProps) {
         {/* Series */}
         <Paper sx={{ p: 2, bgcolor: theme.palette.background.paper, borderRadius: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <TvIcon sx={{ color: '#10b981' }} />
+            <TvIcon sx={{ color: 'mediaType.series' }} />
             <Typography variant="caption" color="text.secondary">{t('assistantToolUi.tvSeries')}</Typography>
           </Box>
           <Typography variant="h4" fontWeight={700} sx={{ color: 'text.primary' }}>
@@ -101,7 +101,7 @@ export function StatsDisplay({ data }: StatsDisplayProps) {
             </Box>
             <Box>
               <Typography variant="caption" color="text.secondary">{t('assistantToolUi.seriesStarted')}</Typography>
-              <Typography variant="h6" fontWeight={600} sx={{ color: '#10b981' }}>
+              <Typography variant="h6" fontWeight={600} sx={{ color: 'mediaType.series' }}>
                 {data.watchStats.seriesStarted}
               </Typography>
             </Box>
@@ -221,8 +221,8 @@ export function StudiosDisplay({ data }: StudiosDisplayProps) {
                     size="small"
                     sx={{
                       height: 20,
-                      bgcolor: 'rgba(16, 185, 129, 0.15)',
-                      color: '#10b981',
+                      bgcolor: (t) => alpha(t.palette.mediaType.series, 0.15),
+                      color: 'mediaType.series',
                     }}
                   />
                 </Box>

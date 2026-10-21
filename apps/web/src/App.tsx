@@ -187,7 +187,7 @@ function AppRoutes() {
       <Route
         path="/login"
         element={
-          <DarkStage>
+          <DarkStage fullPage>
             <LoginPage />
           </DarkStage>
         }
