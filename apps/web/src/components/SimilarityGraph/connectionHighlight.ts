@@ -48,15 +48,19 @@ export function primaryConnectionType(reasons: GraphEdge['reasons']): Connection
 /**
  * The types a legend lists for one graph, in legend order: every type some
  * edge carries (a highlight lights any edge CARRYING the type, not only the
- * edges drawn in its colour), plus any type still chosen, so a highlight left
- * over from the previous graph stays visible and can be undone rather than
- * dimming the whole graph for a reason nobody can see. No graph lists nothing.
+ * edges drawn in its colour), plus any type still chosen or previewed: either
+ * one dims the graph, so a type the new graph lacks must stay listed and
+ * undoable rather than dimming it for a reason nobody can see. A previewed
+ * entry also has to stay under the pointer, or no pointerleave ever clears it.
+ * No graph and no highlight lists nothing.
  */
 export function legendConnectionTypes(
   edges: readonly GraphEdge[] | null | undefined,
-  highlighted: ReadonlySet<ConnectionType>
+  highlighted: ReadonlySet<ConnectionType>,
+  preview: ConnectionType | null
 ): ConnectionType[] {
   const present = new Set<ConnectionType>(highlighted)
+  if (preview) present.add(preview)
   for (const edge of edges ?? []) {
     present.add(primaryConnectionType(edge.reasons))
     for (const reason of edge.reasons) present.add(reason.type)
@@ -64,9 +68,15 @@ export function legendConnectionTypes(
   return CONNECTION_TYPES.filter((type) => present.has(type))
 }
 
-/** Whether an edge is drawn strongly: nothing is highlighted, or it carries a highlighted type. */
+/**
+ * Whether an edge is drawn strongly: nothing is highlighted, or it carries a
+ * highlighted type. An edge with no reasons carries the type it is drawn in,
+ * since that is the entry the legend lists for it.
+ */
 export function edgeIsLit(reasons: GraphEdge['reasons'], highlighted: ReadonlySet<ConnectionType>): boolean {
-  return highlighted.size === 0 || reasons.some((r) => highlighted.has(r.type))
+  if (highlighted.size === 0) return true
+  if (reasons.length === 0) return highlighted.has(primaryConnectionType(reasons))
+  return reasons.some((r) => highlighted.has(r.type))
 }
 
 /**

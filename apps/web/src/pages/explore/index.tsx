@@ -34,10 +34,12 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import HistoryIcon from '@mui/icons-material/History'
 import {
   GraphLegend,
+  useLegendTypes,
   useGraphData,
   useSimilarityData,
   type GraphNode,
   type GraphData,
+  type GraphEdge,
   type LoadingStatus,
 } from '../../components/SimilarityGraph'
 import { GraphExplorer } from '../../components/GraphExplorer'
@@ -68,6 +70,34 @@ interface SemanticSearchState {
 
 function randomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
+}
+
+/**
+ * The sidebar's connection legend with its heading. Shown exactly when the
+ * legend lists something (the graph's types, or a highlight still on), by the
+ * legend's own rule, so a highlight can never dim the graph with the legend
+ * and its Clear hidden. Hidden rather than unmounted, so the legend stays
+ * registered and a highlight survives a re-centred graph loading. Its own
+ * component, so a hover re-renders this and not the page.
+ */
+function ConnectionLegendSection({ edges }: { edges: readonly GraphEdge[] | undefined }) {
+  const { t } = useTranslation()
+  const types = useLegendTypes(edges)
+  return (
+    <Box sx={{ display: types.length > 0 ? 'block' : 'none' }}>
+      <Box sx={{ p: 2 }}>
+        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+          {t('mediaGraph.connectionTypesHeading')}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
+          {t('mediaGraph.connectionTypesHighlightHint')}
+        </Typography>
+        <GraphLegend edges={edges} orientation="column" />
+      </Box>
+
+      <Divider />
+    </Box>
+  )
 }
 
 export function ExplorePage() {
@@ -303,7 +333,6 @@ function ExploreContent() {
   }
 
   const { data: displayData, loading, loadingStatus } = getDisplayData()
-  const hasGraphEdges = (displayData?.edges.length ?? 0) > 0
 
   // The cross-media switch is a parameter of the browse graph only -- semantic
   // search and the focused rabbit-hole graph come from endpoints that never
@@ -698,22 +727,7 @@ function ExploreContent() {
         </>
       )}
 
-      {/* Connection Legend: lists the types the graph on screen carries, so
-          with no graph it has nothing to say. Hidden rather than unmounted,
-          so a highlight survives the moment a re-centred graph is loading. */}
-      <Box sx={{ display: hasGraphEdges ? 'block' : 'none' }}>
-        <Box sx={{ p: 2 }}>
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-            {t('mediaGraph.connectionTypesHeading')}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
-            {t('mediaGraph.connectionTypesHighlightHint')}
-          </Typography>
-          <GraphLegend edges={displayData?.edges} orientation="column" />
-        </Box>
-
-        <Divider />
-      </Box>
+      <ConnectionLegendSection edges={displayData?.edges} />
 
       {/* Cross-Media Toggle */}
       <Box sx={{ p: 2 }}>

@@ -14,8 +14,8 @@
  * receive the pointerleave that would clear it.
  */
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import type { ConnectionType } from './types'
-import { effectiveHighlight, toggleHighlight } from './connectionHighlight'
+import type { ConnectionType, GraphEdge } from './types'
+import { effectiveHighlight, legendConnectionTypes, toggleHighlight } from './connectionHighlight'
 
 interface HighlightState {
   highlighted: ReadonlySet<ConnectionType>
@@ -83,6 +83,16 @@ export function useLegendHighlight() {
   const toggle = useCallback((type: ConnectionType) => toggleHighlightedType(type), [])
   const setPreview = useCallback((type: ConnectionType | null) => setHighlightPreview(type), [])
   return { highlighted: current.highlighted, toggle, clear: clearHighlight, setPreview }
+}
+
+/**
+ * The types a legend for these edges lists. Shared by the legend and by
+ * anything framing it (the Explore sidebar's heading), so the two cannot
+ * disagree about whether there is a legend to show. Registers nothing.
+ */
+export function useLegendTypes(edges: readonly GraphEdge[] | null | undefined): ConnectionType[] {
+  const { highlighted, preview } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  return useMemo(() => legendConnectionTypes(edges, highlighted, preview), [edges, highlighted, preview])
 }
 
 /** For a graph: what to draw. Stable while neither the choice nor the preview changes. */
