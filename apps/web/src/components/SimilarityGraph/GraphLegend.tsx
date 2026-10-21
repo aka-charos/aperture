@@ -1,28 +1,39 @@
 import { Box, ButtonBase, Link, Tooltip, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
-import { CONNECTION_COLORS } from './types'
-import { CONNECTION_TYPES } from './connectionHighlight'
+import { CONNECTION_COLORS, type GraphEdge } from './types'
+import { legendConnectionTypes } from './connectionHighlight'
 import { useLegendHighlight } from './connectionHighlightStore'
 import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 
 interface GraphLegendProps {
+  /**
+   * The edges of the graph this legend describes. Only the types they carry
+   * are listed: a key entry for a line the graph does not draw, and a toggle
+   * that highlights nothing, are noise. Null (no graph yet) lists nothing.
+   */
+  edges: readonly GraphEdge[] | null | undefined
   compact?: boolean
   /** A wrapping row under a graph, or a list in a side panel. */
   orientation?: 'row' | 'column'
 }
 
 /**
- * The connection colours, and a highlight for each: hover a type to preview
+ * The connection colours this graph uses, and a highlight for each: hover a type to preview
  * its lines, click it to keep them highlighted (several may be), Clear to go
  * back. Nothing is removed and nothing moves; every legend and every graph on
  * screen share one highlight (connectionHighlightStore.ts), which lasts while
  * some legend is mounted.
  */
-export function GraphLegend({ compact = false, orientation = 'row' }: GraphLegendProps) {
+export function GraphLegend({ edges, compact = false, orientation = 'row' }: GraphLegendProps) {
   const { t } = useTranslation()
   const { highlighted, toggle, clear, setPreview } = useLegendHighlight()
   const fontSize = orientation === 'column' ? '11px' : compact ? '9px' : '10px'
   const anyChosen = highlighted.size > 0
+  const types = legendConnectionTypes(edges, highlighted)
+
+  // After the hook, so the legend stays registered (and a highlight stays
+  // alive) while the next graph loads.
+  if (types.length === 0) return null
 
   return (
     <Box
@@ -38,7 +49,7 @@ export function GraphLegend({ compact = false, orientation = 'row' }: GraphLegen
         p: orientation === 'column' ? 0 : 1,
       }}
     >
-      {CONNECTION_TYPES.map((type) => {
+      {types.map((type) => {
         const chosen = highlighted.has(type)
         // Faded only while something else is chosen, so at rest the legend
         // reads as a plain key.

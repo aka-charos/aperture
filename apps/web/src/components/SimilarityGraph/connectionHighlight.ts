@@ -45,6 +45,25 @@ export function primaryConnectionType(reasons: GraphEdge['reasons']): Connection
   return 'similarity'
 }
 
+/**
+ * The types a legend lists for one graph, in legend order: every type some
+ * edge carries (a highlight lights any edge CARRYING the type, not only the
+ * edges drawn in its colour), plus any type still chosen, so a highlight left
+ * over from the previous graph stays visible and can be undone rather than
+ * dimming the whole graph for a reason nobody can see. No graph lists nothing.
+ */
+export function legendConnectionTypes(
+  edges: readonly GraphEdge[] | null | undefined,
+  highlighted: ReadonlySet<ConnectionType>
+): ConnectionType[] {
+  const present = new Set<ConnectionType>(highlighted)
+  for (const edge of edges ?? []) {
+    present.add(primaryConnectionType(edge.reasons))
+    for (const reason of edge.reasons) present.add(reason.type)
+  }
+  return CONNECTION_TYPES.filter((type) => present.has(type))
+}
+
 /** Whether an edge is drawn strongly: nothing is highlighted, or it carries a highlighted type. */
 export function edgeIsLit(reasons: GraphEdge['reasons'], highlighted: ReadonlySet<ConnectionType>): boolean {
   return highlighted.size === 0 || reasons.some((r) => highlighted.has(r.type))

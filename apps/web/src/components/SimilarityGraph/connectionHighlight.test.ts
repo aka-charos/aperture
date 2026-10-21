@@ -5,6 +5,7 @@ import {
   edgeColorType,
   edgeIsLit,
   effectiveHighlight,
+  legendConnectionTypes,
   litNodeIds,
   primaryConnectionType,
   toggleHighlight,
@@ -104,4 +105,32 @@ test('the highlight lasts while a legend is mounted and resets with the last one
   // The last one going leaves nothing behind for the next page's graph.
   second()
   assert.equal(readHighlightState().highlighted.size, 0)
+})
+
+test('a legend lists only the types its graph carries, in legend order', () => {
+  // director and genre are reasons, similarity rides on the a-d edge.
+  assert.deepEqual(legendConnectionTypes(graph().edges, new Set()), ['director', 'genre', 'similarity'])
+  // A secondary reason counts: highlighting it lights that edge.
+  const edges = [{ source: 'c', target: 'a', similarity: 0.8, reasons: [{ type: 'collection' as const }, { type: 'actor' as const }] }]
+  assert.deepEqual(legendConnectionTypes(edges, new Set()), ['actor', 'collection'])
+})
+
+test('an edge with no reasons lists the type it is drawn in', () => {
+  const edges = [{ source: 'c', target: 'a', similarity: 0.8, reasons: [] }]
+  assert.deepEqual(legendConnectionTypes(edges, new Set()), ['similarity'])
+})
+
+test('a chosen type the graph lacks stays listed so it can be undone', () => {
+  assert.deepEqual(legendConnectionTypes(graph().edges, new Set<ConnectionType>(['network'])), [
+    'director',
+    'genre',
+    'network',
+    'similarity',
+  ])
+})
+
+test('no graph lists nothing', () => {
+  assert.deepEqual(legendConnectionTypes(null, new Set()), [])
+  assert.deepEqual(legendConnectionTypes(undefined, new Set()), [])
+  assert.deepEqual(legendConnectionTypes([], new Set()), [])
 })

@@ -303,6 +303,7 @@ function ExploreContent() {
   }
 
   const { data: displayData, loading, loadingStatus } = getDisplayData()
+  const hasGraphEdges = (displayData?.edges.length ?? 0) > 0
 
   // The cross-media switch is a parameter of the browse graph only -- semantic
   // search and the focused rabbit-hole graph come from endpoints that never
@@ -697,18 +698,22 @@ function ExploreContent() {
         </>
       )}
 
-      {/* Connection Legend */}
-      <Box sx={{ p: 2 }}>
-        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-          {t('mediaGraph.connectionTypesHeading')}
-        </Typography>
-        <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
-          {t('mediaGraph.connectionTypesHighlightHint')}
-        </Typography>
-        <GraphLegend orientation="column" />
-      </Box>
+      {/* Connection Legend: lists the types the graph on screen carries, so
+          with no graph it has nothing to say. Hidden rather than unmounted,
+          so a highlight survives the moment a re-centred graph is loading. */}
+      <Box sx={{ display: hasGraphEdges ? 'block' : 'none' }}>
+        <Box sx={{ p: 2 }}>
+          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+            {t('mediaGraph.connectionTypesHeading')}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
+            {t('mediaGraph.connectionTypesHighlightHint')}
+          </Typography>
+          <GraphLegend edges={displayData?.edges} orientation="column" />
+        </Box>
 
-      <Divider />
+        <Divider />
+      </Box>
 
       {/* Cross-Media Toggle */}
       <Box sx={{ p: 2 }}>

@@ -382,7 +382,7 @@ export function GraphExplorer({
           gap: 1,
         }}
       >
-        {showLegend ? <GraphLegend compact={compact} /> : <Box />}
+        {showLegend ? <GraphLegend edges={data?.edges} compact={compact} /> : <Box />}
         <Typography
           variant={compact ? 'caption' : 'body2'}
           color="text.secondary"

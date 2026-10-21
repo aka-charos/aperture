@@ -376,7 +376,7 @@ export function SimilarMedia({
             <Box
               sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
             >
-              <GraphLegend compact />
+              <GraphLegend edges={graphData?.edges} compact />
               <Typography variant="caption" color="text.secondary">
                 {t('mediaDetail.similar.graphHintOpen')}
               </Typography>
