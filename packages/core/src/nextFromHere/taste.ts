@@ -10,14 +10,13 @@ import { MIN_SKEW_SCORE, skewOf } from '../lib/tasteEvidence.js'
 import type { TrailView } from '../trails/graph.js'
 import { roleBit } from '../trails/rules.js'
 import {
-  DIFFERENT_SIDE_ITEMS,
   CLOSE_ITEMS,
   LIKED_WEIGHT,
   LINKED_PER_ENTITY,
   MAJOR_MASK,
   MIN_PERSON_TITLES,
   NETWORK_AFFINITY_SHARE,
-  PER_ENTITY_CAP,
+  THEMES_SHOWN,
   blendScore,
   closenessFromRank,
   sharedRoleStrength,
@@ -165,6 +164,35 @@ export function companyAffinity(
   }
 }
 
+/**
+ * What one request works out once and every part of it reads: the company
+ * base (a pass over the whole index) and each person's and company's
+ * affinity. Shared by `scoreCandidates` and `peopleRows`.
+ */
+export interface TasteContext {
+  base: CompanyBase
+  person(entity: number): PersonAffinity | null
+  company(entity: number, type: 'movie' | 'series'): CompanyAffinity | null
+}
+
+export function tasteContext(view: TrailView, record: ReadonlyMap<number, ViewerTitle>): TasteContext {
+  const base = companyBase(view, record)
+  const persons = new Map<number, PersonAffinity | null>()
+  const companies = new Map<string, CompanyAffinity | null>()
+  return {
+    base,
+    person(entity) {
+      if (!persons.has(entity)) persons.set(entity, personAffinity(view, entity, record))
+      return persons.get(entity) ?? null
+    },
+    company(entity, type) {
+      const key = `${entity}:${type}`
+      if (!companies.has(key)) companies.set(key, companyAffinity(view, entity, type, record, base))
+      return companies.get(key) ?? null
+    },
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Candidates
 // ---------------------------------------------------------------------------
@@ -174,6 +202,13 @@ export type Reason =
   | { kind: 'shared'; entity: number; rolesStartMask: number; rolesHereMask: number }
   | { kind: 'favourite'; entity: number; rolesHereMask: number; liked: number; averageRating: number | null }
   | { kind: 'company'; entity: number; finished: number; ratio: number }
+  /**
+   * Themes the two share: TMDb keywords on both that still link in the
+   * viewer's scope (a keyword on too many titles says nothing, trails/rules.ts
+   * `linkCap`), rarest first. What "close in feel" is made of, where a rank
+   * alone says only that it is close.
+   */
+  | { kind: 'themes'; entities: number[] }
 
 /** Close in feel only, close and sharing someone, or sharing someone and feeling different. */
 export type Quadrant = 'close' | 'closeLinked' | 'linkedDifferent'
@@ -200,6 +235,8 @@ export interface CandidateInput {
   record: ReadonlyMap<number, ViewerTitle>
   /** Titles never to suggest: the viewer's finished ones. */
   exclude: (title: number) => boolean
+  /** The request's shared affinities; built here when absent. */
+  context?: TasteContext
 }
 
 /** The major-role credits a title carries, as entity → mask. */
@@ -224,7 +261,8 @@ const COMPANY_MASK = roleBit('studio') | roleBit('network')
 export function scoreCandidates(input: CandidateInput): Candidate[] {
   const { view, start, record, exclude } = input
   const fromStart = majorCredits(view, start)
-  const base = companyBase(view, record)
+  const startThemes = linkingKeywords(view, start)
+  const context = input.context ?? tasteContext(view, record)
   // Rank within the neighbour's own media type, 0 the closest.
   const rankOf = new Map<number, number>()
   const typeCount = { movie: 0, series: 0 }
@@ -249,8 +287,6 @@ export function scoreCandidates(input: CandidateInput): Candidate[] {
     }
   }
 
-  const personCache = new Map<number, PersonAffinity | null>()
-  const companyCache = new Map<string, CompanyAffinity | null>()
   const out: Candidate[] = []
 
   for (const title of pool) {
@@ -283,15 +319,12 @@ export function scoreCandidates(input: CandidateInput): Candidate[] {
     for (const [entity, hereMask] of credits) {
       const kind = view.index.entities[entity].kind
       if (kind === 'person' && (hereMask & MAJOR_MASK) !== 0) {
-        if (!personCache.has(entity)) personCache.set(entity, personAffinity(view, entity, record))
-        const affinity = personCache.get(entity)
+        const affinity = context.person(entity)
         if (affinity && (!favourite || affinity.score > favourite.affinity.score)) {
           favourite = { entity, mask: hereMask, affinity }
         }
       } else if (kind === 'company') {
-        const key = `${entity}:${type}`
-        if (!companyCache.has(key)) companyCache.set(key, companyAffinity(view, entity, type, record, base))
-        const affinity = companyCache.get(key)
+        const affinity = context.company(entity, type)
         if (affinity && (!company || affinity.score > company.affinity.score)) company = { entity, affinity }
       }
     }
@@ -312,6 +345,8 @@ export function scoreCandidates(input: CandidateInput): Candidate[] {
         ratio: company.affinity.ratio,
       })
     }
+    const themes = sharedThemes(view, title, startThemes)
+    if (themes.length > 0) reasons.push({ kind: 'themes', entities: themes })
 
     const affinity = Math.max(
       favourite?.affinity.score ?? 0,
@@ -338,24 +373,33 @@ export function scoreCandidates(input: CandidateInput): Candidate[] {
   return out
 }
 
-/**
- * The two lists the page shows. "Close" is the embedding's side (with or
- * without a shared credit); "different" is the side the embedding cannot
- * see — the same people, in a title that feels unlike this one — with no one
- * person or franchise allowed more than PER_ENTITY_CAP places, or a
- * director's filmography fills it.
- */
-export function pickSections(candidates: readonly Candidate[]): { close: Candidate[]; different: Candidate[] } {
-  const close = candidates.filter((c) => c.quadrant !== 'linkedDifferent').slice(0, CLOSE_ITEMS)
-  const different: Candidate[] = []
-  const used = new Map<number, number>()
-  for (const candidate of candidates) {
-    if (different.length >= DIFFERENT_SIDE_ITEMS) break
-    if (candidate.quadrant !== 'linkedDifferent') continue
-    const lead = candidate.sharedEntities[0]
-    if (lead !== undefined && (used.get(lead) ?? 0) >= PER_ENTITY_CAP) continue
-    if (lead !== undefined) used.set(lead, (used.get(lead) ?? 0) + 1)
-    different.push(candidate)
+/** The keywords on a title that link in this scope. */
+function linkingKeywords(view: TrailView, title: number): Set<number> {
+  const out = new Set<number>()
+  for (const entity of view.index.titleEntities[title]) {
+    if (view.index.entities[entity].kind === 'keyword' && view.links(entity)) out.add(entity)
   }
-  return { close, different }
+  return out
+}
+
+/** The start's linking keywords also on `title`, rarest first (then by name), at most THEMES_SHOWN. */
+export function sharedThemes(view: TrailView, title: number, startThemes: ReadonlySet<number>): number[] {
+  if (startThemes.size === 0) return []
+  const shared: number[] = []
+  for (const entity of view.index.titleEntities[title]) if (startThemes.has(entity)) shared.push(entity)
+  shared.sort(
+    (a, b) =>
+      view.count(a) - view.count(b) || view.index.entities[a].name.localeCompare(view.index.entities[b].name)
+  )
+  return shared.slice(0, THEMES_SHOWN)
+}
+
+/**
+ * The "close in feel" list: the embedding's side, with or without a shared
+ * credit. What the same people made in a different feel is not a list of its
+ * own any more: it is the people rows (people.ts), where a director's other
+ * work is read as theirs rather than scattered two at a time.
+ */
+export function pickClose(candidates: readonly Candidate[]): Candidate[] {
+  return candidates.filter((c) => c.quadrant !== 'linkedDifferent').slice(0, CLOSE_ITEMS)
 }

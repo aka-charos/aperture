@@ -20,7 +20,7 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import { PageHeading } from '@/components/PageHeading'
 import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
 import { useOpenMedia } from '@/hooks/useOpenMedia'
-import { useWatchStatus } from '@/hooks/useWatchStatus'
+import { useWatchedRevision } from '@/hooks/useWatchedRevision'
 import { TitlePicker } from './TitlePicker'
 import { TitleTile } from './TitleTile'
 import { TrailStrip } from './TrailStrip'
@@ -93,16 +93,8 @@ function FollowATrail() {
 
   // A title marked watched while Hide what I've watched is on (in the dialog,
   // say) must leave the threads already loaded, so the answers are keyed by a
-  // revision that moves when the viewer's watched set does — after it first
-  // loads, which is not a change.
-  const { watchedMovies, loading: watchLoading } = useWatchStatus()
-  const [watchRevision, setWatchRevision] = useState(0)
-  const seenWatched = useRef<Set<string> | null>(null)
-  useEffect(() => {
-    if (watchLoading) return
-    if (seenWatched.current && seenWatched.current !== watchedMovies) setWatchRevision((revision) => revision + 1)
-    seenWatched.current = watchedMovies
-  }, [watchedMovies, watchLoading])
+  // revision that moves when the viewer's watched set does.
+  const watchRevision = useWatchedRevision()
 
   const { cards, links, remember, rememberLink } = useTrailData(trail, maxTrail)
   const { answers, hasAnswer, store, failure, fail, clearFailure } = useAnswers<ThreadsResponse>()

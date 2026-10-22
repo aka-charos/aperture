@@ -5,8 +5,9 @@ import { roleBit, formatTitleRef } from '../trails/rules.js'
 import { LINKED_PER_ENTITY } from './rules.js'
 import {
   CLOSE_ITEMS,
-  DIFFERENT_SIDE_ITEMS,
-  PER_ENTITY_CAP,
+  PEOPLE_ROWS,
+  ROW_MEMBERS,
+  THEMES_SHOWN,
   closenessFromRank,
   sharedRoleStrength,
   titleWeight,
@@ -15,11 +16,13 @@ import {
   companyAffinity,
   companyBase,
   personAffinity,
-  pickSections,
+  pickClose,
   scoreCandidates,
   type Candidate,
   type ViewerTitle,
 } from './taste.js'
+import { peopleRows } from './people.js'
+import { mapLinks } from './map.js'
 
 let counter = 0
 function uuid(): string {
@@ -37,6 +40,8 @@ const actor = (name: string): CreditSource => ({ role: 'actor', name })
 const editor = (name: string): CreditSource => ({ role: 'editor', name })
 const network = (name: string): CreditSource => ({ role: 'network', name })
 const studio = (name: string): CreditSource => ({ role: 'studio', name })
+const keyword = (name: string): CreditSource => ({ role: 'keyword', name })
+const writer = (name: string): CreditSource => ({ role: 'writer', name })
 
 function build(sources: TitleSource[]): { view: TrailView; at: (s: TitleSource) => number; entity: (key: string) => number } {
   const index = buildTrailIndex(sources)
@@ -203,22 +208,204 @@ test('a favourite person on a candidate becomes a reason, and the same person is
   assert.equal(other.reasons.some((r) => r.kind === 'favourite'), false)
 })
 
-test('the different side holds at most PER_ENTITY_CAP titles per person, and both lists are capped', () => {
-  const fake = (i: number, quadrant: Candidate['quadrant'], lead: number): Candidate => ({
+test('the close list is the embedding side only, capped', () => {
+  const fake = (i: number, quadrant: Candidate['quadrant']): Candidate => ({
     title: i,
     quadrant,
     score: 1 - i / 100,
     reasons: [],
-    sharedEntities: [lead],
+    sharedEntities: [],
   })
   const candidates: Candidate[] = []
-  for (let i = 0; i < 10; i += 1) candidates.push(fake(i, 'linkedDifferent', 7))
-  for (let i = 10; i < 20; i += 1) candidates.push(fake(i, 'linkedDifferent', i))
-  for (let i = 20; i < 40; i += 1) candidates.push(fake(i, 'close', -1))
-  const { close, different } = pickSections(candidates)
+  for (let i = 0; i < 10; i += 1) candidates.push(fake(i, 'linkedDifferent'))
+  for (let i = 10; i < 40; i += 1) candidates.push(fake(i, i % 2 ? 'close' : 'closeLinked'))
+  const close = pickClose(candidates)
   assert.equal(close.length, CLOSE_ITEMS)
-  assert.equal(different.length, DIFFERENT_SIDE_ITEMS)
-  assert.equal(different.filter((c) => c.sharedEntities[0] === 7).length, PER_ENTITY_CAP)
+  assert.ok(close.every((c) => c.quadrant !== 'linkedDifferent'))
+})
+
+test('shared themes are the keywords that still link, rarest first, and say what a close title shares', () => {
+  const start = title('Session 9', [
+    keyword('asylum'),
+    keyword('horror'),
+    keyword('abandoned building'),
+    keyword('psychiatric hospital'),
+    keyword('common'),
+  ])
+  const near = title('Stonehearst Asylum', [
+    keyword('asylum'),
+    keyword('horror'),
+    keyword('psychiatric hospital'),
+    keyword('abandoned building'),
+    keyword('common'),
+  ])
+  const sources = [start, near, title('Other asylum', [keyword('asylum')])]
+  // "horror" on five titles, and "common" on twenty-two: past the floor cap
+  // of 8, so it links nothing.
+  for (let i = 0; i < 3; i += 1) sources.push(title(`Horror ${i}`, [keyword('horror')]))
+  for (let i = 0; i < 20; i += 1) sources.push(title(`Common ${i}`, [keyword('common')]))
+  sources.push(title('Hospital', [keyword('psychiatric hospital')]))
+  const { view, at } = build(sources)
+  const [candidate] = scoreCandidates({
+    view,
+    start: at(start),
+    neighbours: [at(near)],
+    record: new Map(),
+    exclude: () => false,
+  })
+  const themes = candidate.reasons.find((r) => r.kind === 'themes')
+  assert.ok(themes && themes.kind === 'themes')
+  assert.equal(themes.entities.length, THEMES_SHOWN)
+  // abandoned building (two titles), then asylum and psychiatric hospital
+  // (three each, by name); horror (five) is past the three shown.
+  assert.deepEqual(
+    themes.entities.map((e) => view.index.entities[e].name),
+    ['abandoned building', 'asylum', 'psychiatric hospital']
+  )
+})
+
+test('people rows: major roles only, a favourite first, unseen before seen, the start left out', () => {
+  const start = title('Session 9', [
+    director('Brad Anderson'),
+    lead('David Caruso'),
+    actor('Larry Fessenden'),
+    writer('Stephen Gevedon'),
+    keyword('asylum'),
+    { role: 'franchise', name: 'Nine Collection', key: '99' },
+  ])
+  const machinist = { ...title('The Machinist', [director('Brad Anderson')]), year: 2004 }
+  const transsiberian = { ...title('Transsiberian', [director('Brad Anderson')]), year: 2008 }
+  const beirut = { ...title('Beirut', [director('Brad Anderson')]), year: 2018 }
+  const kingOfNY = title('King of New York', [lead('David Caruso')])
+  const twins = title('Twins', [lead('David Caruso')])
+  const fessenden = title('Carnage Park', [actor('Larry Fessenden')])
+  const gevedon = title('Gevedon solo', [writer('Stephen Gevedon')])
+  const sequel = title('Session 10', [{ role: 'franchise', name: 'Nine Collection', key: '99' }])
+  const pad = title('Asylum two', [keyword('asylum')])
+  const { view, at, entity } = build([
+    start,
+    machinist,
+    transsiberian,
+    beirut,
+    kingOfNY,
+    twins,
+    fessenden,
+    gevedon,
+    sequel,
+    pad,
+  ])
+  // The viewer keeps coming back to David Caruso (both his titles they rated,
+  // at 9) and has seen The Machinist.
+  const record = new Map<number, ViewerTitle>([
+    [at(kingOfNY), liked(9)],
+    [at(twins), liked(9)],
+    [at(machinist), liked(null)],
+  ])
+  const rows = peopleRows({
+    view,
+    start: at(start),
+    record,
+    seen: (t) => record.has(t),
+    scores: new Map([[at(beirut), 0.9]]),
+  })
+  const names = rows.map((r) => view.index.entities[r.entity].name)
+  // A bit part and a keyword open no row.
+  assert.equal(names.includes('Larry Fessenden'), false)
+  assert.equal(names.includes('asylum'), false)
+  // A lead the viewer keeps coming back to outranks the director.
+  assert.equal(names[0], 'David Caruso')
+  assert.ok(rows[0].person)
+  assert.ok(names.indexOf('Brad Anderson') < names.indexOf('Stephen Gevedon'))
+  // The franchise is the weakest row.
+  assert.equal(names[names.length - 1], 'Nine Collection')
+  const anderson = rows.find((r) => r.entity === entity('person:brad anderson'))!
+  // Scored unseen first, then unseen by year, then seen.
+  assert.deepEqual(
+    anderson.members.map((m) => view.index.titles[m.title].title),
+    ['Beirut', 'Transsiberian', 'The Machinist']
+  )
+  assert.deepEqual(
+    anderson.members.map((m) => m.seen),
+    [false, false, true]
+  )
+  assert.equal(anderson.total, 3)
+  assert.equal(anderson.seenCount, 1)
+  assert.ok(rows.every((r) => r.members.every((m) => m.title !== at(start))))
+})
+
+test('a company has a row only when the viewer favours it, and rows and members are capped', () => {
+  const start = title('Start', [studio('Niche'), studio('Everywhere'), lead('Prolific')])
+  const sources: TitleSource[] = [start]
+  const niche: TitleSource[] = []
+  for (let i = 0; i < 4; i += 1) niche.push(title(`Niche ${i}`, [studio('Niche')]))
+  for (let i = 0; i < 40; i += 1) sources.push(title(`Everywhere ${i}`, [studio('Everywhere')]))
+  for (let i = 0; i < ROW_MEMBERS + 5; i += 1) sources.push(title(`Prolific ${i}`, [lead('Prolific')]))
+  sources.push(...niche)
+  const { view, at } = build(sources)
+  const record = new Map<number, ViewerTitle>(niche.slice(0, 3).map((s) => [at(s), liked(null)]))
+  const rows = peopleRows({ view, start: at(start), record, seen: (t) => record.has(t), scores: new Map() })
+  const names = rows.map((r) => view.index.entities[r.entity].name)
+  assert.ok(names.includes('Niche'))
+  assert.equal(names.includes('Everywhere'), false)
+  const prolific = rows.find((r) => view.index.entities[r.entity].name === 'Prolific')!
+  assert.equal(prolific.members.length, ROW_MEMBERS)
+  assert.equal(prolific.more, 5)
+  // Every one of them unseen, so hiding the seen leaves all five out still.
+  assert.equal(prolific.moreUnseen, 5)
+  assert.ok(rows.length <= PEOPLE_ROWS)
+})
+
+test('a row leaves out the trail, and counts only the unseen it could not send', () => {
+  const start = title('Start', [director('Prolific')])
+  const sources: TitleSource[] = [start]
+  for (let i = 0; i < ROW_MEMBERS + 3; i += 1) sources.push(title(`Film ${i}`, [director('Prolific')]))
+  const { view, at } = build(sources)
+  const earlierStep = at(sources[1])
+  // Three seen titles past the unseen: only seen ones fall past the cap.
+  const seenTitles = new Set(sources.slice(-3).map(at))
+  const [row] = peopleRows({
+    view,
+    start: at(start),
+    record: new Map(),
+    seen: (t) => seenTitles.has(t),
+    scores: new Map(),
+    exclude: (t) => t === earlierStep,
+  })
+  assert.ok(row.members.every((m) => m.title !== earlierStep))
+  assert.equal(row.total, ROW_MEMBERS + 2)
+  assert.equal(row.more, 2)
+  assert.equal(row.moreUnseen, 0)
+})
+
+test('a person past the Trails rarity cap still joins their own titles on the map', () => {
+  const sources: TitleSource[] = []
+  // Twelve titles: past the floor cap of eight a person links nothing in Trails.
+  for (let i = 0; i < 12; i += 1) sources.push(title(`Busy ${i}`, [director('Busy Director')]))
+  const { view, at } = build(sources)
+  const links = mapLinks(view, [at(sources[0]), at(sources[1])])
+  assert.equal(links.length, 1)
+  assert.equal(view.index.entities[links[0].entity].name, 'Busy Director')
+})
+
+test('the map joins a pair once, by the strongest thing it shares, a person before a theme', () => {
+  const a = title('A', [director('Brad Anderson'), keyword('train')])
+  const b = title('B', [director('Brad Anderson'), keyword('train')])
+  const c = title('C', [keyword('train')])
+  const d = title('D', [actor('Bit Part')])
+  const e = title('E', [actor('Bit Part')])
+  const { view, at } = build([a, b, c, d, e])
+  const links = mapLinks(view, [at(a), at(b), at(c), at(d), at(e), at(a)])
+  const named = links.map((l) => [
+    view.index.titles[l.a].title,
+    view.index.titles[l.b].title,
+    view.index.entities[l.entity].name,
+  ])
+  // A bit part draws no line; A and B are joined by their director, not the theme.
+  assert.deepEqual(named, [
+    ['A', 'B', 'Brad Anderson'],
+    ['A', 'C', 'train'],
+    ['B', 'C', 'train'],
+  ])
 })
 
 test('neighbours are ranked within their own media type, and a lone franchise link stays off the different side', () => {

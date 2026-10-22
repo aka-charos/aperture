@@ -2,6 +2,7 @@
 
 export type ConnectionType =
   | 'director'
+  | 'crew' // writer, cinematographer or composer on both (Next from here's map only)
   | 'actor'
   | 'collection'
   | 'genre'
@@ -42,6 +43,11 @@ export interface GraphEdge {
   target: string | GraphNode
   similarity: number
   reasons: ConnectionReason[]
+  /**
+   * The line's heading in its tooltip, in place of "N% similar": for a graph
+   * whose `similarity` sets only how a line pulls (Next from here's map).
+   */
+  caption?: string
 }
 
 export interface GraphData {
@@ -71,6 +77,7 @@ export interface SimilarityResult {
 // Colors for connection types
 export const CONNECTION_COLORS: Record<ConnectionType, string> = {
   director: '#3B82F6', // Blue
+  crew: '#EF4444', // Red
   actor: '#14B8A6', // Teal
   collection: '#F59E0B', // Gold
   genre: '#8B5CF6', // Purple
@@ -83,6 +90,7 @@ export const CONNECTION_COLORS: Record<ConnectionType, string> = {
 
 export const CONNECTION_LABELS: Record<ConnectionType, string> = {
   director: 'Same Director',
+  crew: 'Same Crew',
   actor: 'Shared Actor',
   collection: 'Same Collection',
   genre: 'Genre Match',

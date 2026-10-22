@@ -34,6 +34,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import HistoryIcon from '@mui/icons-material/History'
 import {
   GraphLegend,
+  connectionTypesIn,
   useGraphData,
   useSimilarityData,
   type GraphNode,
@@ -705,7 +706,7 @@ function ExploreContent() {
         <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
           {t('mediaGraph.connectionTypesHighlightHint')}
         </Typography>
-        <GraphLegend orientation="column" />
+        <GraphLegend orientation="column" types={displayData ? connectionTypesIn(displayData) : undefined} />
       </Box>
 
       <Divider />

@@ -39,6 +39,7 @@ import ThumbUpIcon from '@mui/icons-material/ThumbUp'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
 import RecommendIcon from '@mui/icons-material/Recommend'
 import RouteOutlinedIcon from '@mui/icons-material/RouteOutlined'
+import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined'
 import type {
   Media,
   MediaServerInfo,
@@ -131,6 +132,8 @@ interface MediaHeroProps {
    * Trails has answered links to nothing.
    */
   trailPath?: string | null
+  /** What to watch after this title, in Next from here. Unset draws no button. */
+  nextPath?: string | null
 }
 
 export function MediaHero({
@@ -155,6 +158,7 @@ export function MediaHero({
   onFavoriteToggle,
   onRecommend,
   trailPath,
+  nextPath,
 }: MediaHeroProps) {
   const { t } = useTranslation()
   // The grid this page was opened from is still mounted behind it and reads the
@@ -907,6 +911,21 @@ export function MediaHero({
                     {t('mediaDetail.hero.recommend')}
                   </Button>
                 </span>
+              </Tooltip>
+            )}
+            {/* Into Next from here, starting from this title: what feels
+                closest to it and the people behind it. */}
+            {nextPath && (
+              <Tooltip title={t('next.detail.whatNextTooltip')}>
+                <Button
+                  variant="outlined"
+                  component={RouterLink}
+                  to={nextPath}
+                  startIcon={<SkipNextOutlinedIcon />}
+                  sx={actionBtnSx}
+                >
+                  {t('next.detail.whatNext')}
+                </Button>
               </Tooltip>
             )}
             {/* Into Trails, starting from this title: the people, franchise,

@@ -906,9 +906,10 @@ const SimilarityGraphCanvas = memo(function SimilarityGraphCanvas({
           {hoveredEdge && (
             <>
               <Typography variant="subtitle2" fontWeight={600}>
-                {t('similarityGraph.percentSimilar', {
-                  pct: Math.round(hoveredEdge.similarity * 100),
-                })}
+                {hoveredEdge.caption ??
+                  t('similarityGraph.percentSimilar', {
+                    pct: Math.round(hoveredEdge.similarity * 100),
+                  })}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                 {hoveredEdge.reasons.map((reason, idx) => (

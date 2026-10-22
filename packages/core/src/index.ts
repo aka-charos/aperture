@@ -2085,10 +2085,13 @@ export {
 export {
   getNextFromHere,
   NEXT_CLOSE_ITEMS,
-  NEXT_DIFFERENT_ITEMS,
+  NEXT_MAX_AVOID,
+  NEXT_PEOPLE_ROWS,
   NEXT_STARTS_OFFERED,
   type NextFromHere,
   type NextItem,
+  type NextMapLink,
+  type NextPeopleRow,
+  type NextRowMember,
   type NextReason,
-  type NextQuadrant,
 } from './nextFromHere/index.js'

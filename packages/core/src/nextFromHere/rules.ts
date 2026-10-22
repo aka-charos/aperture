@@ -100,13 +100,26 @@ export function blendScore(parts: { closeness: number; shared: number; affinity:
   )
 }
 
-/** Titles listed in each section. */
+/** Titles in the "close in feel" list. */
 export const CLOSE_ITEMS = 12
-export const DIFFERENT_SIDE_ITEMS = 6
 /** Neighbours asked of the embedding (films and shows together). */
 export const NEIGHBOUR_POOL = 50
-/** At most this many titles per person or franchise in the different-side list. */
-export const PER_ENTITY_CAP = 2
+/** Shared themes (TMDb keywords) named per suggestion, rarest first. */
+export const THEMES_SHOWN = 3
+/** People, franchises and favoured companies of the start given a row of their own. */
+export const PEOPLE_ROWS = 8
+/** Titles sent per row; the rest are counted. */
+export const ROW_MEMBERS = 24
+/**
+ * How a row is ordered: mostly by what the viewer's record says of the
+ * person (or company), then by the part they played in the start. A lead the
+ * viewer keeps returning to outranks a director they have never seen.
+ */
+export const ROW_WEIGHTS = { affinity: 0.6, role: 0.4 } as const
+/** Unseen titles from each row drawn on the map beside the close list. */
+export const MAP_PER_ROW = 3
+/** Lines drawn between titles on the map other than the start's own. */
+export const MAX_MAP_LINKS = 60
 /** Listable titles looked at per shared credit: a lead with sixty films is not read whole. */
 export const LINKED_PER_ENTITY = 40
 /** Recent titles offered as places to start from. */

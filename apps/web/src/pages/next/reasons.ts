@@ -1,12 +1,12 @@
 /**
- * How Next from here words a reason: the decisions only (which string, which
- * values), so they can be pinned without rendering. The page turns them into
- * text with `t()`. Pinned by next.test.ts.
+ * How Next from here words its reasons and keeps its state: the decisions only
+ * (which string, which values, which address), so they can be pinned without
+ * rendering. The page turns them into text with `t()`. Pinned by next.test.ts.
  */
 
-import { isTitleRef } from '../trails/labels'
-import type { TrailRole } from '../trails/types'
-import type { NextReason } from './types'
+import { readRefList } from '../trails/labels'
+import type { TrailLink, TrailRole } from '../trails/types'
+import type { NextItem, NextPeopleRow, NextReason, NextRowMember } from './types'
 
 export type ReasonText =
   | { key: 'next.reason.feelClosestMovie' | 'next.reason.feelClosestSeries'; start: string }
@@ -17,13 +17,15 @@ export type ReasonText =
   | { key: 'next.reason.favouriteRated'; name: string; role: TrailRole; count: number; average: number }
   | { key: 'next.reason.favourite'; name: string; role: TrailRole; count: number }
   | { key: 'next.reason.companyMovies' | 'next.reason.companySeries'; name: string; ratio: number; count: number }
+  | { key: 'next.reason.themes'; names: string[] }
 
 /**
  * Most telling first: a named person or franchise shared with the start,
- * then a favourite, then a studio or network, and "close in feel" last —
- * true of every title in the close list, so it says the least about any one.
+ * then a favourite, then the themes the two share, then a studio or network,
+ * and "close in feel" last — true of every title in the close list, so it
+ * says the least about any one.
  */
-const ORDER: Record<NextReason['kind'], number> = { shared: 0, favourite: 1, company: 2, feel: 3 }
+const ORDER: Record<NextReason['kind'], number> = { shared: 0, favourite: 1, themes: 2, company: 3, feel: 4 }
 
 export function orderReasons(reasons: readonly NextReason[]): NextReason[] {
   return [...reasons].sort((a, b) => ORDER[a.kind] - ORDER[b.kind])
@@ -62,11 +64,120 @@ export function reasonText(reason: NextReason, start: string, type: 'movie' | 's
         ratio: reason.ratio,
         count: reason.finished,
       }
+    case 'themes':
+      return { key: 'next.reason.themes', names: reason.entities.map((entity) => entity.name) }
   }
 }
 
-/** `?title=movie:<uuid>` read back (Trails' ref format); anything else is no start. */
-export function readStartParam(params: URLSearchParams): string | null {
-  const raw = params.get('title')?.trim()
-  return isTitleRef(raw) ? raw.toLowerCase() : null
+// ---------------------------------------------------------------------------
+// The people rows
+// ---------------------------------------------------------------------------
+
+export type RowNote =
+  | { key: 'next.row.favouriteRated'; count: number; average: number }
+  | { key: 'next.row.favourite'; count: number }
+  | { key: 'next.row.companyMovies' | 'next.row.companySeries'; ratio: number; count: number }
+  | { key: 'next.row.seenSome'; seen: number; total: number }
+  | { key: 'next.row.seenNone'; total: number }
+
+/**
+ * The line under a row's name: what the viewer's own record says of them
+ * when it says something (the reason the row sits where it does), else how
+ * much of their work the viewer has seen. `type` is the start's media type,
+ * the one a company's skew was measured in.
+ */
+export function rowNote(row: NextPeopleRow, type: 'movie' | 'series'): RowNote {
+  if (row.favourite) {
+    return row.favourite.averageRating != null
+      ? { key: 'next.row.favouriteRated', count: row.favourite.liked, average: row.favourite.averageRating }
+      : { key: 'next.row.favourite', count: row.favourite.liked }
+  }
+  if (row.company) {
+    return {
+      key: type === 'movie' ? 'next.row.companyMovies' : 'next.row.companySeries',
+      ratio: row.company.ratio,
+      count: row.company.finished,
+    }
+  }
+  return row.seenCount > 0
+    ? { key: 'next.row.seenSome', seen: row.seenCount, total: row.total }
+    : { key: 'next.row.seenNone', total: row.total }
+}
+
+/**
+ * A franchise entity's TMDb collection id, from its stable key
+ * (`franchise:#<id>`, core trails/graph.ts), for its page; null otherwise.
+ */
+export function franchiseIdFromKey(key: string): string | null {
+  const match = /^franchise:#(\d+)$/.exec(key)
+  return match ? match[1] : null
+}
+
+/** A row's titles as shown: all of them, or only the unseen when the viewer hides what they have seen. */
+export function rowMembers(row: NextPeopleRow, hideSeen: boolean): NextRowMember[] {
+  return hideSeen ? row.members.filter((member) => !member.seen) : row.members
+}
+
+// ---------------------------------------------------------------------------
+// Stepping on: the trail
+// ---------------------------------------------------------------------------
+
+/**
+ * What joins the start to a suggestion stepped to, for the trail strip: the
+ * strongest person or franchise they share, or null when they share no one
+ * (the strip then draws a plain arrow — close in feel, nothing named).
+ */
+export function itemLink(item: NextItem): TrailLink | null {
+  const shared = item.reasons.find((reason) => reason.kind === 'shared')
+  if (!shared || shared.kind !== 'shared') return null
+  return { ...shared.entity, rolesFrom: shared.rolesThere, rolesTo: shared.rolesHere }
+}
+
+/** What joins the start to a title stepped to from one of its rows: the row's person itself. */
+export function rowLink(row: NextPeopleRow, member: NextRowMember): TrailLink {
+  return { ...row.entity, rolesFrom: row.rolesThere, rolesTo: member.roles }
+}
+
+export type NextView = 'list' | 'map'
+
+export interface NextUrlState {
+  /** Titles stepped through, oldest first; the last is the start. Empty: the API chooses. */
+  trail: string[]
+  view: NextView
+  /** Leave the viewer's seen titles out of the people rows (suggestions never hold them). */
+  hideSeen: boolean
+}
+
+/**
+ * The page's state from its address. `trail` is read as Trails reads its own
+ * (`readRefList`: malformed refs dropped, repeats kept once, the newest
+ * `maxTrail` kept), so one trail has one meaning on both pages. `?title=`
+ * (the first version's only parameter, and what the title page links with)
+ * reads as a trail of one.
+ */
+export function readNextUrl(params: URLSearchParams, maxTrail = Number.MAX_SAFE_INTEGER): NextUrlState {
+  const trail = readRefList(params.get('trail'), maxTrail)
+  return {
+    trail: trail.length > 0 ? trail : readRefList(params.get('title'), 1),
+    view: params.get('view') === 'map' ? 'map' : 'list',
+    hideSeen: params.get('hide') === 'seen',
+  }
+}
+
+/** The state as URL parameters; defaults are left out, so one state has one address. */
+export function writeNextUrl(state: NextUrlState): URLSearchParams {
+  const params = new URLSearchParams()
+  if (state.trail.length === 1) params.set('title', state.trail[0])
+  else if (state.trail.length > 1) params.set('trail', state.trail.join(','))
+  if (state.view === 'map') params.set('view', 'map')
+  if (state.hideSeen) params.set('hide', 'seen')
+  return params
+}
+
+/** The API query for a trail: its last title is the start, the rest are never suggested again. */
+export function nextQuery(trail: readonly string[]): string {
+  if (trail.length === 0) return ''
+  const params = new URLSearchParams({ title: trail[trail.length - 1] })
+  if (trail.length > 1) params.set('avoid', trail.slice(0, -1).join(','))
+  return `?${params.toString()}`
 }

@@ -97,6 +97,7 @@ export function MediaDetailPage({
   // Trails, from this title: the hero's link and the Strongest links card.
   const trailRef = id ? titleRefFor(mediaType, id) : null
   const trailPath = useTrailPath(trailRef)
+  const nextPath = trailRef ? `/next?${new URLSearchParams({ title: trailRef }).toString()}` : null
   const strongestLinks = useStrongestLinks(trailRef)
 
   // Reading why a title was scored is one of the getting-started steps, and
@@ -208,6 +209,7 @@ export function MediaDetailPage({
         onRecommend={hasConnections && id ? () => setRecommendOpen(true) : undefined}
         // Dropped once Trails has answered that the title links to nothing.
         trailPath={strongestLinks.knownEmpty ? null : trailPath}
+        nextPath={nextPath}
       />
 
       {id && hasConnections && (

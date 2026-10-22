@@ -87,7 +87,7 @@ function readRef(value: string | null): string | null {
 }
 
 /** Refs from a comma-separated value: malformed ones dropped, repeats kept once, the newest `max` kept. */
-function readRefList(value: string | null, max: number): string[] {
+export function readRefList(value: string | null, max: number): string[] {
   if (!value) return []
   const refs: string[] = []
   for (const part of value.split(',')) {

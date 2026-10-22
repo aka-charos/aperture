@@ -1,7 +1,8 @@
 import { Box, ButtonBase, Link, Tooltip, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { CONNECTION_COLORS } from './types'
-import { CONNECTION_TYPES } from './connectionHighlight'
+import { SIMILARITY_GRAPH_TYPES } from './connectionHighlight'
+import type { ConnectionType } from './types'
 import { useLegendHighlight } from './connectionHighlightStore'
 import { connectionTypeLabel } from '../../i18n/connectionTypeLabel'
 
@@ -9,6 +10,12 @@ interface GraphLegendProps {
   compact?: boolean
   /** A wrapping row under a graph, or a list in a side panel. */
   orientation?: 'row' | 'column'
+  /**
+   * The types to list, in legend order: what this legend's graph draws
+   * (`connectionTypesIn`). Absent, before a graph has loaded, every type the
+   * similarity graph can draw.
+   */
+  types?: readonly ConnectionType[]
 }
 
 /**
@@ -18,7 +25,7 @@ interface GraphLegendProps {
  * screen share one highlight (connectionHighlightStore.ts), which lasts while
  * some legend is mounted.
  */
-export function GraphLegend({ compact = false, orientation = 'row' }: GraphLegendProps) {
+export function GraphLegend({ compact = false, orientation = 'row', types = SIMILARITY_GRAPH_TYPES }: GraphLegendProps) {
   const { t } = useTranslation()
   const { highlighted, toggle, clear, setPreview } = useLegendHighlight()
   const fontSize = orientation === 'column' ? '11px' : compact ? '9px' : '10px'
@@ -38,7 +45,7 @@ export function GraphLegend({ compact = false, orientation = 'row' }: GraphLegen
         p: orientation === 'column' ? 0 : 1,
       }}
     >
-      {CONNECTION_TYPES.map((type) => {
+      {types.map((type) => {
         const chosen = highlighted.has(type)
         // Faded only while something else is chosen, so at rest the legend
         // reads as a plain key.

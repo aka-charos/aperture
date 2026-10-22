@@ -11,7 +11,7 @@
  * Pure, pinned by connectionHighlight.test.ts. The choice itself is kept by
  * connectionHighlightStore.ts, shared by every graph and legend on screen.
  */
-import type { ConnectionType, GraphEdge, GraphNode } from './types'
+import type { ConnectionType, GraphData, GraphEdge, GraphNode } from './types'
 import { CONNECTION_COLORS } from './types'
 
 /**
@@ -22,16 +22,35 @@ import { CONNECTION_COLORS } from './types'
 export const CONNECTION_TYPES = Object.keys(CONNECTION_COLORS) as readonly ConnectionType[]
 
 /**
+ * The types the similarity graph itself can draw (Explore, a title's similar
+ * titles): every type but `crew`, which only Next from here's map draws. What a
+ * legend lists before its graph has loaded.
+ */
+export const SIMILARITY_GRAPH_TYPES: readonly ConnectionType[] = CONNECTION_TYPES.filter((type) => type !== 'crew')
+
+/**
+ * The types a graph actually draws, in legend order: what its legend lists,
+ * so every entry lights something. Read off the edges, so a graph that draws
+ * a new type lists it without anyone remembering to.
+ */
+export function connectionTypesIn(graph: Pick<GraphData, 'edges'>): ConnectionType[] {
+  const present = new Set(graph.edges.flatMap((edge) => edge.reasons.map((reason) => reason.type)))
+  return CONNECTION_TYPES.filter((type) => present.has(type))
+}
+
+/**
  * The type an edge is drawn in: the strongest reason it carries.
  *
  * Mirrors core's getPrimaryConnectionType (packages/core/src/similarity/
- * reasons.ts); change the two together.
+ * reasons.ts); change the two together. `crew` is the one type core never
+ * draws: only Next from here's map, which builds its lines in the bundle.
  */
 export function primaryConnectionType(reasons: GraphEdge['reasons']): ConnectionType {
   const priority: ConnectionType[] = [
     'ai_diverse',
     'collection',
     'director',
+    'crew',
     'actor',
     'network',
     'studio',
