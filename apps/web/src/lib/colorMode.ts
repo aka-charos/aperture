@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import type { ColorMode } from '@/theme'
+import { documentChromeColor, type ColorMode } from '@/theme'
 
 /**
  * Light or dark, chosen per BROWSER.
@@ -51,7 +51,7 @@ function applyToDocument() {
   document.documentElement.style.colorScheme = shown
   document.documentElement.dataset.colorMode = shown
   const meta = document.querySelector('meta[name="theme-color"]')
-  meta?.setAttribute('content', shown === 'light' ? '#fbf6f1' : '#0f0f0f')
+  meta?.setAttribute('content', documentChromeColor(shown))
 }
 applyToDocument()
 

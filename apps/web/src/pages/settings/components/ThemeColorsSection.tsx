@@ -117,6 +117,9 @@ export function ThemeColorsSection() {
         <Typography variant="body2" color="text.secondary">
           {t('settingsThemeColors.subtitle')}
         </Typography>
+        <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
+          {t('settingsThemeColors.lightModeNote')}
+        </Typography>
 
         <Divider sx={{ my: 2 }} />
 

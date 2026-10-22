@@ -104,3 +104,91 @@ test('page surfaces take their colours from the theme', () => {
   const stale = Object.keys(ALLOWED).filter((rel) => !seenAllowed.has(rel))
   assert.deepEqual(stale, [], `Exemptions naming files that no longer exist: ${stale.join(', ')}`)
 })
+
+/**
+ * Every light colour comes from the one scheme object.
+ *
+ * The light mode is a single `LightScheme` (`LIGHT_SCHEME` in theme.ts) so that
+ * changing the light palette is changing one object, judged on a rendered screen.
+ * That only holds while nothing else names a colour: the first version carried a
+ * cool grey input-hover outline inside the light options, left over from a
+ * palette that had already been replaced, and the address-bar colour was a copy
+ * in lib/colorMode.ts that had to be retyped by hand three times. Two checks:
+ * the light builders in theme.ts name no literal colour, and no other file
+ * repeats one of the scheme's own values.
+ */
+const THEME = join(SRC, 'theme.ts')
+const LIGHT_BUILDERS = ['lightPaletteFor', 'lightBrand', 'lightSurfaces', 'lightNav', 'lightShadows', 'buildLightOptions']
+const COLOUR_LITERAL = /#[0-9a-f]{3,8}\b|rgba?\(/i
+
+/** The body of a top-level `function name(…)` in a source text, braces matched. */
+export function functionBody(source: string, name: string): string | null {
+  const head = source.indexOf(`function ${name}(`)
+  if (head < 0) return null
+  // Past the parameter list (which may hold an object type's braces), then the
+  // first brace after it opens the body; a return type here is a bare name.
+  let parens = 0
+  let close = -1
+  for (let i = source.indexOf('(', head); i < source.length; i++) {
+    if (source[i] === '(') parens++
+    else if (source[i] === ')' && --parens === 0) {
+      close = i
+      break
+    }
+  }
+  const open = close < 0 ? -1 : source.indexOf('{', close)
+  if (open < 0) return null
+  let depth = 0
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === '{') depth++
+    else if (source[i] === '}' && --depth === 0) return source.slice(open, i + 1)
+  }
+  return null
+}
+
+/** The hex values written inside the `LIGHT_SCHEME` object. */
+export function schemeHexes(source: string): string[] {
+  const start = source.indexOf('const LIGHT_SCHEME: LightScheme = {')
+  if (start < 0) return []
+  const end = source.indexOf('\n}\n', start)
+  return [...source.slice(start, end).matchAll(/'(#[0-9a-f]{6})'/gi)].map((m) => m[1].toLowerCase())
+}
+
+test('the body finder and the scheme reader read what they claim to', () => {
+  const src = 'function a(x: { y: string }): T {\n  return { z: `${x}` }\n}\nfunction b() {}'
+  assert.equal(functionBody(src, 'a'), '{\n  return { z: `${x}` }\n}')
+  assert.equal(functionBody(src, 'missing'), null)
+  assert.deepEqual(schemeHexes("const LIGHT_SCHEME: LightScheme = {\n  ink: '#2A1C16',\n}\n"), ['#2a1c16'])
+})
+
+test('the light builders take every colour from the scheme', () => {
+  const source = readFileSync(THEME, 'utf8')
+  const offenders: string[] = []
+  for (const name of LIGHT_BUILDERS) {
+    const body = functionBody(source, name)
+    assert.ok(body, `theme.ts no longer has function ${name}; update LIGHT_BUILDERS`)
+    body.split('\n').forEach((line, i) => {
+      if (!/^\s*(\/\/|\*)/.test(line) && COLOUR_LITERAL.test(line)) offenders.push(`${name} +${i}: ${line.trim()}`)
+    })
+  }
+  assert.deepEqual(offenders, [], 'A light colour that is not a field of LightScheme:\n' + offenders.join('\n'))
+})
+
+test("no other file repeats one of the light scheme's values", () => {
+  const hexes = schemeHexes(readFileSync(THEME, 'utf8')).filter((hex) => hex !== '#ffffff' && hex !== '#000000')
+  assert.ok(hexes.length >= 10, 'could not read LIGHT_SCHEME out of theme.ts')
+  const offenders: string[] = []
+  for (const [root, label] of [
+    [SRC, ''],
+    [UI_SRC, '@aperture/ui/'],
+  ] as const) {
+    for (const file of sourceFiles(root)) {
+      if (file === THEME) continue
+      const text = readFileSync(file, 'utf8').toLowerCase()
+      for (const hex of hexes) {
+        if (text.includes(hex)) offenders.push(`${label}${relative(root, file).replace(/\\/g, '/')}: ${hex}`)
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], 'A copy of a light scheme colour; read it from the theme instead:\n' + offenders.join('\n'))
+})

@@ -3909,6 +3909,7 @@
   "settingsThemeColors": {
     "title": "Brand colors",
     "subtitle": "The two accent colors used throughout the app — buttons, highlights, gradients, and badges. Other colors (errors, warnings, success) stay fixed.",
+    "lightModeNote": "The light appearance answers the default pair with its own ink and accent. Save any other pair and both appearances use it as saved.",
     "primaryLabel": "Primary",
     "secondaryLabel": "Secondary",
     "invalidHex": "Enter a color like #6366f1",

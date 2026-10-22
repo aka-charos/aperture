@@ -5175,7 +5175,8 @@
     "saved": "Brand colors updated",
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
-    "unknownError": "Something went wrong"
+    "unknownError": "Something went wrong",
+    "lightModeNote": "The light appearance answers the default pair with its own ink and accent. Save any other pair and both appearances use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -6741,7 +6742,8 @@
     "page": {
       "allGuides": "All guide pages",
       "openSection": "Open {{section}}",
-      "notFound": "There is no guide page called “{{slug}}”."
+      "notFound": "There is no guide page called “{{slug}}”.",
+      "onThisPage": "On this page"
     },
     "help": {
       "button": "Guide",

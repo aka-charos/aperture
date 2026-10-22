@@ -169,6 +169,8 @@ interface LightScheme {
   ink: string
   /** The pill and filled toggles under the pointer. */
   inkHover: string
+  /** Text and icons set ON ink: the selected pill, a filled toggle, a contained button. */
+  onInk: string
   /** Secondary text. */
   muted: string
   /** Behind everything. */
@@ -183,6 +185,8 @@ interface LightScheme {
   border: string
   /** Input and outlined-control outlines. */
   borderStrong: string
+  /** An input's outline under the pointer. */
+  borderHover: string
   tableHead: string
   /** Progress-bar tracks, an empty thumbnail. */
   fill: string
@@ -205,6 +209,7 @@ interface LightScheme {
 const LIGHT_SCHEME: LightScheme = {
   ink: '#2a1c16',
   inkHover: '#45312a',
+  onInk: '#ffffff',
   muted: '#6a574d',
   canvas: '#ecdfd3',
   sheet: '#fbf6f1',
@@ -212,6 +217,7 @@ const LIGHT_SCHEME: LightScheme = {
   raisedHover: '#f6ede5',
   border: '#e0cfc0',
   borderStrong: '#c6ad98',
+  borderHover: '#8f7564',
   tableHead: '#f6ece3',
   fill: '#e4d3c4',
   fillDeep: '#eadcd0',
@@ -251,16 +257,31 @@ function lightPaletteFor(s: LightScheme) {
 }
 
 /**
- * The light mode's brand colours: monochrome unless an admin has set their
- * own, in which case that colour is the operator's decision and wins.
+ * The light mode's brand colours: the scheme's ink and accent, unless an admin
+ * has set a brand pair, which then replaces BOTH.
+ *
+ * The pair is one decision. Brand colours are saved together and shown together
+ * on the settings page, so a lone primary takes the secondary it was saved
+ * beside rather than the scheme's accent — mixing them would put two colours on
+ * the page that nobody chose as a pair. "Set" means the saved pair differs from
+ * the default one: Reset saves the defaults, so the default pair is what "no
+ * brand colour" looks like on the wire, and the settings card says the light
+ * appearance answers it with its own colours.
  */
+function brandPairIsDefault(): boolean {
+  return palette.primary.main === DEFAULT_PRIMARY.main && palette.secondary.main === DEFAULT_SECONDARY.main
+}
+
 function lightBrand(s: LightScheme) {
-  const ink = { main: s.ink, light: lighten(s.ink, 0.3), dark: darken(s.ink, 0.3), contrastText: '#ffffff' }
-  const gray = { main: s.secondary, light: lighten(s.secondary, 0.25), dark: darken(s.secondary, 0.25), contrastText: '#ffffff' }
-  return {
-    primary: palette.primary.main === DEFAULT_PRIMARY.main ? ink : { ...palette.primary },
-    secondary: palette.secondary.main === DEFAULT_SECONDARY.main ? gray : { ...palette.secondary },
+  if (!brandPairIsDefault()) return { primary: { ...palette.primary }, secondary: { ...palette.secondary } }
+  const ink = { main: s.ink, light: lighten(s.ink, 0.3), dark: darken(s.ink, 0.3), contrastText: s.onInk }
+  const accent = {
+    main: s.secondary,
+    light: lighten(s.secondary, 0.25),
+    dark: darken(s.secondary, 0.25),
+    contrastText: s.onInk,
   }
+  return { primary: ink, secondary: accent }
 }
 
 /** The brand gradients for one mode's primary and secondary. */
@@ -306,15 +327,19 @@ function lightSurfaces(s: LightScheme): SurfaceTokens {
   }
 }
 
-function navTokens(mode: ColorMode, s?: LightScheme): NavTokens {
-  return mode === 'light' && s
-    ? { selectedBg: s.ink, selectedHoverBg: s.inkHover, selectedText: '#ffffff', selectedIcon: '#ffffff' }
-    : {
-        selectedBg: alpha(palette.primary.main, 0.12),
-        selectedHoverBg: alpha(palette.primary.main, 0.18),
-        selectedText: palette.text.primary,
-        selectedIcon: palette.primary.main,
-      }
+/** The light mode's selected page: a solid ink pill. */
+function lightNav(s: LightScheme): NavTokens {
+  return { selectedBg: s.ink, selectedHoverBg: s.inkHover, selectedText: s.onInk, selectedIcon: s.onInk }
+}
+
+/** The dark mode's selected page: a tint of the brand colour. */
+function darkNav(): NavTokens {
+  return {
+    selectedBg: alpha(palette.primary.main, 0.12),
+    selectedHoverBg: alpha(palette.primary.main, 0.18),
+    selectedText: palette.text.primary,
+    selectedIcon: palette.primary.main,
+  }
 }
 
 /**
@@ -376,8 +401,8 @@ export function applyThemeColorOverrides(overrides: ThemeColorOverrides | null |
   )
 }
 
-function buildThemeOptions(mode: ColorMode, scheme: LightScheme): ThemeOptions {
-  return mode === 'light' ? buildLightOptions(scheme) : buildDarkOptions()
+function buildThemeOptions(mode: ColorMode): ThemeOptions {
+  return mode === 'light' ? buildLightOptions(LIGHT_SCHEME) : buildDarkOptions()
 }
 
 const SANS_FONT = '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
@@ -413,10 +438,11 @@ const BUTTON_SIZES = { sizeSmall: { fontSize: '0.75rem' }, sizeLarge: { fontSize
 const TAB_TYPE = { fontFamily: SANS_FONT, fontSize: '0.875rem', letterSpacing: '0.02857em' }
 
 /**
- * The light mode's look, after the "calm corporate" reference: crisper 6px
- * corners, every working surface an off-white sheet with a 1px border on a
- * mid-gray canvas, ink as the primary colour, a solid ink pill for the
- * selected page, gray table headers, and transitions on colour only.
+ * The light mode's look: crisper 6px corners, every working surface a paper
+ * sheet with a 1px border on the sand canvas, ink as the primary colour, a
+ * solid ink pill for the selected page, tinted table headers, and transitions
+ * on colour only. Every colour here comes from the scheme (`lightColourCallSites`
+ * in themeColorCallSites.test.ts holds it to that).
  */
 function buildLightOptions(s: LightScheme): ThemeOptions {
   const border = s.border
@@ -429,9 +455,9 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
       ...brand,
       ...lightPalette,
       surface: lightSurfaces(s),
-      nav: navTokens('light', s),
-      // TEXT on a light surface, so darker than the dark mode's pair; slate
-      // rather than teal for series, the one hue a monochrome page keeps.
+      nav: lightNav(s),
+      // TEXT on a light surface, so darker than the dark mode's pair; the
+      // scheme's info colour for series, the one cool note on a warm page.
       mediaType: { movie: brand.primary.main, series: lightPalette.info.main },
       gradient: gradientTokens(brand.primary, brand.secondary),
     },
@@ -546,7 +572,7 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
           root: {
             backgroundColor: s.raised,
             '& .MuiOutlinedInput-notchedOutline': { borderColor: s.borderStrong },
-            '&:hover:not(.Mui-focused):not(.Mui-disabled) .MuiOutlinedInput-notchedOutline': { borderColor: '#7d777a' },
+            '&:hover:not(.Mui-focused):not(.Mui-disabled) .MuiOutlinedInput-notchedOutline': { borderColor: s.borderHover },
           },
         },
       },
@@ -576,7 +602,7 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
             borderColor: s.borderStrong,
             '&.Mui-selected': {
               backgroundColor: s.ink,
-              color: '#ffffff',
+              color: s.onInk,
               '&:hover': { backgroundColor: s.inkHover },
             },
           },
@@ -592,7 +618,7 @@ function buildDarkOptions(): ThemeOptions {
       mode: 'dark',
       ...palette,
       surface: DARK_SURFACES,
-      nav: navTokens('dark'),
+      nav: darkNav(),
       mediaType: { movie: palette.primary.light, series: '#10b981' },
       gradient: gradientTokens(palette.primary, palette.secondary),
     },
@@ -704,7 +730,7 @@ function buildDarkOptions(): ThemeOptions {
 /**
  * Hero backdrops (a title's page, a person's, a studio's) sit under the page's
  * own text. In the dark mode the image is dimmed and fades into near-black under
- * light text; in the light mode it stays bright and washes into the gray canvas
+ * light text; in the light mode it stays bright and washes into the sand canvas
  * well before the title, because ink on a dark image is unreadable.
  */
 export function backdropImageFilter(theme: Theme): string {
@@ -741,8 +767,18 @@ export function stageGlow(theme: Theme): string {
   return `radial-gradient(circle at 50% 50%, ${centre} 0%, ${theme.palette.background.default} 100%)`
 }
 
+/**
+ * The colour the browser's own chrome is told for each mode (the phone address
+ * bar, through `<meta name="theme-color">`): the light mode's sheet, which the
+ * app bar is drawn in, and the dark mode's page background. Read from the theme's
+ * own values so a palette change cannot leave the address bar behind.
+ */
+export function documentChromeColor(mode: ColorMode): string {
+  return mode === 'light' ? LIGHT_SCHEME.sheet : palette.background.default
+}
+
 export function createAppTheme(direction: 'ltr' | 'rtl', mode: ColorMode = 'dark'): Theme {
-  return createTheme({ ...buildThemeOptions(mode, LIGHT_SCHEME), direction })
+  return createTheme({ ...buildThemeOptions(mode), direction })
 }
 
 /** @deprecated Prefer `createAppTheme('ltr')` from RtlProviders; kept for Storybook or tests. */
