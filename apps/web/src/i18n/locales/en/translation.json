@@ -1650,8 +1650,6 @@
     "episode": "Episode",
     "details": "Details",
     "play": "Play",
-    "showMore": "Show more",
-    "showLess": "Show less",
     "watched": "Watched",
     "watchedCount": "Watched {{count}}×",
     "viewDetails": "View Details",

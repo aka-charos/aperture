@@ -3980,8 +3980,6 @@
     "carouselSimilarError": "Δεν βρέθηκαν παρόμοιοι τίτλοι: {{message}}",
     "directedBy": "Σκην. {{name}}",
     "createdBy": "Δημιουργός: {{name}}",
-    "showMore": "Περισσότερα",
-    "showLess": "Λιγότερα",
     "episode": "Επεισόδιο",
     "carouselEpisodesTitle": "Επεισόδια πιο κοντά στο «{{concept}}»",
     "carouselEpisodesDesc": "Τα {{count}} πιο κοντινά επεισόδια στη βιβλιοθήκη σας",

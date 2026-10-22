@@ -2070,8 +2070,6 @@
     "favoriteNotInLibrary": "That title isn't in your library, so it can't be favorited.",
     "directedBy": "Dir. {{name}}",
     "createdBy": "Created by {{name}}",
-    "showMore": "Show more",
-    "showLess": "Show less",
     "episode": "Episode",
     "carouselEpisodesTitle": "Episodes closest to \"{{concept}}\"",
     "carouselEpisodesDesc": "The {{count}} nearest episodes in your library",
