@@ -30,7 +30,6 @@ import { useWatching } from '../../../hooks/useWatching'
 import {
   SimilarityGraph,
   GraphLegend,
-  connectionTypesIn,
   useSimilarityData,
   CONNECTION_COLORS,
 } from '../../../components/SimilarityGraph'
@@ -377,7 +376,7 @@ export function SimilarMedia({
             <Box
               sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
             >
-              <GraphLegend compact types={graphData ? connectionTypesIn(graphData) : undefined} />
+              <GraphLegend edges={graphData?.edges} compact />
               <Typography variant="caption" color="text.secondary">
                 {t('mediaDetail.similar.graphHintOpen')}
               </Typography>

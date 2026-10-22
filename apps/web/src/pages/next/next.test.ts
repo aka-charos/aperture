@@ -13,7 +13,7 @@ import {
   writeNextUrl,
 } from './reasons'
 import { buildMapData, connectionTypeFor, type MapLabels } from './map'
-import { connectionTypesIn } from '../../components/SimilarityGraph/connectionHighlight'
+import { legendConnectionTypes } from '../../components/SimilarityGraph/connectionHighlight'
 import type { NextFromHereResponse, NextPeopleRow, NextReason } from './types'
 import type { TrailEntity, TrailTitle } from '../trails/types'
 
@@ -244,7 +244,7 @@ test('the map: the start in the middle, every line a named reason, a person befo
   assert.equal(between[0].target, fromRow.id)
   assert.ok(graph.edges.every((e) => e.target !== notDrawn.id))
   // The legend lists what the map draws, and nothing it does not.
-  assert.deepEqual(connectionTypesIn(graph), [
+  assert.deepEqual(legendConnectionTypes(graph.edges, new Set(), null), [
     'director',
     'keyword',
     'similarity',

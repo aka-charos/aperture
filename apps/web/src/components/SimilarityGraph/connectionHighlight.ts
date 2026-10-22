@@ -11,7 +11,7 @@
  * Pure, pinned by connectionHighlight.test.ts. The choice itself is kept by
  * connectionHighlightStore.ts, shared by every graph and legend on screen.
  */
-import type { ConnectionType, GraphData, GraphEdge, GraphNode } from './types'
+import type { ConnectionType, GraphEdge, GraphNode } from './types'
 import { CONNECTION_COLORS } from './types'
 
 /**
@@ -20,23 +20,6 @@ import { CONNECTION_COLORS } from './types'
  * drawn without also appearing in every legend.
  */
 export const CONNECTION_TYPES = Object.keys(CONNECTION_COLORS) as readonly ConnectionType[]
-
-/**
- * The types the similarity graph itself can draw (Explore, a title's similar
- * titles): every type but `crew`, which only Next from here's map draws. What a
- * legend lists before its graph has loaded.
- */
-export const SIMILARITY_GRAPH_TYPES: readonly ConnectionType[] = CONNECTION_TYPES.filter((type) => type !== 'crew')
-
-/**
- * The types a graph actually draws, in legend order: what its legend lists,
- * so every entry lights something. Read off the edges, so a graph that draws
- * a new type lists it without anyone remembering to.
- */
-export function connectionTypesIn(graph: Pick<GraphData, 'edges'>): ConnectionType[] {
-  const present = new Set(graph.edges.flatMap((edge) => edge.reasons.map((reason) => reason.type)))
-  return CONNECTION_TYPES.filter((type) => present.has(type))
-}
 
 /**
  * The type an edge is drawn in: the strongest reason it carries.
@@ -64,9 +47,38 @@ export function primaryConnectionType(reasons: GraphEdge['reasons']): Connection
   return 'similarity'
 }
 
-/** Whether an edge is drawn strongly: nothing is highlighted, or it carries a highlighted type. */
+/**
+ * The types a legend lists for one graph, in legend order: every type some
+ * edge carries (a highlight lights any edge CARRYING the type, not only the
+ * edges drawn in its colour), plus any type still chosen or previewed: either
+ * one dims the graph, so a type the new graph lacks must stay listed and
+ * undoable rather than dimming it for a reason nobody can see. A previewed
+ * entry also has to stay under the pointer, or no pointerleave ever clears it.
+ * No graph and no highlight lists nothing.
+ */
+export function legendConnectionTypes(
+  edges: readonly GraphEdge[] | null | undefined,
+  highlighted: ReadonlySet<ConnectionType>,
+  preview: ConnectionType | null
+): ConnectionType[] {
+  const present = new Set<ConnectionType>(highlighted)
+  if (preview) present.add(preview)
+  for (const edge of edges ?? []) {
+    present.add(primaryConnectionType(edge.reasons))
+    for (const reason of edge.reasons) present.add(reason.type)
+  }
+  return CONNECTION_TYPES.filter((type) => present.has(type))
+}
+
+/**
+ * Whether an edge is drawn strongly: nothing is highlighted, or it carries a
+ * highlighted type. An edge with no reasons carries the type it is drawn in,
+ * since that is the entry the legend lists for it.
+ */
 export function edgeIsLit(reasons: GraphEdge['reasons'], highlighted: ReadonlySet<ConnectionType>): boolean {
-  return highlighted.size === 0 || reasons.some((r) => highlighted.has(r.type))
+  if (highlighted.size === 0) return true
+  if (reasons.length === 0) return highlighted.has(primaryConnectionType(reasons))
+  return reasons.some((r) => highlighted.has(r.type))
 }
 
 /**

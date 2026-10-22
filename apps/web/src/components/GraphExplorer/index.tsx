@@ -32,7 +32,6 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import {
   SimilarityGraph,
   GraphLegend,
-  connectionTypesIn,
   type GraphData,
   type GraphNode,
   type LoadingStatus,
@@ -383,7 +382,7 @@ export function GraphExplorer({
           gap: 1,
         }}
       >
-        {showLegend ? <GraphLegend compact={compact} types={data ? connectionTypesIn(data) : undefined} /> : <Box />}
+        {showLegend ? <GraphLegend edges={data?.edges} compact={compact} /> : <Box />}
         <Typography
           variant={compact ? 'caption' : 'body2'}
           color="text.secondary"

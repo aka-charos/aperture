@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, Box, Typography } from '@mui/material'
-import { GraphLegend, SimilarityGraph, connectionTypesIn, type GraphNode } from '@/components/SimilarityGraph'
+import { GraphLegend, SimilarityGraph, type GraphNode } from '@/components/SimilarityGraph'
 import { roleKey } from '../trails/labels'
 import type { TrailEntity, TrailRole, TrailTitle } from '../trails/types'
 import { buildMapData, type MapLabels } from './map'
@@ -35,7 +35,6 @@ export function NextMap({ data, onOpen, onStepItem, onStepRow }: NextMapProps) {
     [t, i18n.language]
   )
   const graph = useMemo(() => buildMapData(data, labels), [data, labels])
-  const types = useMemo(() => (graph ? connectionTypesIn(graph) : []), [graph])
 
   const titleFor = useCallback(
     (node: GraphNode): TrailTitle | null => {
@@ -86,7 +85,7 @@ export function NextMap({ data, onOpen, onStepItem, onStepRow }: NextMapProps) {
       <Box sx={{ height: { xs: 480, md: 640 }, borderRadius: 2, overflow: 'hidden' }}>
         <SimilarityGraph data={graph} onNodeOpen={onNodeOpen} onNodeExplore={onNodeExplore} />
       </Box>
-      <GraphLegend types={types} />
+      <GraphLegend edges={graph.edges} />
     </Box>
   )
 }

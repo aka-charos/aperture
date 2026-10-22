@@ -4,10 +4,10 @@
  * Renders either:
  * - a horizontal scrollable carousel (default) — the secondary "Also worth
  *   checking" strip and plain library/search results; or
- * - a vertical stack of rich cards (when `data.layout === 'list'`) — every list
+ * - a responsive grid of rich cards (when `data.layout === 'list'`) — every list
  *   whose cards carry a synopsis and a written "why it fits": the web-search
  *   "Recommendations" and the two "Your AI Recommendations" lists. A reason is
- *   what earns the vertical form; without one a card is a poster and belongs in
+ *   what earns the grid form; without one a card is a poster and belongs in
  *   the scroller.
  */
 import { useEffect, useRef, useState } from 'react'
@@ -20,11 +20,13 @@ import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd'
 import { ContentCard } from './ContentCard'
 import { CreatePlaylistFromSuggestionsDialog } from './CreatePlaylistFromSuggestionsDialog'
 import { COMPACT_THREAD, chatText } from '../density'
+import { useCarouselHeaderText } from './carouselHeader'
 import type { ContentCarouselData, ContentItem } from './types'
 
 interface ContentCarouselProps {
   data: ContentCarouselData
-  onPlay?: (id: string, href: string) => void
+  /** Leave the heading out: a tab above the section already names it. */
+  hideTitle?: boolean
 }
 
 /**
@@ -40,31 +42,22 @@ const favoriteStatusCache = new Map<string, boolean>()
 
 const favoriteKey = (item: Pick<ContentItem, 'id' | 'type'>) => `${item.type}:${item.id}`
 
-function useCarouselHeaderText(data: ContentCarouselData) {
-  const { t } = useTranslation()
-  const title = data.titleKey
-    ? t(`assistantToolUi.${data.titleKey}`, {
-        ...(data.titleParams ?? {}),
-        defaultValue: data.title,
-      })
-    : data.title
-  const description = data.descriptionKey
-    ? t(`assistantToolUi.${data.descriptionKey}`, {
-        ...(data.descriptionParams ?? {}),
-        defaultValue: data.description,
-      })
-    : data.description
-  const resolvedTitle = typeof title === 'string' && title.length > 0 ? title : undefined
-  const resolvedDescription = typeof description === 'string' && description.length > 0 ? description : undefined
-  return { resolvedTitle, resolvedDescription }
-}
+/**
+ * Narrowest a rich card may get before the grid drops a column. The card spends
+ * a fixed 100px on its poster, and the title, director and synopsis share the
+ * column beside it; at 380px that column is about 240px, below which titles
+ * wrap to two lines so often that the synopsis beside the poster all but goes.
+ */
+const LIST_CARD_MIN_WIDTH = 380
 
-export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
+export function ContentCarousel({ data, hideTitle = false }: ContentCarouselProps) {
   const { t } = useTranslation()
   const theme = useTheme()
   const rtl = theme.direction === 'rtl'
   const scrollRef = useRef<HTMLDivElement>(null)
-  const { resolvedTitle, resolvedDescription } = useCarouselHeaderText(data)
+  const header = useCarouselHeaderText(data)
+  const resolvedTitle = hideTitle ? undefined : header.resolvedTitle
+  const { resolvedDescription } = header
 
   // 'list' = vertical rich cards (anything with per-card reasons). Anything
   // else = carousel.
@@ -281,14 +274,30 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
       {renderHeader()}
 
       {isList ? (
-        /* Vertical stacked list of rich cards (recommendations with reasons) */
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, [COMPACT_THREAD]: { gap: 1 } }}>
+        /* Grid of rich cards (recommendations with reasons). Sized off the
+           thread's own width, never a window breakpoint: the same list renders
+           in the 420px dock, the dialog and the full /assistant page, so one
+           card per row in the dock and three or four on a wide page.
+           `auto-fit` rather than `auto-fill`: a one- or two-card answer fills
+           the row instead of sitting in a quarter of it beside empty tracks,
+           and `min(…, 100%)` lets a single column shrink below the minimum
+           rather than overflow. Cards align to the top of their row rather
+           than stretching: a stretched row would hand every neighbour a blank
+           band each time one card's synopsis is expanded. */
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(auto-fit, minmax(min(${LIST_CARD_MIN_WIDTH}px, 100%), 1fr))`,
+            alignItems: 'start',
+            gap: 1.25,
+            [COMPACT_THREAD]: { gap: 1 },
+          }}
+        >
           {data.items.map((item) => (
             <ContentCard
               key={item.id}
               item={item}
               variant="list"
-              onPlay={onPlay}
               isFavorite={favorited.has(item.id)}
               favoritePending={pendingFavorites.has(item.id)}
               onToggleFavorite={handleToggleFavorite}
@@ -374,12 +383,11 @@ export function ContentCarousel({ data, onPlay }: ContentCarouselProps) {
               //
               // It matters more now that the reason is never clamped: card
               // height follows a model-written sentence, so without this a row
-              // reads as a ragged staircase and the Details/Play buttons sit at
+              // reads as a ragged staircase and the Details button and heart sit at
               // a different height on every card.
               <Box key={item.id} sx={{ scrollSnapAlign: 'start', flexShrink: 0, display: 'flex' }}>
                 <ContentCard
                   item={item}
-                  onPlay={onPlay}
                   isFavorite={favorited.has(item.id)}
                   favoritePending={pendingFavorites.has(item.id)}
                   onToggleFavorite={handleToggleFavorite}
