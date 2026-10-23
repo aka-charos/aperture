@@ -157,27 +157,40 @@ export const palette = {
 }
 
 /**
- * The light mode: warm and restrained. Ink is the primary colour, one accent
- * (the secondary) carries emphasis, status keeps its meaning, and an admin's
- * own brand colour replaces ink and accent when one is set. Depth comes from
- * borders and the canvas-against-sheet contrast rather than from shadows.
- * Every neutral comes from ONE scheme object, so nothing else in the light
- * mode names a colour of its own.
+ * The light mode, laid out the way a light palette guide lays out a site: two
+ * ACCENT colours for calls to action (terracotta and rust), four CONTRAST
+ * colours from dark to pale for text and state (navy, slate, sage, pale sage),
+ * and three BASE colours for the surfaces, all warm beige and none of them
+ * white. The accent is the primary colour; the selected page and a selected
+ * toggle sit on pale sage; depth comes from the base steps and borders rather
+ * than from shadows. An admin's own brand pair replaces both accents when one
+ * is set. Every colour comes from ONE scheme object, so nothing else in the
+ * light mode names a colour of its own.
  */
 interface LightScheme {
-  /** Text, the primary colour and the selected-page pill. */
+  /** Accent 1: the primary colour (contained buttons, tabs, switches, progress). */
+  accent: string
+  /** Accent 2: the secondary colour, a deeper rust. */
+  accentDeep: string
+  /** Text and icons set ON an accent or on ink (button labels, tooltips). */
+  onAccent: string
+  /** Contrast 1: text and the darkest marks. */
   ink: string
-  /** The pill and filled toggles under the pointer. */
-  inkHover: string
-  /** Text and icons set ON ink: the selected pill, a filled toggle, a contained button. */
-  onInk: string
-  /** Secondary text. */
+  /** Contrast 2: secondary text, and information. */
   muted: string
-  /** Behind everything. */
+  /** Contrast 3: the cool note, the series label and success. */
+  sage: string
+  /** Contrast 4: the selected page, a selected toggle or row. */
+  highlight: string
+  /** The highlight under the pointer. */
+  highlightHover: string
+  /** Text and icons set on the highlight. */
+  onHighlight: string
+  /** Base 1: behind everything. */
   canvas: string
-  /** Cards, panels, the sidebar and the app bar. */
+  /** Base 2: cards, panels, the sidebar and the app bar. */
   sheet: string
-  /** Inputs and cards sitting inside a panel. */
+  /** Base 3: inputs and cards sitting inside a panel. */
   raised: string
   /** A row or card under the pointer. */
   raisedHover: string
@@ -193,38 +206,39 @@ interface LightScheme {
   /** Behind posters while they load. */
   fillDeep: string
   scrollbar: string
-  /** The accent: the secondary colour when no brand colour is set. */
-  secondary: string
-  /** Information, and the series label: the one cool note in a warm scheme. */
-  info: string
   /** The two ends of the gradient shown where a hero has no image. */
   placeholder: [string, string]
 }
 
 /**
- * Rosewood, after a rosewood-and-sand moodboard: espresso ink on sand and
- * blush, paper-white sheets, a burnt-orange accent and slate teal for
- * information.
+ * Vintage: the palette's beige (#e5dac6) as the base, its navy (#33364d) as
+ * ink, slate (#4f6466) and sage (#6f9984) as the cool contrast, and terracotta
+ * (#cc6f57) with rust (#9b5143) as the accents. The accent is a shade deeper
+ * than the palette's terracotta so that a label on it, and the accent used as
+ * text, both stay readable.
  */
 const LIGHT_SCHEME: LightScheme = {
-  ink: '#2a1c16',
-  inkHover: '#45312a',
-  onInk: '#ffffff',
-  muted: '#6a574d',
-  canvas: '#ecdfd3',
-  sheet: '#fbf6f1',
-  raised: '#ffffff',
-  raisedHover: '#f6ede5',
-  border: '#e0cfc0',
-  borderStrong: '#c6ad98',
-  borderHover: '#8f7564',
-  tableHead: '#f6ece3',
-  fill: '#e4d3c4',
-  fillDeep: '#eadcd0',
-  scrollbar: '#cbb29d',
-  secondary: '#a9541f',
-  info: '#4f6164',
-  placeholder: ['#e6d2c1', '#d2b59d'],
+  accent: '#b85c45',
+  accentDeep: '#9b5143',
+  onAccent: '#f6f0e6',
+  ink: '#33364d',
+  muted: '#4f6466',
+  sage: '#4f7a66',
+  highlight: '#cddfd4',
+  highlightHover: '#c0d6c9',
+  onHighlight: '#2f4a3d',
+  canvas: '#e5dac6',
+  sheet: '#ebe3d4',
+  raised: '#efe9dd',
+  raisedHover: '#e5dccb',
+  border: '#d4c7ad',
+  borderStrong: '#bcab8b',
+  borderHover: '#8a7a5c',
+  tableHead: '#e3d8c3',
+  fill: '#d8cbb1',
+  fillDeep: '#ddd1b9',
+  scrollbar: '#c2b394',
+  placeholder: ['#d9ccb2', '#c4b192'],
 }
 
 /**
@@ -233,9 +247,9 @@ const LIGHT_SCHEME: LightScheme = {
  * on a light surface. Shared by every scheme.
  */
 const LIGHT_STATUS = {
-  error: { main: '#b8383a', light: '#cf5f61', dark: '#952a2c' },
-  warning: { main: '#8a5a12', light: '#a8772e', dark: '#6e470c' },
-  success: { main: '#2f6b47', light: '#4c8762', dark: '#225236' },
+  error: { main: '#a4423a', light: '#bd6259', dark: '#83332c' },
+  warning: { main: '#8c6420', light: '#a8813c', dark: '#6e4e17' },
+  success: { main: '#3f6b54', light: '#5b8770', dark: '#2f5240' },
 }
 
 function lightPaletteFor(s: LightScheme) {
@@ -252,12 +266,12 @@ function lightPaletteFor(s: LightScheme) {
       disabledBackground: alpha(s.ink, 0.08),
     },
     ...LIGHT_STATUS,
-    info: { main: s.info, light: lighten(s.info, 0.25), dark: darken(s.info, 0.25) },
+    info: { main: s.muted, light: lighten(s.muted, 0.25), dark: darken(s.muted, 0.25) },
   }
 }
 
 /**
- * The light mode's brand colours: the scheme's ink and accent, unless an admin
+ * The light mode's brand colours: the scheme's two accents, unless an admin
  * has set a brand pair, which then replaces BOTH.
  *
  * The pair is one decision. Brand colours are saved together and shown together
@@ -274,14 +288,13 @@ function brandPairIsDefault(): boolean {
 
 function lightBrand(s: LightScheme) {
   if (!brandPairIsDefault()) return { primary: { ...palette.primary }, secondary: { ...palette.secondary } }
-  const ink = { main: s.ink, light: lighten(s.ink, 0.3), dark: darken(s.ink, 0.3), contrastText: s.onInk }
-  const accent = {
-    main: s.secondary,
-    light: lighten(s.secondary, 0.25),
-    dark: darken(s.secondary, 0.25),
-    contrastText: s.onInk,
-  }
-  return { primary: ink, secondary: accent }
+  const shades = (main: string) => ({
+    main,
+    light: lighten(main, 0.25),
+    dark: darken(main, 0.2),
+    contrastText: s.onAccent,
+  })
+  return { primary: shades(s.accent), secondary: shades(s.accentDeep) }
 }
 
 /** The brand gradients for one mode's primary and secondary. */
@@ -327,9 +340,9 @@ function lightSurfaces(s: LightScheme): SurfaceTokens {
   }
 }
 
-/** The light mode's selected page: a solid ink pill. */
+/** The light mode's selected page: a pale sage pill, the palest contrast colour. */
 function lightNav(s: LightScheme): NavTokens {
-  return { selectedBg: s.ink, selectedHoverBg: s.inkHover, selectedText: s.onInk, selectedIcon: s.onInk }
+  return { selectedBg: s.highlight, selectedHoverBg: s.highlightHover, selectedText: s.onHighlight, selectedIcon: s.onHighlight }
 }
 
 /** The dark mode's selected page: a tint of the brand colour. */
@@ -438,10 +451,10 @@ const BUTTON_SIZES = { sizeSmall: { fontSize: '0.75rem' }, sizeLarge: { fontSize
 const TAB_TYPE = { fontFamily: SANS_FONT, fontSize: '0.875rem', letterSpacing: '0.02857em' }
 
 /**
- * The light mode's look: crisper 6px corners, every working surface a paper
- * sheet with a 1px border on the sand canvas, ink as the primary colour, a
- * solid ink pill for the selected page, tinted table headers, and transitions
- * on colour only. Every colour here comes from the scheme (`lightColourCallSites`
+ * The light mode's look: crisper 6px corners, every working surface a beige
+ * sheet with a 1px border on the beige canvas, terracotta as the primary
+ * colour, a pale sage pill for the selected page, tinted table headers, and
+ * transitions on colour only. Every colour here comes from the scheme (`lightColourCallSites`
  * in themeColorCallSites.test.ts holds it to that).
  */
 function buildLightOptions(s: LightScheme): ThemeOptions {
@@ -456,9 +469,9 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
       ...lightPalette,
       surface: lightSurfaces(s),
       nav: lightNav(s),
-      // TEXT on a light surface, so darker than the dark mode's pair; the
-      // scheme's info colour for series, the one cool note on a warm page.
-      mediaType: { movie: brand.primary.main, series: lightPalette.info.main },
+      // TEXT on a light surface, so darker than the dark mode's pair; sage for
+      // series, the cool contrast colour on a warm page.
+      mediaType: { movie: brand.primary.main, series: s.sage },
       gradient: gradientTokens(brand.primary, brand.secondary),
     },
     typography: TYPOGRAPHY,
@@ -546,9 +559,10 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
             borderRadius: 6,
             marginInline: 8,
             '&.Mui-selected': {
-              backgroundColor: alpha(s.ink, 0.07),
-              '&:hover': { backgroundColor: alpha(s.ink, 0.1) },
-              '&.Mui-focusVisible': { backgroundColor: alpha(s.ink, 0.12) },
+              backgroundColor: s.highlight,
+              color: s.onHighlight,
+              '&:hover': { backgroundColor: s.highlightHover },
+              '&.Mui-focusVisible': { backgroundColor: s.highlightHover },
             },
           },
         },
@@ -566,6 +580,16 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
       },
       MuiChip: {
         styleOverrides: { root: { borderRadius: 6 } },
+      },
+      // MUI's standard alert lightens its colour almost to white; a tint over
+      // the sheet keeps it inside the scheme.
+      MuiAlert: {
+        styleOverrides: {
+          standard: ({ ownerState }) => {
+            const tone = lightPalette[ownerState.severity ?? 'success']?.main ?? s.muted
+            return { backgroundColor: alpha(tone, 0.12), color: s.ink }
+          },
+        },
       },
       MuiOutlinedInput: {
         styleOverrides: {
@@ -594,16 +618,16 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
       MuiTab: {
         styleOverrides: { root: { ...TAB_TYPE, '&.Mui-selected': { fontWeight: 600 } } },
       },
-      // The active side of a segmented control is filled, the same ink as the
-      // selected page in the sidebar; a faint tint is lost on a light sheet.
+      // The active side of a segmented control is filled with the same pale sage
+      // as the selected page in the sidebar.
       MuiToggleButton: {
         styleOverrides: {
           root: {
             borderColor: s.borderStrong,
             '&.Mui-selected': {
-              backgroundColor: s.ink,
-              color: s.onInk,
-              '&:hover': { backgroundColor: s.inkHover },
+              backgroundColor: s.highlight,
+              color: s.onHighlight,
+              '&:hover': { backgroundColor: s.highlightHover },
             },
           },
         },
