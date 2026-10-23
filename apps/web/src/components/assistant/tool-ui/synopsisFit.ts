@@ -7,25 +7,38 @@
  * the longest word-boundary prefix that, followed by the suffix, still fits.
  *
  * Measured in an off-screen copy carrying the synopsis's own font and width,
- * never by rewriting the rendered element, which React owns.
+ * never by rewriting the rendered element, which React owns. The card keeps a
+ * height cap as well, so a copy that measures a hair differently from the real
+ * text costs a clipped line rather than a synopsis running past the poster.
  */
 
-/** The copy's styles are read from the element it stands in for. */
+/** Everything about the text that can move where a line breaks. */
 const COPIED_STYLES = [
   'fontFamily',
   'fontSize',
   'fontWeight',
   'fontStyle',
+  'fontStretch',
+  'fontVariant',
+  'fontKerning',
+  'fontFeatureSettings',
+  'fontVariationSettings',
   'letterSpacing',
   'lineHeight',
   'wordSpacing',
+  'wordBreak',
+  'overflowWrap',
+  'hyphens',
   'textTransform',
   'direction',
 ] as const
 
+/** Not even the suffix fits in the lines allowed: show no synopsis. */
+export const NOTHING_FITS = -1
+
 /**
- * The character count to show, or null when the whole text fits without the
- * suffix. 0 means not even one word fits beside it.
+ * The character count to show before the suffix, null when the whole text fits
+ * without one, or `NOTHING_FITS`. 0 means the suffix fits but no word beside it.
  *
  * `suffix` is the suffix as it renders (ellipsis, space, label), and
  * `suffixWeight` the weight it renders at, since a bolder label is wider.
@@ -47,11 +60,10 @@ export function fitSynopsis(
   for (const key of COPIED_STYLES) probe.style[key] = style[key]
   probe.style.position = 'absolute'
   probe.style.visibility = 'hidden'
-  probe.style.insetInlineStart = '-10000px'
+  probe.style.left = '-10000px'
   probe.style.top = '0'
   probe.style.width = `${width}px`
   probe.style.whiteSpace = 'normal'
-  probe.style.overflowWrap = 'break-word'
   const body = document.createTextNode('')
   const tail = document.createElement('span')
   tail.style.fontWeight = suffixWeight
@@ -70,8 +82,10 @@ export function fitSynopsis(
       body.data = text.slice(0, length).trimEnd()
       return probe.scrollHeight <= limit
     }
+    if (!fits(0)) return NOTHING_FITS
     // Longest prefix that fits, by halving; the text is a few hundred
-    // characters, so this is about ten layouts.
+    // characters, so this is about ten layouts. It is always shorter than the
+    // whole text, which was just shown not to fit.
     let low = 0
     let high = text.length
     while (low < high) {
@@ -81,7 +95,7 @@ export function fitSynopsis(
     }
     // Back to the last word boundary, so no word is cut in half.
     const space = text.lastIndexOf(' ', low)
-    return space > 0 && low < text.length ? space : low
+    return space > 0 ? space : low
   } finally {
     probe.remove()
   }

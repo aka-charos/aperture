@@ -51,7 +51,7 @@ import { useTranslation } from 'react-i18next'
 import { RankBadge, WatchedBadge, getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
 import { COMPACT_THREAD, chatText } from '../density'
-import { fitSynopsis } from './synopsisFit'
+import { NOTHING_FITS, fitSynopsis } from './synopsisFit'
 import type { ContentItem } from './types'
 
 interface ContentCardProps {
@@ -142,7 +142,10 @@ export function ContentCard({
   const [overviewLines, setOverviewLines] = useState(isList ? 3 : COMPACT_OVERVIEW_LINES)
   /** Characters shown before "… More ›"; null when the whole synopsis fits. */
   const [overviewCut, setOverviewCut] = useState<number | null>(null)
-  const moreLabel = `${t('assistantToolUi.moreLink')} ${theme.direction === 'rtl' ? '‹' : '›'}`
+  // '›' in every direction: it is a mirrored character, so a right-to-left
+  // line already draws it pointing the other way. Swapping it by hand
+  // mirrors it twice.
+  const moreLabel = `${t('assistantToolUi.moreLink')} ›`
 
   // A list card's synopsis ends at the poster's bottom edge: as many whole
   // lines as fit below where it starts, none when a long title already
@@ -161,10 +164,15 @@ export function ContentCard({
     const text = item.overview
     if (!overview || !text) return
     let cancelled = false
+    // The cut costs about ten layouts, and the observer fires on every frame
+    // the column is resized, so it is redone only when something it depends
+    // on moved.
+    let measuredFor = ''
     const measure = () => {
       // A card in a hidden tab has no layout: every offset and height reads 0,
       // which would clamp as if the synopsis started at the poster's top. The
-      // observer fires again when the tab is shown, and measures then.
+      // observer fires again when the tab is shown, and measures then; until
+      // then the height cap below holds the uncut text to its lines.
       if (cancelled || overview.offsetParent === null) return
       let lines = COMPACT_OVERVIEW_LINES
       if (isList) {
@@ -172,16 +180,26 @@ export function ContentCard({
         if (!(lineHeight > 0)) return
         lines = Math.max(0, Math.floor((LIST_POSTER_HEIGHT - overview.offsetTop) / lineHeight))
       }
-      setOverviewLines(lines)
-      setOverviewCut(lines > 0 ? fitSynopsis(text, overview, lines, `… ${moreLabel}`, '600') : null)
+      const key = `${overview.clientWidth}|${lines}`
+      if (key === measuredFor) return
+      measuredFor = key
+      const cut = lines > 0 ? fitSynopsis(text, overview, lines, `… ${moreLabel}`, '600') : null
+      // Not even "… More ›" fits beside a long title: show no synopsis at
+      // all rather than a link spilling under the poster.
+      setOverviewLines(cut === NOTHING_FITS ? 0 : lines)
+      setOverviewCut(cut === NOTHING_FITS ? null : cut)
     }
     measure()
     // The column is observed: a narrower column rewraps the title, which moves
     // where the synopsis starts, and rewraps the synopsis itself.
     const observer = new ResizeObserver(measure)
     if (bodyRef.current) observer.observe(bodyRef.current)
-    // A web font arriving late changes every width the cut was made against.
-    void document.fonts?.ready.then(measure)
+    // A web font arriving late changes every width the cut was made against,
+    // without changing the column's width, so it measures afresh.
+    void document.fonts?.ready.then(() => {
+      measuredFor = ''
+      measure()
+    })
     return () => {
       cancelled = true
       observer.disconnect()
@@ -194,14 +212,16 @@ export function ContentCard({
   const openMediaDetail = useMediaDetailModal()
 
   const handleDetails = () => {
-    if (!detailsAction?.href) return
+    // An episode card's `id` is the episode (the carousel keys on it), and no
+    // detail view takes one — the parent show is the destination.
+    const titleId = item.episode?.seriesId ?? item.id
     if (openMediaDetail) {
-      // An episode card's `id` is the episode (the carousel keys on it), and no
-      // detail view takes one — the parent show is the destination.
-      openMediaDetail(item.type, item.episode?.seriesId ?? item.id)
+      openMediaDetail(item.type, titleId)
       return
     }
-    navigate(detailsAction.href)
+    // The card itself is the only way to open the title now, so a card whose
+    // tool sent no details link still opens it, at the title's own address.
+    navigate(detailsAction?.href ?? `/${item.type === 'movie' ? 'movies' : 'series'}/${titleId}`)
   }
 
   const typeLabel = item.episode
@@ -371,11 +391,20 @@ export function ContentCard({
       variant="caption"
       component="p"
       sx={{
-        // A block, so it has a width to measure the cut against.
-        display: overviewLines > 0 ? 'block' : 'none',
+        // A block, so it has a width to measure the cut against. Never
+        // `display: none` when no line fits: hidden, it has no layout to be
+        // measured again by, and a later, wider column could never bring it
+        // back.
+        display: 'block',
         m: 0,
         color: 'text.secondary',
         lineHeight: 1.45,
+        // The cap the cut is measured to, kept as a safety net: an uncut
+        // synopsis waiting to be measured (in a hidden tab) and a copy that
+        // measured a hair short both stop at the line count instead of
+        // running past the poster.
+        maxHeight: `${overviewLines * 1.45}em`,
+        overflow: 'hidden',
       }}
     >
       {overviewCut == null ? (
