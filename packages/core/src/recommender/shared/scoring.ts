@@ -372,12 +372,13 @@ export const TARGET_COMPONENT_SPREAD = 0.57
  * 0.44 for the ninth. A constant is the right instrument for a constant
  * shortfall -- there is nothing per-run to adapt to.
  *
- * Re-measured when the rating became the unified one (F-167): 0.445 across
- * thirteen viewers' movie pools (0.440-0.446), against 0.46 on the media
- * server's rating. Series pools read about 0.33 under both and share this
- * constant anyway -- a separate, older mismatch, recorded there and left alone.
+ * Re-measured when the rating became the unified one (F-167): 0.431 across
+ * thirteen viewers' movie pools (0.426-0.438), measured with the rule exactly
+ * as it ships, against 0.46 on the media server's rating. Series pools read
+ * about 0.33 under both and share this constant anyway -- a separate, older
+ * mismatch, recorded there and left alone.
  */
-const RATING_TYPICAL_SPREAD = 0.445
+const RATING_TYPICAL_SPREAD = 0.43
 
 /**
  * How far a novelty gain may travel from 1.0.

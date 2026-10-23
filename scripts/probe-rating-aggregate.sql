@@ -46,7 +46,7 @@
 -- rating that moved since the run does not register as an effect of the
 -- aggregate. The preference nudge is carried over exactly (it is a fixed share
 -- of the remaining headroom, so it is inverted from final - base and reapplied).
--- Two variants: A is what ships (the rating gain at 0.57 / 0.445); B
+-- Two variants: A is what ships (the rating gain at 0.57 / 0.43); B
 -- re-measures the gain from each pool's own new spread.
 --
 -- Read-only (temp functions, views and tables only). Weights are psql
@@ -219,8 +219,8 @@ CREATE TEMP VIEW sim AS
          pg_temp.renudge(p.base, p.final,
            (p.ws * greatest(p.ns, 0) + p.wn * p.nov + p.wr * p.old_score) / (p.ws + p.wn + p.wr)) AS final_old,
          pg_temp.renudge(p.base, p.final,
-           (p.ws * greatest(p.ns, 0) + p.wn * p.nov + p.wr * (0.46 / 0.445) * p.new_score)
-           / (p.ws + p.wn + p.wr * (0.46 / 0.445))) AS final_a,
+           (p.ws * greatest(p.ns, 0) + p.wn * p.nov + p.wr * (0.46 / 0.43) * p.new_score)
+           / (p.ws + p.wn + p.wr * (0.46 / 0.43))) AS final_a,
          pg_temp.renudge(p.base, p.final,
            (p.ws * greatest(p.ns, 0) + p.wn * p.nov
             + p.wr * (0.46 / NULLIF(ps.new_spread, 0)) * p.new_score)
@@ -283,7 +283,7 @@ SELECT media_type, title, year, ROUND(coalesce(community, imdb)::numeric, 1) AS 
  ORDER BY aggregate - coalesce(community, imdb) ASC LIMIT 15;
 
 \echo
-\echo '=== 3. Rating-score spread inside each run''s pool (0.46 on the old rating, 0.445 shipped)'
+\echo '=== 3. Rating-score spread inside each run''s pool (0.46 on the old rating, 0.43 shipped)'
 SELECT p.media_type, COUNT(*) AS runs,
        ROUND(MIN(ps.old_spread)::numeric, 3) AS old_min,
        ROUND((percentile_cont(0.5) WITHIN GROUP (ORDER BY ps.old_spread))::numeric, 3) AS old_median,
@@ -296,7 +296,7 @@ SELECT p.media_type, COUNT(*) AS runs,
  GROUP BY p.media_type ORDER BY p.media_type;
 
 \echo
-\echo '=== 4. Per viewer: how much of today''s ranking survives (A = shipped gain 0.57/0.445, B = per-pool gain)'
+\echo '=== 4. Per viewer: how much of today''s ranking survives (A = shipped gain 0.57/0.43, B = per-pool gain)'
 SELECT u.username, r.media_type, max(r.selected_count) AS n, COUNT(*) AS pool,
        COUNT(*) FILTER (WHERE r_old <= selected_count AND r_a <= selected_count) AS top_n_kept_a,
        COUNT(*) FILTER (WHERE r_old <= selected_count AND r_b <= selected_count) AS top_n_kept_b,
