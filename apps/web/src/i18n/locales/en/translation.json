@@ -1636,6 +1636,8 @@
     "noImage": "No Image",
     "createPlaylist": "Create playlist",
     "sectionUntitled": "Results",
+    "moreLink": "More",
+    "moreAbout": "More about {{title}}",
     "favorite": "Add to favorites",
     "removeFavorite": "Remove from favorites",
     "favoriteAdded": "Added to your favorites",

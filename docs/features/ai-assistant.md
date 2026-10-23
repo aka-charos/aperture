@@ -22,7 +22,7 @@
 
 > "A slow, wintry film — nothing longer than two hours"
 
-Concept queries are answered with **semantic search** over your library's embeddings, not just title matching. Answers arrive as **poster cards**, each with a reason attached, in a grid that fits the width of the chat. Each card has **Details**, which opens the title (playback starts there), and a favorite toggle; an episode card also has **Play**, which opens that episode directly.
+Concept queries are answered with **semantic search** over your library's embeddings, not just title matching. Answers arrive as **poster cards**, each with a reason attached, in a grid that fits the width of the chat. Click a card, its title, or **More ›** at the end of a cut synopsis to open the title (playback starts there); each card also has a favorite toggle, and an episode card has **Play**, which opens that episode directly.
 
 ### Answer questions about *you*
 
@@ -72,7 +72,7 @@ A suggestion carousel has a **create-playlist** action: the titles it recommende
 
 > *Status: Searching your library…*
 
-**Encore:** carousel of atmospheric horror from your library — each card with a one-line reason ("slow-burn haunted-house dread, minimal gore"), a **Details** button, and the watched titles omitted because "Only suggest what I haven't watched" is on.
+**Encore:** carousel of atmospheric horror from your library — each card with a one-line reason ("slow-burn haunted-house dread, minimal gore"), opening the title when clicked, and the watched titles omitted because "Only suggest what I haven't watched" is on.
 
 **You:** "okay but something newer, this century only"
 
@@ -89,7 +89,7 @@ A suggestion carousel has a **create-playlist** action: the titles it recommende
 ## Good to Know
 
 - **It can't rate for you** — ratings stay a manual action (deliberately: a rating is your judgement)
-- **It can't play directly** — Details opens the title, and you play it from there
+- **It can't play directly** — a card opens the title, and you play it from there
 - **Discovery turns use the internet** — when the answer needs web sources, the request involves external services; library-only questions stay local
 - **It doesn't guess watched state** — with "only unwatched" on, the filter is real: played titles and 5%+ progress are excluded
 - **Welcome-screen suggestion chips** refresh with your latest recommendation run — a one-click way in

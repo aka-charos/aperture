@@ -3780,6 +3780,8 @@
     "noImage": "Χωρίς εικόνα",
     "createPlaylist": "Δημιουργία λίστας",
     "sectionUntitled": "Αποτελέσματα",
+    "moreLink": "Περισσότερα",
+    "moreAbout": "Περισσότερα για {{title}}",
     "favorite": "Προσθήκη στα αγαπημένα",
     "removeFavorite": "Αφαίρεση από τα αγαπημένα",
     "favoriteAdded": "Προστέθηκε στα αγαπημένα σας",

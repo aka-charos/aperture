@@ -13,22 +13,22 @@
  *   user's own AI recommendations, and any section shown in a tab). Three
  *   bands: the poster with the title, year, rating and synopsis beside it, the
  *   synopsis cut where the poster ends; the reason across nearly the full
- *   width; and one row holding Details, the director, genres and the heart. A column
+ *   width; and one row holding the director, genres and the heart. A column
  *   beside the poster that ran on past it left the reason squeezed into the
  *   narrow column for no reason, with empty space under the artwork.
  *
- * The type (film, or show and episode) is the Details button's icon and
- * colour, not a separate chip. Only an episode card has a Play action: for a film or show, Details opens the
- * title page and playing starts there.
+ * There is no Details button: the card, its title and the "More ›" that ends a
+ * cut synopsis all open the title page, where playing starts. Only an episode
+ * card has a Play action, since the title page it opens is its show's.
  *
  * The SYNOPSIS is the only clamped text, in both variants — it exists in full on
- * the detail page, which the card itself opens, so it is cut at an ellipsis and
- * never expanded in place. The "why it fits"
+ * the detail page, which the card itself opens, so it is cut short on
+ * "… More ›" and never expanded in place. The "why it fits"
  * is never clamped anywhere: it is the only text on the card with no second
  * home, and hiding it behind a control means reading a row of six picks one
  * expansion at a time.
  */
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import {
   Box,
   Typography,
@@ -41,8 +41,6 @@ import {
 } from '@mui/material'
 import { alpha, darken, useTheme } from '@mui/material/styles'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import MovieOutlinedIcon from '@mui/icons-material/MovieOutlined'
-import LiveTvOutlinedIcon from '@mui/icons-material/LiveTvOutlined'
 import StarIcon from '@mui/icons-material/Star'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
@@ -53,6 +51,7 @@ import { useTranslation } from 'react-i18next'
 import { RankBadge, WatchedBadge, getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
 import { COMPACT_THREAD, chatText } from '../density'
+import { fitSynopsis } from './synopsisFit'
 import type { ContentItem } from './types'
 
 interface ContentCardProps {
@@ -129,20 +128,21 @@ export function ContentCard({
   const isList = variant === 'list'
 
   const detailsAction = item.actions?.find(a => a.id === 'details')
-  // Details covers playback for a film or a show: the title page it opens has
-  // the media server's Play button. An episode is the exception — Details opens
-  // its show, not the episode — so its card keeps a direct Play.
+  // Opening the card covers playback for a film or a show: the title page has
+  // the media server's Play button. An episode is the exception — the card
+  // opens its show, not the episode — so it keeps a direct Play.
   const episodePlayAction = item.episode ? item.actions?.find(a => a.id === 'play') : undefined
 
   const { year, rest: genreLine } = splitMeta(item.subtitle)
 
-  // The synopsis is never expanded in place. A cut one ends on the clamp's
-  // ellipsis, and the card itself (synopsis included) opens the title's
-  // detail view, where the whole of it is.
+  // The synopsis is never expanded in place. A cut one ends on "… More ›",
+  // which opens the title's detail view, where the whole of it is.
   const bodyRef = useRef<HTMLDivElement>(null)
-  const overviewRef = useRef<HTMLSpanElement>(null)
-  const [listOverviewLines, setListOverviewLines] = useState(3)
-  const overviewLines = isList ? listOverviewLines : COMPACT_OVERVIEW_LINES
+  const overviewRef = useRef<HTMLParagraphElement>(null)
+  const [overviewLines, setOverviewLines] = useState(isList ? 3 : COMPACT_OVERVIEW_LINES)
+  /** Characters shown before "… More ›"; null when the whole synopsis fits. */
+  const [overviewCut, setOverviewCut] = useState<number | null>(null)
+  const moreLabel = `${t('assistantToolUi.moreLink')} ${theme.direction === 'rtl' ? '‹' : '›'}`
 
   // A list card's synopsis ends at the poster's bottom edge: as many whole
   // lines as fit below where it starts, none when a long title already
@@ -152,28 +152,41 @@ export function ContentCard({
   // for exactly this.
   // Before paint, or every card would first draw at the default line count
   // and snap to its measured one a frame later.
+  //
+  // Both variants then cut the synopsis themselves rather than with CSS
+  // line-clamp, which can only end on a bare ellipsis: the cut leaves room for
+  // "… More ›" on the last line (`fitSynopsis`).
   useLayoutEffect(() => {
-    if (!isList) return
     const overview = overviewRef.current
-    if (!overview) return
+    const text = item.overview
+    if (!overview || !text) return
+    let cancelled = false
     const measure = () => {
       // A card in a hidden tab has no layout: every offset and height reads 0,
       // which would clamp as if the synopsis started at the poster's top. The
       // observer fires again when the tab is shown, and measures then.
-      if (overview.offsetParent === null) return
-      const lineHeight = Number.parseFloat(getComputedStyle(overview).lineHeight)
-      if (lineHeight > 0) {
-        const room = LIST_POSTER_HEIGHT - overview.offsetTop
-        setListOverviewLines(Math.max(0, Math.floor(room / lineHeight)))
+      if (cancelled || overview.offsetParent === null) return
+      let lines = COMPACT_OVERVIEW_LINES
+      if (isList) {
+        const lineHeight = Number.parseFloat(getComputedStyle(overview).lineHeight)
+        if (!(lineHeight > 0)) return
+        lines = Math.max(0, Math.floor((LIST_POSTER_HEIGHT - overview.offsetTop) / lineHeight))
       }
+      setOverviewLines(lines)
+      setOverviewCut(lines > 0 ? fitSynopsis(text, overview, lines, `… ${moreLabel}`, '600') : null)
     }
     measure()
     // The column is observed: a narrower column rewraps the title, which moves
-    // where the synopsis starts.
+    // where the synopsis starts, and rewraps the synopsis itself.
     const observer = new ResizeObserver(measure)
     if (bodyRef.current) observer.observe(bodyRef.current)
-    return () => observer.disconnect()
-  }, [isList, item.overview])
+    // A web font arriving late changes every width the cut was made against.
+    void document.fonts?.ready.then(measure)
+    return () => {
+      cancelled = true
+      observer.disconnect()
+    }
+  }, [isList, item.overview, moreLabel])
 
   // Chat surfaces that own the whole viewport open the item here instead of
   // routing, so the conversation and its scroll position survive a look at a
@@ -203,7 +216,7 @@ export function ContentCard({
         width,
         height,
         flexShrink: 0,
-        borderRadius: 1,
+        // Square: rounded corners read as a cropped poster.
         overflow: 'hidden',
         bgcolor: theme.palette.divider,
         position: 'relative',
@@ -287,29 +300,55 @@ export function ContentCard({
     </Box>
   )
 
-  // The type is carried by the Details button's icon and colour: a film strip
-  // for a film, a television for a show or an episode. On a list card that
-  // replaced a "Movie" / "Series" chip that took a line's worth of room to say
-  // one word; a carousel card keeps the chip as well (see there). The icon
-  // names the type to assistive technology.
+  // A carousel card shows the type as a chip beside the title; a list card
+  // shows none.
   const isMovie = item.type === 'movie' && !item.episode
   const typeColor = isMovie ? theme.palette.mediaType.movie : theme.palette.mediaType.series
-  const TypeIcon = isMovie ? MovieOutlinedIcon : LiveTvOutlinedIcon
+  // The accent "More ›" and the focus ring use: the dark theme's accent is its
+  // primary, the light theme's primary is ink and its accent is secondary.
+  const accent = theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.secondary.main
 
+  const openDetails = (e: MouseEvent) => {
+    e.stopPropagation()
+    handleDetails()
+  }
+
+  // The title is a button: with no Details button, it and "More ›" are what a
+  // keyboard reaches to open the title (the card's own click is mouse-only).
   const title = (
-    <Typography
-      variant="body2"
-      fontWeight={600}
-      sx={{ color: 'text.primary', minWidth: 0, ...clampLines(2) }}
+    <Box
+      component="button"
+      type="button"
+      onClick={openDetails}
+      sx={{
+        display: 'block',
+        width: '100%',
+        p: 0,
+        m: 0,
+        border: 0,
+        bgcolor: 'transparent',
+        font: 'inherit',
+        textAlign: 'start',
+        cursor: 'pointer',
+        color: 'inherit',
+        '&:focus-visible': { outline: `2px solid ${accent}`, outlineOffset: 2, borderRadius: '2px' },
+      }}
     >
-      {item.name}
-      {year && (
-        <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>
-          {' '}
-          ({year})
-        </Box>
-      )}
-    </Typography>
+      <Typography
+        variant="body2"
+        component="span"
+        fontWeight={600}
+        sx={{ color: 'text.primary', minWidth: 0, ...clampLines(2) }}
+      >
+        {item.name}
+        {year && (
+          <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>
+            {' '}
+            ({year})
+          </Box>
+        )}
+      </Typography>
+    </Box>
   )
 
   // Director (movies) / creator (series) — the same DB column serves both
@@ -330,14 +369,43 @@ export function ContentCard({
     <Typography
       ref={overviewRef}
       variant="caption"
+      component="p"
       sx={{
+        // A block, so it has a width to measure the cut against.
+        display: overviewLines > 0 ? 'block' : 'none',
+        m: 0,
         color: 'text.secondary',
         lineHeight: 1.45,
-        // `line-clamp: 0` is not a clamp at all, so no room is a zero height.
-        ...(overviewLines > 0 ? clampLines(overviewLines) : { maxHeight: 0, overflow: 'hidden' }),
       }}
     >
-      {item.overview}
+      {overviewCut == null ? (
+        item.overview
+      ) : (
+        <>
+          {item.overview.slice(0, overviewCut).trimEnd()}…{' '}
+          <Box
+            component="button"
+            type="button"
+            onClick={openDetails}
+            aria-label={t('assistantToolUi.moreAbout', { title: item.name })}
+            sx={{
+              display: 'inline',
+              p: 0,
+              border: 0,
+              bgcolor: 'transparent',
+              font: 'inherit',
+              fontWeight: 600,
+              color: accent,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              '&:hover': { textDecoration: 'underline' },
+              '&:focus-visible': { outline: `2px solid ${accent}`, outlineOffset: 2, borderRadius: '2px' },
+            }}
+          >
+            {moreLabel}
+          </Box>
+        </>
+      )}
     </Typography>
   )
 
@@ -384,38 +452,6 @@ export function ContentCard({
         {item.reason}
       </Typography>
     </Box>
-  )
-
-  // The tooltip names the type the icon shows, for anyone unsure of the glyph.
-  const detailsButton = (
-    <Tooltip title={typeLabel}>
-    <Button
-      size="small"
-      variant="outlined"
-      startIcon={<TypeIcon titleAccess={typeLabel} sx={{ fontSize: 16 }} />}
-      onClick={(e) => {
-        e.stopPropagation()
-        handleDetails()
-      }}
-      sx={{
-        flexShrink: 0,
-        minWidth: 0,
-        px: 1.25,
-        py: 0.375,
-        fontSize: chatText(11),
-        fontWeight: 600,
-        color: typeColor,
-        borderColor: alpha(typeColor, 0.5),
-        bgcolor: alpha(typeColor, 0.1),
-        '&:hover': {
-          borderColor: typeColor,
-          bgcolor: alpha(typeColor, 0.18),
-        },
-      }}
-    >
-      {t('assistantToolUi.details')}
-    </Button>
-    </Tooltip>
   )
 
   const playButton = episodePlayAction?.href && (
@@ -493,10 +529,9 @@ export function ContentCard({
     // List card, three bands:
     // - the poster with the title, year and rating and the synopsis beside it,
     //   the synopsis cut at the poster's bottom edge so the two end on one
-    //   line (its ellipsis says there is more; the card opens it);
+    //   line, ending on "… More ›" when cut;
     // - the reason across nearly the whole card, never clamped;
-    // - one row of facts and actions: Details (its icon is the type),
-    //   director, genres, heart.
+    // - one row: Play (episodes only), director, genres, heart.
     return (
       <Paper
         sx={{
@@ -544,11 +579,10 @@ export function ContentCard({
 
         {reason}
 
-        {/* One line: the actions keep their size, and the director and
-            genres between them shrink to an ellipsis rather than wrapping the
-            row onto a second line. */}
+        {/* One line: Play (episodes only) and the heart keep their size, and
+            the director and genres between them shrink to an ellipsis rather
+            than wrapping the row onto a second line. */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 'auto', minWidth: 0 }}>
-          {detailsButton}
           {playButton}
           <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
             {director}
@@ -616,9 +650,7 @@ export function ContentCard({
         ref={bodyRef}
         sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}
       >
-        {/* Title and year, with the type beside them: a carousel card's
-            Details sits at its foot, below the reason, too far down to be
-            the type's only sign. */}
+        {/* Title and year, with the type beside them. */}
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, minWidth: 0 }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>{title}</Box>
           <Chip
@@ -639,11 +671,12 @@ export function ContentCard({
         {reason}
 
         {/* Action buttons */}
-        <Box sx={{ display: 'flex', gap: 1, mt: 'auto', pt: 1, [COMPACT_THREAD]: { pt: 0.75 } }}>
-          {detailsButton}
-          {playButton}
-          {favoriteButton}
-        </Box>
+        {(playButton || favoriteButton) && (
+          <Box sx={{ display: 'flex', gap: 1, mt: 'auto', pt: 1, [COMPACT_THREAD]: { pt: 0.75 } }}>
+            {playButton}
+            {favoriteButton}
+          </Box>
+        )}
       </Box>
     </Paper>
   )
