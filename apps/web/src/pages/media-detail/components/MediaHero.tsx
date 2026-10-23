@@ -78,6 +78,13 @@ const JELLYFIN_PURPLE = '#965ec7'
  */
 const CREW_NAMES_SHOWN = 4
 
+/**
+ * The hero's own width at which the poster moves beside the info. A 280px
+ * poster plus its 32px margin leaves about 400px beside it, which still fits the
+ * widest single action button and a readable line of text.
+ */
+const HERO_SIDE_BY_SIDE = '@container hero (min-width: 720px)'
+
 interface MediaHeroProps {
   media: Media
   mediaServer: MediaServerInfo | null
@@ -416,9 +423,19 @@ export function MediaHero({
       <Box
         data-tour="title-hero"
         sx={{
-          display: 'flex',
-          gap: 4,
-          flexDirection: { xs: 'column', md: 'row' },
+          // The poster FLOATS beside everything else rather than taking a
+          // column: the info rows sit beside it, and the synopsis wraps around
+          // it and then runs on at full width underneath, so the space under
+          // the poster is used however tall the info turns out (a column left
+          // it empty whenever the info ended first). Every info row is a flex
+          // box that wraps, so each shrinks into the space beside the poster
+          // instead of dropping below it. `flow-root` keeps the float inside.
+          // Side by side or stacked is decided by this box's own width, not
+          // the window's, since the hero also renders in the title dialog
+          // and in a pane narrowed by the assistant dock.
+          display: 'flow-root',
+          containerType: 'inline-size',
+          containerName: 'hero',
           mt: { xs: -18, md: -28 },
           position: 'relative',
           zIndex: 1,
@@ -431,13 +448,22 @@ export function MediaHero({
         <Paper
           elevation={8}
           sx={{
-            width: { xs: 200, md: 280 },
-            height: { xs: 300, md: 420 },
-            flexShrink: 0,
+            width: 200,
+            height: 300,
+            mx: 'auto',
+            mb: 4,
             borderRadius: 2,
             overflow: 'hidden',
             position: 'relative',
-            alignSelf: { xs: 'center', md: 'flex-start' },
+            [HERO_SIDE_BY_SIDE]: {
+              // `left`/`mr` are flipped to `right`/`ml` by the RTL stylis plugin.
+              float: 'left',
+              width: 280,
+              height: 420,
+              ml: 0,
+              mr: 4,
+              mb: 2,
+            },
           }}
         >
           {media.poster_url ? (
@@ -514,7 +540,7 @@ export function MediaHero({
         </Paper>
 
         {/* Info */}
-        <Box sx={{ flex: 1 }}>
+        <Box>
           {/* Status badges. A movie carried an "Available" chip here, which
               said nothing: the detail page is reached from the library, so
               every film on it is available by construction. The equivalent
@@ -1037,53 +1063,53 @@ export function MediaHero({
               </Typography>
             </Box>
           )}
+        </Box>
 
-          {/* Overview, with IMDb's longer synopsis available on request.
-              Collapsed by default and never swapped in silently: the long plot
-              is a user-submitted synopsis that narrates the whole story, so for
-              anything with a twist it gives it away. Only offered when it is
-              actually longer — OMDb returns the short blurb when IMDb has no
-              long one, and a "read more" that reveals nothing is worse than
-              no button. */}
-          {(media.overview || media.plot_full) && (
-            <Box sx={{ maxWidth: 600 }}>
-              <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-                {showFullPlot && media.plot_full ? shownLong : shownShort}
-              </Typography>
-              <Box display="flex" alignItems="center" flexWrap="wrap" columnGap={1}>
-                {hasLongerPlot && (
+        {/* Overview, with IMDb's longer synopsis available on request.
+            Collapsed by default and never swapped in silently: the long plot
+            is a user-submitted synopsis that narrates the whole story, so for
+            anything with a twist it gives it away. Only offered when it is
+            actually longer — OMDb returns the short blurb when IMDb has no
+            long one, and a "read more" that reveals nothing is worse than
+            no button. */}
+        {(media.overview || media.plot_full) && (
+          <Box sx={{ maxWidth: 600, [HERO_SIDE_BY_SIDE]: { maxWidth: 920 } }}>
+            <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+              {showFullPlot && media.plot_full ? shownLong : shownShort}
+            </Typography>
+            <Box display="flex" alignItems="center" flexWrap="wrap" columnGap={1}>
+              {hasLongerPlot && (
+                <Button
+                  size="small"
+                  startIcon={showFullPlot ? <ExpandLessIcon /> : <NotesIcon />}
+                  onClick={() => setShowFullPlot((shown) => !shown)}
+                  sx={{ mt: 0.5, ml: -1, textTransform: 'none' }}
+                >
+                  {showFullPlot ? t('mediaDetail.hero.showShortPlot') : t('mediaDetail.hero.showFullPlot')}
+                </Button>
+              )}
+              {localized && (
+                <>
+                  {shownIsTranslated && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                      {t('mediaDetail.hero.machineTranslated')}
+                    </Typography>
+                  )}
                   <Button
                     size="small"
-                    startIcon={showFullPlot ? <ExpandLessIcon /> : <NotesIcon />}
-                    onClick={() => setShowFullPlot((shown) => !shown)}
-                    sx={{ mt: 0.5, ml: -1, textTransform: 'none' }}
+                    startIcon={<TranslateIcon />}
+                    onClick={() => setShowOriginal((shown) => !shown)}
+                    sx={{ mt: 0.5, textTransform: 'none' }}
                   >
-                    {showFullPlot ? t('mediaDetail.hero.showShortPlot') : t('mediaDetail.hero.showFullPlot')}
+                    {showOriginal
+                      ? t('mediaDetail.hero.showTranslation')
+                      : t('mediaDetail.hero.showOriginal')}
                   </Button>
-                )}
-                {localized && (
-                  <>
-                    {shownIsTranslated && (
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                        {t('mediaDetail.hero.machineTranslated')}
-                      </Typography>
-                    )}
-                    <Button
-                      size="small"
-                      startIcon={<TranslateIcon />}
-                      onClick={() => setShowOriginal((shown) => !shown)}
-                      sx={{ mt: 0.5, textTransform: 'none' }}
-                    >
-                      {showOriginal
-                        ? t('mediaDetail.hero.showTranslation')
-                        : t('mediaDetail.hero.showOriginal')}
-                    </Button>
-                  </>
-                )}
-              </Box>
+                </>
+              )}
             </Box>
-          )}
-        </Box>
+          </Box>
+        )}
       </Box>
 
       {/* Confirmation Dialog for Mark Unwatched */}
