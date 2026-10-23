@@ -228,26 +228,27 @@ interface LightScheme {
 }
 
 /**
- * Vintage: the palette's beige (#e5dac6) as the base, its navy (#33364d) as
+ * Vintage: the palette's beige (#e5dac6, taken a shade darker for the canvas so
+ * the sheets stand off it) as the base, its navy (#33364d) as
  * ink, sage (#6f9984) as the cool contrast, terracotta (#cc6f57) as the accent
  * and slate teal (#4f6466) as the second accent. Every text-bearing colour is
  * taken a shade deeper than the palette where it had to be to reach 4.5:1 on
  * the beige; the palette's own terracotta and rust read at about 3:1 there.
  */
 const LIGHT_SCHEME: LightScheme = {
-  accent: '#974834',
-  accentDeep: '#4f6466',
+  accent: '#914532',
+  accentDeep: '#4b5f61',
   onAccent: '#f6f0e6',
   ink: '#33364d',
-  muted: '#5a5c6e',
-  sage: '#3a6450',
+  muted: '#585a6c',
+  sage: '#39634f',
   highlight: '#cddfd4',
   highlightHover: '#c0d6c9',
   onHighlight: '#2f4a3d',
   info: '#3e5577',
   error: '#a52a3a',
-  warning: '#7a5518',
-  canvas: '#e5dac6',
+  warning: '#795418',
+  canvas: '#ded3bd',
   sheet: '#ebe3d4',
   raised: '#efe9dd',
   raisedHover: '#e5dccb',
@@ -256,7 +257,7 @@ const LIGHT_SCHEME: LightScheme = {
   borderHover: '#8a7a5c',
   tableHead: '#e3d8c3',
   fill: '#d8cbb1',
-  fillDeep: '#ddd1b9',
+  fillDeep: '#d5c8ae',
   scrollbar: '#c2b394',
   placeholder: ['#d9ccb2', '#c4b192'],
 }
