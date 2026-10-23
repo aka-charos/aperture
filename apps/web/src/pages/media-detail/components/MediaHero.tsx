@@ -80,10 +80,20 @@ const CREW_NAMES_SHOWN = 4
 
 /**
  * The hero's own width at which the poster moves beside the info. A 280px
- * poster plus its 32px margin leaves about 400px beside it, which still fits the
- * widest single action button and a readable line of text.
+ * poster plus its 32px margin leaves about 330px beside it, which still fits the
+ * widest single action button. Lower than the 900px window breakpoint it
+ * replaces would suggest, because the hero is narrower than the window by the
+ * sidebar and padding: at 640 a 1024px window with the sidebar open stays side
+ * by side, as it was before.
  */
-const HERO_SIDE_BY_SIDE = '@container hero (min-width: 720px)'
+const HERO_SIDE_BY_SIDE = '@container hero (min-width: 640px)'
+
+/**
+ * The hero's own width at which it takes its side padding and the full-size
+ * title: roughly the 600px window breakpoint (`sm`) it replaces, less the
+ * page's own padding.
+ */
+const HERO_ROOMY = '@container hero (min-width: 560px)'
 
 interface MediaHeroProps {
   media: Media
@@ -420,28 +430,38 @@ export function MediaHero({
 
   return (
     <>
+      {/* Every size in the hero is decided by the hero's own width, not the
+          window's, since it also renders in the title dialog and in a pane
+          narrowed by the assistant dock. A container cannot query itself, so
+          this box only names the container and the box inside it carries the
+          offset and padding. */}
       <Box
         data-tour="title-hero"
         sx={{
-          // The poster FLOATS beside everything else rather than taking a
-          // column: the info rows sit beside it, and the synopsis wraps around
-          // it and then runs on at full width underneath, so the space under
-          // the poster is used however tall the info turns out (a column left
-          // it empty whenever the info ended first). Every info row is a flex
-          // box that wraps, so each shrinks into the space beside the poster
-          // instead of dropping below it. `flow-root` keeps the float inside.
-          // Side by side or stacked is decided by this box's own width, not
-          // the window's, since the hero also renders in the title dialog
-          // and in a pane narrowed by the assistant dock.
-          display: 'flow-root',
           containerType: 'inline-size',
           containerName: 'hero',
-          mt: { xs: -18, md: -28 },
           position: 'relative',
           zIndex: 1,
+        }}
+      >
+      <Box
+        sx={{
+          // The poster FLOATS rather than taking a column: what sits beside it
+          // shortens to fit, and the synopsis wraps around it and then runs on
+          // at full width underneath, so the space under the poster is used
+          // however tall the info turns out (a column left it empty whenever
+          // the info ended first). A row that is a flex box (or `flow-root`)
+          // shrinks into the space beside the poster as a whole; a plain block
+          // keeps its own width and only its lines are shortened, so a block
+          // with a maxWidth must be made one or the other, or the poster eats
+          // into it. `flow-root` here keeps the float inside the hero.
+          display: 'flow-root',
+          mt: -18,
           // The page already pads a phone by 16px; a second 24px here left the
           // hero 40px in from each edge.
-          px: { xs: 0, sm: 3 },
+          px: 0,
+          [HERO_ROOMY]: { px: 3 },
+          [HERO_SIDE_BY_SIDE]: { mt: -28 },
         }}
       >
         {/* Poster */}
@@ -456,12 +476,13 @@ export function MediaHero({
             overflow: 'hidden',
             position: 'relative',
             [HERO_SIDE_BY_SIDE]: {
-              // `left`/`mr` are flipped to `right`/`ml` by the RTL stylis plugin.
-              float: 'left',
+              // Logical values, never left/right: the RTL stylis plugin does not
+              // flip rules inside an @container block.
+              float: 'inline-start',
               width: 280,
               height: 420,
-              ml: 0,
-              mr: 4,
+              marginInlineStart: 0,
+              marginInlineEnd: theme.spacing(4),
               mb: 2,
             },
           }}
@@ -619,7 +640,8 @@ export function MediaHero({
                 textShadow: theme.palette.surface.heroTextShadow,
                 // h3 is 3rem, which fits about eight characters a line on a
                 // phone; one long word would push the page sideways.
-                fontSize: { xs: '2rem', sm: '3rem' },
+                fontSize: '2rem',
+                [HERO_ROOMY]: { fontSize: '3rem' },
                 overflowWrap: 'anywhere',
               }}
             >
@@ -1046,7 +1068,9 @@ export function MediaHero({
             <Typography
               variant="caption"
               color="text.secondary"
-              sx={{ display: 'block', mb: 1.5, fontStyle: 'italic', maxWidth: 600 }}
+              // flow-root, not block: beside the floated poster a plain block
+              // keeps its 600px and only its lines shorten, to about 290px.
+              sx={{ display: 'flow-root', mb: 1.5, fontStyle: 'italic', maxWidth: 600 }}
             >
               "{media.rt_consensus}"
             </Typography>
@@ -1110,6 +1134,7 @@ export function MediaHero({
             </Box>
           </Box>
         )}
+      </Box>
       </Box>
 
       {/* Confirmation Dialog for Mark Unwatched */}
