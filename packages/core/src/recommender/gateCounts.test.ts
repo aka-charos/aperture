@@ -7,6 +7,7 @@ import {
   ABSENT_MEANS_ZERO,
   compareCounts,
   INTEREST_MATCHING_VERSION,
+  QUALITY_RATING_VERSION,
   inputCountsSql,
   isMissingRunCountsColumn,
   outputCountsSql,
@@ -233,4 +234,21 @@ test('the interest-matching version regenerates viewers with interests once, and
   assert.ok(ABSENT_MEANS_ZERO.has('interest_matching'))
   assert.ok(inputCountsSql('movie', '$1').includes("'interest_matching'"))
   assert.ok(inputCountsSql('series', '$1').includes("'interest_matching'"))
+})
+
+test('the quality-rating version regenerates every viewer once', () => {
+  // Every viewer scores on the rating, so unlike interest matching the
+  // current value is the version for everyone, movies and series alike.
+  const before = { watch_history: 240 }
+  assert.deepEqual(compareCounts(before, { ...before, quality_rating: QUALITY_RATING_VERSION }), {
+    kind: 'changed',
+    key: 'quality_rating',
+    stored: 0,
+    current: QUALITY_RATING_VERSION,
+  })
+  const after = { ...before, quality_rating: QUALITY_RATING_VERSION }
+  assert.deepEqual(compareCounts(after, after), { kind: 'same' })
+  assert.ok(ABSENT_MEANS_ZERO.has('quality_rating'))
+  assert.ok(inputCountsSql('movie', '$1').includes(`'quality_rating', (SELECT ${QUALITY_RATING_VERSION})`))
+  assert.ok(inputCountsSql('series', '$1').includes(`'quality_rating', (SELECT ${QUALITY_RATING_VERSION})`))
 })

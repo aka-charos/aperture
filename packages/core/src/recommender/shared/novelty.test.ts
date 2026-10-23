@@ -479,7 +479,8 @@ test('similarity is the reference and is never re-gained', () => {
 })
 
 test('the rating gain is fixed, because its shortfall is', () => {
-  // Measured 0.46 for eight of nine live users and 0.44 for the ninth, so
+  // Measured 0.46 for eight of nine live users and 0.44 for the ninth, and
+  // 0.445 again once the rating became the unified one (F-167), so
   // there is nothing per-run to adapt to.
   const config = { similarityWeight: 0.7, noveltyWeight: 0.08, ratingWeight: 0.21 }
   const a = effectiveBlendWeights(config, 0.2).ratingWeight
@@ -502,7 +503,7 @@ test('correcting the weights makes realised influence track the configured share
   // Measured spreads, with novelty at its post-widening value.
   const sim = poolWithSpread(0.577)
   const nov = poolWithSpread(0.65)
-  const rat = poolWithSpread(0.46)
+  const rat = poolWithSpread(0.445)
   const candidates = sim.map((s, i) => ({
     similarity: s,
     normalizedSimilarity: s,
@@ -532,7 +533,7 @@ test('the correction still helps when the clamp binds', () => {
   const config = { similarityWeight: 0.7, noveltyWeight: 0.08, ratingWeight: 0.21 }
   const sim = poolWithSpread(0.577)
   const nov = poolWithSpread(0.24)
-  const rat = poolWithSpread(0.46)
+  const rat = poolWithSpread(0.445)
   const candidates = sim.map((s, i) => ({
     similarity: s,
     normalizedSimilarity: s,

@@ -77,6 +77,8 @@ Each candidate is scored with configurable weights:
 | **Rating** | 20% | Community and critic scores |
 | **Diversity** | 20% | Variety across your final list |
 
+The rating is one number. For movies it combines the IMDb rating (60%) with the Metacritic and Rotten Tomatoes critic scores (40%), each put on IMDb's scale first; a movie critics never reviewed uses its IMDb rating alone. Series use their IMDb rating, because critic scores for shows are rare.
+
 You can customize these (or switch to your own weights entirely) under **Advanced** in [Recommendations settings](user-settings/recommendations.md). Only the ratio between them matters — they're normalized automatically.
 
 ### Exclusions

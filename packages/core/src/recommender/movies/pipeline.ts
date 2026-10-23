@@ -32,6 +32,7 @@ import { loadInterestMatchIndex } from '../interestMatches.js'
 import { getLibraryScopeForUser } from '../../lib/libraryScope.js'
 import { loadRecommendationRecipients } from '../recipients.js'
 import { scoreCandidates } from './scoring.js'
+import { getQualityRatings } from '../../ratings/qualityRatings.js'
 import { applyDiversityAndSelect } from './selection.js'
 import {
   storeCandidates,
@@ -525,7 +526,8 @@ export async function generateRecommendationsForUser(
     const { candidates: scoredCandidates, weights: blendWeights } = scoreCandidates(
       candidates,
       genreFamiliarity,
-      cfg
+      cfg,
+      await getQualityRatings('movie')
     )
 
     // 4.5 Apply franchise, genre, and custom interest preference adjustments

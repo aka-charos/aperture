@@ -51,6 +51,8 @@ import {
   spreadOf,
   type BlendWeights,
 } from '../shared/index.js'
+import { getQualityRatings } from '../../ratings/qualityRatings.js'
+import { scoringRating } from '../../ratings/unifiedRating.js'
 import { getDonorWatchedIds, getTwinPairs } from '../twinAffinity.js'
 import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
 import { refreshTasteSynopsis } from '../../lib/tasteSynopsisRefresh.js'
@@ -535,6 +537,10 @@ async function scoreSeriesCandidates(
     ratingsMap.set(row.id, row.community_rating)
     votesMap.set(row.id, row.imdb_vote_count)
   }
+  // The unified rating scores; the media server's own rating stays on the
+  // candidate for the acclaimed gate and the slot prompt. Series take the
+  // audience half only (F-167). Mirrors movies/scoring.ts.
+  const qualityRatings = await getQualityRatings('series')
 
   // Similarity is read against the pool it came from rather than as an absolute
   // cosine, so the configured similarity weight buys the influence it claims.
@@ -547,8 +553,9 @@ async function scoreSeriesCandidates(
   // movies/scoring.ts.
   const scored = candidates.map((candidate) => ({
     ...candidate,
-    // Use shared rating score calculation (handles bad data, proper scaling)
-    ratingScore: calculateRatingScore(ratingsMap.get(candidate.seriesId)),
+    ratingScore: calculateRatingScore(
+      scoringRating(qualityRatings, candidate.seriesId, ratingsMap.get(candidate.seriesId))
+    ),
     communityRating: ratingsMap.get(candidate.seriesId) ?? null,
     voteCount: votesMap.get(candidate.seriesId) ?? null,
     // Use shared novelty score calculation (handles missing genres). The genre

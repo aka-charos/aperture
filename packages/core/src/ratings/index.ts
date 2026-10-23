@@ -26,6 +26,16 @@ export {
   type ImdbRefreshResult,
 } from './imdbDataset.js'
 export {
+  RT_MC_MAX_DISAGREEMENT,
+  UNIFIED_RATING_WEIGHTS,
+  computeUnifiedRatings,
+  scoringRating,
+  trustedRtScore,
+  type UnifiedRatingInput,
+  type UnifiedRatingMediaType,
+} from './unifiedRating.js'
+export { QUALITY_RATINGS_TTL_MS, getQualityRatings } from './qualityRatings.js'
+export {
   refreshRatings,
   type RatingsRefreshOptions,
   type RatingsRefreshResult,

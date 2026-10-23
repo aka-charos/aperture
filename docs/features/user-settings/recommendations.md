@@ -69,7 +69,7 @@ Off, your recommendations use the scoring weights your admin set. On, you set yo
 |--------|--------------|
 | **Similarity** | How strongly to favour titles close to your taste. Usually the one to keep highest |
 | **Genre Discovery** | Rewards a familiar anchor plus a genre you rarely watch: partly new, rather than as strange as possible |
-| **Community Rating** | How much to favour highly rated titles. This score never changes, so a high value makes your list repeat itself |
+| **Community Rating** | How much to favour highly rated titles (IMDb, plus Metacritic and Rotten Tomatoes critic scores for movies). This score rarely changes, so a high value makes your list repeat itself |
 | **Diversity** | How hard to push for variety when your final list is picked |
 
 Only the ratio between them matters, so they don't need to add up to 100%. Each slider shows the default when you've moved away from it, and **Reset to Defaults** puts them all back.

@@ -371,8 +371,13 @@ export const TARGET_COMPONENT_SPREAD = 0.57
  * remarkably steady: 0.46 for eight of nine users on the live instance and
  * 0.44 for the ninth. A constant is the right instrument for a constant
  * shortfall -- there is nothing per-run to adapt to.
+ *
+ * Re-measured when the rating became the unified one (F-167): 0.445 across
+ * thirteen viewers' movie pools (0.440-0.446), against 0.46 on the media
+ * server's rating. Series pools read about 0.33 under both and share this
+ * constant anyway -- a separate, older mismatch, recorded there and left alone.
  */
-const RATING_TYPICAL_SPREAD = 0.46
+const RATING_TYPICAL_SPREAD = 0.445
 
 /**
  * How far a novelty gain may travel from 1.0.
@@ -407,7 +412,7 @@ export function spreadOf(values: number[]): number {
  * The correction goes on the WEIGHT and not on the component, deliberately.
  * Both produce identical rankings -- w/spread x value orders the same as w x
  * value/spread -- but only this direction leaves the numbers on screen alone.
- * "Quality 82%" means IMDb 8.2, exactly and checkably, and rescaling the
+ * "Quality 82%" means a unified rating of 8.2 (F-167), and rescaling the
  * component to fix an influence problem would destroy that to no purpose.
  *
  * Deliberately NOT a blanket standardization of all three. Similarity's

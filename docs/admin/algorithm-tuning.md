@@ -14,7 +14,7 @@ Four factors, defaults **40 / 20 / 20 / 20** for both media types:
 |--------|----------------|
 | **Similarity** | Closeness to the user's taste profile |
 | **Genre Discovery** (novelty) | Reward for less-watched genres around a familiar anchor |
-| **Rating** | Community/critic quality signal |
+| **Rating** | The unified quality rating: the refreshed IMDb rating, plus Metacritic and Rotten Tomatoes for movies (audience 60 / critics 40); series use IMDb alone |
 | **Diversity** | Variety across the final selection (applied at selection, via MMR, never to the score) |
 
 The first three are blended by their **shares**, so they do not have to add up to 100%; 0.4/0.2/0.2 and 0.8/0.4/0.4 are the same blend. The chip beside them shows those shares. Diversity is separate because it only shapes which of the scored titles are picked.

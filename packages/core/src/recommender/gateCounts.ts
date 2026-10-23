@@ -49,12 +49,20 @@ export type GateCounts = Record<string, number>
 export const INTEREST_MATCHING_VERSION = 1
 
 /**
+ * The version of the quality rating scoring reads (ratings/unifiedRating.ts).
+ * Bump it when a change to that rating would change picks: every viewer then
+ * regenerates once on their next scheduled run. 1 = the unified rating,
+ * refreshed IMDb plus critics (F-167).
+ */
+export const QUALITY_RATING_VERSION = 1
+
+/**
  * Keys that a run which predates them must read as 0 rather than be skipped.
  * compareCounts skips a key the stored snapshot lacks (a count added later,
  * which the timestamps still cover); a version marker has no timestamp, so
  * skipping it would mean the change it marks never reaches anyone.
  */
-export const ABSENT_MEANS_ZERO = new Set(['interest_matching'])
+export const ABSENT_MEANS_ZERO = new Set(['interest_matching', 'quality_rating'])
 
 /**
  * Each input count, per media type. Scoped exactly as the matching timestamp
@@ -94,6 +102,9 @@ function inputCountQueries(mediaType: GateMediaType, user: string): Array<[strin
     'interest_matching',
     `SELECT CASE WHEN EXISTS (SELECT 1 FROM user_custom_interests WHERE user_id = ${user}) THEN ${INTEREST_MATCHING_VERSION} ELSE 0 END`,
   ])
+  // Not a count either: which quality rating scoring read. It applies to every
+  // viewer, so a change to it regenerates everyone once.
+  counts.push(['quality_rating', `SELECT ${QUALITY_RATING_VERSION}`])
   if (!isMovie) {
     // Series-level favourites live here rather than in watch_history.
     counts.push([
