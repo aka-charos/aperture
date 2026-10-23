@@ -24,9 +24,10 @@
 --                     to the sources it is built from?
 --   6. disagreements -- titles where audience and critics part most, to read
 --
--- SCALES. imdb/tmdb/community are 0-10 (x10), letterboxd is 0-5 (x20), RT,
--- Metacritic and MDBList are 0-100. Check section 2's min/max: a source whose
--- max is not near its scale's top means the scale assumption is wrong.
+-- SCALES. imdb/tmdb/community/letterboxd are 0-10 (x10); RT, Metacritic and
+-- MDBList are 0-100. Letterboxd was first assumed 0-5 and the first run read
+-- 84-176, so it is stored as MDBList's 0-10 value. MDBList stores -1 for "no
+-- score", read here as NULL.
 --
 -- Read-only. Every row in movies/series is counted, including titles in
 -- libraries switched off in Aperture.
@@ -47,15 +48,15 @@ CREATE TEMP VIEW rating_rows AS
          rt_critic_score::float8       AS rt_critic,
          rt_audience_score::float8     AS rt_audience,
          metacritic_score::float8      AS metacritic,
-         letterboxd_score::float8 * 20 AS letterboxd,
-         mdblist_score::float8         AS mdblist
+         letterboxd_score::float8 * 10 AS letterboxd,
+         NULLIF(mdblist_score, -1)::float8 AS mdblist
     FROM movies
   UNION ALL
   SELECT 'series', id, title, year,
          community_rating::float8 * 10, imdb_rating::float8 * 10, imdb_vote_count,
          tmdb_rating::float8 * 10, tmdb_vote_count,
          rt_critic_score::float8, rt_audience_score::float8, metacritic_score::float8,
-         letterboxd_score::float8 * 20, mdblist_score::float8
+         letterboxd_score::float8 * 10, NULLIF(mdblist_score, -1)::float8
     FROM series;
 
 -- One row per (title, source, value). A stored 0 is kept as a value: whether a
