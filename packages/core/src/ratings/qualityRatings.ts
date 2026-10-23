@@ -6,31 +6,26 @@
  * because the rank-mapping takes percentiles over the library: a pool's
  * Metacritic range is not the library's.
  *
- * Cached per media type for QUALITY_RATINGS_TTL_MS. A recommendation job runs
- * both pipelines once per viewer, and the answer is one statement over every
- * title, so without the cache a twenty-viewer run reads the table forty times
- * for one answer. A rating that moved inside the window reaches the next run
- * instead of this one, which is harmless: ratings move weekly.
+ * Cached per media type for QUALITY_RATINGS_TTL_MS (ratingsCache.ts). A
+ * recommendation job runs both pipelines once per viewer, and the answer is one
+ * statement over every title, so without the cache a twenty-viewer run reads
+ * the table forty times for one answer. A rating that moved inside the window
+ * reaches the next run instead of this one, which is harmless: ratings move
+ * weekly.
  *
- * Never throws. A failed read answers an empty map, and the scorer then falls
- * back to the media server's rating for every title -- the behaviour before
- * the unified rating existed -- rather than failing a run that is otherwise
- * fine.
+ * Never throws. A failed read answers an empty map, is not cached, and the
+ * scorer then falls back to the media server's rating for every title -- the
+ * behaviour before the unified rating existed -- rather than failing a run
+ * that is otherwise fine.
  */
 import { query } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
+import { createRatingsCache } from './ratingsCache.js'
 import { computeUnifiedRatings, type UnifiedRatingMediaType } from './unifiedRating.js'
 
 const logger = createChildLogger('quality-ratings')
 
 export const QUALITY_RATINGS_TTL_MS = 10 * 60 * 1000
-
-interface CacheEntry {
-  at: number
-  ratings: Promise<Map<string, number | null>>
-}
-
-const cache = new Map<UnifiedRatingMediaType, CacheEntry>()
 
 interface RatingRow {
   id: string
@@ -41,7 +36,7 @@ interface RatingRow {
   metacritic: number | null
 }
 
-async function readRatings(mediaType: UnifiedRatingMediaType): Promise<Map<string, number | null>> {
+async function readRatings(mediaType: UnifiedRatingMediaType): Promise<Map<string, number | null> | null> {
   const table = mediaType === 'movie' ? 'movies' : 'series'
   try {
     // NUMERIC arrives from pg as a string; float8 arrives as a number.
@@ -57,23 +52,14 @@ async function readRatings(mediaType: UnifiedRatingMediaType): Promise<Map<strin
     return computeUnifiedRatings(result.rows, mediaType)
   } catch (err) {
     logger.warn({ err, mediaType }, 'Could not read ratings for the unified rating; scoring falls back to the media server rating')
-    // Not cached: the next run asks again rather than scoring on the fallback
-    // for the rest of the window.
-    cache.delete(mediaType)
-    return new Map()
+    return null
   }
 }
 
 /**
  * Every title's unified rating (0-10), or null for a title no source rates.
  * A title absent from the map (added since the cache was filled, or a failed
- * read) is the caller's to fall back on.
+ * read) is the caller's to fall back on, through scoringRating.
  */
-export function getQualityRatings(mediaType: UnifiedRatingMediaType): Promise<Map<string, number | null>> {
-  const now = Date.now()
-  const entry = cache.get(mediaType)
-  if (entry && now - entry.at < QUALITY_RATINGS_TTL_MS) return entry.ratings
-  const ratings = readRatings(mediaType)
-  cache.set(mediaType, { at: now, ratings })
-  return ratings
-}
+export const getQualityRatings: (mediaType: UnifiedRatingMediaType) => Promise<Map<string, number | null>> =
+  createRatingsCache(readRatings, () => new Map<string, number | null>(), QUALITY_RATINGS_TTL_MS)

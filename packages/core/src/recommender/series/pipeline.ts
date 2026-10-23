@@ -525,11 +525,18 @@ async function scoreSeriesCandidates(
 ): Promise<ScoredSeriesPool> {
   // Get ratings for candidates
   const seriesIds = candidates.map((c) => c.seriesId)
-  const ratingsResult = await query<{
-    id: string
-    community_rating: number | null
-    imdb_vote_count: number | null
-  }>(`SELECT id, community_rating, imdb_vote_count FROM series WHERE id = ANY($1)`, [seriesIds])
+  // The unified rating scores; the media server's own rating stays on the
+  // candidate for the acclaimed gate and the slot prompt. Series take the
+  // audience half only (F-167). Mirrors movies/scoring.ts. The two reads are
+  // independent, so they run together.
+  const [ratingsResult, qualityRatings] = await Promise.all([
+    query<{
+      id: string
+      community_rating: number | null
+      imdb_vote_count: number | null
+    }>(`SELECT id, community_rating, imdb_vote_count FROM series WHERE id = ANY($1)`, [seriesIds]),
+    getQualityRatings('series'),
+  ])
 
   const ratingsMap = new Map<string, number | null>()
   const votesMap = new Map<string, number | null>()
@@ -537,10 +544,6 @@ async function scoreSeriesCandidates(
     ratingsMap.set(row.id, row.community_rating)
     votesMap.set(row.id, row.imdb_vote_count)
   }
-  // The unified rating scores; the media server's own rating stays on the
-  // candidate for the acclaimed gate and the slot prompt. Series take the
-  // audience half only (F-167). Mirrors movies/scoring.ts.
-  const qualityRatings = await getQualityRatings('series')
 
   // Similarity is read against the pool it came from rather than as an absolute
   // cosine, so the configured similarity weight buys the influence it claims.

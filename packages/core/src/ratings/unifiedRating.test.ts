@@ -5,7 +5,7 @@ import {
   RT_MC_MAX_DISAGREEMENT,
   UNIFIED_RATING_WEIGHTS,
   computeUnifiedRatings,
-  midrankPercentiles,
+  percentileWithin,
   presentMean,
   trustedRtScore,
   valueAtPercentile,
@@ -43,13 +43,20 @@ test('a missing source is left out, never counted as zero', () => {
 })
 
 test('ties take the middle of their rank range', () => {
-  const p = midrankPercentiles([100, 100, 100, 50, 0])
-  assert.equal(p.get(0), 0)
-  assert.equal(p.get(50), 0.25)
+  const sorted = [0, 50, 100, 100, 100]
+  assert.equal(percentileWithin(sorted, 0), 0)
+  assert.equal(percentileWithin(sorted, 50), 0.25)
   // Positions 2, 3, 4 of 0..4: the middle is 3, i.e. 0.75 -- not the top.
-  assert.equal(p.get(100), 0.75)
-  assert.equal(midrankPercentiles([7]).get(7), 0.5)
-  assert.equal(midrankPercentiles([]).size, 0)
+  assert.equal(percentileWithin(sorted, 100), 0.75)
+  assert.equal(percentileWithin([7], 7), 0.5)
+  assert.equal(percentileWithin([], 7), null)
+})
+
+test('a value no title holds sits half a rank below the next one up', () => {
+  const sorted = [10, 20, 30, 40, 50]
+  assert.equal(percentileWithin(sorted, 25), 1.5 / 4)
+  assert.equal(percentileWithin(sorted, 5), 0)
+  assert.equal(percentileWithin(sorted, 99), 1)
 })
 
 test('a percentile reads the reference by nearest rank', () => {
@@ -97,11 +104,12 @@ test('series ignore critic scores', () => {
 })
 
 test('audience is IMDb, then the media server, then TMDb rank-mapped', () => {
+  // TMDb is mapped against the titles carrying both it and IMDb.
   const library = [
-    ...ALIGNED,
+    ...ALIGNED.map((r, i) => ({ ...r, tmdb: 4 + i })),
     row('imdb-and-community', { imdb: 7, community: 9.3 }),
     row('community-only', { community: 6.4 }),
-    // TMDb at the top of the TMDb values maps to the top of IMDb (9).
+    // TMDb above every paired TMDb value maps to the top of their IMDb (9).
     row('tmdb-only', { tmdb: 8.8 }),
     row('tmdb-low', { tmdb: 1 }),
     row('nothing', {}),
@@ -132,4 +140,25 @@ test('a dropped RT leaves Metacritic as the whole critic half', () => {
 test('non-finite inputs read as missing', () => {
   const ratings = computeUnifiedRatings([row('n', { imdb: Number.NaN, community: 7 })], 'movie')
   assert.equal(ratings.get('n'), 7)
+})
+
+test('a reviewed film is mapped against reviewed films, not the whole library', () => {
+  // The reviewed films (ALIGNED) are a better-rated subset: the library also
+  // holds a long tail of unreviewed films rated 3-4. Mapped against the whole
+  // library, a Metacritic median would read a 3-4 IMDb and every reviewed film
+  // would lose against an unreviewed film its critics and audience agree on.
+  const tail = Array.from({ length: 20 }, (_, i) => row(`tail${i}`, { imdb: 3 + (i % 2) }))
+  const ratings = computeUnifiedRatings([...ALIGNED, ...tail], 'movie')
+  for (const r of ALIGNED) {
+    assert.ok(Math.abs((ratings.get(r.id) ?? 0) - (r.imdb ?? 0)) < 1e-9, `${r.id}: ${ratings.get(r.id)}`)
+  }
+  assert.equal(ratings.get('tail0'), 3)
+})
+
+test('no paired titles means the source maps nothing', () => {
+  // Critic scores on titles none of which has an IMDb rating: nothing to map
+  // against, so the audience figure stands.
+  const ratings = computeUnifiedRatings([row('p', { community: 7, metacritic: 20 }), row('q', { community: 6, metacritic: 90 })], 'movie')
+  assert.equal(ratings.get('p'), 7)
+  assert.equal(ratings.get('q'), 6)
 })

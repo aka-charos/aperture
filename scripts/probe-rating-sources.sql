@@ -23,6 +23,9 @@
 --   5. mdblist_score -- MDBList already ships its own aggregate; how close is it
 --                     to the sources it is built from?
 --   6. disagreements -- titles where audience and critics part most, to read
+--   7. RT vs Metacritic -- how far the two disagree, and every film the RT guard
+--                     (RT_MC_MAX_DISAGREEMENT, ratings/unifiedRating.ts) drops,
+--                     to read for genuine splits the guard costs
 --
 -- SCALES. imdb/tmdb/community/letterboxd are 0-10 (x10); RT, Metacritic and
 -- MDBList are 0-100. Letterboxd was first assumed 0-5 and the first run read
@@ -234,3 +237,27 @@ SELECT media_type, title, year,
  WHERE rt_critic IS NOT NULL AND imdb IS NOT NULL AND imdb_votes >= 5000
  ORDER BY imdb - rt_critic DESC
  LIMIT 15;
+
+\echo
+\echo '=== 7a. RT - Metacritic, films carrying both (the guard drops |diff| > 50)'
+SELECT media_type, COUNT(*) AS n,
+       ROUND(AVG(rt_critic - metacritic)::numeric, 1)          AS mean_diff,
+       ROUND(stddev_samp(rt_critic - metacritic)::numeric, 1)  AS sd_diff,
+       COUNT(*) FILTER (WHERE rt_critic - metacritic > 30)     AS rt_above_30,
+       COUNT(*) FILTER (WHERE rt_critic - metacritic > 40)     AS rt_above_40,
+       COUNT(*) FILTER (WHERE rt_critic - metacritic > 50)     AS rt_above_50,
+       COUNT(*) FILTER (WHERE metacritic - rt_critic > 30)     AS mc_above_30,
+       COUNT(*) FILTER (WHERE metacritic - rt_critic > 40)     AS mc_above_40,
+       COUNT(*) FILTER (WHERE metacritic - rt_critic > 50)     AS mc_above_50
+  FROM rating_rows
+ WHERE rt_critic IS NOT NULL AND metacritic IS NOT NULL
+ GROUP BY media_type
+ ORDER BY media_type;
+
+\echo
+\echo '=== 7b. Every film the guard drops RT for (|RT - Metacritic| > 50) -- read: mismatch or genuine split?'
+SELECT media_type, title, year, rt_critic::int AS rt, metacritic::int AS mc,
+       ROUND((imdb / 10)::numeric, 1) AS imdb, imdb_votes
+  FROM rating_rows
+ WHERE rt_critic IS NOT NULL AND metacritic IS NOT NULL AND abs(rt_critic - metacritic) > 50
+ ORDER BY abs(rt_critic - metacritic) DESC, imdb_votes DESC NULLS LAST;

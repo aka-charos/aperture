@@ -1,28 +1,31 @@
--- What would an aggregated quality rating change?
+-- What does the unified quality rating change?
 --
--- THE PROPOSAL. Today the quality term is calculateRatingScore(community_rating),
--- and probe-rating-sources.sql measured community_rating as effectively an IMDb
--- copy (r = 0.995, about 0.1 point high on releases from the last year or two,
--- F-087). The proposal replaces the rating fed to calculateRatingScore with:
+-- THE RULE, as ratings/unifiedRating.ts ships it (F-167). The quality term used
+-- to be calculateRatingScore(community_rating); probe-rating-sources.sql
+-- measured community_rating as effectively an IMDb copy (r = 0.995, about 0.1
+-- point high on releases from the last two years, F-087). It is now:
 --
---   audience = 0.75 IMDb + 0.25 TMDb
+--   audience = the refreshed IMDb rating; the media server's where IMDb is
+--              missing; TMDb (rank-mapped) where both are
 --   critics  = 0.6 Metacritic + 0.4 RT critic         (movies only)
 --   rating   = 0.6 audience + 0.4 critics
 --
 -- Weights re-normalise over what a title HAS: a missing source never counts as
--- zero, and a title with no critic score is its audience figure. Series get the
--- audience half only, since RT/Metacritic cover about 1% of shows.
+-- zero, and a title with no critic score is its audience figure. An RT score
+-- more than :rt_guard points from the title's Metacritic is dropped (OMDb
+-- matches titles by name and sometimes stores another film's RT).
 --
 -- WHY RANK-MAPPING. The sources are not on one scale: RT is a share of
 -- positive reviews (sd 25.8, piles up at 100), Metacritic a weighted mean
--- (sd 17.1), IMDb a 0-10 mean (sd 9.4 on x10). A weighted mean of raw numbers
--- would let RT dominate by having the widest spread. So every source other
--- than IMDb is mapped onto IMDb's own distribution by rank: a title at the
--- 80th percentile of Metacritic gets the IMDb rating that sits at IMDb's 80th
--- percentile. The aggregate therefore stays on the 0-10 scale
--- calculateRatingScore expects, and "Quality 82%" keeps meaning 8.2.
--- Ties take the midpoint of their rank range (every RT 100 maps to the middle
--- of the 100s, not the top), per media type.
+-- (sd 17.1), IMDb a 0-10 mean (sd 9.4 on x10). So every source other than IMDb
+-- is mapped onto IMDb by rank, among the titles that carry BOTH: a title at
+-- the 80th percentile of Metacritic gets the IMDb rating at the 80th
+-- percentile of the Metacritic-reviewed films. Not of the whole library: the
+-- films critics reviewed are better known and better rated, and mapping onto
+-- the library's IMDb would mark every reviewed film down. Ties take the middle
+-- of their rank range; a value no paired title holds sits half a rank below
+-- the next one up; the IMDb value is read by nearest rank. All of that is the
+-- code's own arithmetic, so this measures what ships.
 --
 -- WHAT IT MEASURES
 --   0. formula check -- the stored base_score rebuilt from the stored
@@ -31,8 +34,7 @@
 --   1. library-wide  -- old rating vs aggregate, and the rating SCORE spread
 --   2. movers        -- the titles the aggregate moves most
 --   3. pool spread   -- p90-p10 of the rating score in each run's pool, old vs
---                       new: RATING_TYPICAL_SPREAD (0.46) is the old figure,
---                       and the new median is what it would become
+--                       new: RATING_TYPICAL_SPREAD was 0.46 on the old rating
 --   4. per viewer    -- for each viewer's newest completed run, how much of the
 --                       top N and of the MMR shortlist survives
 --   5. titles        -- which titles enter and leave viewers' top N
@@ -44,26 +46,18 @@
 -- rating that moved since the run does not register as an effect of the
 -- aggregate. The preference nudge is carried over exactly (it is a fixed share
 -- of the remaining headroom, so it is inverted from final - base and reapplied).
--- Two variants: A keeps the current rating gain (0.57 / 0.46); B re-measures
--- the gain from each pool's new spread, which is what a re-measured
--- RATING_TYPICAL_SPREAD would do.
+-- Two variants: A is what ships (the rating gain at 0.57 / 0.445); B
+-- re-measures the gain from each pool's own new spread.
 --
--- Read-only (temp functions and views only). Weights are psql variables, so a
--- different split is a re-run, e.g. psql ... -v w_critic=0.5 -f /tmp/agg.sql
+-- Read-only (temp functions, views and tables only). Weights are psql
+-- variables, so a different split is a re-run, e.g.
+--   psql ... -v w_critic=0.5 -f /tmp/agg.sql
 --
 -- Run (Windows host, cmd.exe):
 --   docker cp scripts\probe-rating-aggregate.sql aperture-db:/tmp/agg.sql
 --   docker exec aperture-db psql -U app -d aperture -f /tmp/agg.sql
 
 \pset footer off
-\if :{?w_imdb}
-\else
-  \set w_imdb 0.75
-\endif
-\if :{?w_tmdb}
-\else
-  \set w_tmdb 0.25
-\endif
 \if :{?w_mc}
 \else
   \set w_mc 0.6
@@ -80,7 +74,11 @@
 \else
   \set w_critic 0.4
 \endif
-\echo 'weights: audience' :w_audience '(imdb' :w_imdb ', tmdb' :w_tmdb ') / critics' :w_critic '(mc' :w_mc ', rt' :w_rt ')'
+\if :{?rt_guard}
+\else
+  \set rt_guard 50
+\endif
+\echo 'weights: audience' :w_audience '/ critics' :w_critic '(mc' :w_mc ', rt' :w_rt ') / rt guard' :rt_guard
 
 -- calculateRatingScore (packages/core/src/recommender/shared/scoring.ts), copied.
 CREATE FUNCTION pg_temp.rating_score(r float8) RETURNS float8 LANGUAGE sql IMMUTABLE AS $$
@@ -94,60 +92,75 @@ CREATE FUNCTION pg_temp.rating_score(r float8) RETURNS float8 LANGUAGE sql IMMUT
   END
 $$;
 
--- The weighted mean of whatever is present; NULL when nothing is.
+-- presentMean (ratings/unifiedRating.ts): the weighted mean of whatever is present.
 CREATE FUNCTION pg_temp.wmean(a float8, wa float8, b float8, wb float8) RETURNS float8
 LANGUAGE sql IMMUTABLE AS $$
   SELECT CASE
     WHEN a IS NULL AND b IS NULL THEN NULL
-    WHEN a IS NULL THEN CASE WHEN wb > 0 THEN b END
-    WHEN b IS NULL THEN CASE WHEN wa > 0 THEN a END
+    WHEN a IS NULL THEN b
+    WHEN b IS NULL THEN a
     WHEN wa + wb <= 0 THEN NULL
     ELSE (wa * a + wb * b) / (wa + wb)
   END
 $$;
 
+-- RT is guarded here, before anything is mapped, as trustedRtScore does.
 CREATE TEMP VIEW src AS
-  SELECT 'movie'::text AS media_type, id, title, year,
-         community_rating::float8 AS community, imdb_rating::float8 AS imdb, imdb_vote_count AS imdb_votes,
-         tmdb_rating::float8 AS tmdb, rt_critic_score::float8 AS rt, metacritic_score::float8 AS mc
-    FROM movies
-  UNION ALL
-  SELECT 'series', id, title, year,
-         community_rating::float8, imdb_rating::float8, imdb_vote_count,
-         tmdb_rating::float8, rt_critic_score::float8, metacritic_score::float8
-    FROM series;
+  SELECT media_type, id, title, year, community, imdb, imdb_votes, tmdb, mc, rt_raw,
+         CASE WHEN rt_raw IS NOT NULL AND mc IS NOT NULL AND abs(rt_raw - mc) > :rt_guard
+              THEN NULL ELSE rt_raw END AS rt
+    FROM (
+      SELECT 'movie'::text AS media_type, id, title, year,
+             community_rating::float8 AS community, imdb_rating::float8 AS imdb, imdb_vote_count AS imdb_votes,
+             tmdb_rating::float8 AS tmdb, rt_critic_score::float8 AS rt_raw, metacritic_score::float8 AS mc
+        FROM movies
+      UNION ALL
+      SELECT 'series', id, title, year,
+             community_rating::float8, imdb_rating::float8, imdb_vote_count,
+             tmdb_rating::float8, rt_critic_score::float8, metacritic_score::float8
+        FROM series
+    ) raw;
 
--- IMDb's distribution per media type, as 1001 quantiles.
-CREATE TEMP VIEW imdb_q AS
-  SELECT media_type,
-         percentile_disc(ARRAY(SELECT g / 1000.0 FROM generate_series(0, 1000) g)::float8[])
-           WITHIN GROUP (ORDER BY imdb) AS q
-    FROM src WHERE imdb IS NOT NULL
-   GROUP BY media_type;
+CREATE TEMP VIEW src_long AS
+  SELECT media_type, id, imdb, s.source, s.value
+    FROM src CROSS JOIN LATERAL (VALUES ('tmdb', tmdb), ('rt', rt), ('mc', mc)) AS s(source, value)
+   WHERE s.value IS NOT NULL;
 
+-- Tables, not views: both are read once per title below, and a view would be
+-- re-aggregated each time.
+CREATE TEMP TABLE pair_counts AS
+  SELECT media_type, source, value, COUNT(*) AS cnt,
+         SUM(COUNT(*)) OVER (PARTITION BY media_type, source ORDER BY value) - COUNT(*) AS less
+    FROM src_long WHERE imdb IS NOT NULL
+   GROUP BY media_type, source, value;
+
+CREATE TEMP TABLE pair_ref AS
+  SELECT media_type, source, array_agg(imdb ORDER BY imdb) AS ref, COUNT(*) AS n
+    FROM src_long WHERE imdb IS NOT NULL
+   GROUP BY media_type, source;
+
+-- percentileWithin + valueAtPercentile (ratings/unifiedRating.ts).
 CREATE TEMP VIEW mapped AS
-  WITH long AS (
-    SELECT media_type, id, s.source, s.value
-      FROM src CROSS JOIN LATERAL (VALUES ('tmdb', tmdb), ('rt', rt), ('mc', mc)) AS s(source, value)
-     WHERE s.value IS NOT NULL
-  ), ranked AS (
-    SELECT media_type, id, source,
-           (rank() OVER w - 1 + (count(*) OVER (PARTITION BY media_type, source, value) - 1) / 2.0)
-             / NULLIF(count(*) OVER (PARTITION BY media_type, source) - 1, 0) AS p
-      FROM long
-    WINDOW w AS (PARTITION BY media_type, source ORDER BY value)
-  )
-  SELECT r.media_type, r.id,
-         max(CASE WHEN source = 'tmdb' THEN q.q[1 + round(coalesce(r.p, 0.5) * 1000)::int] END) AS tmdb_m,
-         max(CASE WHEN source = 'rt'   THEN q.q[1 + round(coalesce(r.p, 0.5) * 1000)::int] END) AS rt_m,
-         max(CASE WHEN source = 'mc'   THEN q.q[1 + round(coalesce(r.p, 0.5) * 1000)::int] END) AS mc_m
-    FROM ranked r JOIN imdb_q q USING (media_type)
-   GROUP BY r.media_type, r.id;
+  SELECT l.media_type, l.id,
+         max(CASE WHEN l.source = 'tmdb' THEN r.ref[1 + round(pc.p * (r.n - 1))::int] END) AS tmdb_m,
+         max(CASE WHEN l.source = 'rt'   THEN r.ref[1 + round(pc.p * (r.n - 1))::int] END) AS rt_m,
+         max(CASE WHEN l.source = 'mc'   THEN r.ref[1 + round(pc.p * (r.n - 1))::int] END) AS mc_m
+    FROM src_long l
+    JOIN pair_ref r USING (media_type, source)
+    CROSS JOIN LATERAL (
+      SELECT CASE WHEN r.n = 1 THEN 0.5 ELSE least(1, greatest(0,
+               coalesce(
+                 (SELECT c.less + (c.cnt - 1) / 2.0 FROM pair_counts c
+                   WHERE c.media_type = l.media_type AND c.source = l.source AND c.value = l.value),
+                 (SELECT coalesce(SUM(c.cnt), 0) - 0.5 FROM pair_counts c
+                   WHERE c.media_type = l.media_type AND c.source = l.source AND c.value < l.value)
+               ) / (r.n - 1))) END AS p
+    ) pc
+   GROUP BY l.media_type, l.id;
 
 CREATE TEMP VIEW agg AS
   SELECT s.*, m.tmdb_m, m.rt_m, m.mc_m,
-         -- the refreshed IMDb figure; the media server's copy only where IMDb is missing
-         pg_temp.wmean(coalesce(s.imdb, s.community), :w_imdb, m.tmdb_m, :w_tmdb) AS audience,
+         coalesce(s.imdb, s.community, m.tmdb_m) AS audience,
          CASE WHEN s.media_type = 'movie' THEN pg_temp.wmean(m.mc_m, :w_mc, m.rt_m, :w_rt) END AS critic
     FROM src s LEFT JOIN mapped m USING (media_type, id);
 
@@ -206,7 +219,8 @@ CREATE TEMP VIEW sim AS
          pg_temp.renudge(p.base, p.final,
            (p.ws * greatest(p.ns, 0) + p.wn * p.nov + p.wr * p.old_score) / (p.ws + p.wn + p.wr)) AS final_old,
          pg_temp.renudge(p.base, p.final,
-           (p.ws * greatest(p.ns, 0) + p.wn * p.nov + p.wr * p.new_score) / (p.ws + p.wn + p.wr)) AS final_a,
+           (p.ws * greatest(p.ns, 0) + p.wn * p.nov + p.wr * (0.46 / 0.445) * p.new_score)
+           / (p.ws + p.wn + p.wr * (0.46 / 0.445))) AS final_a,
          pg_temp.renudge(p.base, p.final,
            (p.ws * greatest(p.ns, 0) + p.wn * p.nov
             + p.wr * (0.46 / NULLIF(ps.new_spread, 0)) * p.new_score)
@@ -269,7 +283,7 @@ SELECT media_type, title, year, ROUND(coalesce(community, imdb)::numeric, 1) AS 
  ORDER BY aggregate - coalesce(community, imdb) ASC LIMIT 15;
 
 \echo
-\echo '=== 3. Rating-score spread inside each run''s pool (RATING_TYPICAL_SPREAD is 0.46 today)'
+\echo '=== 3. Rating-score spread inside each run''s pool (0.46 on the old rating, 0.445 shipped)'
 SELECT p.media_type, COUNT(*) AS runs,
        ROUND(MIN(ps.old_spread)::numeric, 3) AS old_min,
        ROUND((percentile_cont(0.5) WITHIN GROUP (ORDER BY ps.old_spread))::numeric, 3) AS old_median,
@@ -282,7 +296,7 @@ SELECT p.media_type, COUNT(*) AS runs,
  GROUP BY p.media_type ORDER BY p.media_type;
 
 \echo
-\echo '=== 4. Per viewer: how much of today''s ranking survives (A = current gain, B = re-measured gain)'
+\echo '=== 4. Per viewer: how much of today''s ranking survives (A = shipped gain 0.57/0.445, B = per-pool gain)'
 SELECT u.username, r.media_type, max(r.selected_count) AS n, COUNT(*) AS pool,
        COUNT(*) FILTER (WHERE r_old <= selected_count AND r_a <= selected_count) AS top_n_kept_a,
        COUNT(*) FILTER (WHERE r_old <= selected_count AND r_b <= selected_count) AS top_n_kept_b,

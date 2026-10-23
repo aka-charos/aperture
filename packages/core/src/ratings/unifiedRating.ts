@@ -16,7 +16,9 @@
  *
  * 1. Every source but IMDb is RANK-MAPPED onto IMDb's own distribution before
  *    it is mixed: a title at the 80th percentile of Metacritic counts as the
- *    IMDb rating at IMDb's 80th percentile. The sources are not one scale --
+ *    IMDb rating at the 80th percentile -- of the titles that carry BOTH
+ *    (rankMapper says why: a source's titles are not the library). The
+ *    sources are not one scale --
  *    RT is a share of positive reviews that piles up at 100, Metacritic a
  *    weighted critic mean, IMDb an audience mean -- so a mean of raw numbers
  *    hands the result to whichever spreads widest. Mapping keeps the answer on
@@ -38,7 +40,12 @@
  *    film with the same name -- Guillermo del Toro's Pinocchio was stored with
  *    the 27 of the 2022 remake, beside its own correct Metacritic 79 -- and at a
  *    0.4 critic share that moves picks. Metacritic is kept because it is the
- *    graded measure; RT alone, with no Metacritic to check it, is used as is.
+ *    graded measure. RT alone, with no Metacritic to check it, is used as is,
+ *    deliberately: the only other check is IMDb, and against IMDb a mismatch
+ *    and a genuine split look identical -- Pinocchio's wrong RT 27 against
+ *    IMDb 7.6 is the same shape as The Life of David Gale's real RT 19 against
+ *    IMDb 7.5, which is exactly the disagreement a critic share exists to
+ *    carry. A guard there would remove the feature from the titles it is for.
  *
  * Pure: no database. The loader is qualityRatings.ts; pinned by
  * unifiedRating.test.ts.
@@ -67,7 +74,20 @@ export const UNIFIED_RATING_WEIGHTS = {
   rt: 0.4,
 } as const
 
-/** Points (0-100) beyond which an RT score is taken to belong to another film. */
+/**
+ * Points (0-100) beyond which an RT score is taken to belong to another film.
+ *
+ * Derived from the measured distribution, not from the one mismatch that
+ * prompted it (F-167). Over the 6,858 films carrying both, RT runs 5.7 points
+ * above Metacritic on average, with sd 25.8 against 17.1 and r = 0.884, so
+ * RT - MC has an sd of about 13.3. A 50-point gap is 3.3 sd on the side RT
+ * already leans (RT above) and 4.2 sd on the other; under a normal model that
+ * is about three genuine films in the library, and real tails are fatter, so
+ * `scripts/probe-rating-sources.sql` section 7 counts and lists them. The
+ * failure is asymmetric toward dropping: a genuine RT lost leaves Metacritic
+ * carrying the whole critic half, while a wrong one kept moves the title by
+ * the full 0.4 critic share.
+ */
 export const RT_MC_MAX_DISAGREEMENT = 50
 
 function finite(value: number | null | undefined): number | null {
@@ -93,29 +113,6 @@ export function trustedRtScore(rt: number | null, metacritic: number | null): nu
   return rt
 }
 
-/**
- * Midrank percentile of every value in `values`, in [0, 1]: the middle of the
- * rank range a value's ties occupy. A single value is 0.5.
- */
-export function midrankPercentiles(values: number[]): Map<number, number> {
-  const sorted = [...values].sort((a, b) => a - b)
-  const n = sorted.length
-  const out = new Map<number, number>()
-  if (n === 0) return out
-  if (n === 1) {
-    out.set(sorted[0], 0.5)
-    return out
-  }
-  let lo = 0
-  while (lo < n) {
-    let hi = lo
-    while (hi + 1 < n && sorted[hi + 1] === sorted[lo]) hi++
-    out.set(sorted[lo], (lo + hi) / 2 / (n - 1))
-    lo = hi + 1
-  }
-  return out
-}
-
 /** The value at percentile `p` of an ascending array (nearest rank). */
 export function valueAtPercentile(sortedAscending: number[], p: number): number | null {
   const n = sortedAscending.length
@@ -125,15 +122,51 @@ export function valueAtPercentile(sortedAscending: number[], p: number): number 
 }
 
 /**
- * A mapper from one source's values onto the reference distribution: the
- * reference value at the same midrank percentile.
+ * Midrank percentile of `value` within an ascending array, in [0, 1]. A value
+ * present takes the middle of its ties, so every RT 100 maps to the middle of
+ * the 100s rather than the top; a value
+ * absent sits half a rank below the first value above it. A single-value
+ * array answers 0.5.
  */
-function rankMapper(sourceValues: number[], referenceSorted: number[]): (value: number | null) => number | null {
-  const percentiles = midrankPercentiles(sourceValues)
+export function percentileWithin(sortedAscending: number[], value: number): number | null {
+  const n = sortedAscending.length
+  if (n === 0) return null
+  if (n === 1) return 0.5
+  let less = 0
+  let hi = n
+  while (less < hi) {
+    const mid = (less + hi) >> 1
+    if (sortedAscending[mid] < value) less = mid + 1
+    else hi = mid
+  }
+  let equal = 0
+  while (less + equal < n && sortedAscending[less + equal] === value) equal++
+  const rank = equal > 0 ? less + (equal - 1) / 2 : less - 0.5
+  return Math.min(1, Math.max(0, rank / (n - 1)))
+}
+
+export interface RankPair {
+  source: number
+  imdb: number
+}
+
+/**
+ * A mapper from one source onto IMDb, built from the titles that carry BOTH:
+ * a source value reads the IMDb rating at the same percentile among those
+ * titles. Built from the pairs and not from the whole library, because the
+ * titles a source covers are not the library -- the films critics reviewed are
+ * better known and better rated than the films they did not -- and mapping a
+ * critic's median onto the library's median IMDb would mark down every film a
+ * critic reviewed, against every film no critic did. With no pairs it maps
+ * nothing.
+ */
+export function rankMapper(pairs: RankPair[]): (value: number | null) => number | null {
+  const source = pairs.map((p) => p.source).sort((a, b) => a - b)
+  const reference = pairs.map((p) => p.imdb).sort((a, b) => a - b)
   return (value) => {
     if (value == null) return null
-    const p = percentiles.get(value)
-    return p == null ? null : valueAtPercentile(referenceSorted, p)
+    const p = percentileWithin(source, value)
+    return p == null ? null : valueAtPercentile(reference, p)
   }
 }
 
@@ -168,14 +201,15 @@ export function computeUnifiedRatings(
     rt: trustedRtScore(finite(row.rt), finite(row.metacritic)),
   }))
 
-  const reference = clean
-    .map((row) => row.imdb)
-    .filter((v): v is number => v != null)
-    .sort((a, b) => a - b)
+  const pairsOf = (pick: (row: (typeof clean)[number]) => number | null): RankPair[] =>
+    clean.flatMap((row) => {
+      const source = pick(row)
+      return source == null || row.imdb == null ? [] : [{ source, imdb: row.imdb }]
+    })
 
-  const mapTmdb = rankMapper(clean.flatMap((r) => (r.tmdb == null ? [] : [r.tmdb])), reference)
-  const mapMetacritic = rankMapper(clean.flatMap((r) => (r.metacritic == null ? [] : [r.metacritic])), reference)
-  const mapRt = rankMapper(clean.flatMap((r) => (r.rt == null ? [] : [r.rt])), reference)
+  const mapTmdb = rankMapper(pairsOf((r) => r.tmdb))
+  const mapMetacritic = rankMapper(pairsOf((r) => r.metacritic))
+  const mapRt = rankMapper(pairsOf((r) => r.rt))
 
   const out = new Map<string, number | null>()
   for (const row of clean) {
