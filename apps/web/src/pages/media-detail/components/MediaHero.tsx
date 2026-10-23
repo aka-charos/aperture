@@ -38,7 +38,6 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
 import ThumbUpIcon from '@mui/icons-material/ThumbUp'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
 import RecommendIcon from '@mui/icons-material/Recommend'
-import RouteOutlinedIcon from '@mui/icons-material/RouteOutlined'
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined'
 import type {
   Media,
@@ -127,11 +126,6 @@ interface MediaHeroProps {
    * connections; the button is not drawn otherwise.
    */
   onRecommend?: () => void
-  /**
-   * Start a trail at this title, in Trails. Unset (no button) for a title
-   * Trails has answered links to nothing.
-   */
-  trailPath?: string | null
   /** What to watch after this title, in Next from here. Unset draws no button. */
   nextPath?: string | null
 }
@@ -157,7 +151,6 @@ export function MediaHero({
   favoriteLoading = false,
   onFavoriteToggle,
   onRecommend,
-  trailPath,
   nextPath,
 }: MediaHeroProps) {
   const { t } = useTranslation()
@@ -925,21 +918,6 @@ export function MediaHero({
                   sx={actionBtnSx}
                 >
                   {t('next.detail.whatNext')}
-                </Button>
-              </Tooltip>
-            )}
-            {/* Into Trails, starting from this title: the people, franchise,
-                companies and keywords it shares with the rest of the library. */}
-            {trailPath && (
-              <Tooltip title={t('trails.detail.followTooltip')}>
-                <Button
-                  variant="outlined"
-                  component={RouterLink}
-                  to={trailPath}
-                  startIcon={<RouteOutlinedIcon />}
-                  sx={actionBtnSx}
-                >
-                  {t('trails.detail.follow')}
                 </Button>
               </Tooltip>
             )}

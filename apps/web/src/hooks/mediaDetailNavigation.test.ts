@@ -2,23 +2,23 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { navigationClosesDialog } from './mediaDetailNavigation'
 
-const trails = { pathname: '/trails', search: '?mode=route' }
+const next = { pathname: '/next', search: '?title=a' }
 
 test('moving to another page closes the dialog, however it got there', () => {
   for (const kind of ['PUSH', 'REPLACE', 'POP'] as const) {
-    assert.equal(navigationClosesDialog(trails, { pathname: '/person/x', search: '' }, kind), true)
+    assert.equal(navigationClosesDialog(next, { pathname: '/person/x', search: '' }, kind), true)
   }
 })
 
 test('a link to the same page with other parameters closes it', () => {
-  assert.equal(navigationClosesDialog(trails, { pathname: '/trails', search: '?mode=threads' }, 'PUSH'), true)
-  assert.equal(navigationClosesDialog(trails, { pathname: '/trails', search: '?mode=threads' }, 'POP'), true)
+  assert.equal(navigationClosesDialog(next, { pathname: '/next', search: '?title=b' }, 'PUSH'), true)
+  assert.equal(navigationClosesDialog(next, { pathname: '/next', search: '?title=b' }, 'POP'), true)
 })
 
 test('a page writing its own state back in place does not close it', () => {
-  assert.equal(navigationClosesDialog(trails, { pathname: '/trails', search: '?mode=common' }, 'REPLACE'), false)
+  assert.equal(navigationClosesDialog(next, { pathname: '/next', search: '?title=a&view=map' }, 'REPLACE'), false)
 })
 
 test('nothing changed, nothing closes', () => {
-  assert.equal(navigationClosesDialog(trails, { ...trails }, 'PUSH'), false)
+  assert.equal(navigationClosesDialog(next, { ...next }, 'PUSH'), false)
 })

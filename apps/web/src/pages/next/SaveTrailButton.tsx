@@ -23,7 +23,7 @@ export function SaveTrailButton({ titles }: SaveTrailButtonProps) {
   return (
     <>
       <Button size="small" startIcon={<PlaylistAddIcon />} onClick={() => setOpen(true)}>
-        {t('trails.actions.savePlaylist')}
+        {t('next.actions.savePlaylist')}
       </Button>
       <CreatePlaylistDialog
         open={open}

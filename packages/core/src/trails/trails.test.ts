@@ -8,7 +8,6 @@ import {
   linkCap,
   maskCost,
   normalizeName,
-  parseEntityKinds,
   parseTitleRef,
   rarity,
   roleBit,
@@ -23,10 +22,7 @@ import {
   describeIndex,
   pickWellConnected,
   sharedLinks,
-  titleThread,
-  titleThreads,
-  walkTrail,
-  weightedPick,
+  linkedThreadCount,
   type TrailIndex,
   type CreditSource,
   type TitleSource,
@@ -161,22 +157,24 @@ test('one person in two roles links a film to a show', () => {
   assert.equal(index.entities[shared[0].entity].name, 'David Lynch')
 })
 
-test('a title with no shared thing has no threads', () => {
+test('a title with no shared thing links nothing', () => {
   const { index, at, heat, lonely } = library()
   const view = createView(index, null)
-  assert.deepEqual(titleThreads(view, at(lonely)), [])
+  assert.equal(linkedThreadCount(view, at(lonely)), 0)
   assert.deepEqual(sharedLinks(view, at(heat), at(lonely)), [])
 })
 
-test('the scope decides both which titles a thread leads to and how rare a link is', () => {
-  const { index, at, heat, confidential, dahlia, insider } = library()
+test('the scope decides both what a title links to and how rare a link is', () => {
+  const { index, at, heat, dahlia, insider } = library()
   const allowed = [heat, dahlia, insider].map(at)
   const view = createView(index, allowed)
   assert.equal(view.count(entityNamed(index, 'Dante Spinotti')), 2)
-  const spinotti = titleThreads(view, at(heat)).find((thread) => index.entities[thread.entity].name === 'Dante Spinotti')
-  assert.deepEqual(spinotti?.others.map((member) => member.title), [at(insider)])
-  // A title out of scope has no threads at all.
-  assert.deepEqual(titleThreads(view, at(confidential)), [])
+  assert.deepEqual(
+    sharedLinks(view, at(heat), at(insider)).map((link) => index.entities[link.entity].name).includes('Dante Spinotti'),
+    true
+  )
+  // L.A. Confidential is out of scope, so Heat's studio reaches only itself and links nothing.
+  assert.equal(view.links(entityNamed(index, 'Warner Bros.')), false)
 })
 
 test('a category carried by too many titles links nothing', () => {
@@ -187,7 +185,7 @@ test('a category carried by too many titles links nothing', () => {
   const index = buildTrailIndex(sources)
   const view = createView(index, null)
   assert.equal(view.links(entityNamed(index, 'based on novel')), false)
-  assert.deepEqual(titleThreads(view, 0), [])
+  assert.equal(linkedThreadCount(view, 0), 0)
 })
 
 test('every entity has a stable key the index finds it by', () => {
@@ -197,95 +195,6 @@ test('every entity has a stable key the index finds it by', () => {
   assert.equal(index.byKey.get('person:dante spinotti'), spinotti)
   // A rebuild of the same library gives the same keys.
   assert.equal(library().index.entities[spinotti].key, index.entities[spinotti].key)
-})
-
-test('threads leave out the starting title, list members oldest first and count the rest', () => {
-  const { index, at, heat, insider, collateral } = library()
-  const view = createView(index, null)
-  const threads = titleThreads(view, at(heat), { perThread: 1 })
-  const mann = threads.find((thread) => index.entities[thread.entity].name === 'Michael Mann')
-  assert.ok(mann)
-  assert.equal(mann.count, 3)
-  assert.equal(mann.others.length, 1)
-  assert.equal(mann.more, 1)
-  const full = titleThreads(view, at(heat)).find((thread) => thread.entity === mann.entity)
-  assert.deepEqual(full?.others.map((member) => member.title), [at(insider), at(collateral)])
-  // Strongest first, by the cost rules.ts gives a thread.
-  const costs = threads.map((thread) => thread.cost)
-  assert.deepEqual(costs, [...costs].sort((a, b) => a - b))
-})
-
-test('hiding watched titles leaves a thread\'s rarity alone and drops a thread that leads only to them', () => {
-  const { index, at, heat, insider, collateral, confidential } = library()
-  const view = createView(index, null)
-  const exclude = new Uint8Array(index.titles.length)
-  exclude[at(insider)] = 1
-  exclude[at(confidential)] = 1
-  const threads = titleThreads(view, at(heat), { exclude })
-  const names = threads.map((thread) => index.entities[thread.entity].name)
-  // Spinotti and Pacino lead only to watched titles now; Mann still leads to Collateral.
-  assert.ok(!names.includes('Dante Spinotti'))
-  assert.ok(!names.includes('Al Pacino'))
-  const mann = threads.find((thread) => index.entities[thread.entity].name === 'Michael Mann')
-  assert.deepEqual(mann?.others.map((member) => member.title), [at(collateral)])
-  assert.equal(mann?.count, 3)
-})
-
-test('a kind filter keeps only threads of those kinds', () => {
-  const { index, at, heat } = library()
-  const threads = titleThreads(createView(index, null), at(heat), { kinds: new Set(['company'] as const) })
-  assert.deepEqual(threads.map((thread) => index.entities[thread.entity].name), ['Warner Bros.'])
-})
-
-test('a thread opened on its own lists every title it leads to', () => {
-  const { index, at, heat, insider, collateral } = library()
-  const view = createView(index, null)
-  const mann = entityNamed(index, 'Michael Mann')
-  const opened = titleThread(view, at(heat), mann)
-  assert.deepEqual(opened?.others.map((member) => member.title), [at(insider), at(collateral)])
-  assert.equal(opened?.more, 0)
-  // A title not carrying it, and an entity that links nothing, open nothing.
-  assert.equal(titleThread(view, at(collateral), entityNamed(index, 'Dante Spinotti')), null)
-})
-
-test('a walk follows a strong thread to a new title each step, and never follows one thing twice', () => {
-  const { index, at, heat, insider } = library()
-  const view = createView(index, null)
-  // random() = 0 always takes the strongest choice.
-  const walked = walkTrail(view, at(heat), { random: () => 0 })
-  assert.ok(walked.length > 0)
-  const titles = [at(heat), ...walked.map((step) => step.to)]
-  assert.equal(new Set(titles).size, titles.length)
-  const entities = walked.map((step) => step.entity)
-  assert.equal(new Set(entities).size, entities.length)
-  walked.forEach((step, i) => {
-    assert.equal(step.from, titles[i])
-    assert.ok(sharedLinks(view, step.from, step.to).some((link) => link.entity === step.entity))
-  })
-  // The first step takes Heat's strongest thread, to that thread's strongest title.
-  const strongest = titleThreads(view, at(heat))[0]
-  assert.equal(walked[0].entity, strongest.entity)
-  assert.equal(index.entities[strongest.entity].name, 'Al Pacino')
-  assert.equal(walked[0].to, at(insider))
-})
-
-test('a walk avoids excluded and already-visited titles and stops where nothing is left', () => {
-  const { index, at, heat, lonely } = library()
-  const view = createView(index, null)
-  const exclude = new Uint8Array(index.titles.length).fill(1)
-  exclude[at(heat)] = 0
-  assert.deepEqual(walkTrail(view, at(heat), { random: () => 0, exclude }), [])
-  assert.deepEqual(walkTrail(view, at(lonely), { random: () => 0 }), [])
-  const visited = titleThreads(view, at(heat)).flatMap((thread) => thread.others.map((member) => member.title))
-  assert.deepEqual(walkTrail(view, at(heat), { random: () => 0, visited }), [])
-})
-
-test('a weighted pick favours the first choice and covers them all', () => {
-  assert.equal(weightedPick(3, () => 0), 0)
-  assert.equal(weightedPick(3, () => 0.49), 0)
-  assert.equal(weightedPick(3, () => 0.51), 1)
-  assert.equal(weightedPick(3, () => 0.99), 2)
-  assert.equal(weightedPick(1, () => 0.99), 0)
 })
 
 test('the description counts isolated titles and capped entities', () => {
@@ -379,50 +288,12 @@ test('production meta-keywords are not links, whatever their casing', () => {
   )
 })
 
-test('a summary with no members counts what a full thread would list, without listing it', () => {
-  const { index, at, heat, insider } = library()
+test('a random start is a title with enough links to show rows for', () => {
+  const { index, at, heat } = library()
   const view = createView(index, null)
-  const exclude = new Uint8Array(index.titles.length)
-  exclude[at(insider)] = 1
-  for (const options of [{}, { exclude }]) {
-    const full = titleThreads(view, at(heat), options)
-    const summary = titleThreads(view, at(heat), { ...options, perThread: 0 })
-    assert.deepEqual(
-      summary.map((thread) => [thread.entity, thread.others.length, thread.more]),
-      full.map((thread) => [thread.entity, 0, thread.others.length + thread.more])
-    )
-  }
-})
-
-test('a random start honours the kinds and the watched titles the page hides', () => {
-  const { index, at, heat, confidential, insider, collateral } = library()
-  const view = createView(index, null)
-  // Only Heat and L.A. Confidential carry a company that links (Warner Bros.).
-  const companies = new Set(['company'] as const)
   let seed = 0
   const random = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280)
-  for (let i = 0; i < 20; i += 1) {
-    const picked = pickWellConnected(view, random, { kinds: companies })
-    assert.ok(picked === at(heat) || picked === at(confidential))
-  }
-  // With L.A. Confidential watched, Heat's studio leads nowhere, and so does Confidential's.
-  const exclude = new Uint8Array(index.titles.length)
-  exclude[at(confidential)] = 1
-  exclude[at(heat)] = 1
-  assert.equal(pickWellConnected(view, random, { kinds: companies, exclude }), null)
-  // A watched title is never the start either.
-  exclude.fill(0)
-  exclude[at(insider)] = 1
-  exclude[at(collateral)] = 1
-  for (let i = 0; i < 20; i += 1) {
-    const picked = pickWellConnected(view, random, { exclude })
-    assert.ok(picked !== at(insider) && picked !== at(collateral))
-  }
-})
-
-test('kinds from a request: unknown ones dropped, repeats once, none means every kind', () => {
-  assert.deepEqual(parseEntityKinds('keyword,nonsense,person,keyword'), ['keyword', 'person'])
-  assert.equal(parseEntityKinds('nonsense'), null)
-  assert.equal(parseEntityKinds(''), null)
-  assert.equal(parseEntityKinds(undefined), null)
+  // Only Heat links four things (Mann, Spinotti, Pacino, Warner Bros.).
+  for (let i = 0; i < 20; i += 1) assert.equal(pickWellConnected(view, random), at(heat))
+  assert.equal(pickWellConnected(createView(index, [at(heat)]), random), null)
 })

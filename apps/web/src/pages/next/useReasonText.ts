@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { roleKey } from '../trails/labels'
+import { roleKey } from './trail'
 import type { ReasonText } from './reasons'
 
 /** A decided reason (reasons.ts) as a sentence in the reader's language. */

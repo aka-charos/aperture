@@ -21,8 +21,10 @@ import {
   type Candidate,
   type ViewerTitle,
 } from './taste.js'
-import { peopleRows } from './people.js'
+import { moreRows, peopleRows } from './people.js'
 import { mapLinks } from './map.js'
+import { chooseWalkStep, walkSteps } from './walk.js'
+import { STUDIO_ROWS, THEME_ROWS } from './rules.js'
 
 let counter = 0
 function uuid(): string {
@@ -447,4 +449,93 @@ test('only listable titles use up the allowance for a credit, so watched work ne
     candidates.map((c) => view.index.titles[c.title].title),
     ['Unseen']
   )
+})
+
+test('more rows: the start’s linking themes rarest first, then its studios, never a row already taken', () => {
+  const start = title('Session 9', [
+    keyword('asylum'),
+    keyword('abandoned building'),
+    keyword('everywhere'),
+    studio('USA Films'),
+    director('Brad Anderson'),
+  ])
+  const sources: TitleSource[] = [start]
+  sources.push(title('Asylum A', [keyword('asylum')]), title('Asylum B', [keyword('asylum')]))
+  sources.push(title('Ruin', [keyword('abandoned building')]))
+  for (let i = 0; i < 30; i += 1) sources.push(title(`Common ${i}`, [keyword('everywhere')]))
+  sources.push(title('USA one', [studio('USA Films')]))
+  sources.push(title('Machinist', [director('Brad Anderson')]))
+  const { view, at, entity } = build(sources)
+  const rows = moreRows({ view, start: at(start), record: new Map(), seen: () => false, scores: new Map() })
+  const names = rows.map((r) => view.index.entities[r.entity].name)
+  // A keyword past the rarity cap names nothing; a person is a people row, not one of these.
+  assert.deepEqual(names, ['abandoned building', 'asylum', 'USA Films'])
+  assert.equal(rows[1].members.length, 2)
+  assert.ok(rows.every((r) => r.person === null && r.company === null))
+  const taken = moreRows({
+    view,
+    start: at(start),
+    record: new Map(),
+    seen: () => false,
+    scores: new Map(),
+    taken: new Set([entity('company:usa films')]),
+  })
+  assert.equal(taken.some((r) => r.entity === entity('company:usa films')), false)
+})
+
+test('more rows are capped per kind', () => {
+  const credits: CreditSource[] = []
+  for (let i = 0; i < THEME_ROWS + 2; i += 1) credits.push(keyword(`theme ${i}`))
+  for (let i = 0; i < STUDIO_ROWS + 2; i += 1) credits.push(studio(`Studio ${i}`))
+  const start = title('Start', credits)
+  const sources: TitleSource[] = [start]
+  for (const credit of credits) sources.push(title(`Shares ${credit.name}`, [credit]))
+  const { view, at } = build(sources)
+  const rows = moreRows({ view, start: at(start), record: new Map(), seen: () => false, scores: new Map() })
+  const kinds = rows.map((r) => view.index.entities[r.entity].kind)
+  assert.equal(kinds.filter((k) => k === 'keyword').length, THEME_ROWS)
+  assert.equal(kinds.filter((k) => k === 'company').length, STUDIO_ROWS)
+})
+
+function candidate(titleId: number, score: number, sharedEntities: number[] = []): Candidate {
+  return { title: titleId, quadrant: 'close', score, reasons: [], sharedEntities }
+}
+
+test('a walk step takes the best suggestion off the trail whose lead credit is not followed yet', () => {
+  const list = [candidate(1, 0.9, [10]), candidate(2, 0.8, [10]), candidate(3, 0.7, [11])]
+  assert.equal(chooseWalkStep(list, new Set(), new Set())?.title, 1)
+  assert.equal(chooseWalkStep(list, new Set([1]), new Set())?.title, 2)
+  assert.equal(chooseWalkStep(list, new Set(), new Set([10]))?.title, 3)
+  // When every suggestion repeats a followed credit, the best off the trail still goes.
+  assert.equal(chooseWalkStep(list.slice(0, 2), new Set(), new Set([10]))?.title, 1)
+  assert.equal(chooseWalkStep(list, new Set([1, 2, 3]), new Set()), null)
+})
+
+test('a walk never revisits a title, stops when nothing is left, and does not follow one person twice', async () => {
+  const from: Record<number, Candidate[]> = {
+    0: [candidate(1, 0.9, [10]), candidate(2, 0.5, [11])],
+    1: [candidate(0, 0.99), candidate(3, 0.9, [10]), candidate(4, 0.4, [12])],
+    4: [candidate(1, 0.9)],
+  }
+  const seenVisited: number[][] = []
+  const walked = await walkSteps(0, 5, async (titleId, visited) => {
+    seenVisited.push([...visited])
+    return from[titleId] ?? []
+  })
+  // 0 → 1 (via 10); from 1, 3 would follow 10 again, so 4; from 4 only 1, already walked.
+  assert.deepEqual(
+    walked.map((step) => [step.from, step.to.title]),
+    [
+      [0, 1],
+      [1, 4],
+    ]
+  )
+  assert.deepEqual(seenVisited[0], [0])
+  const capped = await walkSteps(0, 1, async (titleId) => from[titleId] ?? [])
+  assert.equal(capped.length, 1)
+  const before = await walkSteps(0, 5, async (titleId) => from[titleId] ?? [], [1])
+  assert.equal(before[0].to.title, 2)
+  // Past its budget a walk keeps the steps it took; the first is always taken.
+  const stopped = await walkSteps(0, 5, async (titleId) => from[titleId] ?? [], [], () => true)
+  assert.equal(stopped.length, 1)
 })

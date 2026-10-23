@@ -6,7 +6,7 @@ import { useWatchStatus } from './useWatchStatus'
  * answers leave out watched titles keys them by it, so a title marked watched
  * (in the detail dialog, say) leaves what is on screen. Its first load is not
  * a change, so the revision starts at 0 and stays there until the set moves
- * after that. Used by Trails and Next from here.
+ * after that. Used by Next from here.
  */
 export function useWatchedRevision(): number {
   const { watchedMovies, loading } = useWatchStatus()

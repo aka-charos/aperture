@@ -5,8 +5,8 @@ import EastIcon from '@mui/icons-material/East'
 import WestIcon from '@mui/icons-material/West'
 import { useTheme } from '@mui/material/styles'
 import { TitleTile } from './TitleTile'
-import { EntityAvatar } from './LinkCard'
-import { KIND_COLOR, pairKey } from './labels'
+import { EntityAvatar } from './EntityAvatar'
+import { KIND_COLOR, pairKey } from './trail'
 import { useTrailText } from './useTrailText'
 import type { TrailLink, TrailTitle } from './types'
 
@@ -49,7 +49,7 @@ export function TrailStrip({ trail, cards, links, onStepBack, onOpen }: TrailStr
     <Box
       ref={scroller}
       role="list"
-      aria-label={t('trails.threads.trail')}
+      aria-label={t('next.strip.label')}
       sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, overflowX: 'auto', pb: 1.5 }}
     >
       {shown.map(({ position, card }, index) => (
@@ -61,7 +61,7 @@ export function TrailStrip({ trail, cards, links, onStepBack, onOpen }: TrailStr
             width={92}
             emphasised={position === last}
             onFollow={position === last ? undefined : () => onStepBack(position)}
-            followLabel={t('trails.strip.back', { title: card.title })}
+            followLabel={t('next.strip.back', { title: card.title })}
           />
         </Box>
       ))}

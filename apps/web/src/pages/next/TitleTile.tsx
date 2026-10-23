@@ -32,7 +32,7 @@ export function TitleTile({
   emphasised = false,
 }: TitleTileProps) {
   const { t } = useTranslation()
-  const label = followLabel ?? t('trails.actions.follow', { title: title.title })
+  const label = followLabel ?? t('next.actions.from', { title: title.title })
   const { isWatched, getEpisodeProgress } = useWatchStatus()
   return (
     <Box

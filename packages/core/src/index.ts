@@ -2049,31 +2049,19 @@ export {
 // itself is decided here, never in the bundle.
 export * from './onboarding/index.js'
 
-// Trails (./trails): titles linked through the named things they
-// share (people, franchises, companies, uncommon keywords), weighted by how
-// rare each is in the viewer's library. Separate from the similarity graph.
+// Trails (./trails): the credits index Next from here reads — titles linked
+// through the named things they share (people, franchises, companies,
+// uncommon keywords). Separate from the similarity graph.
 export {
-  getTitleThreads,
-  getTitleThread,
   getTrail,
   getTrailStart,
-  walkFrom,
   MAX_TRAIL_TITLES,
-  MAX_THREADS as MAX_TRAIL_THREADS,
-  THREAD_MEMBERS as TRAIL_THREAD_MEMBERS,
-  WALK_STEPS as TRAIL_WALK_STEPS,
   LINK_ROLES,
-  parseEntityKinds as parseTrailEntityKinds,
   parseTitleRef,
   formatTitleRef,
   type TrailTitle,
   type TrailEntity,
   type TrailLink,
-  type TrailFilter,
-  type ThreadView,
-  type ThreadMemberView,
-  type TitleThreadsOptions as TrailTitleThreadsOptions,
-  type WalkRequest as TrailWalkRequest,
   type EntityKind as TrailEntityKind,
   type LinkRole as TrailLinkRole,
   type TitleRef as TrailTitleRef,
@@ -2084,14 +2072,19 @@ export {
 // with credits weighed by the viewer's own record rather than by rarity.
 export {
   getNextFromHere,
+  getNextSummary,
+  walkNext,
   NEXT_CLOSE_ITEMS,
   NEXT_MAX_AVOID,
   NEXT_PEOPLE_ROWS,
   NEXT_STARTS_OFFERED,
+  NEXT_WALK_STEPS,
   type NextFromHere,
   type NextItem,
   type NextMapLink,
   type NextPeopleRow,
   type NextRowMember,
   type NextReason,
+  type NextTrailLink,
+  type NextWalkStep,
 } from './nextFromHere/index.js'

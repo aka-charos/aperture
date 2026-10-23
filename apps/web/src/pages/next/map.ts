@@ -12,7 +12,7 @@
  */
 
 import type { ConnectionReason, ConnectionType, GraphData, GraphEdge, GraphNode } from '@/components/SimilarityGraph/types'
-import type { TrailEntity, TrailRole, TrailTitle } from '../trails/types'
+import type { TrailEntity, TrailRole, TrailTitle } from './types'
 import type { NextFromHereResponse } from './types'
 
 /** The connection type a credit is drawn in. */

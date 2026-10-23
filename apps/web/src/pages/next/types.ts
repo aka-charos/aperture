@@ -1,10 +1,57 @@
 /**
  * The Next from here API's shapes, mirrored by hand from core's
- * `nextFromHere/index.ts` (the bundle never imports core). Change the two
- * together. Titles and entities are the Trails shapes, reused.
+ * `nextFromHere/index.ts` and `trails/index.ts` (the bundle never imports
+ * core). Change them together.
  */
 
-import type { TrailEntity, TrailRole, TrailTitle } from '../trails/types'
+export type TrailEntityKind = 'person' | 'franchise' | 'company' | 'keyword'
+
+export type TrailRole =
+  | 'franchise'
+  | 'director'
+  | 'creator'
+  | 'writer'
+  | 'lead'
+  | 'cinematographer'
+  | 'composer'
+  | 'editor'
+  | 'actor'
+  | 'keyword'
+  | 'studio'
+  | 'network'
+
+export interface TrailTitle {
+  /** `movie:<id>` or `series:<id>`. */
+  ref: string
+  type: 'movie' | 'series'
+  id: string
+  title: string
+  year: number | null
+  posterUrl: string | null
+}
+
+export interface TrailEntity {
+  /** Stable across index rebuilds. */
+  key: string
+  kind: TrailEntityKind
+  name: string
+  photo: string | null
+  /** Titles in the viewer's library carrying it. */
+  titleCount: number
+}
+
+/** What joins two steps of a trail: a person or franchise, and its part on each side. */
+export interface TrailLink extends TrailEntity {
+  rolesFrom: TrailRole[]
+  rolesTo: TrailRole[]
+}
+
+export interface TrailResponse {
+  /** The trail's titles in the viewer's library, in order. */
+  titles: TrailTitle[]
+  /** links[i] joins titles[i] to titles[i + 1]: the strongest thing they share, or null. */
+  links: (TrailLink | null)[]
+}
 
 export type NextReason =
   | { kind: 'feel'; rank: number }
@@ -53,6 +100,20 @@ export interface NextFromHereResponse {
   start: TrailTitle | null
   close: NextItem[]
   people: NextPeopleRow[]
+  /** The start's themes, studios and networks, each a row like a person's, rarest first. */
+  moreRows: NextPeopleRow[]
   map: { refs: string[]; links: NextMapLink[] }
   starts: TrailTitle[]
+}
+
+/** `/api/next-from-here/summary`: the few best suggestions, for a title's own page. */
+export interface NextSummaryResponse {
+  start: TrailTitle
+  items: NextItem[]
+}
+
+/** `/api/next-from-here/walk`: each step, and the person or franchise it went through (null: closeness alone). */
+export interface NextWalkResponse {
+  start: TrailTitle
+  steps: Array<{ title: TrailTitle; via: TrailLink | null }>
 }

@@ -41,8 +41,8 @@ import { WatchingPage } from './pages/watching'
 import { PersonDetailPage } from './pages/PersonDetail'
 import { StudioDetailPage } from './pages/StudioDetail'
 import { ExplorePage } from './pages/explore'
-import { TrailsPage } from './pages/trails'
 import { NextFromHerePage } from './pages/next'
+import { TrailsRedirect } from './pages/next/TrailsRedirect'
 import { AssistantPage } from './pages/assistant'
 import { DiscoveryPage } from './pages/discovery'
 import { MyRequestsPage } from './pages/MyRequests'
@@ -216,7 +216,8 @@ function AppRoutes() {
         <Route path="playlists" element={<PlaylistsPage />} />
         <Route path="collections" element={<CollectionsPage />} />
         <Route path="explore" element={<ExplorePage />} />
-        <Route path="trails" element={<TrailsPage />} />
+        {/* Trails was folded into Next from here; old links keep their trail. */}
+        <Route path="trails" element={<TrailsRedirect />} />
         <Route path="next" element={<NextFromHerePage />} />
         <Route path="discovery" element={<DiscoveryPage />} />
         <Route path="my-requests" element={<MyRequestsPage />} />

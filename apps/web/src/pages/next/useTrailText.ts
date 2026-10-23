@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { hereCaption, roleKey, stepCaption, type HereCaption, type StepCaption } from './labels'
+import { hereCaption, roleKey, stepCaption, type HereCaption, type StepCaption } from './trail'
 import type { TrailEntityKind, TrailLink, TrailRole } from './types'
 
 /** The page's wording of links, from the pure decisions in labels.ts. */
@@ -12,11 +12,11 @@ export function useTrailText() {
   const caption = useCallback(
     (decided: StepCaption | HereCaption): string => {
       switch (decided.key) {
-        case 'trails.caption.same':
+        case 'next.caption.same':
           return t(decided.key, { role: role(decided.role) })
-        case 'trails.caption.differs':
+        case 'next.caption.differs':
           return t(decided.key, { from: role(decided.from), to: role(decided.to) })
-        case 'trails.here.role':
+        case 'next.here.role':
           return t(decided.key, { role: role(decided.role) })
         default:
           return t(decided.key)

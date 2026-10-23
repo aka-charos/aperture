@@ -8,8 +8,7 @@ import { useWatching } from '../../hooks/useWatching'
 import { useConnections } from '../../hooks/useConnections'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useMediaDetail } from './hooks'
-import { useStrongestLinks } from './hooks/useStrongestLinks'
-import { useTrailPath } from '../trails/useTrailPath'
+import { useNextSummary } from './hooks/useNextSummary'
 import {
   MediaBackdrop,
   MediaHero,
@@ -17,13 +16,14 @@ import {
   SeasonsList,
   MissingSeasonsCard,
   SimilarMedia,
-  StrongestLinks,
+  WhatNextCard,
   MovieInsights,
   TitleAnalysis,
   RecommendToDialog,
 } from './components'
 import { insightsHaveDetail } from './helpers'
-import { titleRefFor } from '../trails/labels'
+import { titleRefFor } from '../next/trail'
+import { nextPath as nextPathFor } from '../next/reasons'
 import { isMovie, isSeries } from './types'
 import type { MediaType } from './types'
 
@@ -94,11 +94,10 @@ export function MediaDetailPage({
   // operator's. The route also allows a viewer's own picks, as the bulk one does.
   const onRefreshExplanation = user?.isAdmin ? refreshExplanation : undefined
 
-  // Trails, from this title: the hero's link and the Strongest links card.
-  const trailRef = id ? titleRefFor(mediaType, id) : null
-  const trailPath = useTrailPath(trailRef)
-  const nextPath = trailRef ? `/next?${new URLSearchParams({ title: trailRef }).toString()}` : null
-  const strongestLinks = useStrongestLinks(trailRef)
+  // Next from here, from this title: the hero's What next button and the card.
+  const titleRef = id ? titleRefFor(mediaType, id) : null
+  const nextPath = titleRef ? nextPathFor(titleRef) : null
+  const nextSummary = useNextSummary(titleRef)
 
   // Reading why a title was scored is one of the getting-started steps, and
   // only the browser sees it happen. The panel draws only for a scored title
@@ -207,8 +206,6 @@ export function MediaDetailPage({
         favoriteLoading={favoriteLoading}
         onFavoriteToggle={isMovie(media) && user?.id ? toggleFavorite : undefined}
         onRecommend={hasConnections && id ? () => setRecommendOpen(true) : undefined}
-        // Dropped once Trails has answered that the title links to nothing.
-        trailPath={strongestLinks.knownEmpty ? null : trailPath}
         nextPath={nextPath}
       />
 
@@ -263,10 +260,20 @@ export function MediaDetailPage({
                   up with and a line nobody can track. */}
               {id && <TitleAnalysis mediaType={mediaType} mediaId={id} />}
               <MediaInfoCard media={media} />
-              {/* The strongest named links out of this title, from Trails.
-                  Asked for only as it nears the screen; draws nothing until
-                  it has some. */}
-              {trailPath && <StrongestLinks state={strongestLinks} trailPath={trailPath} />}
+              {/* What to watch after this, from Next from here. Asked for
+                  only as it nears the screen; draws nothing until it has some. */}
+              {nextPath && (
+                <WhatNextCard
+                  state={nextSummary}
+                  title={media.title}
+                  nextPath={nextPath}
+                  onOpen={(title) =>
+                    onOpenMedia
+                      ? onOpenMedia(title.type, title.id)
+                      : navigate(`/${title.type === 'movie' ? 'movies' : 'series'}/${title.id}`)
+                  }
+                />
+              )}
               {/* Aired episodes missing from the server + Seerr requests (series only) */}
               {isSeries(media) && (
                 <MissingSeasonsCard

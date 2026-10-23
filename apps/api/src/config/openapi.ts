@@ -235,12 +235,12 @@ const tags = [
     },
   },
   {
-    name: 'trails',
+    name: 'next-from-here',
     description:
-      'How library titles are linked through the people, franchises, companies and uncommon keywords they share, weighted by how rare each is in the viewer\'s library: routes between two titles, threads out of one, and what several have in common.',
+      'What to watch after a title: titles close in feel, the people, franchises, studios and themes behind it weighed by the viewer’s own record, a guided walk, and the trail read back.',
     externalDocs: {
-      description: 'Trails',
-      url: `${DOCS_BASE}/features/trails.md`,
+      description: 'Next from here',
+      url: `${DOCS_BASE}/features/next-from-here.md`,
     },
   },
   {

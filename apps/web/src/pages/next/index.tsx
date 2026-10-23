@@ -13,23 +13,25 @@ import {
   Switch,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined'
 import ViewListIcon from '@mui/icons-material/ViewList'
 import HubIcon from '@mui/icons-material/Hub'
 import CasinoIcon from '@mui/icons-material/Casino'
+import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk'
 import { PageHeading } from '@/components/PageHeading'
 import { MediaDetailModalProvider } from '@/hooks/MediaDetailModalProvider'
 import { useOpenMedia } from '@/hooks/useOpenMedia'
 import { useWatchedRevision } from '@/hooks/useWatchedRevision'
-import { TitlePicker } from '../trails/TitlePicker'
-import { TitleTile } from '../trails/TitleTile'
-import { TrailStrip } from '../trails/TrailStrip'
-import { SaveTrailButton } from '../trails/SaveTrailButton'
-import { fetchTrails, useTrailData, useTrailLimits } from '../trails/api'
-import { stepTrail } from '../trails/labels'
-import type { TrailLink, TrailTitle } from '../trails/types'
+import { TitlePicker } from './TitlePicker'
+import { TitleTile } from './TitleTile'
+import { TrailStrip } from './TrailStrip'
+import { SaveTrailButton } from './SaveTrailButton'
+import { fetchNext, useTrailData, useTrailLimits } from './api'
+import { ROW_KINDS, extendTrail, stepTrail } from './trail'
+import type { TrailEntityKind, TrailLink, TrailTitle } from './types'
 import { NextMap } from './NextMap'
 import { PeopleRow } from './PeopleRow'
 import {
@@ -39,11 +41,12 @@ import {
   readNextUrl,
   reasonText,
   rowLink,
+  rowShown,
   writeNextUrl,
   type NextUrlState,
 } from './reasons'
 import { useReasonText } from './useReasonText'
-import type { NextFromHereResponse, NextItem, NextPeopleRow, NextRowMember } from './types'
+import type { NextFromHereResponse, NextItem, NextPeopleRow, NextRowMember, NextWalkResponse } from './types'
 
 /** Reasons shown under each title; the rest are not more convincing. */
 const REASONS_SHOWN = 3
@@ -57,11 +60,14 @@ const REASONS_SHOWN = 3
  *   keep returning to, themes the two share, a network they favour.
  * - **The people behind it** (Trails' threads), one row per person who shaped
  *   the start, ordered by what the viewer's record says of them, never by
- *   rarity; their other work unseen first.
+ *   rarity; their other work unseen first. Its **themes and studios** follow,
+ *   rarest first, and chips narrow the rows to the kinds wanted.
  * - **The map** (the Explore graph): the same titles drawn around the start,
  *   every line a named reason.
  * - **The trail** (Trails' strip): every step taken from a suggestion is kept,
  *   can be gone back to and saved as a playlist, and is never suggested again.
+ *   **Take me somewhere** walks a few steps for the viewer, each to the best
+ *   suggestion from the step before.
  *
  * The work is the API's; this page states it.
  */
@@ -98,6 +104,11 @@ function NextFromHere() {
   const [surprising, setSurprising] = useState(false)
   // A failed Surprise me is said beside its button; the page on screen stays.
   const [surpriseFailed, setSurpriseFailed] = useState(false)
+  const [walking, setWalking] = useState(false)
+  const [walkNote, setWalkNote] = useState<{ severity: 'info' | 'warning'; text: string } | null>(null)
+  // The trail as it is now, for a walk answering after the viewer stepped elsewhere.
+  const currentTrail = useRef(trailKey)
+  currentTrail.current = trailKey
 
   // A title marked watched in the dialog leaves the suggestions: the answer is
   // asked again when the viewer's watched set moves.
@@ -166,14 +177,57 @@ function NextFromHere() {
   const surprise = () => {
     setSurprising(true)
     setSurpriseFailed(false)
-    fetchTrails<{ title: TrailTitle }>('start')
+    fetchNext<{ title: TrailTitle }>('start')
       .then((response) => startFrom(response.title))
       .catch(() => setSurpriseFailed(true))
       .finally(() => setSurprising(false))
   }
 
+  /** "Take me somewhere": a few steps from the start, each kept on the trail with what it went through. */
+  const walk = () => {
+    if (!start) return
+    const from = trail.length > 0 ? trail : [start.ref]
+    const askedFrom = trailKey
+    setWalking(true)
+    setWalkNote(null)
+    fetchNext<NextWalkResponse>(`walk${nextQuery(from)}`)
+      .then((response) => {
+        // The viewer stepped elsewhere while it walked: this walk is no longer theirs.
+        if (currentTrail.current !== askedFrom) return
+        if (response.steps.length === 0) {
+          setWalkNote({ severity: 'info', text: t('next.walk.none') })
+          return
+        }
+        remember([response.start, ...response.steps.map((step) => step.title)])
+        let previous = response.start.ref
+        for (const step of response.steps) {
+          rememberLink(previous, step.title.ref, step.via)
+          previous = step.title.ref
+        }
+        update({ trail: extendTrail(from, response.steps.map((step) => step.title.ref), maxTrail ?? undefined) })
+        if (limits && response.steps.length < limits.walkSteps) {
+          setWalkNote({ severity: 'info', text: t('next.walk.short', { count: response.steps.length }) })
+        }
+      })
+      .catch(() => setWalkNote({ severity: 'warning', text: t('next.walk.failed') }))
+      .finally(() => setWalking(false))
+  }
+
+  /** A chip toggles its own kind; with none chosen every row shows. */
+  const toggleKind = (kind: TrailEntityKind) =>
+    update({ kinds: state.kinds.includes(kind) ? state.kinds.filter((k) => k !== kind) : [...state.kinds, kind] })
+
   const trailTitles = trail.map((ref) => cards.get(ref)).filter((card): card is TrailTitle => card != null)
-  const nothing = data && start && data.close.length === 0 && data.people.length === 0
+  const nothing =
+    data && start && data.close.length === 0 && data.people.length === 0 && data.moreRows.length === 0
+  const allRows = data ? [...data.people, ...data.moreRows] : []
+  // A kind chosen on an earlier start keeps its chip even when this start has
+  // no row of it, so a filter carried in the address can always be undone.
+  const kindsOffered = ROW_KINDS.filter(
+    (kind) => state.kinds.includes(kind) || allRows.some((row) => row.entity.kind === kind)
+  )
+  const peopleShown = data ? data.people.filter((row) => rowShown(row, state.kinds)) : []
+  const moreShown = data ? data.moreRows.filter((row) => rowShown(row, state.kinds)) : []
 
   return (
     <Box>
@@ -276,6 +330,18 @@ function NextFromHere() {
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Tooltip title={limits ? t('next.walk.tooltip', { count: limits.walkSteps }) : ''}>
+                <span>
+                  <Button
+                    variant="contained"
+                    startIcon={walking ? <CircularProgress size={16} color="inherit" /> : <DirectionsWalkIcon />}
+                    onClick={walk}
+                    disabled={walking}
+                  >
+                    {t('next.walk.button')}
+                  </Button>
+                </span>
+              </Tooltip>
               <FormControlLabel
                 control={<Switch checked={state.hideSeen} onChange={(_, checked) => update({ hideSeen: checked })} />}
                 label={t('next.controls.hideSeen')}
@@ -299,6 +365,12 @@ function NextFromHere() {
             </Box>
           </Box>
 
+          {walkNote && (
+            <Alert severity={walkNote.severity} onClose={() => setWalkNote(null)} sx={{ mb: 2 }}>
+              {walkNote.text}
+            </Alert>
+          )}
+
           {nothing && <Alert severity="info">{t('next.empty.nothing', { title: start.title })}</Alert>}
 
           {state.view === 'map' ? (
@@ -320,17 +392,75 @@ function NextFromHere() {
                   </Box>
                 </Box>
               )}
-              {data.people.length > 0 && (
+              {(kindsOffered.length > 1 || state.kinds.length > 0) && (
+                <Box
+                  role="group"
+                  aria-label={t('next.kinds.label')}
+                  sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', mb: 2 }}
+                >
+                  <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
+                    {t('next.kinds.label')}
+                  </Typography>
+                  <Chip
+                    label={t('next.kinds.all')}
+                    size="small"
+                    color={state.kinds.length === 0 ? 'primary' : 'default'}
+                    variant={state.kinds.length === 0 ? 'filled' : 'outlined'}
+                    aria-pressed={state.kinds.length === 0}
+                    onClick={() => update({ kinds: [] })}
+                  />
+                  {kindsOffered.map((kind) => {
+                    const chosen = state.kinds.includes(kind)
+                    return (
+                      <Chip
+                        key={kind}
+                        label={t(`next.kinds.${kind}`)}
+                        size="small"
+                        color={chosen ? 'primary' : 'default'}
+                        variant={chosen ? 'filled' : 'outlined'}
+                        aria-pressed={chosen}
+                        onClick={() => toggleKind(kind)}
+                      />
+                    )
+                  })}
+                </Box>
+              )}
+              {allRows.length > 0 && peopleShown.length === 0 && moreShown.length === 0 && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  {t('next.kinds.noneLeft')}
+                </Alert>
+              )}
+              {peopleShown.length > 0 && (
                 <Box component="section" sx={{ mb: 4 }}>
                   <Typography variant="h6">{t('next.sections.people.title')}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                     {t('next.sections.people.description')}
                   </Typography>
                   <Stack spacing={1.5}>
-                    {data.people.map((row) => (
+                    {peopleShown.map((row) => (
                       <PeopleRow
                         // Per start: a row expanded on one title must not arrive
                         // expanded on the next, where the same person has a row too.
+                        key={`${start.ref}:${row.entity.key}`}
+                        row={row}
+                        startType={start.type}
+                        hideSeen={state.hideSeen}
+                        onOpen={open}
+                        onStep={stepFromRow}
+                      />
+                    ))}
+                  </Stack>
+                </Box>
+              )}
+              {moreShown.length > 0 && (
+                <Box component="section" sx={{ mb: 4 }}>
+                  <Typography variant="h6">{t('next.sections.more.title')}</Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                    {t('next.sections.more.description')}
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {moreShown.map((row) => (
+                      <PeopleRow
                         key={`${start.ref}:${row.entity.key}`}
                         row={row}
                         startType={start.type}

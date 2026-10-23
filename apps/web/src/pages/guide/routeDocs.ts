@@ -34,8 +34,8 @@ export const ROUTE_DOCS: readonly RouteDocs[] = [
   { path: '/browse', docs: ['browse', 'grid-list-views'], tour: 'browse', hint: 'browse' },
   { path: '/movies', docs: ['browse', 'grid-list-views'] },
   { path: '/series', docs: ['browse', 'grid-list-views'] },
-  { path: '/movies/', docs: ['movie-detail', 'ratings', 'title-analysis', 'similarity-graphs', 'trails'], tour: 'title', hint: 'title' },
-  { path: '/series/', docs: ['series-detail', 'ratings', 'title-analysis', 'similarity-graphs', 'trails'], tour: 'title', hint: 'title' },
+  { path: '/movies/', docs: ['movie-detail', 'ratings', 'title-analysis', 'similarity-graphs', 'next-from-here'], tour: 'title', hint: 'title' },
+  { path: '/series/', docs: ['series-detail', 'ratings', 'title-analysis', 'similarity-graphs', 'next-from-here'], tour: 'title', hint: 'title' },
   { path: '/recommendations', docs: ['recommendations'], tour: 'recommendations', hint: 'recommendations' },
   { path: '/top-picks', docs: ['top-picks'] },
   { path: '/top-picks/', docs: ['top-picks'] },
@@ -44,7 +44,6 @@ export const ROUTE_DOCS: readonly RouteDocs[] = [
   { path: '/collections', docs: ['collections'] },
   // No hint: Explore fills the viewport, and a line above it would push the graph off the bottom.
   { path: '/explore', docs: ['explore'], tour: 'explore' },
-  { path: '/trails', docs: ['trails'] },
   { path: '/next', docs: ['next-from-here'] },
   { path: '/discovery', docs: ['discovery'], hint: 'discovery' },
   { path: '/my-requests', docs: ['my-requests'] },

@@ -116,6 +116,20 @@ export const ROW_MEMBERS = 24
  * viewer keeps returning to outranks a director they have never seen.
  */
 export const ROW_WEIGHTS = { affinity: 0.6, role: 0.4 } as const
+/** Theme rows (TMDb keywords the start carries) below the people, rarest first. */
+export const THEME_ROWS = 6
+/** Studio and network rows below the people, rarest first. */
+export const STUDIO_ROWS = 3
+/** Suggestions on a title's own page (the "What next" card). */
+export const SUMMARY_ITEMS = 3
+/** Steps the guided walk takes, each to the best suggestion from the step before. */
+export const WALK_STEPS = 5
+/**
+ * How long a walk may take before it returns the steps it has: each step is
+ * a neighbour query, run one after another, and a request held open long
+ * is cut by the proxy in front of the API (F-141).
+ */
+export const WALK_BUDGET_MS = 20_000
 /** Unseen titles from each row drawn on the map beside the close list. */
 export const MAP_PER_ROW = 3
 /** Lines drawn between titles on the map other than the start's own. */

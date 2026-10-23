@@ -4,9 +4,8 @@
  * rendering. The page turns them into text with `t()`. Pinned by next.test.ts.
  */
 
-import { readRefList } from '../trails/labels'
-import type { TrailLink, TrailRole } from '../trails/types'
-import type { NextItem, NextPeopleRow, NextReason, NextRowMember } from './types'
+import { ROW_KINDS, readRefList } from './trail'
+import type { NextItem, NextPeopleRow, NextReason, NextRowMember, TrailEntityKind, TrailLink, TrailRole } from './types'
 
 export type ReasonText =
   | { key: 'next.reason.feelClosestMovie' | 'next.reason.feelClosestSeries'; start: string }
@@ -144,16 +143,23 @@ export interface NextUrlState {
   /** Titles stepped through, oldest first; the last is the start. Empty: the API chooses. */
   trail: string[]
   view: NextView
-  /** Leave the viewer's seen titles out of the people rows (suggestions never hold them). */
+  /** Leave the viewer's seen titles out of the rows (suggestions never hold them). */
   hideSeen: boolean
+  /** Only rows of these kinds; empty means every kind. */
+  kinds: TrailEntityKind[]
+}
+
+function readKinds(value: string | null): TrailEntityKind[] {
+  if (!value) return []
+  const wanted = new Set(value.split(','))
+  // In the chips' own order, so one selection has one address.
+  return ROW_KINDS.filter((kind) => wanted.has(kind))
 }
 
 /**
- * The page's state from its address. `trail` is read as Trails reads its own
- * (`readRefList`: malformed refs dropped, repeats kept once, the newest
- * `maxTrail` kept), so one trail has one meaning on both pages. `?title=`
- * (the first version's only parameter, and what the title page links with)
- * reads as a trail of one.
+ * The page's state from its address. `trail` drops malformed refs, keeps
+ * repeats once and keeps the newest `maxTrail`; `?title=` (what a title page
+ * links with) reads as a trail of one.
  */
 export function readNextUrl(params: URLSearchParams, maxTrail = Number.MAX_SAFE_INTEGER): NextUrlState {
   const trail = readRefList(params.get('trail'), maxTrail)
@@ -161,6 +167,7 @@ export function readNextUrl(params: URLSearchParams, maxTrail = Number.MAX_SAFE_
     trail: trail.length > 0 ? trail : readRefList(params.get('title'), 1),
     view: params.get('view') === 'map' ? 'map' : 'list',
     hideSeen: params.get('hide') === 'seen',
+    kinds: readKinds(params.get('kinds')),
   }
 }
 
@@ -171,7 +178,31 @@ export function writeNextUrl(state: NextUrlState): URLSearchParams {
   else if (state.trail.length > 1) params.set('trail', state.trail.join(','))
   if (state.view === 'map') params.set('view', 'map')
   if (state.hideSeen) params.set('hide', 'seen')
+  const kinds = ROW_KINDS.filter((kind) => state.kinds.includes(kind))
+  // Every kind chosen is no filter, so it is written as none.
+  if (kinds.length > 0 && kinds.length < ROW_KINDS.length) params.set('kinds', kinds.join(','))
   return params
+}
+
+/** Whether a row shows under the chosen kinds (none chosen shows every row). */
+export function rowShown(row: Pick<NextPeopleRow, 'entity'>, kinds: readonly TrailEntityKind[]): boolean {
+  return kinds.length === 0 || kinds.includes(row.entity.kind)
+}
+
+/** The address a title's own page links to: Next from here, starting at it. */
+export function nextPath(ref: string): string {
+  return `/next?${writeNextUrl({ trail: [ref], view: 'list', hideSeen: false, kinds: [] }).toString()}`
+}
+
+/**
+ * The Next from here address for an old Trails one (`/trails?trail=…`): the
+ * same trail. The retired filters are dropped — Next leaves out what the
+ * viewer has seen by itself, and Trails' kinds filtered threads, not rows.
+ */
+export function nextPathFromTrails(params: URLSearchParams): string {
+  const trail = readRefList(params.get('trail'), Number.MAX_SAFE_INTEGER)
+  const query = writeNextUrl({ trail, view: 'list', hideSeen: false, kinds: [] }).toString()
+  return query ? `/next?${query}` : '/next'
 }
 
 /** The API query for a trail: its last title is the start, the rest are never suggested again. */

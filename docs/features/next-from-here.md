@@ -22,9 +22,15 @@ What counts as liking a title: rating it 7 or higher, or finishing it without ra
 
 One row for each person who shaped the start (its director, creator, writers, cinematographer, composer and lead actors), one for its franchise, and one for a studio or network you favour. Each row shows what else of theirs is in your library: the titles you haven't seen first, best suggestion first, then the ones you have, faded.
 
-The rows are ordered by **you**, not by how famous anyone is. Someone you keep coming back to comes first, with a line saying why ("You liked 3 of their titles, rated 8.7 on average"). Then the people with the biggest part in the start: a director before a lead, a lead before the franchise. A bit part, an editor or a keyword never gets a row.
+The rows are ordered by **you**, not by how famous anyone is. Someone you keep coming back to comes first, with a line saying why ("You liked 3 of their titles, rated 8.7 on average"). Then the people with the biggest part in the start: a director before a lead, a lead before the franchise. A bit part or an editor never gets a row.
 
 Turn on **Hide what I've seen** to leave the titles you've seen out of the rows. **Show all** opens a long row in place, and a row's name opens that person's, studio's or franchise's own page.
+
+## Themes and studios
+
+Below the people, the start's themes (its TMDb keywords) and its studios and networks get rows of their own: what else in your library carries them, rarest first. As with the reasons, a theme or studio on a large part of your library gets no row, and one that already has a row above is not repeated.
+
+The chips under **Show connections through** (**People**, **Franchises**, **Studios & networks**, **Themes**) narrow the rows to the kinds you choose. **Every kind** shows them all again.
 
 ## As a map
 
@@ -36,6 +42,7 @@ Click a poster for its details. **Shift+click**, the poster's corner button, or 
 
 The **corner button** on any suggestion's poster (in the list, a row or the map) makes that title the new start. The page keeps the way you came as **Your trail**, posters joined by what linked each step, and never suggests a title already on it.
 
+- **Take me somewhere** walks a few steps for you. Each step goes to the best suggestion from the title before, never to anything you've seen or anything already on the trail, and it doesn't follow the same person twice while there is another way on.
 - Use a poster's corner button in the trail to **go back** to that step.
 - **Save as playlist** puts the trail on your media server as a playlist.
 - **Start a new trail here** forgets the earlier steps and keeps the current title.
@@ -44,11 +51,12 @@ The **corner button** on any suggestion's poster (in the list, a row or the map)
 
 - **Start from** lets you pick any title in your library. **Recently watched** offers your latest finished titles as one-click starts.
 - **Surprise me** starts from a title chosen for you, one with plenty of people linking it to the rest of your library.
-- The **What next** button on a title's page opens this page from that title.
+- A title's page has an **After this** card with the best few suggestions and the reason for each, and a **What next** button. Both open this page from that title.
+- Links to the old Trails page open here, on the same trail.
 - The start, your trail and the view are kept in the page's address, so **Back** and a shared link return to the same page.
 
 ## Why a list is short or empty
 
-- Close in feel needs the title's AI embedding. A title without one (new, or not yet embedded) gets only the people rows.
+- Close in feel needs the title's AI embedding. A title without one (new, or not yet embedded) gets only the rows.
 - Someone you have watched a lot may have nothing left: suggestions leave out everything you have finished, started or rated.
 - The credits come from your media server and the metadata enrichment. New titles appear here within the hour after they are synced.

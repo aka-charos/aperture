@@ -5,17 +5,31 @@ import {
   itemLink,
   nextQuery,
   orderReasons,
+  nextPath,
+  nextPathFromTrails,
   readNextUrl,
   reasonText,
   rowLink,
   rowMembers,
   rowNote,
+  rowShown,
   writeNextUrl,
+  type NextUrlState,
 } from './reasons'
+import {
+  ROW_KINDS,
+  extendTrail,
+  hereCaption,
+  pairKey,
+  stepCaption,
+  stepTrail,
+  titleRefFor,
+  trailLookupNeeded,
+} from './trail'
 import { buildMapData, connectionTypeFor, type MapLabels } from './map'
 import { legendConnectionTypes } from '../../components/SimilarityGraph/connectionHighlight'
 import type { NextFromHereResponse, NextPeopleRow, NextReason } from './types'
-import type { TrailEntity, TrailTitle } from '../trails/types'
+import type { TrailEntity, TrailTitle } from './types'
 
 const person = (name: string): TrailEntity => ({ key: `person:${name}`, kind: 'person', name, photo: null, titleCount: 4 })
 const keyword = (name: string): TrailEntity => ({ key: `keyword:${name}`, kind: 'keyword', name, photo: null, titleCount: 3 })
@@ -139,21 +153,88 @@ test('a step remembers the person it went through, and nothing when it was close
   assert.deepEqual(rowLink(anderson, anderson.members[0]).rolesTo, ['director'])
 })
 
-test('the address holds the trail; ?title= reads as a trail of one, and defaults are left out', () => {
+test('the address holds the trail and the row kinds; ?title= reads as a trail of one, and defaults are left out', () => {
   const a = 'movie:00000000-0000-4000-8000-00000000000A'
   const b = 'series:00000000-0000-4000-8000-00000000000b'
-  assert.deepEqual(readNextUrl(new URLSearchParams({ title: a })), { trail: [a.toLowerCase()], view: 'list', hideSeen: false })
-  assert.deepEqual(readNextUrl(new URLSearchParams(`trail=${a},movie:42,${b},${a}&view=map&hide=seen`)), {
+  const none = { view: 'list', hideSeen: false, kinds: [] }
+  assert.deepEqual(readNextUrl(new URLSearchParams({ title: a })), { trail: [a.toLowerCase()], ...none })
+  assert.deepEqual(readNextUrl(new URLSearchParams(`trail=${a},movie:42,${b},${a}&view=map&hide=seen&kinds=keyword,nonsense,person`)), {
     trail: [a.toLowerCase(), b],
     view: 'map',
     hideSeen: true,
+    kinds: ['person', 'keyword'],
   })
   assert.deepEqual(readNextUrl(new URLSearchParams(`trail=${a},${b}`), 1).trail, [b])
-  assert.deepEqual(readNextUrl(new URLSearchParams('')), { trail: [], view: 'list', hideSeen: false })
-  assert.equal(writeNextUrl({ trail: [b], view: 'list', hideSeen: false }).toString(), new URLSearchParams({ title: b }).toString())
-  assert.equal(writeNextUrl({ trail: [], view: 'list', hideSeen: false }).toString(), '')
-  const round = writeNextUrl({ trail: [a.toLowerCase(), b], view: 'map', hideSeen: true })
-  assert.deepEqual(readNextUrl(round), { trail: [a.toLowerCase(), b], view: 'map', hideSeen: true })
+  assert.deepEqual(readNextUrl(new URLSearchParams('')), { trail: [], ...none })
+  assert.equal(
+    writeNextUrl({ trail: [b], view: 'list', hideSeen: false, kinds: [] }).toString(),
+    new URLSearchParams({ title: b }).toString()
+  )
+  assert.equal(writeNextUrl({ trail: [], view: 'list', hideSeen: false, kinds: [] }).toString(), '')
+  // Every kind chosen is no filter, so it is written as none.
+  assert.equal(writeNextUrl({ trail: [], view: 'list', hideSeen: false, kinds: [...ROW_KINDS] }).toString(), '')
+  const state: NextUrlState = { trail: [a.toLowerCase(), b], view: 'map', hideSeen: true, kinds: ['franchise', 'company'] }
+  assert.deepEqual(readNextUrl(writeNextUrl(state)), state)
+})
+
+test('a row shows when its kind is chosen, or when none is', () => {
+  const r = row(keyword('asylum'), [])
+  assert.equal(rowShown(r, []), true)
+  assert.equal(rowShown(r, ['keyword', 'company']), true)
+  assert.equal(rowShown(r, ['person']), false)
+})
+
+test('an old Trails address opens the same trail here, its filters dropped', () => {
+  const a = 'movie:00000000-0000-4000-8000-00000000000a'
+  const b = 'series:00000000-0000-4000-8000-00000000000b'
+  assert.equal(nextPathFromTrails(new URLSearchParams(`trail=${a}&unwatched=1&kinds=person`)), nextPath(a))
+  assert.equal(nextPathFromTrails(new URLSearchParams(`trail=${a},movie:42,${b}`)), `/next?${new URLSearchParams({ trail: `${a},${b}` })}`)
+  assert.equal(nextPathFromTrails(new URLSearchParams('mode=connect&from=x')), '/next')
+  assert.equal(nextPath(a), `/next?${new URLSearchParams({ title: a })}`)
+})
+
+test('a step names the role when both titles give the same one, else both in order', () => {
+  assert.deepEqual(stepCaption({ kind: 'person', rolesFrom: ['cinematographer'], rolesTo: ['cinematographer'] }), {
+    key: 'next.caption.same',
+    role: 'cinematographer',
+  })
+  assert.deepEqual(stepCaption({ kind: 'person', rolesFrom: ['lead', 'writer'], rolesTo: ['director'] }), {
+    key: 'next.caption.differs',
+    from: 'lead',
+    to: 'director',
+  })
+  assert.deepEqual(stepCaption({ kind: 'franchise', rolesFrom: ['franchise'], rolesTo: ['franchise'] }), {
+    key: 'next.caption.franchise',
+  })
+  assert.deepEqual(hereCaption('person', ['director', 'writer']), { key: 'next.here.role', role: 'director' })
+  assert.deepEqual(hereCaption('keyword', ['keyword']), { key: 'next.here.keyword' })
+})
+
+test('stepping back onto the trail cuts it there, a walk is appended in order, and a long trail drops its oldest', () => {
+  const A = 'movie:00000000-0000-4000-8000-000000000001'
+  const B = 'series:00000000-0000-4000-8000-000000000002'
+  const C = 'movie:00000000-0000-4000-8000-000000000003'
+  assert.deepEqual(stepTrail([A, B], C), [A, B, C])
+  assert.deepEqual(stepTrail([A, B, C], B), [A, B])
+  assert.deepEqual(stepTrail([A, B], C, 2), [B, C])
+  assert.deepEqual(extendTrail([A], [B, C]), [A, B, C])
+  assert.deepEqual(extendTrail([A], [B, C], 2), [B, C])
+  assert.equal(titleRefFor('movie', '00000000-0000-4000-8000-00000000000A'), 'movie:00000000-0000-4000-8000-00000000000a')
+  assert.equal(titleRefFor('series', 'not-a-uuid'), null)
+})
+
+test('a trail is looked up only while a title or a side-by-side pair is unknown, never for a title that is gone', () => {
+  const A = 'movie:00000000-0000-4000-8000-000000000001'
+  const B = 'series:00000000-0000-4000-8000-000000000002'
+  const C = 'movie:00000000-0000-4000-8000-000000000003'
+  const cards = new Set([A, C])
+  const links = new Set([pairKey(A, C)])
+  const hasCard = (ref: string) => cards.has(ref)
+  const hasLink = (key: string) => links.has(key)
+  assert.equal(trailLookupNeeded([A, B, C], hasCard, hasLink, new Set([B])), false)
+  assert.equal(trailLookupNeeded([A, B, C], hasCard, hasLink, new Set()), true)
+  assert.equal(trailLookupNeeded([C, A], hasCard, hasLink, new Set()), true)
+  assert.equal(trailLookupNeeded([A], hasCard, hasLink, new Set()), false)
 })
 
 test('the API is asked from the last title, the earlier ones never suggested again', () => {
@@ -199,6 +280,7 @@ test('the map: the start in the middle, every line a named reason, a person befo
       },
       { title: feelOnly, reasons: [{ kind: 'feel', rank: 4 }] },
     ],
+    moreRows: [],
     people: [
       row(anderson, [
         { title: close, seen: false },

@@ -53,7 +53,6 @@
     "sharedWithMeBadge_other": "새 작품 {{count}}개",
     "watchThis": "이거 봐요",
     "userMenu": "Account menu",
-    "trails": "Trails",
     "nextFromHere": "Next from here"
   },
   "admin": {
@@ -2065,7 +2064,8 @@
     "analysisSpoilerReveal": "This part places the film in its tradition and may reveal how it ends — tap to read",
     "analysisNotYet": "No analysis has been written for this title yet. Open its page to generate one.",
     "analysisDeclined": "An analysis was attempted, but there was not enough published writing about this title to work from.",
-    "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it."
+    "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it.",
+    "sectionUntitled": "Results"
   },
   "similarityGraph": {
     "loadingFallback": "로드 중…",
@@ -6651,117 +6651,16 @@
     "war_politics": "War & Politics",
     "western": "Western"
   },
-  "trails": {
-    "title": "Trails",
-    "description": "Follow the people, franchises and studios that link the titles in your library. The rarer the link, the more it says.",
-    "threads": {
-      "pick": "Start from a title",
-      "startAgain": "Start again from…",
-      "backToStart": "Back to the start",
-      "trail": "Your trail",
-      "empty": "Pick a title to see every named thread leading out of it — the people, franchise, companies and keywords it shares with the rest of your library, rarest first. Follow one to keep going.",
-      "notFound": "This title isn't in your library.",
-      "count_one": "{{count}} thread leads out of it, rarest first.",
-      "count_other": "{{count}} threads lead out of it, rarest first.",
-      "none": "{{title}} shares no named link with anything else in your library.",
-      "more_one": "and {{count}} more",
-      "more_other": "and {{count}} more"
-    },
-    "picker": {
-      "placeholder": "Search your library",
-      "typeMore": "Type at least two letters",
-      "noResults": "No titles found"
-    },
-    "actions": {
-      "follow": "Follow the threads from {{title}}",
-      "savePlaylist": "Save as playlist"
-    },
-    "errors": {
-      "load": "Couldn't load this. Try again."
-    },
-    "roles": {
-      "franchise": "Franchise",
-      "director": "Director",
-      "creator": "Creator",
-      "writer": "Writer",
-      "lead": "Lead actor",
-      "cinematographer": "Cinematographer",
-      "composer": "Composer",
-      "editor": "Editor",
-      "actor": "Actor",
-      "keyword": "Keyword",
-      "studio": "Studio",
-      "network": "Network"
-    },
-    "caption": {
-      "same": "{{role}} on both",
-      "differs": "{{from}}, then {{to}}",
-      "franchise": "Same franchise",
-      "keyword": "Tagged on both"
-    },
-    "here": {
-      "role": "{{role}} here",
-      "franchise": "This title's franchise",
-      "keyword": "Tagged here"
-    },
-    "rarity": {
-      "onlyTwo": "Only these two in your library",
-      "count_one": "{{count}} title in your library",
-      "count_other": "{{count}} titles in your library"
-    },
-    "detail": {
-      "follow": "Follow a trail",
-      "followTooltip": "Start a trail at this title: the people, franchise, companies and keywords it shares with the rest of your library",
-      "title": "Strongest links",
-      "description": "The rarest named things this title shares with the rest of your library.",
-      "seeAll_one": "See its thread in Trails",
-      "seeAll_other": "See all {{count}} threads in Trails",
-      "sharedWith_one": "Shared with {{count}} other title in your library",
-      "sharedWith_other": "Shared with {{count}} other titles in your library"
-    },
-    "start": {
-      "surprise": "Surprise me",
-      "surpriseFailed": "Couldn't find a title with enough links to start from. Your library may not have enough credits filled in yet."
-    },
-    "walk": {
-      "button": "Take me on a trail",
-      "tooltip_one": "Walk {{count}} step from here, along a strong link to a title you haven’t watched",
-      "tooltip_other": "Walk {{count}} steps from here, each along a strong link to a title you haven’t watched",
-      "none": "Nothing you haven’t watched is linked from here. Try another title, or fewer filters.",
-      "short_one": "The trail ran out after {{count}} step: nothing new was linked further on.",
-      "short_other": "The trail ran out after {{count}} steps: nothing new was linked further on.",
-      "failed": "Couldn't walk a trail from here. Try again."
-    },
-    "filters": {
-      "hideWatched": "Hide what I’ve watched",
-      "kinds": "Threads through",
-      "all": "Show every kind",
-      "kind": {
-        "person": "People",
-        "franchise": "Franchises",
-        "company": "Studios & networks",
-        "keyword": "Keywords"
-      },
-      "noneLeft": "With these filters, nothing leads out of {{title}}."
-    },
-    "strip": {
-      "back": "Go back to {{title}}"
-    },
-    "thread": {
-      "showAll_one": "Show all {{count}}",
-      "showAll_other": "Show all {{count}}",
-      "showFewer": "Show fewer",
-      "loadFailed": "Couldn't load the whole list. Try again.",
-      "nothingLeft": "Nothing more to show on this thread with your filters."
-    }
-  },
   "next": {
     "title": "Next from here",
     "description": "What to watch after a title: what feels closest to it, and what its people made that feels different, each with the reasons it is here.",
     "after": "After",
     "picker": {
       "label": "Start from",
-      "recent": "Recently watched:"
+      "recent": "Recently watched:",
+      "placeholder": "Search your library",
+      "typeMore": "Type at least two letters",
+      "noResults": "No titles found"
     },
     "sections": {
       "close": {
@@ -6771,6 +6670,10 @@
       "people": {
         "title": "The people behind it",
         "description": "Who made this one, and what else of theirs is in your library, unseen first. The people you keep coming back to come first."
+      },
+      "more": {
+        "title": "Themes and studios",
+        "description": "What else in your library shares this title's themes, studios and networks, the rarest first."
       }
     },
     "reason": {
@@ -6793,7 +6696,8 @@
     "actions": {
       "from": "Next from {{title}}",
       "retry": "Try again",
-      "surprise": "Surprise me"
+      "surprise": "Surprise me",
+      "savePlaylist": "Save as playlist"
     },
     "errors": {
       "load": "Couldn't load suggestions. Try again.",
@@ -6840,7 +6744,57 @@
     },
     "detail": {
       "whatNext": "What next",
-      "whatNextTooltip": "What to watch after this: what feels closest to it, and the people behind it"
+      "whatNextTooltip": "What to watch after this: what feels closest to it, and the people behind it",
+      "title": "After this",
+      "description": "The best of what to watch next, from how close it feels and who made it.",
+      "seeAll": "See more in Next from here"
+    },
+    "roles": {
+      "franchise": "Franchise",
+      "director": "Director",
+      "creator": "Creator",
+      "writer": "Writer",
+      "lead": "Lead actor",
+      "cinematographer": "Cinematographer",
+      "composer": "Composer",
+      "editor": "Editor",
+      "actor": "Actor",
+      "keyword": "Keyword",
+      "studio": "Studio",
+      "network": "Network"
+    },
+    "caption": {
+      "same": "{{role}} on both",
+      "differs": "{{from}}, then {{to}}",
+      "franchise": "Same franchise",
+      "keyword": "Tagged on both"
+    },
+    "here": {
+      "role": "{{role}} here",
+      "franchise": "This title's franchise",
+      "keyword": "Tagged here"
+    },
+    "strip": {
+      "back": "Go back to {{title}}",
+      "label": "Your trail"
+    },
+    "kinds": {
+      "all": "Show every kind",
+      "person": "People",
+      "franchise": "Franchises",
+      "company": "Studios & networks",
+      "label": "Show connections through",
+      "keyword": "Themes",
+      "noneLeft": "With these filters there is nothing left to show."
+    },
+    "walk": {
+      "short_one": "The trail ran out after {{count}} step: nothing new was linked further on.",
+      "short_other": "The trail ran out after {{count}} steps: nothing new was linked further on.",
+      "button": "Take me somewhere",
+      "tooltip_one": "Walk {{count}} step from here, to the best suggestion, never to anything you've seen",
+      "tooltip_other": "Walk {{count}} steps from here, each to the best suggestion from the one before, never to anything you've seen",
+      "none": "Nothing you haven't seen leads on from here. Try another title.",
+      "failed": "Couldn't walk on from here. Try again."
     }
   },
   "colorMode": {

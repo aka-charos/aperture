@@ -72,7 +72,7 @@ export function TitlePicker({
       filterOptions={(list) => list}
       isOptionEqualToValue={(option, chosen) => option.ref === chosen.ref}
       getOptionLabel={(option) => option.title}
-      noOptionsText={tooShort ? t('trails.picker.typeMore') : t('trails.picker.noResults')}
+      noOptionsText={tooShort ? t('next.picker.typeMore') : t('next.picker.noResults')}
       loadingText={t('common.loading')}
       renderOption={(props, option) => {
         const { key, ...rest } = props as typeof props & { key: string }
@@ -98,7 +98,7 @@ export function TitlePicker({
         )
       }}
       renderInput={(params) => (
-        <TextField {...params} label={label} placeholder={t('trails.picker.placeholder')} autoFocus={autoFocus} size="small" />
+        <TextField {...params} label={label} placeholder={t('next.picker.placeholder')} autoFocus={autoFocus} size="small" />
       )}
       sx={{ minWidth: 220, flex: 1 }}
     />

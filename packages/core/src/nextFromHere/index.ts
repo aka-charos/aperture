@@ -19,14 +19,33 @@ import type { TrailView } from '../trails/graph.js'
 import { formatTitleRef, rolesOf, type LinkRole, type TitleRef } from '../trails/rules.js'
 import { getWatchStatusForUser } from '../watching/watchedItems.js'
 import { mapLinks } from './map.js'
-import { peopleRows, type PeopleRow } from './people.js'
-import { LIKED_WEIGHT, MAP_PER_ROW, NEIGHBOUR_POOL, STARTS_OFFERED, titleWeight } from './rules.js'
-import { pickClose, scoreCandidates, tasteContext, type Candidate, type Reason, type ViewerTitle } from './taste.js'
+import { moreRows, peopleRows, type PeopleRow } from './people.js'
+import {
+  LIKED_WEIGHT,
+  MAP_PER_ROW,
+  NEIGHBOUR_POOL,
+  STARTS_OFFERED,
+  SUMMARY_ITEMS,
+  WALK_BUDGET_MS,
+  WALK_STEPS,
+  titleWeight,
+} from './rules.js'
+import {
+  pickClose,
+  scoreCandidates,
+  tasteContext,
+  type Candidate,
+  type Reason,
+  type TasteContext,
+  type ViewerTitle,
+} from './taste.js'
+import { walkSteps } from './walk.js'
 
 export {
   CLOSE_ITEMS as NEXT_CLOSE_ITEMS,
   PEOPLE_ROWS as NEXT_PEOPLE_ROWS,
   STARTS_OFFERED as NEXT_STARTS_OFFERED,
+  WALK_STEPS as NEXT_WALK_STEPS,
 } from './rules.js'
 
 /** The most titles a request may ask to leave out (a trail's earlier steps). */
@@ -99,6 +118,11 @@ export interface NextFromHere {
   close: NextItem[]
   /** The people (and franchise, and favoured studio or network) behind the start, strongest for this viewer first. */
   people: NextPeopleRow[]
+  /**
+   * The start's themes (TMDb keywords) and its studios and networks, each a
+   * row like a person's, rarest first: what else in the library shares them.
+   */
+  moreRows: NextPeopleRow[]
   /**
    * The map: the refs drawn around the start (the close list, then the first
    * unseen titles of each row) and the lines between them.
@@ -306,6 +330,115 @@ function itemView(view: TrailView, candidate: Candidate): NextItem {
   }
 }
 
+/** A link between two steps of a trail: the person or franchise shared, and the part they had on each side. */
+export interface NextTrailLink extends TrailEntity {
+  rolesFrom: LinkRole[]
+  rolesTo: LinkRole[]
+}
+
+/** One step a walk took: the title, and what it went through (null for closeness alone). */
+export interface NextWalkStep {
+  title: TrailTitle
+  via: NextTrailLink | null
+}
+
+interface Prepared {
+  view: TrailView
+  start: number
+  record: ViewerRecord
+  starts: TrailTitle[]
+  avoided: Set<number>
+  seen: (title: number) => boolean
+  context: TasteContext
+}
+
+interface NoStart {
+  view: TrailView
+  start: null
+  starts: TrailTitle[]
+}
+
+interface PrepareOptions {
+  /** Runs as soon as the start is known, so the neighbour lookup need not wait on the record. */
+  early?: (view: TrailView, start: number) => void
+  /**
+   * Whether to read the viewer's recent titles for `starts`. Only the page
+   * offers them; the title page's card and the walk always have a start and
+   * would pay for a query nothing reads.
+   */
+  withStarts?: boolean
+}
+
+/**
+ * Resolves the start and the avoided titles and loads the viewer's record.
+ * Null when `ref` is not in scope; `start: null` when none was given and the
+ * viewer has no recent title to start from.
+ */
+async function prepare(
+  scope: LibraryScope,
+  userId: string,
+  ref: TitleRef | null,
+  avoid: readonly TitleRef[],
+  { early = () => {}, withStarts = true }: PrepareOptions = {}
+): Promise<Prepared | NoStart | null> {
+  let view: TrailView
+  let start: number | null = null
+  if (ref) {
+    const resolved = await resolve(scope, [ref])
+    view = resolved.view
+    start = resolved.titles[0]
+    if (start == null) return null
+    early(view, start)
+  } else {
+    view = await viewFor(scope)
+  }
+  // Without a ref the recent titles are where the start comes from.
+  const readStarts = withStarts || start == null
+  const [record, played] = await Promise.all([
+    loadRecord(view, userId),
+    readStarts ? recentlyPlayed(userId) : Promise.resolve([]),
+  ])
+  const startTitles = readStarts ? pickStarts(view, played, record) : []
+  const starts = startTitles.map((title) => titleView(view.index.titles[title]))
+  if (start == null) start = startTitles[0] ?? null
+  if (start == null) return { view, start: null, starts }
+  const avoided = new Set<number>()
+  for (const step of avoid.slice(0, NEXT_MAX_AVOID)) {
+    const title = view.index.byRef.get(formatTitleRef(step))
+    if (title !== undefined && title !== start) avoided.add(title)
+  }
+  const seen = (title: number) => record.titles.has(title) || record.started.has(title)
+  return { view, start, record, starts, avoided, seen, context: tasteContext(view, record.titles) }
+}
+
+function candidatesFor(
+  prepared: Prepared,
+  start: number,
+  neighbours: readonly number[],
+  visited?: ReadonlySet<number>
+): Candidate[] {
+  const { view, record, seen, avoided, context } = prepared
+  return scoreCandidates({
+    view,
+    start,
+    neighbours,
+    record: record.titles,
+    exclude: (title) => seen(title) || avoided.has(title) || visited?.has(title) === true,
+    context,
+  })
+}
+
+/** The person or franchise a step to `candidate` went through, from its strongest shared credit. */
+function stepVia(view: TrailView, candidate: Candidate): NextTrailLink | null {
+  const shared = candidate.reasons.find((reason) => reason.kind === 'shared')
+  if (!shared || shared.kind !== 'shared') return null
+  return {
+    ...entityView(view, shared.entity),
+    rolesFrom: rolesOf(shared.rolesStartMask),
+    rolesTo: rolesOf(shared.rolesHereMask),
+  }
+}
+
 /**
  * What to watch after `ref` (or, with none, after the viewer's most recent
  * title they finished and did not dislike). Null when `ref` is given and is
@@ -320,51 +453,41 @@ export async function getNextFromHere(
   ref: TitleRef | null,
   avoid: readonly TitleRef[] = []
 ): Promise<NextFromHere | null> {
-  let view: TrailView
-  let start: number | null = null
-  if (ref) {
-    const resolved = await resolve(scope, [ref])
-    view = resolved.view
-    start = resolved.titles[0]
-    if (start == null) return null
-  } else {
-    view = await viewFor(scope)
-  }
-
   // With the start known, the neighbours do not wait on the viewer's record.
   // neighboursOf never rejects, so the early promise cannot go unhandled.
-  const early = start != null ? neighboursOf(view, scope, start) : null
-  const [record, played] = await Promise.all([loadRecord(view, userId), recentlyPlayed(userId)])
-  const starts = pickStarts(view, played, record)
-  if (start == null) start = starts[0] ?? null
-  const startsView = starts.map((title) => titleView(view.index.titles[title]))
-  if (start == null) return { start: null, close: [], people: [], map: { refs: [], links: [] }, starts: startsView }
-
-  const avoided = new Set<number>()
-  for (const step of avoid.slice(0, NEXT_MAX_AVOID)) {
-    const title = view.index.byRef.get(formatTitleRef(step))
-    if (title !== undefined && title !== start) avoided.add(title)
-  }
-  const seen = (title: number) => record.titles.has(title) || record.started.has(title)
-  const neighbours = await (early ?? neighboursOf(view, scope, start))
-  const context = tasteContext(view, record.titles)
-  const candidates = scoreCandidates({
-    view,
-    start,
-    neighbours,
-    record: record.titles,
-    exclude: (title) => seen(title) || avoided.has(title),
-    context,
+  let early: Promise<number[]> | null = null
+  const prepared = await prepare(scope, userId, ref, avoid, {
+    early: (view, start) => {
+      early = neighboursOf(view, scope, start)
+    },
   })
+  if (!prepared) return null
+  if (prepared.start == null) {
+    return { start: null, close: [], people: [], moreRows: [], map: { refs: [], links: [] }, starts: prepared.starts }
+  }
+  const { view, start, record, seen, avoided, context } = prepared
+  const neighbours = await (early ?? neighboursOf(view, scope, start))
+  const candidates = candidatesFor(prepared, start, neighbours)
   const close = pickClose(candidates)
+  const scores = new Map(candidates.map((candidate) => [candidate.title, candidate.score]))
   const rows = peopleRows({
     view,
     start,
     record: record.titles,
     seen,
-    scores: new Map(candidates.map((candidate) => [candidate.title, candidate.score])),
+    scores,
     exclude: (title) => avoided.has(title),
     context,
+  })
+  const others = moreRows({
+    view,
+    start,
+    record: record.titles,
+    seen,
+    scores,
+    exclude: (title) => avoided.has(title),
+    context,
+    taken: new Set(rows.map((row) => row.entity)),
   })
   const drawn = mapTitles(close, rows)
   const refOf = (title: number) => formatTitleRef(view.index.titles[title])
@@ -372,6 +495,7 @@ export async function getNextFromHere(
     start: titleView(view.index.titles[start]),
     close: close.map((candidate) => itemView(view, candidate)),
     people: rows.map((row) => rowView(view, row)),
+    moreRows: others.map((row) => rowView(view, row)),
     map: {
       refs: drawn.map(refOf),
       links: mapLinks(view, drawn).map((link) => ({
@@ -382,6 +506,65 @@ export async function getNextFromHere(
         rolesTo: rolesOf(link.maskB),
       })),
     },
-    starts: startsView,
+    starts: prepared.starts,
+  }
+}
+
+/**
+ * The few best suggestions after a title, for its own page: the strongest
+ * candidates whatever their kind (close in feel or the same people), so a
+ * title with no embedding still gets an answer. Null when the title is not
+ * in scope.
+ */
+export async function getNextSummary(
+  scope: LibraryScope,
+  userId: string,
+  ref: TitleRef
+): Promise<{ start: TrailTitle; items: NextItem[] } | null> {
+  let early: Promise<number[]> | null = null
+  const prepared = await prepare(scope, userId, ref, [], {
+    early: (view, start) => {
+      early = neighboursOf(view, scope, start)
+    },
+    withStarts: false,
+  })
+  if (!prepared || prepared.start == null) return null
+  const { view, start } = prepared
+  const neighbours = await (early ?? neighboursOf(view, scope, start))
+  const candidates = candidatesFor(prepared, start, neighbours)
+  return {
+    start: titleView(view.index.titles[start]),
+    items: candidates.slice(0, SUMMARY_ITEMS).map((candidate) => itemView(view, candidate)),
+  }
+}
+
+/**
+ * "Take me somewhere" (walk.ts): up to WALK_STEPS steps from `ref`, each to
+ * the best suggestion from the step before, never to a title the viewer has
+ * seen or one already on the trail (`avoid`). Null when the title is not in
+ * scope; empty `steps` when nothing is left to suggest.
+ */
+export async function walkNext(
+  scope: LibraryScope,
+  userId: string,
+  ref: TitleRef,
+  avoid: readonly TitleRef[] = []
+): Promise<{ start: TrailTitle; steps: NextWalkStep[] } | null> {
+  const prepared = await prepare(scope, userId, ref, avoid, { withStarts: false })
+  if (!prepared || prepared.start == null) return null
+  const { view, start } = prepared
+  // Each step waits on a neighbour query from the one before, so a slow
+  // embedding table multiplies; past the budget the walk returns what it has.
+  const deadline = Date.now() + WALK_BUDGET_MS
+  const walked = await walkSteps(
+    start,
+    WALK_STEPS,
+    async (title, visited) => candidatesFor(prepared, title, await neighboursOf(view, scope, title), visited),
+    [],
+    () => Date.now() > deadline
+  )
+  return {
+    start: titleView(view.index.titles[start]),
+    steps: walked.map((step) => ({ title: titleView(view.index.titles[step.to.title]), via: stepVia(view, step.to) })),
   }
 }
