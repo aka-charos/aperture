@@ -3907,7 +3907,7 @@
   "settingsThemeColors": {
     "title": "Brand colors",
     "subtitle": "The two accent colors used throughout the app — buttons, highlights, gradients, and badges. Other colors (errors, warnings, success) stay fixed.",
-    "lightModeNote": "The light appearance answers the default pair with its own terracotta and rust. Save any other pair and both appearances use it as saved.",
+    "lightModeNote": "The light appearance answers the default pair with its own terracotta and slate teal. Save any other pair and both appearances use it as saved.",
     "primaryLabel": "Primary",
     "secondaryLabel": "Secondary",
     "invalidHex": "Enter a color like #6366f1",

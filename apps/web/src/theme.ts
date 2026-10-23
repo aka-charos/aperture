@@ -1,4 +1,4 @@
-import { createTheme, alpha, lighten, darken, type Theme, type ThemeOptions, type Shadows } from '@mui/material/styles'
+import { createTheme, alpha, type Theme, type ThemeOptions, type Shadows } from '@mui/material/styles'
 
 /** The two appearances. Dark is the original; light is the calm, bordered one. */
 export type ColorMode = 'light' | 'dark'
@@ -35,6 +35,12 @@ export interface SurfaceTokens {
   fillDeep: string
   /** The gradient shown where a hero has no image. */
   placeholder: string
+  /**
+   * The plate a studio logo sits on. Logos are mostly dark marks on
+   * transparency, so the dark mode needs a light plate under them; the light
+   * mode is already light, and its plate is a base step, never white.
+   */
+  logoPlate: string
 }
 
 /** The main sidebar's selected entry. */
@@ -158,25 +164,31 @@ export const palette = {
 
 /**
  * The light mode, laid out the way a light palette guide lays out a site: two
- * ACCENT colours for calls to action (terracotta and rust), four CONTRAST
- * colours from dark to pale for text and state (navy, slate, sage, pale sage),
- * and three BASE colours for the surfaces, all warm beige and none of them
- * white. The accent is the primary colour; the selected page and a selected
- * toggle sit on pale sage; depth comes from the base steps and borders rather
- * than from shadows. An admin's own brand pair replaces both accents when one
- * is set. Every colour comes from ONE scheme object, so nothing else in the
- * light mode names a colour of its own.
+ * ACCENT colours for calls to action (terracotta, and slate teal as the cool
+ * second accent), the CONTRAST colours from dark to pale for text and state
+ * (navy ink, a grey-navy for secondary text, sage, pale sage), three BASE
+ * colours for the surfaces, all warm beige and none of them white, and the
+ * status colours. The accent is the primary colour; the selected page and a
+ * selected toggle sit on pale sage; depth comes from the base steps and
+ * borders rather than from shadows. An admin's own brand pair replaces both
+ * accents when one is set.
+ *
+ * Every colour comes from this ONE scheme object, so nothing else in the light
+ * mode names a colour of its own. Every colour used as text or as a label's
+ * background reaches 4.5:1 against every base and the highlight, and the
+ * secondary, information and error colours are three different hues, so an
+ * accent never reads as a failure and information never reads as plain text.
  */
 interface LightScheme {
   /** Accent 1: the primary colour (contained buttons, tabs, switches, progress). */
   accent: string
-  /** Accent 2: the secondary colour, a deeper rust. */
+  /** Accent 2: the secondary colour, the cool counterpart to the terracotta. */
   accentDeep: string
-  /** Text and icons set ON an accent or on ink (button labels, tooltips). */
+  /** Text and icons set ON an accent or a status colour (button labels). */
   onAccent: string
   /** Contrast 1: text and the darkest marks. */
   ink: string
-  /** Contrast 2: secondary text, and information. */
+  /** Contrast 2: secondary text. */
   muted: string
   /** Contrast 3: the cool note, the series label and success. */
   sage: string
@@ -186,6 +198,11 @@ interface LightScheme {
   highlightHover: string
   /** Text and icons set on the highlight. */
   onHighlight: string
+  /** Information: a blue-slate, apart from secondary text and the accents. */
+  info: string
+  /** Errors: a crimson, apart from the terracotta accent. */
+  error: string
+  warning: string
   /** Base 1: behind everything. */
   canvas: string
   /** Base 2: cards, panels, the sidebar and the app bar. */
@@ -212,21 +229,24 @@ interface LightScheme {
 
 /**
  * Vintage: the palette's beige (#e5dac6) as the base, its navy (#33364d) as
- * ink, slate (#4f6466) and sage (#6f9984) as the cool contrast, and terracotta
- * (#cc6f57) with rust (#9b5143) as the accents. The accent is a shade deeper
- * than the palette's terracotta so that a label on it, and the accent used as
- * text, both stay readable.
+ * ink, sage (#6f9984) as the cool contrast, terracotta (#cc6f57) as the accent
+ * and slate teal (#4f6466) as the second accent. Every text-bearing colour is
+ * taken a shade deeper than the palette where it had to be to reach 4.5:1 on
+ * the beige; the palette's own terracotta and rust read at about 3:1 there.
  */
 const LIGHT_SCHEME: LightScheme = {
-  accent: '#b85c45',
-  accentDeep: '#9b5143',
+  accent: '#974834',
+  accentDeep: '#4f6466',
   onAccent: '#f6f0e6',
   ink: '#33364d',
-  muted: '#4f6466',
-  sage: '#4f7a66',
+  muted: '#5a5c6e',
+  sage: '#3a6450',
   highlight: '#cddfd4',
   highlightHover: '#c0d6c9',
   onHighlight: '#2f4a3d',
+  info: '#3e5577',
+  error: '#a52a3a',
+  warning: '#7a5518',
   canvas: '#e5dac6',
   sheet: '#ebe3d4',
   raised: '#efe9dd',
@@ -242,16 +262,10 @@ const LIGHT_SCHEME: LightScheme = {
 }
 
 /**
- * The status colours: muted and darker than the dark mode's, because they are
- * also used as TEXT, and the dark mode's bright green and amber are under 3:1
- * on a light surface. Shared by every scheme.
+ * The light palette. Status and information colours give only their main
+ * value: MUI derives the light, dark and label shades the same way it does
+ * for every other palette colour.
  */
-const LIGHT_STATUS = {
-  error: { main: '#a4423a', light: '#bd6259', dark: '#83332c' },
-  warning: { main: '#8c6420', light: '#a8813c', dark: '#6e4e17' },
-  success: { main: '#3f6b54', light: '#5b8770', dark: '#2f5240' },
-}
-
 function lightPaletteFor(s: LightScheme) {
   return {
     background: { default: s.canvas, paper: s.sheet },
@@ -265,8 +279,10 @@ function lightPaletteFor(s: LightScheme) {
       disabled: alpha(s.ink, 0.32),
       disabledBackground: alpha(s.ink, 0.08),
     },
-    ...LIGHT_STATUS,
-    info: { main: s.muted, light: lighten(s.muted, 0.25), dark: darken(s.muted, 0.25) },
+    error: { main: s.error },
+    warning: { main: s.warning },
+    success: { main: s.sage },
+    info: { main: s.info },
   }
 }
 
@@ -288,12 +304,7 @@ function brandPairIsDefault(): boolean {
 
 function lightBrand(s: LightScheme) {
   if (!brandPairIsDefault()) return { primary: { ...palette.primary }, secondary: { ...palette.secondary } }
-  const shades = (main: string) => ({
-    main,
-    light: lighten(main, 0.25),
-    dark: darken(main, 0.2),
-    contrastText: s.onAccent,
-  })
+  const shades = (main: string) => ({ ...deriveShades(main), contrastText: s.onAccent })
   return { primary: shades(s.accent), secondary: shades(s.accentDeep) }
 }
 
@@ -319,6 +330,7 @@ const DARK_SURFACES: SurfaceTokens = {
   fill: '#424242',
   fillDeep: '#212121',
   placeholder: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+  logoPlate: 'rgba(255, 255, 255, 0.92)',
 }
 
 function lightSurfaces(s: LightScheme): SurfaceTokens {
@@ -337,6 +349,7 @@ function lightSurfaces(s: LightScheme): SurfaceTokens {
     fill: s.fill,
     fillDeep: s.fillDeep,
     placeholder: `linear-gradient(135deg, ${s.placeholder[0]} 0%, ${s.placeholder[1]} 100%)`,
+    logoPlate: s.raised,
   }
 }
 
@@ -561,6 +574,9 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
             '&.Mui-selected': {
               backgroundColor: s.highlight,
               color: s.onHighlight,
+              // The icon takes action.active by default, which would leave it
+              // navy-grey beside a sage label.
+              '& .MuiListItemIcon-root': { color: s.onHighlight },
               '&:hover': { backgroundColor: s.highlightHover },
               '&.Mui-focusVisible': { backgroundColor: s.highlightHover },
             },
@@ -586,7 +602,8 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
       MuiAlert: {
         styleOverrides: {
           standard: ({ ownerState }) => {
-            const tone = lightPalette[ownerState.severity ?? 'success']?.main ?? s.muted
+            // MUI colours an alert by its color first and its severity second.
+            const tone = lightPalette[ownerState.color ?? ownerState.severity ?? 'success'].main
             return { backgroundColor: alpha(tone, 0.12), color: s.ink }
           },
         },

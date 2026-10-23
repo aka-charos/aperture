@@ -32,7 +32,8 @@ interface StudioLogoProps {
  *
  * A tile is an opaque picture made to be shown whole, so it gets rounded
  * corners and nothing else. A mark is usually a dark logo on transparency and
- * all but vanishes on the dark theme, so it sits on a light plate; it is
+ * all but vanishes on the dark theme, so it sits on a plate (`surface.logoPlate`:
+ * light in the dark mode, a beige base step in the light mode); it is
  * scaled to fit, never cropped, because logos are wide.
  */
 export function StudioLogo({ logo, name, height, maxWidth, fallback }: StudioLogoProps) {
@@ -69,7 +70,7 @@ export function StudioLogo({ logo, name, height, maxWidth, fallback }: StudioLog
         px: 0.75,
         py: 0.375,
         borderRadius: 1,
-        bgcolor: 'rgba(255, 255, 255, 0.92)',
+        bgcolor: 'surface.logoPlate',
         border: 1,
         borderColor: 'divider',
         lineHeight: 0,

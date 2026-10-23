@@ -43,3 +43,76 @@ test("the browser chrome is told each mode's own page colour", () => {
   assert.equal(documentChromeColor('dark'), createAppTheme('ltr', 'dark').palette.background.default)
   assert.equal(documentChromeColor('light'), createAppTheme('ltr', 'light').palette.background.paper)
 })
+
+/**
+ * The light mode's two promises, read off the built theme rather than the
+ * scheme object, so an override that bypasses the scheme is caught too.
+ *
+ * No surface is white: the operator's rule after paper-white sheets were tried
+ * and rejected. The ceiling sits just above the lightest base step (#efe9dd,
+ * luminance 0.818), so any background drifting toward white fails here.
+ *
+ * Every colour that carries text reaches 4.5:1 (WCAG AA for normal text) on
+ * every surface it sits on, and every label reaches it on its own fill. The
+ * palette's own terracotta and rust read at about 3:1 on the beige, which is
+ * how a first version shipped unreadable button labels and tab names.
+ */
+const { getLuminance, getContrastRatio } = require('@mui/material/styles') as typeof import('@mui/material/styles')
+const LIGHT_SURFACE_CEILING = 0.83
+const AA_TEXT = 4.5
+
+test('no light-mode surface is white', () => {
+  const t = createAppTheme('ltr', 'light')
+  const surfaces: Record<string, string> = {
+    'background.default': t.palette.background.default,
+    'background.paper': t.palette.background.paper,
+    'surface.raised': t.palette.surface.raised,
+    'surface.raisedHover': t.palette.surface.raisedHover,
+    'surface.glass': t.palette.surface.glass,
+    'surface.glassStrong': t.palette.surface.glassStrong,
+    'surface.panel': t.palette.surface.panel,
+    'surface.heroFade': t.palette.surface.heroFade,
+    'surface.fill': t.palette.surface.fill,
+    'surface.fillDeep': t.palette.surface.fillDeep,
+    'surface.logoPlate': t.palette.surface.logoPlate,
+    'nav.selectedBg': t.palette.nav.selectedBg,
+  }
+  for (const [name, colour] of Object.entries(surfaces)) {
+    assert.ok(getLuminance(colour) <= LIGHT_SURFACE_CEILING, `${name} ${colour} is too close to white`)
+  }
+})
+
+test('every light-mode text colour reaches 4.5:1 on every surface', () => {
+  const t = createAppTheme('ltr', 'light')
+  const p = t.palette
+  const surfaces = [p.background.default, p.background.paper, p.surface.raised, p.nav.selectedBg]
+  const texts: Record<string, string> = {
+    'text.primary': p.text.primary,
+    'text.secondary': p.text.secondary,
+    'primary.main': p.primary.main,
+    'secondary.main': p.secondary.main,
+    'error.main': p.error.main,
+    'warning.main': p.warning.main,
+    'success.main': p.success.main,
+    'info.main': p.info.main,
+    'mediaType.movie': p.mediaType.movie,
+    'mediaType.series': p.mediaType.series,
+    'nav.selectedText': p.nav.selectedText,
+  }
+  for (const [name, colour] of Object.entries(texts)) {
+    for (const surface of surfaces) {
+      const ratio = getContrastRatio(colour, surface)
+      assert.ok(ratio >= AA_TEXT, `${name} ${colour} on ${surface} is ${ratio.toFixed(2)}:1`)
+    }
+  }
+  for (const key of ['primary', 'secondary'] as const) {
+    const ratio = getContrastRatio(p[key].contrastText, p[key].main)
+    assert.ok(ratio >= AA_TEXT, `${key} label on its fill is ${ratio.toFixed(2)}:1`)
+  }
+})
+
+test('the secondary, information and error colours are told apart', () => {
+  const p = createAppTheme('ltr', 'light').palette
+  const distinct = new Set([p.primary.main, p.secondary.main, p.info.main, p.error.main, p.text.secondary])
+  assert.equal(distinct.size, 5)
+})

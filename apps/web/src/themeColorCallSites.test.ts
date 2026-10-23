@@ -31,6 +31,13 @@ const DARK_ONLY: Array<{ pattern: RegExp; what: string }> = [
   { pattern: /['"`]#(252525|212121|1a1a2e|16213e)['"`]/i, what: 'a dark surface hex' },
   { pattern: /['"`]#(e4e4e7|d4d4d8|a1a1aa|71717a)['"`]/i, what: 'a zinc text grey tuned for black' },
   { pattern: /['"`]grey\.(800|900)['"`]/, what: "MUI's dark grey as a fill" },
+  // The light mode has no white surface, so a plate or panel drawn white on a
+  // page surface breaks it (the studio logo plate did). An overlay ON artwork
+  // is not caught: none of them needs a near-opaque white fill.
+  {
+    pattern: /(bgcolor|backgroundColor|background)\s*:\s*['"`](#fff(fff)?|white|common\.white|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*(1|0?\.[5-9]\d*)\s*\))['"`]/i,
+    what: 'a white background',
+  },
 ]
 
 /**
@@ -73,6 +80,9 @@ test('the scanner catches each dark-only shape and ignores artwork overlays', ()
   assert.equal(findDarkOnlyColours("bgcolor: '#252525',").length, 1)
   assert.equal(findDarkOnlyColours("color: '#a1a1aa',").length, 1)
   assert.equal(findDarkOnlyColours("bgcolor: 'grey.900',").length, 1)
+  assert.equal(findDarkOnlyColours("bgcolor: 'rgba(255, 255, 255, 0.92)',").length, 1)
+  assert.equal(findDarkOnlyColours("backgroundColor: '#fff',").length, 1)
+  assert.equal(findDarkOnlyColours("bgcolor: 'common.white',").length, 1)
   // A scrim on a poster is the same in both modes.
   assert.equal(findDarkOnlyColours("backgroundColor: 'rgba(0, 0, 0, 0.75)',").length, 0)
   assert.equal(findDarkOnlyColours("border: '1.5px solid rgba(255, 255, 255, 0.75)',").length, 0)

@@ -5050,7 +5050,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own terracotta and rust. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "The light appearance answers the default pair with its own terracotta and slate teal. Save any other pair and both appearances use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
