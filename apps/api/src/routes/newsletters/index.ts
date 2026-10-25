@@ -464,13 +464,17 @@ const newslettersRoutes: FastifyPluginAsync = async (fastify) => {
   // --------------------------------------------------------- unsubscribe
 
   // A mail client's one-click unsubscribe (RFC 8058) POSTs a form body, as
-  // either encoding the RFC allows. Parsed here only, as a string nobody reads:
-  // the token in the address is the whole request.
-  fastify.addContentTypeParser(
-    ['application/x-www-form-urlencoded', 'multipart/form-data'],
-    { parseAs: 'string' },
-    (_req, body, done) => done(null, body)
-  )
+  // either encoding the RFC allows. The token in the address is the whole
+  // request, so the body is accepted and never read. multipart/form-data is
+  // already parsed by @fastify/multipart (registered in server.ts), and adding
+  // a second parser for it throws at boot, so only the urlencoded one is added.
+  if (!fastify.hasContentTypeParser('application/x-www-form-urlencoded')) {
+    fastify.addContentTypeParser(
+      'application/x-www-form-urlencoded',
+      { parseAs: 'string' },
+      (_req, body, done) => done(null, body)
+    )
+  }
 
   /**
    * The link in a newsletter. A GET only shows a confirm button and changes
