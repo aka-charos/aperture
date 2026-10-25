@@ -28,12 +28,14 @@ export function TitlePickerDialog({
   open,
   availableFields,
   defaultFields,
+  analysisParts: availableParts,
   onClose,
   onInsert,
 }: {
   open: boolean
   availableFields: string[]
   defaultFields: string[]
+  analysisParts: { movie: string[]; series: string[] }
   onClose: () => void
   onInsert: (attrs: TitleCardAttrs) => void
 }) {
@@ -41,6 +43,7 @@ export function TitlePickerDialog({
   const [term, setTerm] = useState('')
   const [picked, setPicked] = useState<LibrarySearchHit | null>(null)
   const [fields, setFields] = useState<string[]>(defaultFields)
+  const [analysisParts, setAnalysisParts] = useState<string[]>([])
   const { hits, loading, tooShort } = useLibraryTitleSearch(term, { limit: 12, enabled: open })
 
   // Each opening starts fresh, with the fields the server suggests.
@@ -49,6 +52,7 @@ export function TitlePickerDialog({
     setTerm('')
     setPicked(null)
     setFields(defaultFields)
+    setAnalysisParts([])
   }, [open, defaultFields])
 
   return (
@@ -76,7 +80,15 @@ export function TitlePickerDialog({
         {!picked && (
           <List dense sx={{ mt: 1, maxHeight: 320, overflowY: 'auto' }}>
             {hits.map((hit) => (
-              <ListItemButton key={`${hit.type}:${hit.id}`} onClick={() => setPicked(hit)}>
+              <ListItemButton
+                key={`${hit.type}:${hit.id}`}
+                onClick={() => {
+                  setPicked(hit)
+                  // Parts belong to a media type (a show has a structure part, a film
+                  // does not), so a choice made for another title does not carry over.
+                  setAnalysisParts([])
+                }}
+              >
                 <ListItemAvatar>
                   <Avatar
                     variant="rounded"
@@ -106,7 +118,15 @@ export function TitlePickerDialog({
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               {t('newsletters.picker.chooseFields')}
             </Typography>
-            <TitleFieldPicker fields={fields} available={availableFields} mediaType={picked.type} onChange={setFields} />
+            <TitleFieldPicker
+              fields={fields}
+              available={availableFields}
+              mediaType={picked.type}
+              onChange={setFields}
+              analysisParts={analysisParts}
+              availableAnalysisParts={availableParts[picked.type]}
+              onAnalysisPartsChange={setAnalysisParts}
+            />
             {fields.includes('fullPlot') && (
               <Typography variant="caption" color="warning.main" component="p" sx={{ mt: 1 }}>
                 {t('newsletters.editor.fullPlotWarning')}
@@ -130,6 +150,7 @@ export function TitlePickerDialog({
               year: picked.year,
               posterUrl: picked.poster_url,
               fields,
+              analysisParts: analysisParts.filter((part) => availableParts[picked.type].includes(part)),
             })
           }
         >

@@ -4,6 +4,9 @@ export {
   NEWSLETTER_MAX_TEXT_CHARS,
   NEWSLETTER_MAX_TITLES,
   TITLE_FIELDS,
+  analysisPartsFor,
+  currentAnalysisPart,
+  type AnalysisPart,
   isTitleField,
   newsletterDocumentProblem,
   readNewsletterDocument,
@@ -67,4 +70,4 @@ export {
   type NewsletterInput,
   type StartSendResult,
 } from './send.js'
-export { buildNewsletterContent, posterRequestUrl } from './build.js'
+export { analysisPassages, buildNewsletterContent, posterRequestUrl } from './build.js'

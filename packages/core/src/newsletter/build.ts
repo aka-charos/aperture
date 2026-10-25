@@ -31,6 +31,7 @@ import { emailText, type EmailStringKey } from '../email/strings.js'
 import type { EmailBlock, EmailContent, EmailFact, EmailPassage } from '../email/template.js'
 import { getStoredAnalysis } from '../analysis/generate.js'
 import { splitAnalysisParagraphs } from '../analysis/paragraphMap.js'
+import { buildAnalysisSegments, type AnalysisSegment } from '../analysis/segments.js'
 import { query } from '../lib/db.js'
 import {
   binderFor,
@@ -43,7 +44,15 @@ import { appLocaleToTmdbLanguage, type AppLocaleCode } from '../lib/locales.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getLocalizedGenreNames } from '../tmdb/genres.js'
 import { resolveLocalizedAnalysis, resolveLocalizedSynopsis } from '../translation/store.js'
-import { titleKey, titleRefsIn, type NewsletterPart, type TitleField, type TitleRef } from './document.js'
+import {
+  currentAnalysisPart,
+  type AnalysisPart,
+  titleKey,
+  titleRefsIn,
+  type NewsletterPart,
+  type TitleField,
+  type TitleRef,
+} from './document.js'
 
 const logger = createChildLogger('newsletter')
 
@@ -146,7 +155,16 @@ export async function loadTitleFacts(refs: readonly TitleRef[]): Promise<Map<str
 export interface LocalizedTitleText {
   overview: string | null
   plotFull: string | null
-  analysis: string[]
+  /** The analysis in the reader's language, for a card showing all of it. */
+  analysis: AnalysisSegment[]
+  /**
+   * The analysis cut into labelled parts, for a card showing only some. The
+   * reader's translation when it kept its labels, else the original, which
+   * always has them when it has a map: a translation whose paragraph count
+   * differs from the original comes back unlabelled (translation/store.ts),
+   * and a parts-only card would otherwise show its readers nothing.
+   */
+  analysisByPart: AnalysisSegment[]
 }
 
 export interface LanguageEdition {
@@ -178,20 +196,24 @@ export async function loadLanguageEdition(
     Promise.all(
       [...wanted].map(async ([key, fields]): Promise<[string, LocalizedTitleText]> => {
         const fact = facts.get(key)
-        if (!fact) return [key, { overview: null, plotFull: null, analysis: [] }]
+        if (!fact) return [key, { overview: null, plotFull: null, analysis: [], analysisByPart: [] }]
         const { mediaType, id } = fact.ref
         // The language is always a valid locale here, so the viewer id the
         // resolvers take for their fallback is never read.
         const synopsis =
           fields.has('plot') || fields.has('fullPlot') ? await resolveLocalizedSynopsis(mediaType, id, language, '') : null
-        let analysis: string[] = []
+        let analysis: AnalysisSegment[] = []
+        let analysisByPart: AnalysisSegment[] = []
         if (fields.has('analysis')) {
           const localized = await resolveLocalizedAnalysis(mediaType, id, language, '')
-          if (localized) {
-            analysis = splitAnalysisParagraphs(localized.text)
+          const labelled = (segments: AnalysisSegment[]) => segments.some((s) => s.questions.length > 0)
+          if (localized && labelled(localized.paragraphs)) {
+            analysis = analysisByPart = localized.paragraphs
           } else {
             const stored = await getStoredAnalysis(mediaType, id).catch(() => null)
-            if (stored?.analysis) analysis = splitAnalysisParagraphs(stored.analysis)
+            const original = stored?.analysis ? buildAnalysisSegments(stored.analysis, stored.paragraphMap) : []
+            analysis = localized ? localized.paragraphs : original
+            analysisByPart = original
           }
         }
         return [
@@ -200,6 +222,7 @@ export async function loadLanguageEdition(
             overview: synopsis?.overview ?? fact.overview,
             plotFull: synopsis?.plot_full ?? fact.plotFull,
             analysis,
+            analysisByPart,
           },
         ]
       })
@@ -405,8 +428,14 @@ export function buildNewsletterContent(input: {
     const passages: EmailPassage[] = []
     const plot = has('fullPlot') && localized?.plotFull ? localized.plotFull : has('plot') ? localized?.overview : null
     if (plot) passages.push({ label: text('newsletter.passage.plot'), paragraphs: splitAnalysisParagraphs(plot) })
-    if (has('analysis') && localized && localized.analysis.length > 0) {
-      passages.push({ label: text('newsletter.passage.analysis'), paragraphs: localized.analysis })
+    if (has('analysis') && localized) {
+      passages.push(
+        ...analysisPassages(
+          part.analysisParts === 'all' ? localized.analysis : localized.analysisByPart,
+          part.analysisParts,
+          text
+        )
+      )
     }
 
     const image = has('poster') ? images.get(key) : undefined
@@ -439,6 +468,59 @@ export function buildNewsletterContent(input: {
     },
     images: [...used.values()],
   }
+}
+
+/** Retired questions are read through `currentAnalysisPart` first, so only current parts need a label. */
+const ANALYSIS_PART_LABEL: Record<AnalysisPart, EmailStringKey> = {
+  tradition: 'newsletter.analysis.tradition',
+  work: 'newsletter.analysis.work',
+  structure: 'newsletter.analysis.structure',
+  circumstances: 'newsletter.analysis.circumstances',
+  reception: 'newsletter.analysis.reception',
+}
+
+/**
+ * The analysis as a card shows it. With `all`, the whole analysis under one
+ * heading, as the title's page reads. With parts chosen, only the runs
+ * answering one of them, each headed by EVERY part it answers (a paragraph the
+ * model labelled Context and Form is headed both, so its form discussion is not
+ * passed off as context), and runs are merged only when they were adjacent in
+ * the article.
+ *
+ * An analysis without a paragraph map (written before the model labelled its
+ * paragraphs) cannot be cut into parts, so a card asking for parts shows none
+ * of it rather than passing the whole article off as the part that was asked
+ * for. It fills in when the analysis is rewritten.
+ */
+export function analysisPassages(
+  segments: readonly AnalysisSegment[],
+  parts: readonly AnalysisPart[] | 'all',
+  text: (key: EmailStringKey) => string
+): EmailPassage[] {
+  if (segments.length === 0) return []
+  if (parts === 'all') {
+    return [
+      {
+        label: text('newsletter.passage.analysis'),
+        paragraphs: segments.flatMap((segment) => splitAnalysisParagraphs(segment.text)),
+      },
+    ]
+  }
+  const passages: EmailPassage[] = []
+  let lastKept = -2
+  segments.forEach((segment, index) => {
+    const answers = [...new Set(segment.questions.map(currentAnalysisPart))]
+    if (!answers.some((q) => parts.includes(q))) return
+    const label = answers.map((q) => text(ANALYSIS_PART_LABEL[q])).join(' · ')
+    const previous = passages[passages.length - 1]
+    const paragraphs = splitAnalysisParagraphs(segment.text)
+    // Neighbouring runs with the same heading read as one; runs that had
+    // something else between them in the article stay apart.
+    if (previous && lastKept === index - 1 && previous.label === label) previous.paragraphs.push(...paragraphs)
+    else passages.push({ label, paragraphs })
+    lastKept = index
+  })
+  return passages
 }
 
 /** Everything a send or a preview looks up once, whatever the reader. */

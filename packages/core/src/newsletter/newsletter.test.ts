@@ -10,7 +10,7 @@ import {
   resolveRecipients,
   type AudienceUser,
 } from './audience.js'
-import { buildNewsletterContent, posterRequestUrl, type TitleFacts } from './build.js'
+import { analysisPassages, buildNewsletterContent, posterRequestUrl, type TitleFacts } from './build.js'
 import {
   DEFAULT_TITLE_FIELDS,
   NEWSLETTER_MAX_TITLES,
@@ -102,7 +102,13 @@ test('a title card keeps only a valid reference and known fields, in canonical o
     ],
   })
   assert.equal(parts.length, 3)
-  assert.deepEqual(parts[0], { type: 'titleRef', mediaType: 'movie', id: MOVIE_ID, fields: ['poster', 'plot', 'link'] })
+  assert.deepEqual(parts[0], {
+    type: 'titleRef',
+    mediaType: 'movie',
+    id: MOVIE_ID,
+    fields: ['poster', 'plot', 'link'],
+    analysisParts: 'all',
+  })
   assert.deepEqual((parts[1] as { fields: string[] }).fields, [...DEFAULT_TITLE_FIELDS], 'no fields stored = the defaults')
   assert.deepEqual(titleRefsIn(parts), [
     { mediaType: 'movie', id: MOVIE_ID },
@@ -219,7 +225,7 @@ test('a title card is built in the reader language and only from the chosen fiel
     edition: {
       language: 'el',
       genreNames: { 'Science Fiction': 'Επιστημονική Φαντασία' },
-      text: new Map([[`movie:${MOVIE_ID}`, { overview: 'Ένα σκάφος.', plotFull: null, analysis: [] }]]),
+      text: new Map([[`movie:${MOVIE_ID}`, { overview: 'Ένα σκάφος.', plotFull: null, analysis: [], analysisByPart: [] }]]),
     },
     images: new Map(),
     context: { locale: 'el', frame, linkBase: 'https://c.example' },
@@ -271,4 +277,73 @@ test('the poster is asked for at a width, and only over http(s)', () => {
   assert.equal(posterRequestUrl('http://emby/x?maxWidth=100'), 'http://emby/x?maxWidth=100')
   assert.equal(posterRequestUrl('file:///etc/passwd'), null)
   assert.equal(posterRequestUrl(null), null)
+})
+
+// ----------------------------------------------------------- analysis parts
+
+const label = (key: string) => key.replace('newsletter.analysis.', '').replace('newsletter.passage.', '')
+
+test('a card keeps only analysis parts its media type has, in the prompt order', () => {
+  const [movie, series] = readNewsletterDocument({
+    type: 'doc',
+    content: [
+      { type: 'titleCard', attrs: { mediaType: 'movie', id: MOVIE_ID, analysisParts: ['reception', 'structure', 'bogus', 'tradition'] } },
+      { type: 'titleCard', attrs: { mediaType: 'series', id: SERIES_ID, analysisParts: ['structure', 'tradition'] } },
+    ],
+  })
+  assert.deepEqual((movie as { analysisParts: string[] }).analysisParts, ['tradition', 'reception'], 'a film has no structure part')
+  assert.deepEqual((series as { analysisParts: string[] }).analysisParts, ['tradition', 'structure'])
+})
+
+test('a choice none of whose parts is known shows nothing, never the whole analysis', () => {
+  const [unknown, none, retired] = readNewsletterDocument({
+    type: 'doc',
+    content: [
+      { type: 'titleCard', attrs: { mediaType: 'movie', id: MOVIE_ID, analysisParts: ['renamedSection'] } },
+      { type: 'titleCard', attrs: { mediaType: 'movie', id: MOVIE_ID, analysisParts: [] } },
+      { type: 'titleCard', attrs: { mediaType: 'movie', id: MOVIE_ID, analysisParts: ['intent'] } },
+    ],
+  })
+  assert.deepEqual((unknown as { analysisParts: unknown }).analysisParts, [], 'chosen but unknown: nothing')
+  assert.equal((none as { analysisParts: unknown }).analysisParts, 'all', 'nothing chosen: all of it')
+  assert.deepEqual((retired as { analysisParts: unknown }).analysisParts, ['circumstances'], 'a retired id reads as its successor')
+  assert.deepEqual(analysisPassages([{ text: 'Context.', questions: ['tradition'] }], [], label as never), [])
+})
+
+
+test('no parts chosen shows the whole analysis under one heading', () => {
+  const passages = analysisPassages(
+    [
+      { text: 'Context one.\n\nContext two.', questions: ['tradition'] },
+      { text: 'Form.', questions: ['work'] },
+    ],
+    'all',
+    label as never
+  )
+  assert.deepEqual(passages, [{ label: 'analysis', paragraphs: ['Context one.', 'Context two.', 'Form.'] }])
+})
+
+test('chosen parts keep only their runs, each headed by every part it answers', () => {
+  const passages = analysisPassages(
+    [
+      { text: 'Context.', questions: ['tradition'] },
+      { text: 'More context.', questions: ['tradition'] },
+      { text: 'Form.', questions: ['work'] },
+      { text: 'Back to context.', questions: ['tradition'] },
+      { text: 'Old intent paragraph.', questions: ['intent'] },
+      { text: 'Context and form.', questions: ['tradition', 'work'] },
+    ],
+    ['tradition', 'circumstances'],
+    label as never
+  )
+  assert.deepEqual(passages, [
+    { label: 'tradition', paragraphs: ['Context.', 'More context.'] },
+    { label: 'tradition', paragraphs: ['Back to context.'] },
+    { label: 'circumstances', paragraphs: ['Old intent paragraph.'] },
+    { label: 'tradition · work', paragraphs: ['Context and form.'] },
+  ])
+})
+
+test('an analysis without labels shows nothing when parts are asked for', () => {
+  assert.deepEqual(analysisPassages([{ text: 'Unlabelled.', questions: [] }], ['tradition'], label as never), [])
 })

@@ -43,6 +43,8 @@ export interface NewsletterOptions {
   defaultLanguage: string
   titleFields: string[]
   defaultTitleFields: string[]
+  /** Decided by the server: the analysis parts a card may choose, per media type. */
+  analysisParts: { movie: string[]; series: string[] }
   sendingProblem: string | null
   sendingProblemText: string | null
 }

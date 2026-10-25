@@ -45,7 +45,6 @@ import {
   type NewsletterOptions,
 } from './api'
 import { NewsletterBodyEditor } from './NewsletterBodyEditor'
-import { FALLBACK_DEFAULT_FIELDS, FALLBACK_TITLE_FIELDS } from './fields'
 import { StatusChip } from './StatusChip'
 
 const PREVIEW_DEBOUNCE_MS = 1200
@@ -64,7 +63,7 @@ export function NewsletterEditor({
   onOpen,
 }: {
   id: string
-  options: NewsletterOptions | null
+  options: NewsletterOptions
   onBack: () => void
   onOpen: (id: string) => void
 }) {
@@ -117,7 +116,7 @@ export function NewsletterEditor({
   }, [load])
 
   useEffect(() => {
-    if (options && !previewLanguage) setPreviewLanguage(options.defaultLanguage)
+    if (!previewLanguage) setPreviewLanguage(options.defaultLanguage)
   }, [options, previewLanguage])
 
   // While a send runs, follow it; afterwards, list who got it.
@@ -250,9 +249,10 @@ export function NewsletterEditor({
   }
 
   const recipientCount = audience?.recipients.length ?? 0
-  const languageLabel = (code: string) => options?.languages.find((l) => l.code === code)?.label ?? code
-  const availableFields = options?.titleFields ?? FALLBACK_TITLE_FIELDS
-  const defaultFields = options?.defaultTitleFields ?? FALLBACK_DEFAULT_FIELDS
+  const languageLabel = (code: string) => options.languages.find((l) => l.code === code)?.label ?? code
+  const availableFields = options.titleFields
+  const defaultFields = options.defaultTitleFields
+  const analysisParts = options.analysisParts
 
   return (
     <Stack spacing={2}>
@@ -292,7 +292,7 @@ export function NewsletterEditor({
             startIcon={busy === 'send' ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
             disabled={
               busy !== null ||
-              !!options?.sendingProblem ||
+              !!options.sendingProblem ||
               // A partly-sent retry goes to whoever is left, whatever the groups reach now.
               (editable && (!subject.trim() || groupIds.length === 0 || recipientCount === 0))
             }
@@ -303,7 +303,7 @@ export function NewsletterEditor({
         )}
       </Stack>
 
-      {options?.sendingProblemText && canSend && (
+      {options.sendingProblemText && canSend && (
         <Alert severity="warning">{t('newsletters.editor.cannotSend', { reason: options.sendingProblemText })}</Alert>
       )}
       {newsletter.status === 'failed' && newsletter.lastError && (
@@ -426,6 +426,7 @@ export function NewsletterEditor({
               initialContent={content}
               availableFields={availableFields}
               defaultFields={defaultFields}
+              analysisParts={analysisParts}
               onChange={(doc) => {
                 setContent(doc)
                 setDirty(true)
@@ -489,7 +490,7 @@ export function NewsletterEditor({
                 onChange={(event) => setPreviewLanguage(event.target.value)}
                 sx={{ minWidth: 150 }}
               >
-                {(options?.languages ?? []).map((language) => (
+                {options.languages.map((language) => (
                   <MenuItem key={language.code} value={language.code}>
                     {language.label}
                   </MenuItem>

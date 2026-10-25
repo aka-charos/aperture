@@ -194,12 +194,14 @@ export function NewsletterBodyEditor({
   initialContent,
   availableFields,
   defaultFields,
+  analysisParts,
   onChange,
 }: {
   /** Read once, when the editor mounts; remount (a `key`) to load another document. */
   initialContent: Record<string, unknown>
   availableFields: string[]
   defaultFields: string[]
+  analysisParts: { movie: string[]; series: string[] }
   onChange: (doc: Record<string, unknown>) => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -207,6 +209,8 @@ export function NewsletterBodyEditor({
   // after the editor mounted still reach every card.
   const fieldsRef = useRef(availableFields)
   fieldsRef.current = availableFields
+  const partsRef = useRef(analysisParts)
+  partsRef.current = analysisParts
 
   const editor = useEditor({
     extensions: [
@@ -216,7 +220,7 @@ export function NewsletterBodyEditor({
         codeBlock: false,
         link: { openOnClick: false, autolink: true, protocols: ['http', 'https'] },
       }),
-      TitleCard.configure({ availableFields: () => fieldsRef.current }),
+      TitleCard.configure({ availableFields: () => fieldsRef.current, analysisParts: () => partsRef.current }),
     ],
     content: initialContent,
     onUpdate: ({ editor: e }) => onChange(e.getJSON() as Record<string, unknown>),
@@ -253,6 +257,7 @@ export function NewsletterBodyEditor({
         open={pickerOpen}
         availableFields={availableFields}
         defaultFields={defaultFields}
+        analysisParts={analysisParts}
         onClose={() => setPickerOpen(false)}
         onInsert={(attrs: TitleCardAttrs) => {
           editor.chain().focus().insertContent({ type: 'titleCard', attrs }).run()

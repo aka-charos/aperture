@@ -6941,6 +6941,12 @@
       "noAddress": "Add an email address to your account to receive newsletters.",
       "unavailable": "Your server is not sending newsletters at the moment.",
       "error": "Could not save your choice."
+    },
+    "analysisParts": {
+      "title": "Which parts of the analysis",
+      "all": "All of it",
+      "some": "Only these parts",
+      "unlabelledNote": "An older analysis that is not divided into parts shows nothing here until it is rewritten."
     }
   }
 }

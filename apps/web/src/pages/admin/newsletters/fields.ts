@@ -1,31 +1,8 @@
-/**
- * Field order and the default set come from the API (`/api/newsletters/options`);
- * this copy is only what a card falls back to before that answers, and the
- * server reads every stored list against its own (core newsletter/document.ts).
+/*
+ * The field list, the default fields and the analysis parts are all decided by
+ * the server (`/api/newsletters/options`); the editor waits for them rather
+ * than carrying a copy that drifts the first time core changes its list.
  */
-export const FALLBACK_TITLE_FIELDS = [
-  'poster',
-  'year',
-  'runtime',
-  'genres',
-  'rating',
-  'director',
-  'cast',
-  'network',
-  'languages',
-  'countries',
-  'plot',
-  'fullPlot',
-  'analysis',
-  'link',
-]
-
-/**
- * What a new card shows before the server's suggestion arrives. A module
- * constant on purpose: a fresh array each render would re-run every effect
- * that depends on it (the title picker resets itself on its default fields).
- */
-export const FALLBACK_DEFAULT_FIELDS = ['poster', 'year', 'genres', 'plot', 'link']
 
 export interface TitleCardAttrs {
   mediaType: 'movie' | 'series'
@@ -35,6 +12,8 @@ export interface TitleCardAttrs {
   year: number | null
   posterUrl: string | null
   fields: string[]
+  /** Which parts of the film analysis to show; empty shows all of it (as the server reads it). */
+  analysisParts: string[]
 }
 
 /** The translation key for a field's label; a show's director is its creator. */

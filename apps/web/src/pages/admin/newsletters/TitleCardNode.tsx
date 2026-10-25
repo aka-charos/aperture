@@ -14,16 +14,23 @@ import {
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import TuneIcon from '@mui/icons-material/Tune'
 import { getProxiedImageUrl } from '@aperture/ui'
-import { FALLBACK_TITLE_FIELDS, fieldLabelKey, type TitleCardAttrs } from './fields'
+import { fieldLabelKey, type TitleCardAttrs } from './fields'
+import { titleCardAttributes } from './titleCardAttributes'
 import { TitleFieldPicker } from './TitleFieldPicker'
 
 function TitleCardView({ node, updateAttributes, deleteNode, selected, extension }: ReactNodeViewProps) {
   const { t } = useTranslation()
   const raw = node.attrs as TitleCardAttrs
   // A document saved by anything else may carry a malformed list; draw it as none.
-  const attrs = { ...raw, fields: Array.isArray(raw.fields) ? raw.fields : [] }
+  const attrs = {
+    ...raw,
+    fields: Array.isArray(raw.fields) ? raw.fields : [],
+    analysisParts: Array.isArray(raw.analysisParts) ? raw.analysisParts : [],
+  }
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
-  const available = (extension.options as { availableFields: () => string[] }).availableFields()
+  const options = extension.options as TitleCardOptions
+  const available = options.availableFields()
+  const availableParts = options.analysisParts()[attrs.mediaType]
   const poster = attrs.posterUrl ? getProxiedImageUrl(attrs.posterUrl) : null
 
   return (
@@ -74,7 +81,13 @@ function TitleCardView({ node, updateAttributes, deleteNode, selected, extension
                   key={field}
                   size="small"
                   variant="outlined"
-                  label={t(fieldLabelKey(field, attrs.mediaType))}
+                  label={
+                    field === 'analysis' && attrs.analysisParts.length > 0
+                      ? `${t(fieldLabelKey(field, attrs.mediaType))}: ${attrs.analysisParts
+                          .map((part) => t(`mediaDetail.analysis.section.${part}`))
+                          .join(', ')}`
+                      : t(fieldLabelKey(field, attrs.mediaType))
+                  }
                 />
               ))
             )}
@@ -109,6 +122,9 @@ function TitleCardView({ node, updateAttributes, deleteNode, selected, extension
             available={available}
             mediaType={attrs.mediaType}
             onChange={(fields) => updateAttributes({ fields })}
+            analysisParts={attrs.analysisParts}
+            availableAnalysisParts={availableParts}
+            onAnalysisPartsChange={(analysisParts) => updateAttributes({ analysisParts })}
           />
           {attrs.fields.includes('fullPlot') && (
             <Typography variant="caption" color="warning.main" component="p" sx={{ mt: 1 }}>
@@ -126,7 +142,12 @@ function TitleCardView({ node, updateAttributes, deleteNode, selected, extension
  * configures it, but its text is not editable here — the email reads the
  * title's facts when it is built, in each reader's language.
  */
-export const TitleCard = Node.create<{ availableFields: () => string[] }>({
+interface TitleCardOptions {
+  availableFields: () => string[]
+  analysisParts: () => { movie: string[]; series: string[] }
+}
+
+export const TitleCard = Node.create<TitleCardOptions>({
   name: 'titleCard',
   group: 'block',
   atom: true,
@@ -134,51 +155,12 @@ export const TitleCard = Node.create<{ availableFields: () => string[] }>({
   selectable: true,
 
   addOptions() {
-    return { availableFields: () => FALLBACK_TITLE_FIELDS }
+    // Filled from the server's options by the editor that configures the node.
+    return { availableFields: () => [], analysisParts: () => ({ movie: [], series: [] }) }
   },
 
-  // Each attribute says how it survives HTML, because copy and paste go
-  // through it: left to the default, an attribute comes back as the string
-  // its HTML attribute held, so `fields` would arrive as "poster,year".
   addAttributes() {
-    const text = (name: string, fallback: string | null) => ({
-      default: fallback,
-      parseHTML: (element: HTMLElement) => element.getAttribute(`data-${name}`) ?? fallback,
-      renderHTML: (attributes: Record<string, unknown>) =>
-        attributes[name] == null ? {} : { [`data-${name}`]: String(attributes[name]) },
-    })
-    return {
-      mediaType: {
-        ...text('mediaType', 'movie'),
-        parseHTML: (element: HTMLElement) => (element.getAttribute('data-mediaType') === 'series' ? 'series' : 'movie'),
-      },
-      id: text('id', null),
-      title: text('title', ''),
-      posterUrl: text('posterUrl', null),
-      year: {
-        default: null,
-        parseHTML: (element: HTMLElement) => {
-          const year = Number.parseInt(element.getAttribute('data-year') ?? '', 10)
-          return Number.isFinite(year) ? year : null
-        },
-        renderHTML: (attributes: Record<string, unknown>) =>
-          attributes.year == null ? {} : { 'data-year': String(attributes.year) },
-      },
-      fields: {
-        default: [],
-        parseHTML: (element: HTMLElement) => {
-          try {
-            const value: unknown = JSON.parse(element.getAttribute('data-fields') ?? '[]')
-            return Array.isArray(value) ? value.filter((f): f is string => typeof f === 'string') : []
-          } catch {
-            return []
-          }
-        },
-        renderHTML: (attributes: Record<string, unknown>) => ({
-          'data-fields': JSON.stringify(Array.isArray(attributes.fields) ? attributes.fields : []),
-        }),
-      },
-    }
+    return titleCardAttributes()
   },
 
   parseHTML() {

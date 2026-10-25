@@ -97,6 +97,8 @@ export default function NewslettersRoute() {
   }
 
   if (editing) {
+    // The editor's field list and analysis parts are the server's; it waits for them.
+    if (!options) return error ? <Alert severity="error">{error}</Alert> : <LinearProgress />
     return <NewsletterEditor id={editing} options={options} onBack={() => open(null)} onOpen={(id) => open(id)} />
   }
 

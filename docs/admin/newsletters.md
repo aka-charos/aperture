@@ -36,6 +36,7 @@ A typical setup is one group per language, for example *English readers* (app la
 - **Subject** is also the heading at the top of the email. **Preview text** is the line inbox lists show beside it.
 - The editor offers headings, bold, italic, underline, strikethrough, lists, quotes, dividers and links (web addresses only).
 - **Insert movie or show** searches the library and adds a title card. Choose what the card shows: poster, year, runtime, genres, rating, director (or creator), cast, network, languages, countries, plot, full synopsis, film analysis and a link to the title's page. Change it later with the card's settings button. The full synopsis often gives the ending away.
+- With **Film analysis** ticked, choose **All of it** or **Only these parts**: Context, Form and style, Making, Critical reception, and Narrative structure for a series. Each chosen part appears under its own heading. An older analysis that is not divided into parts shows nothing for a card limited to parts, until the analysis is rewritten.
 - **Save draft** stores it. Drafts and failed sends can be edited; a sent newsletter cannot, but **Duplicate as new draft** reuses it.
 
 A title card stores only which title and which facts. The facts themselves are read when the email is built, so a card always shows the title as it is when the newsletter is sent.

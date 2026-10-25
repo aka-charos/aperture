@@ -17,6 +17,7 @@
  * was true when it was inserted and is stale by the time it is sent.
  */
 import type { EmailBlock, EmailRun } from '../email/template.js'
+import { questionIdsFor, type AnalysisQuestionId } from '../analysis/prompt.js'
 
 /** What a title card can show, in the order a card shows it. */
 export const TITLE_FIELDS = [
@@ -45,6 +46,29 @@ export function isTitleField(value: unknown): value is TitleField {
   return typeof value === 'string' && (TITLE_FIELDS as readonly string[]).includes(value)
 }
 
+/** A question the current prompt asks: every id but the two retired ones. */
+export type AnalysisPart = Exclude<AnalysisQuestionId, 'intent' | 'dispute'>
+
+/**
+ * The parts of a film analysis a card can be limited to: the questions the
+ * current prompt asks, per media type (a show also has `structure`).
+ */
+export function analysisPartsFor(mediaType: 'movie' | 'series'): AnalysisPart[] {
+  return questionIdsFor(mediaType).map(currentAnalysisPart)
+}
+
+/**
+ * The part a retired question's paragraphs now belong to. Rows written before
+ * prompt version 9 label paragraphs `intent` and `dispute`, which version 9
+ * folded into `circumstances` and `reception`; choosing the new part must
+ * still find them, or an older analysis shows nothing for it.
+ */
+export function currentAnalysisPart(question: AnalysisQuestionId): AnalysisPart {
+  if (question === 'intent') return 'circumstances'
+  if (question === 'dispute') return 'reception'
+  return question
+}
+
 export interface TitleRef {
   mediaType: 'movie' | 'series'
   id: string
@@ -54,6 +78,12 @@ export interface TitleRef {
 export interface TitlePart extends TitleRef {
   type: 'titleRef'
   fields: TitleField[]
+  /**
+   * `all` for the whole analysis (nothing chosen). A list, even an EMPTY one,
+   * means only those parts: a choice none of whose parts this build knows any
+   * more shows nothing, never the whole article it was chosen to avoid.
+   */
+  analysisParts: AnalysisPart[] | 'all'
 }
 
 export type NewsletterPart = Exclude<EmailBlock, { type: 'title' }> | TitlePart
@@ -142,7 +172,16 @@ function readTitle(node: Node): TitlePart | null {
   const requested = Array.isArray(a.fields) ? a.fields.filter(isTitleField) : [...DEFAULT_TITLE_FIELDS]
   // Kept in TITLE_FIELDS order whatever order the editor stored them in.
   const fields = TITLE_FIELDS.filter((field) => requested.includes(field))
-  return { type: 'titleRef', mediaType, id, fields }
+  // Kept in the prompt's order, and only parts this media type has. A retired
+  // question id reads as the part that replaced it.
+  const wantedParts = Array.isArray(a.analysisParts)
+    ? a.analysisParts.filter((p): p is AnalysisQuestionId => typeof p === 'string').map(currentAnalysisPart)
+    : []
+  const analysisParts: AnalysisPart[] | 'all' =
+    Array.isArray(a.analysisParts) && a.analysisParts.length > 0
+      ? analysisPartsFor(mediaType).filter((part) => wantedParts.includes(part))
+      : 'all'
+  return { type: 'titleRef', mediaType, id, fields, analysisParts }
 }
 
 function readBlock(node: Node, out: NewsletterPart[]): void {

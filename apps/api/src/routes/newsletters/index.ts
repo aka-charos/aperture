@@ -31,6 +31,7 @@ import {
   DEFAULT_TITLE_FIELDS,
   GROUP_ROLES,
   TITLE_FIELDS,
+  analysisPartsFor,
   createNewsletter,
   createNewsletterGroup,
   deleteNewsletter,
@@ -176,6 +177,8 @@ const newslettersRoutes: FastifyPluginAsync = async (fastify) => {
       defaultLanguage: defaults.defaultUiLanguage,
       titleFields: TITLE_FIELDS,
       defaultTitleFields: DEFAULT_TITLE_FIELDS,
+      // The parts a card's analysis can be limited to, as the current prompt asks them.
+      analysisParts: { movie: analysisPartsFor('movie'), series: analysisPartsFor('series') },
       sendingProblem,
       sendingProblemText: sendingProblem ? SENDING_PROBLEM_TEXT[sendingProblem] : null,
     }
