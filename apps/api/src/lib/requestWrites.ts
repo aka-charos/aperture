@@ -26,7 +26,14 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
  * kind, for anyone. When in doubt, leave it out: a missing badge is a visible,
  * self-explaining gap, and a write slipped through here is neither.
  */
-const READ_ONLY_POSTS = new Set(['/api/favorites/status/bulk', '/api/seerr/status/batch'])
+const READ_ONLY_POSTS = new Set([
+  '/api/favorites/status/bulk',
+  '/api/seerr/status/batch',
+  // A newsletter rendered from the editor's unsaved content, and who a set of
+  // groups reaches: both take a body only because a document does not fit in a URL.
+  '/api/newsletters/preview',
+  '/api/newsletters/audience',
+])
 
 /**
  * GETs that write. The method rule rests on "a GET changes nothing", and these

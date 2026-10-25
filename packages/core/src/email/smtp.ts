@@ -32,6 +32,7 @@ import {
   type SmtpFailure,
   type SmtpOutcome,
 } from './rules.js'
+import { safeUrl } from './template.js'
 
 export type { EmailImage, EmailSender, OutgoingEmail, SentEmail, SmtpOutcome } from './rules.js'
 
@@ -125,13 +126,21 @@ function compose(sender: EmailSender, message: OutgoingEmail): SendMailOptions |
   const images = message.images ?? []
   const imageProblem = emailImagesProblem(images)
   if (imageProblem) return { ok: false, failure: 'invalidMessage', detail: imageProblem }
+  const headers: Record<string, string> = { 'Auto-Submitted': 'auto-generated' }
+  // One-click unsubscribe only over https: the POST a mail client makes to it
+  // carries no credential but the token in the address.
+  const unsubscribe = safeUrl(message.unsubscribeUrl)
+  if (unsubscribe?.startsWith('https:')) {
+    headers['List-Unsubscribe'] = `<${unsubscribe}>`
+    headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
+  }
   return {
     from: { name: singleLine(sender.name), address: sender.address },
     to: message.to,
     subject: singleLine(message.subject),
     text: message.text,
     html: message.html,
-    headers: { 'Auto-Submitted': 'auto-generated' },
+    headers,
     // Buffers only, never a path or URL: the transport refuses file and URL
     // access, and an image is fetched (and capped) before it gets here.
     attachments: images.map((image) => ({

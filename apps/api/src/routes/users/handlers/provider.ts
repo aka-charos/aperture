@@ -12,6 +12,17 @@ import { isAccountEnabled } from '../../../lib/accountEnabled.js'
 import { loadGoneAccounts } from './goneAccounts.js'
 import type { UserRow } from '../types.js'
 
+/**
+ * A user row as these routes answer with it: everything but the newsletter
+ * unsubscribe token (0212), which is a capability over that person's
+ * subscription and is never sent to any client. The queries here read whole
+ * rows, so it has to be taken out of the answer.
+ */
+function withoutNewsletterToken<T extends object>(row: T): Omit<T, 'newsletter_token'> {
+  const { newsletter_token: _token, ...rest } = row as T & { newsletter_token?: unknown }
+  return rest
+}
+
 export function registerProviderHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/users/provider
@@ -143,7 +154,7 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
         if (existing) {
           return reply.status(409).send({ 
             error: 'User already imported',
-            user: existing 
+            user: withoutNewsletterToken(existing) 
           })
         }
 
@@ -188,7 +199,7 @@ export function registerProviderHandlers(fastify: FastifyInstance) {
           )
         }
 
-        return reply.status(201).send({ user: newUser })
+        return reply.status(201).send({ user: newUser ? withoutNewsletterToken(newUser) : newUser })
       } catch (error) {
         fastify.log.error({ error, providerUserId }, 'Failed to import user')
         return reply.status(500).send({ error: 'Failed to import user from media server' })

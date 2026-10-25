@@ -35,16 +35,73 @@ export interface EmailAction {
   url: string | null
 }
 
+/**
+ * A piece of formatted text: plain text plus the styling it carries. Never
+ * markup — the renderer escapes `text` and builds the tags itself, so rich
+ * text written in an editor reaches an email under the same contract as
+ * every other field. A line break inside a run is kept as a line break.
+ */
+export interface EmailRun {
+  text: string
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  strike?: boolean
+  /** Dropped unless http(s), like every link here. */
+  href?: string | null
+}
+
+/** One labelled fact on a title card, e.g. "Languages: English, French". */
+export interface EmailFact {
+  label: string
+  value: string
+}
+
+/** A titled passage on a title card, e.g. the plot or an analysis. */
+export interface EmailPassage {
+  label?: string
+  /** Paragraphs, in order. */
+  paragraphs: string[]
+}
+
+/**
+ * Body blocks, rendered between the paragraphs and the items. This is the
+ * shape a newsletter's editor document is read into (core newsletter/
+ * document.ts); a notification that only needs sentences keeps using
+ * `paragraphs`.
+ */
+export type EmailBlock =
+  | { type: 'paragraph'; runs: EmailRun[] }
+  | { type: 'heading'; level: 2 | 3; runs: EmailRun[] }
+  | { type: 'list'; ordered: boolean; items: EmailRun[][] }
+  | { type: 'quote'; runs: EmailRun[] }
+  | { type: 'rule' }
+  | {
+      type: 'title'
+      title: string
+      meta?: string
+      url?: string | null
+      imageCid?: string
+      facts: EmailFact[]
+      passages: EmailPassage[]
+      /** A text link under the card, e.g. "Open in Aperture". */
+      linkLabel?: string
+    }
+
 export interface EmailContent {
   subject: string
   /** The line inbox lists show beside the subject; hidden in the body. */
   preheader?: string
   heading: string
   paragraphs: string[]
+  /** Formatted body, after the paragraphs. See `EmailBlock`. */
+  blocks?: EmailBlock[]
   items?: EmailItem[]
   /** The one button. Omitted when it has no link, so a dead button is never drawn. */
   action?: EmailAction
   footer: string[]
+  /** A small link under the footer lines, e.g. Unsubscribe. Omitted without a link. */
+  footerLink?: EmailAction
 }
 
 export interface EmailFrame {
@@ -72,6 +129,7 @@ const TEXT = '#1f2937'
 const MUTED = '#6b7280'
 const RULE = '#e5e7eb'
 const ITEM_IMAGE_WIDTH = 64
+const TITLE_IMAGE_WIDTH = 120
 /**
  * Used only when the accent handed in is not a colour. The caller passes
  * `getThemeColors().primary`, which has its own default, so this is a guard
@@ -158,6 +216,146 @@ function renderItemHtml(item: EmailItem, align: string): string {
   )
 }
 
+/** Escaped text with its line breaks kept. */
+function escapeLines(value: string): string {
+  return escapeHtml(value).replace(/\r?\n/g, '<br>')
+}
+
+function renderRunsHtml(runs: readonly EmailRun[], accent: string): string {
+  return runs
+    .map((run) => {
+      let html = escapeLines(run.text)
+      if (run.bold) html = `<strong>${html}</strong>`
+      if (run.italic) html = `<em>${html}</em>`
+      if (run.underline) html = `<u>${html}</u>`
+      if (run.strike) html = `<s>${html}</s>`
+      const href = safeUrl(run.href)
+      if (href) html = `<a href="${escapeHtml(href)}" style="color:${accent};text-decoration:underline;">${html}</a>`
+      return html
+    })
+    .join('')
+}
+
+function runsText(runs: readonly EmailRun[]): string {
+  return runs
+    .map((run) => {
+      const href = safeUrl(run.href)
+      return href && href !== run.text ? `${run.text} (${href})` : run.text
+    })
+    .join('')
+}
+
+function renderTitleHtml(block: Extract<EmailBlock, { type: 'title' }>, align: string, accent: string): string {
+  const url = safeUrl(block.url)
+  const title = escapeHtml(block.title)
+  const titleHtml = url
+    ? `<a href="${escapeHtml(url)}" style="color:${TEXT};text-decoration:none;">${title}</a>`
+    : title
+  const meta = block.meta
+    ? `<div style="color:${MUTED};font-size:13px;line-height:18px;margin-top:2px;">${escapeHtml(block.meta)}</div>`
+    : ''
+  const facts = block.facts
+    .map(
+      (fact) =>
+        `<div style="font-size:13px;line-height:19px;margin-top:4px;"><span style="color:${MUTED};">${escapeHtml(fact.label)}:</span> ${escapeHtml(fact.value)}</div>`
+    )
+    .join('')
+  const passages = block.passages
+    .map((passage) => {
+      const label = passage.label
+        ? `<div style="font-size:12px;line-height:16px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:${MUTED};margin-top:12px;">${escapeHtml(passage.label)}</div>`
+        : ''
+      const paragraphs = passage.paragraphs
+        .map((p) => `<p style="margin:6px 0 0;font-size:14px;line-height:21px;">${escapeLines(p)}</p>`)
+        .join('')
+      return label + paragraphs
+    })
+    .join('')
+  const link =
+    url && block.linkLabel
+      ? `<div style="margin-top:10px;font-size:14px;"><a href="${escapeHtml(url)}" style="color:${accent};text-decoration:underline;">${escapeHtml(block.linkLabel)}</a></div>`
+      : ''
+  const image =
+    block.imageCid && isContentId(block.imageCid)
+      ? `<td width="${TITLE_IMAGE_WIDTH}" valign="top" style="padding:0;width:${TITLE_IMAGE_WIDTH}px;">` +
+        `<img src="cid:${block.imageCid}" width="${TITLE_IMAGE_WIDTH}" alt="${title}" style="display:block;width:${TITLE_IMAGE_WIDTH}px;height:auto;border:0;border-radius:6px;"></td>` +
+        `<td width="16" style="width:16px;font-size:0;line-height:0;">&nbsp;</td>`
+      : ''
+  return (
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" ` +
+    `style="border:1px solid ${RULE};border-radius:8px;"><tr><td style="padding:14px;">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
+    image +
+    `<td valign="top" align="${align}" style="font-family:${FONT};color:${TEXT};text-align:${align};">` +
+    `<div style="font-size:17px;line-height:23px;font-weight:700;">${titleHtml}</div>` +
+    meta +
+    facts +
+    passages +
+    link +
+    `</td></tr></table></td></tr></table>`
+  )
+}
+
+function renderBlockHtml(block: EmailBlock, align: string, accent: string): string {
+  switch (block.type) {
+    case 'paragraph':
+      return `<p style="margin:0;font-size:15px;line-height:23px;">${renderRunsHtml(block.runs, accent)}</p>`
+    case 'heading':
+      return block.level === 2
+        ? `<h2 style="margin:6px 0 0;font-size:19px;line-height:25px;font-weight:700;">${renderRunsHtml(block.runs, accent)}</h2>`
+        : `<h3 style="margin:4px 0 0;font-size:16px;line-height:22px;font-weight:700;">${renderRunsHtml(block.runs, accent)}</h3>`
+    case 'list': {
+      const tag = block.ordered ? 'ol' : 'ul'
+      const side = align === 'right' ? 'right' : 'left'
+      return (
+        `<${tag} style="margin:0;padding-${side}:22px;font-size:15px;line-height:23px;">` +
+        block.items.map((item) => `<li style="margin:0 0 4px;">${renderRunsHtml(item, accent)}</li>`).join('') +
+        `</${tag}>`
+      )
+    }
+    case 'quote': {
+      const side = align === 'right' ? 'right' : 'left'
+      return (
+        `<div style="border-${side}:3px solid ${RULE};padding-${side}:14px;color:${MUTED};font-size:15px;line-height:23px;font-style:italic;">` +
+        `${renderRunsHtml(block.runs, accent)}</div>`
+      )
+    }
+    case 'rule':
+      return `<div style="border-top:1px solid ${RULE};font-size:0;line-height:0;">&nbsp;</div>`
+    case 'title':
+      return renderTitleHtml(block, align, accent)
+  }
+}
+
+function renderBlockText(block: EmailBlock): string {
+  switch (block.type) {
+    case 'paragraph':
+      return runsText(block.runs)
+    case 'heading':
+      return runsText(block.runs).toUpperCase()
+    case 'list':
+      return block.items.map((item, i) => `${block.ordered ? `${i + 1}.` : '-'} ${runsText(item)}`).join('\n')
+    case 'quote':
+      return runsText(block.runs)
+        .split('\n')
+        .map((line) => `> ${line}`)
+        .join('\n')
+    case 'rule':
+      return '----'
+    case 'title': {
+      const lines = [`== ${block.title}${block.meta ? ` (${block.meta})` : ''} ==`]
+      for (const fact of block.facts) lines.push(`${fact.label}: ${fact.value}`)
+      for (const passage of block.passages) {
+        if (passage.label) lines.push('', passage.label)
+        lines.push(...passage.paragraphs)
+      }
+      const url = safeUrl(block.url)
+      if (url) lines.push('', `${block.linkLabel ?? block.title}: ${url}`)
+      return lines.join('\n')
+    }
+  }
+}
+
 function renderHtml(content: EmailContent, frame: EmailFrame, subject: string): string {
   const accent = accentOf(frame.accent)
   const align = frame.rtl ? 'right' : 'left'
@@ -172,6 +370,10 @@ function renderHtml(content: EmailContent, frame: EmailFrame, subject: string): 
 
   const paragraphs = content.paragraphs
     .map((p) => cell(`<p style="margin:0;font-size:15px;line-height:23px;">${escapeHtml(p)}</p>`, '0 28px 14px'))
+    .join('')
+
+  const blocks = (content.blocks ?? [])
+    .map((block) => cell(renderBlockHtml(block, align, accent), '0 28px 16px'))
     .join('')
 
   const items = content.items?.length
@@ -194,12 +396,20 @@ function renderHtml(content: EmailContent, frame: EmailFrame, subject: string): 
         )
       : ''
 
-  const footer = content.footer.length
-    ? `<tr><td align="${align}" style="padding:16px 28px 22px;border-top:1px solid ${RULE};font-family:${FONT};` +
-      `color:${MUTED};font-size:12px;line-height:18px;text-align:${align};">` +
-      content.footer.map((line) => `<div>${escapeHtml(line)}</div>`).join('') +
-      `</td></tr>`
-    : ''
+  const footerLinkUrl = safeUrl(content.footerLink?.url)
+  const footerLink =
+    content.footerLink && footerLinkUrl
+      ? `<div style="margin-top:6px;"><a href="${escapeHtml(footerLinkUrl)}" style="color:${MUTED};text-decoration:underline;">` +
+        `${escapeHtml(content.footerLink.label)}</a></div>`
+      : ''
+  const footer =
+    content.footer.length || footerLink
+      ? `<tr><td align="${align}" style="padding:16px 28px 22px;border-top:1px solid ${RULE};font-family:${FONT};` +
+        `color:${MUTED};font-size:12px;line-height:18px;text-align:${align};">` +
+        content.footer.map((line) => `<div>${escapeHtml(line)}</div>`).join('') +
+        footerLink +
+        `</td></tr>`
+      : ''
 
   const preheader = content.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${escapeHtml(oneLine(content.preheader))}</div>`
@@ -223,6 +433,7 @@ function renderHtml(content: EmailContent, frame: EmailFrame, subject: string): 
       '10px 28px 16px'
     ) +
     paragraphs +
+    blocks +
     items +
     action +
     footer +
@@ -232,6 +443,7 @@ function renderHtml(content: EmailContent, frame: EmailFrame, subject: string): 
 
 function renderText(content: EmailContent, frame: EmailFrame): string {
   const blocks: string[] = [frame.appName, content.heading, ...content.paragraphs]
+  for (const block of content.blocks ?? []) blocks.push(renderBlockText(block))
   if (content.items?.length) {
     blocks.push(
       content.items
@@ -247,7 +459,10 @@ function renderText(content: EmailContent, frame: EmailFrame): string {
   }
   const actionUrl = safeUrl(content.action?.url)
   if (content.action && actionUrl) blocks.push(`${content.action.label}: ${actionUrl}`)
-  if (content.footer.length) blocks.push(`--\n${content.footer.join('\n')}`)
+  const footerLinkUrl = safeUrl(content.footerLink?.url)
+  const footerLines = [...content.footer]
+  if (content.footerLink && footerLinkUrl) footerLines.push(`${content.footerLink.label}: ${footerLinkUrl}`)
+  if (footerLines.length) blocks.push(`--\n${footerLines.join('\n')}`)
   return `${blocks.join('\n\n')}\n`
 }
 

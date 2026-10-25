@@ -9,7 +9,7 @@
  * - POST /api/settings/smtp/preview - the test message as it would be sent,
  *                                   rendered for the card, in any language
  *
- * Nothing in the app sends email through this yet. It is the connection that
+ * Newsletters send through this (core `newsletter/`). It is the connection that
  * features send through, by calling core `sendEmail`/`sendEmails`; see core
  * `email/`. What an update may change, and where the stored password may go,
  * is core `email/settings.ts` — pure and pinned, not decided here.

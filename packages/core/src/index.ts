@@ -1207,6 +1207,9 @@ export {
 // Outgoing email (SMTP)
 export * from './email/index.js'
 
+// Newsletters (admin-written email to send groups)
+export * from './newsletter/index.js'
+
 // Graph Playlists
 export {
   // AI generation

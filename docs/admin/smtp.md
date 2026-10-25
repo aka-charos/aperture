@@ -1,6 +1,6 @@
 # Outgoing Email (SMTP)
 
-The mail server Aperture sends email through. **Nothing sends email yet.** This page sets up the connection and proves it works, and the notification features added later will use it.
+The mail server Aperture sends email through. This page sets up the connection and proves it works; [Newsletters](newsletters.md) send through it, and need the **Public address** below for their unsubscribe links.
 
 ## Where It Lives
 

@@ -27,6 +27,8 @@ import ManageSearchIcon from '@mui/icons-material/ManageSearch'
 import MenuBookIcon from '@mui/icons-material/MenuBook'
 import MemoryIcon from '@mui/icons-material/Memory'
 import MovieIcon from '@mui/icons-material/Movie'
+import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead'
+import GroupsIcon from '@mui/icons-material/Groups'
 import OutputIcon from '@mui/icons-material/Output'
 import PaidIcon from '@mui/icons-material/Paid'
 import PaletteIcon from '@mui/icons-material/Palette'
@@ -353,6 +355,14 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
       () => import('@/pages/settings/components/ApiKeysSection'),
       'ApiKeysSection'
     ),
+  },
+  newsletters: {
+    icon: <MarkEmailReadIcon />,
+    Component: lazy(() => import('@/pages/admin/newsletters/NewslettersRoute')),
+  },
+  'newsletter-groups': {
+    icon: <GroupsIcon />,
+    Component: lazy(() => import('@/pages/admin/newsletters/NewsletterGroupsRoute')),
   },
   deployment: {
     icon: <SecurityIcon />,

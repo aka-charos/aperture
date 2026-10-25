@@ -85,6 +85,12 @@ const PUBLIC_ROUTES: Record<string, string> = {
     "Trakt's OAuth redirect. The browser arrives here from trakt.tv, so it is " +
     'authenticated by the one-time state token it carries, not by a session. ' +
     'Also on requestWrites’ WRITING_GETS list, since it writes tokens.',
+  'GET /api/newsletter/unsubscribe':
+    'The link in every newsletter, opened from an inbox where the reader may not be signed in. ' +
+    'Authorised by the random per-account token it carries, and changes nothing: it shows a confirm button.',
+  'POST /api/newsletter/unsubscribe':
+    'The confirm button, and a mail client’s one-click unsubscribe (RFC 8058), which carries no session. ' +
+    'The token grants only switching that account’s newsletters off.',
 }
 
 function* walk(dir: string): Generator<string> {

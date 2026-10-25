@@ -16,6 +16,8 @@ import { PosterDisplayCard } from './UserSettings/PosterDisplayCard'
 import { AppearanceCard } from './UserSettings/AppearanceCard'
 import { TipsCard } from './UserSettings/TipsCard'
 import { TraktIntegrationCard } from './UserSettings/TraktIntegrationCard'
+import { NewsletterCard } from './UserSettings/NewsletterCard'
+import { useNewsletterSubscription } from './UserSettings/hooks/useNewsletterSubscription'
 import { SettingsGrid } from './UserSettings/SettingsCard'
 import { RecommendationsTab } from './UserSettings/recommendations/RecommendationsTab'
 import { HomeScreenTab } from './UserSettings/homeScreen/HomeScreenTab'
@@ -64,6 +66,7 @@ export function UserSettingsPage() {
     syncRatings: syncTraktRatings,
     showCallbackResult: showTraktCallback,
   } = useTraktIntegration()
+  const newsletter = useNewsletterSubscription()
 
   /**
    * Which tabs this viewer gets. Emby home rows exist on Emby only. Account is
@@ -72,15 +75,27 @@ export function UserSettingsPage() {
    * address naming it still lands there while the answers arrive.
    */
   const visibleTabs = useMemo<UserSettingsTabKey[]>(() => {
-    const accountKnown = emailLoaded && traktChecked && libraryOutputEnabled !== null
+    const accountKnown = emailLoaded && traktChecked && libraryOutputEnabled !== null && newsletter.loaded
     const accountHasCards =
-      emailNotificationsAllowed || traktStatus?.traktConfigured === true || libraryOutputEnabled === true
+      emailNotificationsAllowed ||
+      traktStatus?.traktConfigured === true ||
+      libraryOutputEnabled === true ||
+      newsletter.offered
     return USER_SETTINGS_TAB_KEYS.filter((key) => {
       if (key === 'home') return user?.provider === 'emby'
       if (key === 'account') return !accountKnown || accountHasCards
       return true
     })
-  }, [emailLoaded, emailNotificationsAllowed, libraryOutputEnabled, traktChecked, traktStatus, user?.provider])
+  }, [
+    emailLoaded,
+    emailNotificationsAllowed,
+    libraryOutputEnabled,
+    newsletter.loaded,
+    newsletter.offered,
+    traktChecked,
+    traktStatus,
+    user?.provider,
+  ])
 
   const tab = visibleUserSettingsTab(requestedTab, visibleTabs)
 
@@ -287,6 +302,14 @@ export function UserSettingsPage() {
                   onDismissEmailError={() => setEmailError(null)}
                 />
               )}
+              <NewsletterCard
+                subscription={newsletter.subscription}
+                offered={newsletter.offered}
+                saving={newsletter.saving}
+                error={newsletter.error}
+                onChange={(optedIn) => void newsletter.setOptedIn(optedIn)}
+                onDismissError={newsletter.dismissError}
+              />
               <TraktIntegrationCard
                 status={traktStatus}
                 loading={loadingTrakt}

@@ -26,6 +26,27 @@ const EN = {
   'test.heading': 'Outgoing email works',
   'test.sentThrough': 'This message was sent through {{server}} because {{admin}} asked for a test in the admin settings.',
   'test.nothingToDo': "There is nothing to do. If you weren't expecting it, you can ignore it.",
+  'newsletter.footer.why': 'You receive this newsletter because you signed up for it in your {{appName}} settings.',
+  'newsletter.unsubscribe': 'Unsubscribe',
+  'newsletter.open': 'Open in {{appName}}',
+  'newsletter.runtime': '{{minutes}} min',
+  'newsletter.fact.genres': 'Genres',
+  'newsletter.fact.rating': 'Rating',
+  'newsletter.fact.languages': 'Languages',
+  'newsletter.fact.countries': 'Countries',
+  'newsletter.fact.director': 'Directed by',
+  'newsletter.fact.creator': 'Created by',
+  'newsletter.fact.cast': 'Starring',
+  'newsletter.fact.network': 'Network',
+  'newsletter.passage.plot': 'Plot',
+  'newsletter.passage.analysis': 'Analysis',
+  'newsletter.page.confirmHeading': 'Stop receiving newsletters?',
+  'newsletter.page.confirmBody': 'You will no longer get {{appName}} newsletters. You can switch them back on in your settings at any time.',
+  'newsletter.page.doneHeading': 'You are unsubscribed',
+  'newsletter.page.doneBody': 'You will not receive any more {{appName}} newsletters. You can switch them back on in your settings.',
+  'newsletter.page.alreadyBody': 'You are not subscribed to {{appName}} newsletters, so there is nothing to do.',
+  'newsletter.page.unknownHeading': 'This link does not work',
+  'newsletter.page.unknownBody': 'It may be incomplete. You can switch newsletters off in your {{appName}} settings instead.',
 } as const satisfies Record<string, string>
 
 export type EmailStringKey = keyof typeof EN
@@ -158,6 +179,31 @@ const TRANSLATIONS: Readonly<Record<Exclude<AppLocaleCode, 'en'>, Translations>>
     'test.sentThrough':
       'Αυτό το μήνυμα στάλθηκε μέσω του {{server}} επειδή ο/η {{admin}} ζήτησε δοκιμή από τις ρυθμίσεις διαχείρισης.',
     'test.nothingToDo': 'Δεν χρειάζεται να κάνετε τίποτα. Αν δεν το περιμένατε, μπορείτε να το αγνοήσετε.',
+    'newsletter.footer.why':
+      'Λαμβάνετε αυτό το ενημερωτικό δελτίο επειδή εγγραφήκατε σε αυτό από τις ρυθμίσεις σας στο {{appName}}.',
+    'newsletter.unsubscribe': 'Διαγραφή από τη λίστα',
+    'newsletter.open': 'Άνοιγμα στο {{appName}}',
+    'newsletter.runtime': '{{minutes}} λεπτά',
+    'newsletter.fact.genres': 'Είδη',
+    'newsletter.fact.rating': 'Βαθμολογία',
+    'newsletter.fact.languages': 'Γλώσσες',
+    'newsletter.fact.countries': 'Χώρες',
+    'newsletter.fact.director': 'Σκηνοθεσία',
+    'newsletter.fact.creator': 'Δημιουργία',
+    'newsletter.fact.cast': 'Πρωταγωνιστούν',
+    'newsletter.fact.network': 'Δίκτυο',
+    'newsletter.passage.plot': 'Υπόθεση',
+    'newsletter.passage.analysis': 'Ανάλυση',
+    'newsletter.page.confirmHeading': 'Διακοπή των ενημερωτικών δελτίων;',
+    'newsletter.page.confirmBody':
+      'Δεν θα λαμβάνετε πλέον ενημερωτικά δελτία του {{appName}}. Μπορείτε να τα ενεργοποιήσετε ξανά από τις ρυθμίσεις σας όποτε θέλετε.',
+    'newsletter.page.doneHeading': 'Η εγγραφή σας ακυρώθηκε',
+    'newsletter.page.doneBody':
+      'Δεν θα λαμβάνετε άλλα ενημερωτικά δελτία του {{appName}}. Μπορείτε να τα ενεργοποιήσετε ξανά από τις ρυθμίσεις σας.',
+    'newsletter.page.alreadyBody': 'Δεν είστε εγγεγραμμένοι στα ενημερωτικά δελτία του {{appName}}, οπότε δεν χρειάζεται κάτι.',
+    'newsletter.page.unknownHeading': 'Αυτός ο σύνδεσμος δεν λειτουργεί',
+    'newsletter.page.unknownBody':
+      'Ίσως είναι ελλιπής. Μπορείτε να απενεργοποιήσετε τα ενημερωτικά δελτία από τις ρυθμίσεις σας στο {{appName}}.',
   },
 }
 

@@ -351,6 +351,13 @@ export interface OutgoingEmail {
   html?: string
   /** Images the HTML shows by content id. */
   images?: EmailImage[]
+  /**
+   * A one-click unsubscribe address (RFC 8058), for mail someone subscribed
+   * to rather than mail about something they did. Sent as `List-Unsubscribe`
+   * plus `List-Unsubscribe-Post`, which is what lets a mail client offer its
+   * own Unsubscribe button; dropped unless https.
+   */
+  unsubscribeUrl?: string
 }
 
 export interface EmailSender {

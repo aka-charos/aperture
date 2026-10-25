@@ -32,6 +32,7 @@ import favoritesRoutes from './favorites/index.js'
 import watchStatusRoutes from './watch-status/index.js'
 import titleTranslationRoutes from './title-translations/index.js'
 import onboardingRoutes from './onboarding/index.js'
+import newslettersRoutes from './newsletters/index.js'
 import socialRoutes from './social/index.js'
 import discoveryRoutes from './discovery/index.js'
 import seerrRoutes from './seerr/index.js'
@@ -139,6 +140,9 @@ const routes: FastifyPluginAsync = async (fastify) => {
 
   // Welcome tour, getting-started checklist, first-visit hints
   await fastify.register(onboardingRoutes)
+
+  // Newsletters: admin-written email to send groups, the opt-in, unsubscribe
+  await fastify.register(newslettersRoutes)
 
   // Social layer: connections, Watch This (received and sent), connections' recent watches
   await fastify.register(socialRoutes)

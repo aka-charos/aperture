@@ -29,6 +29,7 @@ export const ADMIN_GROUP_IDS = [
   'recommendations',
   'appearance',
   'access',
+  'communication',
   'ops',
   'help',
 ] as const
@@ -54,6 +55,7 @@ export const ADMIN_GROUPS: readonly AdminGroup[] = [
   { id: 'recommendations', segment: 'recommendations', labelKey: 'adminNav.groups.recommendations' },
   { id: 'appearance', segment: 'appearance', labelKey: 'adminNav.groups.appearance' },
   { id: 'access', segment: 'access', labelKey: 'adminNav.groups.access' },
+  { id: 'communication', segment: 'communication', labelKey: 'adminNav.groups.communication' },
   { id: 'ops', segment: 'ops', labelKey: 'adminNav.groups.ops' },
   // No segment, like overview: its one entry is `/admin/help`, and a group
   // segment would make that `/admin/help/help` for no reader's benefit.
@@ -784,6 +786,26 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
       'passwordless',
       'security',
     ],
+  },
+
+  // ----------------------------------------------------------- communication
+  {
+    id: 'newsletters',
+    group: 'communication',
+    segment: 'newsletters',
+    titleKey: 'adminNav.newsletters.title',
+    blurbKey: 'adminNav.newsletters.blurb',
+    docs: ['newsletters'],
+    aliases: ['newsletter', 'email', 'mailing', 'announcement', 'campaign', 'wysiwyg', 'unsubscribe'],
+  },
+  {
+    id: 'newsletter-groups',
+    group: 'communication',
+    segment: 'groups',
+    titleKey: 'adminNav.newsletterGroups.title',
+    blurbKey: 'adminNav.newsletterGroups.blurb',
+    docs: ['newsletters'],
+    aliases: ['send group', 'mailing list', 'audience', 'recipients', 'segment', 'language'],
   },
 
   // -------------------------------------------------------------- operations

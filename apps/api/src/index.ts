@@ -4,6 +4,7 @@ import {
   runMigrations,
   getMigrationStatus,
   detectInterruptedEnrichmentRuns,
+  recoverInterruptedNewsletterSends,
   checkEvidenceThresholdProvenance,
   getAllJobConfigs,
   checkDatabaseClientCompatibility,
@@ -91,6 +92,10 @@ async function main() {
     console.warn('⚠️ Could not check for interrupted enrichment runs:', err)
     // Don't exit - this is a recoverable error
   }
+
+  // A newsletter send runs in this process, so one left 'sending' by a restart
+  // can never finish; it reads as failed and a retry reaches whoever was missed.
+  await recoverInterruptedNewsletterSends()
 
   // The evidence threshold is a raw cosine, so it only means anything relative
   // to the embedding model that produced it -- and swapping that model is a
