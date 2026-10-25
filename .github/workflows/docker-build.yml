@@ -59,6 +59,13 @@ jobs:
       - name: Validate
         run: pnpm validate
 
+      # Registers every plugin and route through the real buildServer (no
+      # database needed), so a route that throws while registering fails here
+      # instead of crash-looping the deployed image. Runs after validate, whose
+      # typecheck builds the packages this imports.
+      - name: Server boots
+        run: pnpm --filter @aperture/api test:boot
+
   docker-amd64:
     name: Build Docker Image (amd64)
     needs: [detect-changes, validate]

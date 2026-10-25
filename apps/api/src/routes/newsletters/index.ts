@@ -463,18 +463,25 @@ const newslettersRoutes: FastifyPluginAsync = async (fastify) => {
 
   // --------------------------------------------------------- unsubscribe
 
+  await fastify.register(unsubscribeRoutes)
+}
+
+/**
+ * The unsubscribe link, in its own scope so the form parser below reaches
+ * these two routes and no admin route: an admin route that accepted a form body
+ * could be submitted by a plain HTML form on another site.
+ */
+const unsubscribeRoutes: FastifyPluginAsync = async (fastify) => {
   // A mail client's one-click unsubscribe (RFC 8058) POSTs a form body, as
   // either encoding the RFC allows. The token in the address is the whole
   // request, so the body is accepted and never read. multipart/form-data is
-  // already parsed by @fastify/multipart (registered in server.ts), and adding
-  // a second parser for it throws at boot, so only the urlencoded one is added.
-  if (!fastify.hasContentTypeParser('application/x-www-form-urlencoded')) {
-    fastify.addContentTypeParser(
-      'application/x-www-form-urlencoded',
-      { parseAs: 'string' },
-      (_req, body, done) => done(null, body)
-    )
-  }
+  // already parsed by @fastify/multipart, registered at the root in server.ts;
+  // adding a second parser for it throws at boot, so only urlencoded is added.
+  fastify.addContentTypeParser(
+    'application/x-www-form-urlencoded',
+    { parseAs: 'string' },
+    (_req, body, done) => done(null, body)
+  )
 
   /**
    * The link in a newsletter. A GET only shows a confirm button and changes
