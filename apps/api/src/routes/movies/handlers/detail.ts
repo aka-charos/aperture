@@ -8,6 +8,7 @@ import { getStudioLogos, resolveLocalizedSynopsis, type StudioLogo } from '@aper
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { titleInScope } from '../../../lib/viewerScope.js'
+import { qualityRatingFor } from '../../../lib/qualityRating.js'
 import { getMovieSchema } from '../schemas.js'
 import type { MovieDetailRow } from '../types.js'
 
@@ -50,7 +51,7 @@ export function registerDetailHandler(fastify: FastifyInstance) {
       // Logos for the studios the info card lists, looked up alongside. Never
       // an error: a failed lookup costs the logos, not the page.
       const studioNames = (movie.studios ?? []).map((st) => (typeof st === 'string' ? st : st.name))
-      const [localized_synopsis, studio_logos] = await Promise.all([
+      const [localized_synopsis, studio_logos, quality] = await Promise.all([
         resolveLocalizedSynopsis('movie', id, request.query.lang, request.user!.id),
         getStudioLogos(studioNames, 'studio').then(
           (logos) => Object.fromEntries(logos) as Record<string, StudioLogo>,
@@ -59,9 +60,11 @@ export function registerDetailHandler(fastify: FastifyInstance) {
             return {} as Record<string, StudioLogo>
           }
         ),
+        // The unified rating recommendations score on, for the headline.
+        qualityRatingFor('movie', id, movie),
       ])
 
-      return reply.send({ ...movie, localized_synopsis, studio_logos })
+      return reply.send({ ...movie, localized_synopsis, studio_logos, ...quality })
     }
   )
 }

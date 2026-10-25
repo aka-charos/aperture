@@ -1235,7 +1235,29 @@
       "recommendTooltip": "Send this to people you're connected to",
       "machineTranslated": "Machine-translated",
       "showOriginal": "Show original",
-      "showTranslation": "Show translation"
+      "showTranslation": "Show translation",
+      "rating": {
+        "label": {
+          "imdb": "IMDb",
+          "tmdb": "TMDB",
+          "mediaServer": "Media server",
+          "critics": "Critics",
+          "combined": "{{audience}} + critics"
+        },
+        "source": {
+          "imdb": "IMDb",
+          "tmdb": "TMDB",
+          "mediaServer": "your media server",
+          "metacritic": "Metacritic",
+          "rt": "Rotten Tomatoes"
+        },
+        "explain": {
+          "combined": "One rating made of {{audience}} (60%) and critics (40%: {{critics}}), each put on IMDb's scale first. It's the rating your recommendations use.",
+          "audience": "The {{audience}} rating; there are no critic scores for this title. It's the rating your recommendations use.",
+          "audienceSeries": "The {{audience}} rating. Series use audience ratings only, because critic scores for shows are rare. It's the rating your recommendations use.",
+          "critics": "Made from critic scores ({{critics}}), put on IMDb's scale; there is no audience rating for this title. It's the rating your recommendations use."
+        }
+      }
     },
     "analysis": {
       "headingMovie": "Film Analysis",

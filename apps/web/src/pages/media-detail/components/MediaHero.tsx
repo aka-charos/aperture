@@ -53,6 +53,7 @@ import { useWatchStatus } from '../../../hooks/useWatchStatus'
 import { formatRuntime } from '../hooks'
 import { hasCriticRatings, personPath, studioPath } from '../helpers'
 import { RatingBadges } from './RatingBadges'
+import { headlineRating } from '../qualityRating'
 import { CommunityStrip } from './CommunityStrip'
 import { ReportIssueButton } from './ReportIssueButton'
 import { StudioLogo } from '../../../components/StudioLogo'
@@ -402,8 +403,36 @@ export function MediaHero({
   // series-only column, kept as a fallback so a show enriched before OMDb was
   // configured still says something.
   const awardsLine = media.awards_summary ?? (isSeries(media) ? media.awards : null)
+  // The headline is the unified rating recommendations score on (F-167),
+  // decided by the server, with what it is made of; it replaced the media
+  // server's own rating, which was an IMDb copy of uncertain age.
+  const headline = headlineRating(media)
+  const headlineCritics = headline
+    ? headline.critics.map((s) => t(`mediaDetail.hero.rating.source.${s}`)).join(', ')
+    : ''
+  const headlineAudience = headline?.audience
+    ? t(`mediaDetail.hero.rating.source.${headline.audience}`)
+    : ''
+  const headlineLabel = !headline
+    ? ''
+    : headline.basis === 'combined' && headline.audience
+      ? t('mediaDetail.hero.rating.label.combined', {
+          audience: t(`mediaDetail.hero.rating.label.${headline.audience}`),
+        })
+      : headline.basis === 'critics' || !headline.audience
+        ? t('mediaDetail.hero.rating.label.critics')
+        : t(`mediaDetail.hero.rating.label.${headline.audience}`)
+  const headlineExplain = !headline
+    ? ''
+    : headline.basis === 'combined'
+      ? t('mediaDetail.hero.rating.explain.combined', { audience: headlineAudience, critics: headlineCritics })
+      : headline.basis === 'critics'
+        ? t('mediaDetail.hero.rating.explain.critics', { critics: headlineCritics })
+        : isSeries(media)
+          ? t('mediaDetail.hero.rating.explain.audienceSeries', { audience: headlineAudience })
+          : t('mediaDetail.hero.rating.explain.audience', { audience: headlineAudience })
   const showRatingLine =
-    media.community_rating != null ||
+    headline != null ||
     hasCriticRatings(media) ||
     (isSeries(media) && media.critic_rating != null)
 
@@ -1036,16 +1065,29 @@ export function MediaHero({
             <Box
               sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5, flexWrap: 'wrap' }}
             >
-              {media.community_rating != null && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 0.5 }}>
-                  <StarIcon sx={{ color: 'warning.main' }} />
-                  <Typography variant="h6" fontWeight={600}>
-                    {Number(media.community_rating).toFixed(1)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {t('mediaDetail.hero.outOfTen')}
-                  </Typography>
-                </Box>
+              {headline && (
+                <Tooltip title={headlineExplain}>
+                  <Box
+                    tabIndex={0}
+                    aria-label={`${headline.value.toFixed(1)} ${t('mediaDetail.hero.outOfTen')}. ${headlineExplain}`}
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 0.5, cursor: 'help' }}
+                  >
+                    <StarIcon sx={{ color: 'warning.main' }} />
+                    <Typography variant="h6" fontWeight={600}>
+                      {headline.value.toFixed(1)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {t('mediaDetail.hero.outOfTen')}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ borderBottom: 1, borderColor: 'divider', borderBottomStyle: 'dotted' }}
+                    >
+                      {headlineLabel}
+                    </Typography>
+                  </Box>
+                </Tooltip>
               )}
               {/* Series critic rating */}
               {isSeries(media) && media.critic_rating != null && (

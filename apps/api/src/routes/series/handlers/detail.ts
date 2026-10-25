@@ -8,6 +8,7 @@ import { getStudioLogos, resolveLocalizedSynopsis, type StudioLogo } from '@aper
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { titleInScope } from '../../../lib/viewerScope.js'
+import { qualityRatingFor } from '../../../lib/qualityRating.js'
 import { refreshStaleTmdbTotals } from '@aperture/core/watching'
 import { getSeriesSchema } from '../schemas.js'
 import type { SeriesDetailRow } from '../types.js'
@@ -69,7 +70,7 @@ export function registerDetailHandler(fastify: FastifyInstance) {
       const studioNames = ((series.studios ?? []) as Array<string | { name: string }>).map((st) =>
         typeof st === 'string' ? st : st.name
       )
-      const [localized_synopsis, logos] = await Promise.all([
+      const [localized_synopsis, logos, quality] = await Promise.all([
         resolveLocalizedSynopsis('series', id, request.query.lang, request.user!.id),
         getStudioLogos(
           series.network ? [series.network, ...studioNames] : studioNames,
@@ -78,6 +79,8 @@ export function registerDetailHandler(fastify: FastifyInstance) {
           request.log.warn({ err, seriesId: id }, 'Studio logo lookup failed')
           return new Map<string, StudioLogo>()
         }),
+        // The unified rating recommendations score on, for the headline.
+        qualityRatingFor('series', id, series),
       ])
       const network_logo = series.network ? (logos.get(series.network) ?? null) : null
       const studio_logos = Object.fromEntries(
@@ -87,7 +90,7 @@ export function registerDetailHandler(fastify: FastifyInstance) {
         })
       )
 
-      return reply.send({ ...series, localized_synopsis, studio_logos, network_logo })
+      return reply.send({ ...series, localized_synopsis, studio_logos, network_logo, ...quality })
     }
   )
 }

@@ -9,7 +9,7 @@ The Series Detail page shows everything about a TV series — its episodes and y
 Full-width fanart backdrop, poster, title, year, and the key facts in one line.
 
 - **Status chip** — **Continuing** (green) while new episodes are still coming; otherwise **Ended**
-- **Ratings** — community rating ("8.4 / 10"), critic score where available, and the external badges (Rotten Tomatoes, Metacritic, IMDb, TMDB, Letterboxd) with the critic consensus quote
+- **Ratings** — the headline rating ("8.4 / 10"), the one your recommendations use; for series that is the IMDb rating, because critic scores for shows are rare. Then the critic score where available, and the external badges (Rotten Tomatoes, Metacritic, IMDb, TMDB, Letterboxd) with the critic consensus quote
 - **Created By** — the show's creator, linked to their person page
 - **Synopsis** — translated into your language, with **Show original**, when your admin has synopsis translation on
 - **Seasons / Episodes / avg per episode** chips

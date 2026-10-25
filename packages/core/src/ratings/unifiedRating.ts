@@ -170,6 +170,32 @@ export function rankMapper(pairs: RankPair[]): (value: number | null) => number 
   }
 }
 
+export type UnifiedRatingSource = 'imdb' | 'mediaServer' | 'tmdb' | 'metacritic' | 'rt'
+
+/**
+ * Which sources a title's unified rating is made of, in the order the rule
+ * reads them: the one audience source it used, then the critic scores it kept.
+ * Shipped beside the number so a page can say what the number is, decided
+ * here so it cannot disagree with computeUnifiedRatings (the RT guard drops a
+ * score the raw columns still show). Assumes the title is in a library large
+ * enough for every source to have paired titles, which any real one is.
+ */
+export function unifiedRatingSources(
+  row: Omit<UnifiedRatingInput, 'id'>,
+  mediaType: UnifiedRatingMediaType
+): UnifiedRatingSource[] {
+  const sources: UnifiedRatingSource[] = []
+  if (finite(row.imdb) != null) sources.push('imdb')
+  else if (finite(row.community) != null) sources.push('mediaServer')
+  else if (finite(row.tmdb) != null) sources.push('tmdb')
+  if (mediaType === 'movie') {
+    const metacritic = finite(row.metacritic)
+    if (metacritic != null) sources.push('metacritic')
+    if (trustedRtScore(finite(row.rt), metacritic) != null) sources.push('rt')
+  }
+  return sources
+}
+
 /**
  * The rating to score: the unified one, else the media server's own for a
  * title the map does not hold (added since it was read, or a failed read).

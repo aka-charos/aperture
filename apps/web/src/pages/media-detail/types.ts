@@ -19,6 +19,9 @@ export interface Actor {
 }
 
 // Base media interface with shared properties
+/** Mirrors core's UnifiedRatingSource by hand (the bundle never imports core). */
+export type QualityRatingSource = 'imdb' | 'mediaServer' | 'tmdb' | 'metacritic' | 'rt'
+
 export interface BaseMedia {
   id: string
   provider_item_id: string
@@ -57,6 +60,15 @@ export interface BaseMedia {
   tmdb_vote_count?: number | null
   imdb_rating?: number | null
   imdb_vote_count?: number | null
+  /**
+   * The unified quality rating (0-10) recommendations score on, decided by the
+   * server (core ratings/unifiedRating.ts); null when no source rates the
+   * title. Absent from an older API, which the headline reads as "use
+   * community_rating" (qualityRating.ts).
+   */
+  quality_rating?: number | null
+  /** What quality_rating is made of, decided by the server. Mirrors core's UnifiedRatingSource. */
+  quality_rating_sources?: QualityRatingSource[]
   languages?: string[] | null
   production_countries?: string[] | null
   // MDBList enrichment

@@ -4,7 +4,7 @@
  * TypeScript interfaces for movie-related API endpoints.
  */
 
-import type { LocalizedSynopsis, StudioLogo } from '@aperture/core'
+import type { LocalizedSynopsis, StudioLogo, UnifiedRatingSource } from '@aperture/core'
 
 export interface MovieRow {
   id: string
@@ -75,6 +75,13 @@ export interface MovieDetailRow extends MovieRow {
   tmdb_vote_count: number | null
   imdb_rating: number | null
   imdb_vote_count: number | null
+  /**
+   * The unified quality rating (0-10) recommendations score on, decided by
+   * core ratings/unifiedRating.ts; null when no source rates the title.
+   */
+  quality_rating?: number | null
+  /** What quality_rating is made of, in the order the rule reads them. */
+  quality_rating_sources?: UnifiedRatingSource[]
   languages: string[] | null
   production_countries: string[] | null
   // MDBList enrichment

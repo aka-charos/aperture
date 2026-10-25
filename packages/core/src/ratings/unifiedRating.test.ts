@@ -8,6 +8,7 @@ import {
   percentileWithin,
   presentMean,
   trustedRtScore,
+  unifiedRatingSources,
   valueAtPercentile,
   type UnifiedRatingInput,
 } from './unifiedRating.js'
@@ -161,4 +162,18 @@ test('no paired titles means the source maps nothing', () => {
   const ratings = computeUnifiedRatings([row('p', { community: 7, metacritic: 20 }), row('q', { community: 6, metacritic: 90 })], 'movie')
   assert.equal(ratings.get('p'), 7)
   assert.equal(ratings.get('q'), 6)
+})
+
+test('the sources name what the rating is made of, guard included', () => {
+  const base = { imdb: null, community: null, tmdb: null, rt: null, metacritic: null }
+  assert.deepEqual(unifiedRatingSources({ ...base, imdb: 7.6, metacritic: 53, rt: 70 }, 'movie'), ['imdb', 'metacritic', 'rt'])
+  // Pinocchio: the RT the guard drops is not named.
+  assert.deepEqual(unifiedRatingSources({ ...base, imdb: 7.6, metacritic: 79, rt: 27 }, 'movie'), ['imdb', 'metacritic'])
+  // One audience source, in the rule's order.
+  assert.deepEqual(unifiedRatingSources({ ...base, imdb: 7, community: 9, tmdb: 8 }, 'movie'), ['imdb'])
+  assert.deepEqual(unifiedRatingSources({ ...base, community: 9, tmdb: 8 }, 'movie'), ['mediaServer'])
+  assert.deepEqual(unifiedRatingSources({ ...base, tmdb: 8 }, 'movie'), ['tmdb'])
+  // Series never name critics.
+  assert.deepEqual(unifiedRatingSources({ ...base, imdb: 8, metacritic: 70, rt: 90 }, 'series'), ['imdb'])
+  assert.deepEqual(unifiedRatingSources(base, 'movie'), [])
 })

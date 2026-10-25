@@ -31,7 +31,9 @@ export {
   computeUnifiedRatings,
   scoringRating,
   trustedRtScore,
+  unifiedRatingSources,
   type UnifiedRatingInput,
+  type UnifiedRatingSource,
   type UnifiedRatingMediaType,
 } from './unifiedRating.js'
 export { QUALITY_RATINGS_TTL_MS, getQualityRatings } from './qualityRatings.js'

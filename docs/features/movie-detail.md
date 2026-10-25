@@ -8,7 +8,7 @@ The Movie Detail page shows everything about a specific movie — its ratings, i
 
 The top of the page: full-width fanart backdrop, poster, title, year, and the key facts in one line. The poster carries a **watched tick** once you've finished it, and the director and writers (for series, the creators) are listed under the title, linked to their pages.
 
-- **Ratings** — the community rating from your media server ("7.6 / 10"), followed by external score badges where available: Rotten Tomatoes (Tomatometer and Audience), Metacritic, IMDb, TMDB, and Letterboxd. For movies with a critic consensus, the quote appears under the badges, and an awards line where one exists.
+- **Ratings** — the headline rating ("7.1 / 10"), the one your recommendations use: IMDb (60%) combined with the Metacritic and Rotten Tomatoes critic scores (40%), or IMDb alone when critics never reviewed the film. The small label beside it says which, and hovering it explains the mix. Then the external score badges where available: Rotten Tomatoes (Tomatometer and Audience), Metacritic, IMDb, TMDB, and Letterboxd. For movies with a critic consensus, the quote appears under the badges, and an awards line where one exists.
 - **Genre chips** — clickable, and annotated by the recommender where it has something to say: "a genre you already watch a lot of" versus "new to you".
 - **Synopsis** — with a **Read full synopsis** expander for the longer plot text. If your admin has [synopsis translation](../admin/synopsis-translation.md) on, the plot appears in the language you're reading Aperture in, marked **Machine-translated**, with **Show original** one click away.
 
