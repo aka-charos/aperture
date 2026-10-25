@@ -21,6 +21,8 @@ function candidate(id: string, overrides: Partial<Candidate> = {}): Candidate {
     year: 2020,
     genres: ['Drama'],
     communityRating: 7,
+    qualityRating: null,
+    qualityRatingSources: null,
     voteCount: null,
     similarity: 0.5,
     normalizedSimilarity: 0.5,

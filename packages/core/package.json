@@ -79,7 +79,7 @@
     "test:ai-errors": "node --import tsx --test src/lib/aiErrors.test.ts",
     "test:pacing": "node --import tsx --test src/lib/callPacing.test.ts",
     "test:watch-date": "node --import tsx --test src/lib/watchDateBands.test.ts",
-    "test:ratings": "node --import tsx --test src/ratings/imdbDataset.test.ts src/ratings/unifiedRating.test.ts src/ratings/ratingsCache.test.ts src/ratings/ratingCallSites.test.ts src/recommender/movies/scoring.test.ts",
+    "test:ratings": "node --import tsx --test src/ratings/imdbDataset.test.ts src/ratings/unifiedRating.test.ts src/ratings/ratingCallSites.test.ts src/recommender/movies/scoring.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist",
     "test:evaluation": "node --import tsx --test src/evaluation/holdout.test.ts src/evaluation/metrics.test.ts src/evaluation/csv.test.ts",

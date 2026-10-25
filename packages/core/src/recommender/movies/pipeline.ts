@@ -32,7 +32,7 @@ import { loadInterestMatchIndex } from '../interestMatches.js'
 import { getLibraryScopeForUser } from '../../lib/libraryScope.js'
 import { loadRecommendationRecipients } from '../recipients.js'
 import { scoreCandidates } from './scoring.js'
-import { getQualityRatings } from '../../ratings/qualityRatings.js'
+import { ensureQualityRatings } from '../../ratings/qualityRatings.js'
 import { applyDiversityAndSelect } from './selection.js'
 import {
   storeCandidates,
@@ -439,6 +439,13 @@ export async function generateRecommendationsForUser(
     // or the multi-cluster query itself fails for any reason.
     const tasteClusters = await getUserTasteClusters(user.id, 'movie')
 
+    // The candidates carry the stored unified rating (F-167); compute it for
+    // any film not computed yet -- a title synced since the last refresh, or
+    // the whole library on the first run after the column arrived -- so this
+    // run scores on it rather than on the fallback. One EXISTS check when
+    // nothing is pending; never throws.
+    await ensureQualityRatings('movie')
+
     let candidates: Candidate[]
     if (tasteClusters.length > 1) {
       try {
@@ -526,8 +533,7 @@ export async function generateRecommendationsForUser(
     const { candidates: scoredCandidates, weights: blendWeights } = scoreCandidates(
       candidates,
       genreFamiliarity,
-      cfg,
-      await getQualityRatings('movie')
+      cfg
     )
 
     // 4.5 Apply franchise, genre, and custom interest preference adjustments

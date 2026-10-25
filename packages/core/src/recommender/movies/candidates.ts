@@ -86,10 +86,13 @@ async function queryCandidatesForVector(
     year: number | null
     genres: string[]
     community_rating: number | null
+    quality_rating: number | null
+    quality_rating_sources: string[] | null
     imdb_vote_count: number | null
     similarity: number
   }>(
     `SELECT m.id, m.title, m.year, m.genres, m.community_rating, m.imdb_vote_count,
+            m.quality_rating::float8 AS quality_rating, m.quality_rating_sources,
             1 - (e.${ctx.embeddingColumn} <=> $1::halfvec) as similarity
      FROM ${ctx.tableName} e
      JOIN movies m ON m.id = e.movie_id
@@ -111,6 +114,8 @@ async function queryCandidatesForVector(
     year: row.year,
     genres: row.genres || [],
     communityRating: row.community_rating,
+    qualityRating: row.quality_rating,
+    qualityRatingSources: row.quality_rating_sources,
     voteCount: row.imdb_vote_count,
     similarity: row.similarity,
     // Filled in by scoreCandidates, which needs the whole pool to set the scale.

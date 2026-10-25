@@ -38,13 +38,7 @@ export interface ScoredPool {
 export function scoreCandidates(
   candidates: Candidate[],
   genreFamiliarity: Map<string, number>,
-  config: PipelineConfig,
-  /**
-   * The unified quality rating of every film (ratings/qualityRatings.ts).
-   * Required: scoring on the media server's rating alone is what this
-   * replaced, and a default would let a caller do it without deciding to.
-   */
-  qualityRatings: Map<string, number | null>
+  config: PipelineConfig
 ): ScoredPool {
   // Similarity is read against the pool it came from rather than as an absolute
   // cosine, so the configured similarity weight buys the influence it claims.
@@ -53,10 +47,10 @@ export function scoreCandidates(
 
   // Pass 1: the three components.
   for (const candidate of candidates) {
-    // The unified rating (refreshed IMDb plus critics, F-167); the media
-    // server's own rating only for a film the map does not know yet.
+    // The stored unified rating (refreshed IMDb plus critics, F-167); the
+    // media server's own rating only for a film not computed yet.
     candidate.ratingScore = calculateRatingScore(
-      scoringRating(qualityRatings, candidate.movieId, candidate.communityRating)
+      scoringRating(candidate.qualityRating, candidate.qualityRatingSources, candidate.communityRating)
     )
 
     // Use shared novelty score calculation (handles missing genres)

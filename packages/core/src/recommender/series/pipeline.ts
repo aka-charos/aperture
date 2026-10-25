@@ -51,7 +51,7 @@ import {
   spreadOf,
   type BlendWeights,
 } from '../shared/index.js'
-import { getQualityRatings } from '../../ratings/qualityRatings.js'
+import { ensureQualityRatings } from '../../ratings/qualityRatings.js'
 import { scoringRating } from '../../ratings/unifiedRating.js'
 import { getDonorWatchedIds, getTwinPairs } from '../twinAffinity.js'
 import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
@@ -529,15 +529,19 @@ async function scoreSeriesCandidates(
   // candidate for the acclaimed gate and the slot prompt. Series take the
   // audience half only (F-167). Mirrors movies/scoring.ts. The two reads are
   // independent, so they run together.
-  const [ratingsResult, qualityRatings] = await Promise.all([
-    query<{
-      id: string
-      community_rating: number | null
-      imdb_vote_count: number | null
-    }>(`SELECT id, community_rating, imdb_vote_count FROM series WHERE id = ANY($1)`, [seriesIds]),
-    getQualityRatings('series'),
-  ])
+  const ratingsResult = await query<{
+    id: string
+    community_rating: number | null
+    quality_rating: number | null
+    quality_rating_sources: string[] | null
+    imdb_vote_count: number | null
+  }>(
+    `SELECT id, community_rating, quality_rating::float8 AS quality_rating, quality_rating_sources, imdb_vote_count
+       FROM series WHERE id = ANY($1)`,
+    [seriesIds]
+  )
 
+  const rowsById = new Map(ratingsResult.rows.map((row) => [row.id, row]))
   const ratingsMap = new Map<string, number | null>()
   const votesMap = new Map<string, number | null>()
   for (const row of ratingsResult.rows) {
@@ -557,7 +561,11 @@ async function scoreSeriesCandidates(
   const scored = candidates.map((candidate) => ({
     ...candidate,
     ratingScore: calculateRatingScore(
-      scoringRating(qualityRatings, candidate.seriesId, ratingsMap.get(candidate.seriesId))
+      scoringRating(
+        rowsById.get(candidate.seriesId)?.quality_rating,
+        rowsById.get(candidate.seriesId)?.quality_rating_sources,
+        rowsById.get(candidate.seriesId)?.community_rating
+      )
     ),
     communityRating: ratingsMap.get(candidate.seriesId) ?? null,
     voteCount: votesMap.get(candidate.seriesId) ?? null,
@@ -1087,6 +1095,10 @@ export async function generateSeriesRecommendationsForUser(
     // single-centroid path whenever there's only one cluster, no clusters yet
     // (pre-rebuild), or the multi-cluster query itself fails for any reason.
     const tasteClusters = await getUserTasteClusters(user.id, 'series')
+
+    // Mirrors movies/pipeline.ts: compute the stored unified rating for any
+    // show not computed yet before this run scores on it. Never throws.
+    await ensureQualityRatings('series')
 
     let candidates: SeriesCandidate[]
     if (tasteClusters.length > 1) {

@@ -56,6 +56,7 @@ import {
   refreshAllExplanations,
   checkRecommendationExplanations,
   withInferenceContext,
+  refreshQualityRatingsSafely,
 } from '@aperture/core'
 import { syncAllTraktRatings } from '../trakt/index.js'
 import { refreshAssistantSuggestions } from '../assistant/jobs/refreshSuggestions.js'
@@ -126,6 +127,9 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           },
           `✅ Movie sync complete`
         )
+        // A sync writes community_rating and adds titles: refresh the stored
+        // unified rating (F-167). Never throws.
+        await refreshQualityRatingsSafely('movie')
         break
       }
       case 'generate-movie-embeddings': {
@@ -215,6 +219,7 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           },
           `✅ Series sync complete`
         )
+        await refreshQualityRatingsSafely('series')
         break
       }
       case 'generate-series-embeddings': {
@@ -809,6 +814,9 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           },
           `✅ Ratings refresh complete`
         )
+        // The IMDb figures the unified rating leads with just moved (F-167).
+        await refreshQualityRatingsSafely('movie')
+        await refreshQualityRatingsSafely('series')
         // Skipped when cancelled: cancelJob has already filed the job_runs row,
         // and completing over it would flip a cancelled run to 'completed'.
         if (!result.cancelled) {
@@ -829,6 +837,9 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           },
           `✅ Metadata enrichment complete`
         )
+        // OMDb and TMDb write the ratings the unified one is made of (F-167).
+        await refreshQualityRatingsSafely('movie')
+        await refreshQualityRatingsSafely('series')
         break
       }
       // === Studio Logo Enrichment Job ===
@@ -858,6 +869,9 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           },
           `✅ MDBList enrichment complete`
         )
+        // MDBList writes RT and Metacritic (F-167).
+        await refreshQualityRatingsSafely('movie')
+        await refreshQualityRatingsSafely('series')
         break
       }
       // === Database Backup Job ===

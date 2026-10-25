@@ -8,7 +8,9 @@ import {
   percentileWithin,
   presentMean,
   trustedRtScore,
-  unifiedRatingSources,
+  scoringRating,
+  storedQualityRating,
+  unifiedRatingShares,
   valueAtPercentile,
   type UnifiedRatingInput,
 } from './unifiedRating.js'
@@ -29,6 +31,11 @@ const ALIGNED = [
   row('d', { imdb: 8, metacritic: 80, rt: 70 }),
   row('e', { imdb: 9, metacritic: 90, rt: 90 }),
 ]
+
+/** The ratings alone, for the tests about the number. */
+function ratingsOf(rows: UnifiedRatingInput[], mediaType: 'movie' | 'series'): Map<string, number | null> {
+  return new Map([...computeUnifiedRatings(rows, mediaType)].map(([id, r]) => [id, r.rating]))
+}
 
 test('the decided weights', () => {
   // F-167: audience 0.6 / critics 0.4, and Metacritic leads RT inside critics.
@@ -78,7 +85,7 @@ test('an RT score far from Metacritic is dropped; one with no Metacritic is kept
 })
 
 test('critics that agree with the audience leave the rating where it was', () => {
-  const ratings = computeUnifiedRatings(ALIGNED, 'movie')
+  const ratings = ratingsOf(ALIGNED, 'movie')
   for (const r of ALIGNED) {
     assert.ok(Math.abs((ratings.get(r.id) ?? 0) - (r.imdb ?? 0)) < 1e-9, r.id)
   }
@@ -87,13 +94,13 @@ test('critics that agree with the audience leave the rating where it was', () =>
 test('critics who rate a title lower than its audience pull it down by their share', () => {
   // Title x: IMDb 9 (the top), Metacritic and RT both at the bottom of their scales.
   const library = [...ALIGNED, row('x', { imdb: 9, metacritic: 10, rt: 5 })]
-  const x = computeUnifiedRatings(library, 'movie').get('x') ?? 0
+  const x = ratingsOf(library, 'movie').get('x') ?? 0
   // Critics map to the bottom of IMDb's distribution (5): 0.6 x 9 + 0.4 x 5.
   assert.ok(Math.abs(x - 7.4) < 1e-9, String(x))
 })
 
 test('raw scales never reach the result: everything stays on 0-10', () => {
-  const ratings = computeUnifiedRatings([...ALIGNED, row('z', { metacritic: 100, rt: 100 })], 'movie')
+  const ratings = ratingsOf([...ALIGNED, row('z', { metacritic: 100, rt: 100 })], 'movie')
   for (const value of ratings.values()) {
     assert.ok(value != null && value >= 0 && value <= 10, String(value))
   }
@@ -101,7 +108,7 @@ test('raw scales never reach the result: everything stays on 0-10', () => {
 
 test('series ignore critic scores', () => {
   const library = [...ALIGNED, row('x', { imdb: 9, metacritic: 10, rt: 5 })]
-  assert.equal(computeUnifiedRatings(library, 'series').get('x'), 9)
+  assert.equal(ratingsOf(library, 'series').get('x'), 9)
 })
 
 test('audience is IMDb, then the media server, then TMDb rank-mapped', () => {
@@ -115,7 +122,7 @@ test('audience is IMDb, then the media server, then TMDb rank-mapped', () => {
     row('tmdb-low', { tmdb: 1 }),
     row('nothing', {}),
   ]
-  const ratings = computeUnifiedRatings(library, 'series')
+  const ratings = ratingsOf(library, 'series')
   assert.equal(ratings.get('imdb-and-community'), 7)
   assert.equal(ratings.get('community-only'), 6.4)
   assert.equal(ratings.get('tmdb-only'), 9)
@@ -125,21 +132,21 @@ test('audience is IMDb, then the media server, then TMDb rank-mapped', () => {
 
 test('TMDb does not move a title that has an IMDb rating', () => {
   const library = ALIGNED.map((r) => ({ ...r, tmdb: 10 - (r.imdb ?? 0) }))
-  const ratings = computeUnifiedRatings(library, 'series')
+  const ratings = ratingsOf(library, 'series')
   for (const r of library) assert.equal(ratings.get(r.id), r.imdb)
 })
 
 test('a dropped RT leaves Metacritic as the whole critic half', () => {
   // y: IMDb 9, Metacritic 20 (maps to 5), RT 95 -- 75 points apart, so RT goes.
   const library = [...ALIGNED, row('y', { imdb: 9, metacritic: 20, rt: 95 })]
-  const y = computeUnifiedRatings(library, 'movie').get('y') ?? 0
+  const y = ratingsOf(library, 'movie').get('y') ?? 0
   // MC 20 ties with title a's 20: midrank of positions 0 and 1 of 0..5 is 0.1,
   // which reads IMDb's sorted [5,6,7,8,9,9] at round(0.5) = index 1 -> 6.
   assert.ok(Math.abs(y - (0.6 * 9 + 0.4 * 6)) < 1e-9, String(y))
 })
 
 test('non-finite inputs read as missing', () => {
-  const ratings = computeUnifiedRatings([row('n', { imdb: Number.NaN, community: 7 })], 'movie')
+  const ratings = ratingsOf([row('n', { imdb: Number.NaN, community: 7 })], 'movie')
   assert.equal(ratings.get('n'), 7)
 })
 
@@ -149,7 +156,7 @@ test('a reviewed film is mapped against reviewed films, not the whole library', 
   // library, a Metacritic median would read a 3-4 IMDb and every reviewed film
   // would lose against an unreviewed film its critics and audience agree on.
   const tail = Array.from({ length: 20 }, (_, i) => row(`tail${i}`, { imdb: 3 + (i % 2) }))
-  const ratings = computeUnifiedRatings([...ALIGNED, ...tail], 'movie')
+  const ratings = ratingsOf([...ALIGNED, ...tail], 'movie')
   for (const r of ALIGNED) {
     assert.ok(Math.abs((ratings.get(r.id) ?? 0) - (r.imdb ?? 0)) < 1e-9, `${r.id}: ${ratings.get(r.id)}`)
   }
@@ -159,21 +166,56 @@ test('a reviewed film is mapped against reviewed films, not the whole library', 
 test('no paired titles means the source maps nothing', () => {
   // Critic scores on titles none of which has an IMDb rating: nothing to map
   // against, so the audience figure stands.
-  const ratings = computeUnifiedRatings([row('p', { community: 7, metacritic: 20 }), row('q', { community: 6, metacritic: 90 })], 'movie')
+  const ratings = ratingsOf([row('p', { community: 7, metacritic: 20 }), row('q', { community: 6, metacritic: 90 })], 'movie')
   assert.equal(ratings.get('p'), 7)
   assert.equal(ratings.get('q'), 6)
 })
 
 test('the sources name what the rating is made of, guard included', () => {
-  const base = { imdb: null, community: null, tmdb: null, rt: null, metacritic: null }
-  assert.deepEqual(unifiedRatingSources({ ...base, imdb: 7.6, metacritic: 53, rt: 70 }, 'movie'), ['imdb', 'metacritic', 'rt'])
-  // Pinocchio: the RT the guard drops is not named.
-  assert.deepEqual(unifiedRatingSources({ ...base, imdb: 7.6, metacritic: 79, rt: 27 }, 'movie'), ['imdb', 'metacritic'])
-  // One audience source, in the rule's order.
-  assert.deepEqual(unifiedRatingSources({ ...base, imdb: 7, community: 9, tmdb: 8 }, 'movie'), ['imdb'])
-  assert.deepEqual(unifiedRatingSources({ ...base, community: 9, tmdb: 8 }, 'movie'), ['mediaServer'])
-  assert.deepEqual(unifiedRatingSources({ ...base, tmdb: 8 }, 'movie'), ['tmdb'])
+  const library = [
+    ...ALIGNED.map((r, i) => ({ ...r, tmdb: 4 + i })),
+    row('lynch', { imdb: 7.6, metacritic: 53, rt: 70 }),
+    // Pinocchio: the RT the guard drops is not named.
+    row('pinocchio', { imdb: 7.6, metacritic: 79, rt: 27 }),
+    row('both-audiences', { imdb: 7, community: 9, tmdb: 8 }),
+    row('community-only', { community: 9, tmdb: 8 }),
+    row('tmdb-only', { tmdb: 8 }),
+    row('nothing', {}),
+  ]
+  const movies = computeUnifiedRatings(library, 'movie')
+  assert.deepEqual(movies.get('lynch')?.sources, ['imdb', 'metacritic', 'rt'])
+  assert.deepEqual(movies.get('pinocchio')?.sources, ['imdb', 'metacritic'])
+  assert.deepEqual(movies.get('both-audiences')?.sources, ['imdb'])
+  assert.deepEqual(movies.get('community-only')?.sources, ['mediaServer'])
+  assert.deepEqual(movies.get('tmdb-only')?.sources, ['tmdb'])
+  assert.deepEqual(movies.get('nothing'), { rating: null, sources: [] })
   // Series never name critics.
-  assert.deepEqual(unifiedRatingSources({ ...base, imdb: 8, metacritic: 70, rt: 90 }, 'series'), ['imdb'])
-  assert.deepEqual(unifiedRatingSources(base, 'movie'), [])
+  assert.deepEqual(computeUnifiedRatings(library, 'series').get('lynch')?.sources, ['imdb'])
+})
+
+test('a source with nothing to map against is not named, and gives no rating', () => {
+  // TMDb alone in a library where no title has both TMDb and IMDb.
+  const ratings = computeUnifiedRatings([row('t', { tmdb: 7 }), row('u', { tmdb: 8 })], 'movie')
+  assert.deepEqual(ratings.get('t'), { rating: null, sources: [] })
+})
+
+test('the stored pair reads back, and not computed falls back to the media server', () => {
+  // NUMERIC arrives from pg as text.
+  assert.deepEqual(storedQualityRating('7.12', ['imdb', 'metacritic', 'rt'], '9.30'), {
+    rating: 7.12,
+    sources: ['imdb', 'metacritic', 'rt'],
+  })
+  // NULL sources = not computed yet: the media server's rating, named.
+  assert.deepEqual(storedQualityRating(null, null, '7.6'), { rating: 7.6, sources: ['mediaServer'] })
+  assert.deepEqual(storedQualityRating(null, null, null), { rating: null, sources: [] })
+  // Computed, and nothing rates it: no rating, and never the fallback.
+  assert.deepEqual(storedQualityRating(null, [], '7.6'), { rating: null, sources: [] })
+  // A name this build does not know is dropped rather than shown raw.
+  assert.deepEqual(storedQualityRating(8, ['imdb', 'letterboxd'], null), { rating: 8, sources: ['imdb'] })
+  assert.equal(scoringRating('7.12', ['imdb'], '9.3'), 7.12)
+  assert.equal(scoringRating(null, null, 6.4), 6.4)
+})
+
+test('the shares are whole percentages of the decided weights', () => {
+  assert.deepEqual(unifiedRatingShares(), { audience: 60, critics: 40 })
 })

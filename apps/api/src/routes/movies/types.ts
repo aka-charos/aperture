@@ -80,8 +80,14 @@ export interface MovieDetailRow extends MovieRow {
    * core ratings/unifiedRating.ts; null when no source rates the title.
    */
   quality_rating?: number | null
-  /** What quality_rating is made of, in the order the rule reads them. */
-  quality_rating_sources?: UnifiedRatingSource[]
+  /**
+   * What quality_rating is made of, in the order the rule reads them. As
+   * selected from the row this is the stored text[] (null = not computed); as
+   * sent, the decided list from lib/qualityRating.ts.
+   */
+  quality_rating_sources?: UnifiedRatingSource[] | string[] | null
+  /** Whole percentages of the audience / critics blend, decided by core. */
+  quality_rating_shares?: { audience: number; critics: number }
   languages: string[] | null
   production_countries: string[] | null
   // MDBList enrichment

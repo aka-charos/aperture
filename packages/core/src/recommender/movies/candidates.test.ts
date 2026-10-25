@@ -11,6 +11,8 @@ function candidate(id: string, similarity: number): Candidate {
     year: 2020,
     genres: [],
     communityRating: null,
+    qualityRating: null,
+    qualityRatingSources: null,
     voteCount: null,
     similarity,
     normalizedSimilarity: 0,

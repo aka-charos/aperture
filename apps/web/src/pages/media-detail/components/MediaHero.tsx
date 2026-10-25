@@ -413,24 +413,40 @@ export function MediaHero({
   const headlineAudience = headline?.audience
     ? t(`mediaDetail.hero.rating.source.${headline.audience}`)
     : ''
-  const headlineLabel = !headline
-    ? ''
-    : headline.basis === 'combined' && headline.audience
-      ? t('mediaDetail.hero.rating.label.combined', {
-          audience: t(`mediaDetail.hero.rating.label.${headline.audience}`),
-        })
-      : headline.basis === 'critics' || !headline.audience
+  // A number whose sources this build cannot name ('unknown') gets no label
+  // and a plain explanation, never a guess.
+  const headlineLabel =
+    !headline || headline.basis === 'unknown'
+      ? ''
+      : headline.basis === 'critics'
         ? t('mediaDetail.hero.rating.label.critics')
-        : t(`mediaDetail.hero.rating.label.${headline.audience}`)
+        : headline.basis === 'combined' && headline.audience
+          ? t('mediaDetail.hero.rating.label.combined', {
+              audience: t(`mediaDetail.hero.rating.label.${headline.audience}`),
+            })
+          : headline.audience
+            ? t(`mediaDetail.hero.rating.label.${headline.audience}`)
+            : ''
+  // The blend shares come from the server (decided by core), never from this
+  // bundle; an older API that sends none gets the sentence without them.
   const headlineExplain = !headline
     ? ''
     : headline.basis === 'combined'
-      ? t('mediaDetail.hero.rating.explain.combined', { audience: headlineAudience, critics: headlineCritics })
+      ? headline.shares
+        ? t('mediaDetail.hero.rating.explain.combined', {
+            audience: headlineAudience,
+            critics: headlineCritics,
+            audienceShare: headline.shares.audience,
+            criticsShare: headline.shares.critics,
+          })
+        : t('mediaDetail.hero.rating.explain.combinedNoShares', { audience: headlineAudience, critics: headlineCritics })
       : headline.basis === 'critics'
         ? t('mediaDetail.hero.rating.explain.critics', { critics: headlineCritics })
-        : isSeries(media)
-          ? t('mediaDetail.hero.rating.explain.audienceSeries', { audience: headlineAudience })
-          : t('mediaDetail.hero.rating.explain.audience', { audience: headlineAudience })
+        : headline.basis === 'unknown'
+          ? t('mediaDetail.hero.rating.explain.unknown')
+          : isSeries(media)
+            ? t('mediaDetail.hero.rating.explain.audienceSeries', { audience: headlineAudience })
+            : t('mediaDetail.hero.rating.explain.audience', { audience: headlineAudience })
   const showRatingLine =
     headline != null ||
     hasCriticRatings(media) ||
@@ -1069,6 +1085,7 @@ export function MediaHero({
                 <Tooltip title={headlineExplain}>
                   <Box
                     tabIndex={0}
+                    role="group"
                     aria-label={`${headline.value.toFixed(1)} ${t('mediaDetail.hero.outOfTen')}. ${headlineExplain}`}
                     sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 0.5, cursor: 'help' }}
                   >
@@ -1079,13 +1096,15 @@ export function MediaHero({
                     <Typography variant="body2" color="text.secondary">
                       {t('mediaDetail.hero.outOfTen')}
                     </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ borderBottom: 1, borderColor: 'divider', borderBottomStyle: 'dotted' }}
-                    >
-                      {headlineLabel}
-                    </Typography>
+                    {headlineLabel && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ borderBottom: 1, borderColor: 'divider', borderBottomStyle: 'dotted' }}
+                      >
+                        {headlineLabel}
+                      </Typography>
+                    )}
                   </Box>
                 </Tooltip>
               )}

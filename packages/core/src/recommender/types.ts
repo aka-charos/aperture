@@ -27,6 +27,13 @@ export interface Candidate {
   genres: string[]
   communityRating: number | null
   /**
+   * The stored unified rating and what it is made of (movies.quality_rating,
+   * quality_rating_sources, migration 0213); read through scoringRating, which
+   * falls back to communityRating while sources is null (not computed yet).
+   */
+  qualityRating: number | null
+  qualityRatingSources: string[] | null
+  /**
    * Votes behind communityRating. Read ONLY by the acclaimed-slot gate
    * (shared/acclaimedSlots.ts) -- never by scoring, where it would promote
    * obscure poorly-rated titles.

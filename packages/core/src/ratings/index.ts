@@ -30,13 +30,20 @@ export {
   UNIFIED_RATING_WEIGHTS,
   computeUnifiedRatings,
   scoringRating,
+  storedQualityRating,
   trustedRtScore,
-  unifiedRatingSources,
+  unifiedRatingShares,
+  type UnifiedRating,
   type UnifiedRatingInput,
   type UnifiedRatingSource,
   type UnifiedRatingMediaType,
 } from './unifiedRating.js'
-export { QUALITY_RATINGS_TTL_MS, getQualityRatings } from './qualityRatings.js'
+export {
+  ensureQualityRatings,
+  refreshQualityRatings,
+  refreshQualityRatingsSafely,
+  type QualityRatingRefresh,
+} from './qualityRatings.js'
 export {
   refreshRatings,
   type RatingsRefreshOptions,

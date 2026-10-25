@@ -8,7 +8,7 @@ import { getStudioLogos, resolveLocalizedSynopsis, type StudioLogo } from '@aper
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { titleInScope } from '../../../lib/viewerScope.js'
-import { qualityRatingFor } from '../../../lib/qualityRating.js'
+import { qualityRatingFields } from '../../../lib/qualityRating.js'
 import { getMovieSchema } from '../schemas.js'
 import type { MovieDetailRow } from '../types.js'
 
@@ -35,7 +35,8 @@ export function registerDetailHandler(fastify: FastifyInstance) {
                 imdb_id, tmdb_id, keywords, collection_id, collection_name,
                 rt_critic_score, rt_audience_score, rt_consensus, metacritic_score, awards_summary,
                 languages, production_countries, plot_full, letterboxd_score, mdblist_score, streaming_providers,
-                tmdb_rating, tmdb_vote_count, imdb_rating, imdb_vote_count
+                tmdb_rating, tmdb_vote_count, imdb_rating, imdb_vote_count,
+                quality_rating::float8 AS quality_rating, quality_rating_sources
          FROM movies WHERE id = $1`,
         [id]
       )
@@ -51,7 +52,7 @@ export function registerDetailHandler(fastify: FastifyInstance) {
       // Logos for the studios the info card lists, looked up alongside. Never
       // an error: a failed lookup costs the logos, not the page.
       const studioNames = (movie.studios ?? []).map((st) => (typeof st === 'string' ? st : st.name))
-      const [localized_synopsis, studio_logos, quality] = await Promise.all([
+      const [localized_synopsis, studio_logos] = await Promise.all([
         resolveLocalizedSynopsis('movie', id, request.query.lang, request.user!.id),
         getStudioLogos(studioNames, 'studio').then(
           (logos) => Object.fromEntries(logos) as Record<string, StudioLogo>,
@@ -60,11 +61,11 @@ export function registerDetailHandler(fastify: FastifyInstance) {
             return {} as Record<string, StudioLogo>
           }
         ),
-        // The unified rating recommendations score on, for the headline.
-        qualityRatingFor('movie', id, movie),
       ])
 
-      return reply.send({ ...movie, localized_synopsis, studio_logos, ...quality })
+      // The unified rating recommendations score on, for the headline: the
+      // pair stored on the row, read the way the scorer reads it (F-167).
+      return reply.send({ ...movie, localized_synopsis, studio_logos, ...qualityRatingFields(movie) })
     }
   )
 }

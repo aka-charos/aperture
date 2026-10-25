@@ -47,7 +47,8 @@
  *    IMDb 7.5, which is exactly the disagreement a critic share exists to
  *    carry. A guard there would remove the feature from the titles it is for.
  *
- * Pure: no database. The loader is qualityRatings.ts; pinned by
+ * Pure: no database. qualityRatings.ts computes and stores it on each title;
+ * storedQualityRating reads it back. Pinned by
  * unifiedRating.test.ts.
  */
 
@@ -172,52 +173,38 @@ export function rankMapper(pairs: RankPair[]): (value: number | null) => number 
 
 export type UnifiedRatingSource = 'imdb' | 'mediaServer' | 'tmdb' | 'metacritic' | 'rt'
 
-/**
- * Which sources a title's unified rating is made of, in the order the rule
- * reads them: the one audience source it used, then the critic scores it kept.
- * Shipped beside the number so a page can say what the number is, decided
- * here so it cannot disagree with computeUnifiedRatings (the RT guard drops a
- * score the raw columns still show). Assumes the title is in a library large
- * enough for every source to have paired titles, which any real one is.
- */
-export function unifiedRatingSources(
-  row: Omit<UnifiedRatingInput, 'id'>,
-  mediaType: UnifiedRatingMediaType
-): UnifiedRatingSource[] {
-  const sources: UnifiedRatingSource[] = []
-  if (finite(row.imdb) != null) sources.push('imdb')
-  else if (finite(row.community) != null) sources.push('mediaServer')
-  else if (finite(row.tmdb) != null) sources.push('tmdb')
-  if (mediaType === 'movie') {
-    const metacritic = finite(row.metacritic)
-    if (metacritic != null) sources.push('metacritic')
-    if (trustedRtScore(finite(row.rt), metacritic) != null) sources.push('rt')
-  }
-  return sources
+export interface UnifiedRating {
+  /** 0-10, or null when no source rates the title. */
+  rating: number | null
+  /**
+   * What `rating` is made of, in the order the rule reads them: the audience
+   * source it used, then the critic scores it kept. Empty when `rating` is
+   * null. Decided by the same computation as the number, so a label built from
+   * it can never name a score the number does not contain (a guarded RT, or a
+   * TMDb with nothing to map against).
+   */
+  sources: UnifiedRatingSource[]
 }
 
 /**
- * The rating to score: the unified one, else the media server's own for a
- * title the map does not hold (added since it was read, or a failed read).
+ * The share of the blend each half carries, as whole percentages: what a page
+ * says the mix is. Shipped as a decided value, never written into the bundle,
+ * so a retune of UNIFIED_RATING_WEIGHTS reaches the explanation with it.
  */
-export function scoringRating(
-  qualityRatings: Map<string, number | null>,
-  id: string,
-  communityRating: number | null | undefined
-): number | null {
-  if (qualityRatings.has(id)) return qualityRatings.get(id) ?? null
-  return communityRating ?? null
+export function unifiedRatingShares(): { audience: number; critics: number } {
+  const total = UNIFIED_RATING_WEIGHTS.audience + UNIFIED_RATING_WEIGHTS.critics
+  const audience = Math.round((UNIFIED_RATING_WEIGHTS.audience / total) * 100)
+  return { audience, critics: 100 - audience }
 }
 
 /**
- * The unified rating (0-10) of every title in a library of one media type, or
- * null for a title with no rating from any source. Percentiles are taken over
- * the rows given, so pass the whole table, not a candidate pool.
+ * The unified rating of every title in a library of one media type. Percentiles
+ * are taken over the rows given, so pass the whole table, not a candidate pool.
  */
 export function computeUnifiedRatings(
   rows: UnifiedRatingInput[],
   mediaType: UnifiedRatingMediaType
-): Map<string, number | null> {
+): Map<string, UnifiedRating> {
   const clean = rows.map((row) => ({
     id: row.id,
     imdb: finite(row.imdb),
@@ -237,14 +224,74 @@ export function computeUnifiedRatings(
   const mapMetacritic = rankMapper(pairsOf((r) => r.metacritic))
   const mapRt = rankMapper(pairsOf((r) => r.rt))
 
-  const out = new Map<string, number | null>()
+  const out = new Map<string, UnifiedRating>()
   for (const row of clean) {
-    const audience = row.imdb ?? row.community ?? mapTmdb(row.tmdb)
-    const critics =
-      mediaType === 'movie'
-        ? presentMean(mapMetacritic(row.metacritic), UNIFIED_RATING_WEIGHTS.metacritic, mapRt(row.rt), UNIFIED_RATING_WEIGHTS.rt)
-        : null
-    out.set(row.id, presentMean(audience, UNIFIED_RATING_WEIGHTS.audience, critics, UNIFIED_RATING_WEIGHTS.critics))
+    const sources: UnifiedRatingSource[] = []
+    let audience: number | null = null
+    if (row.imdb != null) {
+      audience = row.imdb
+      sources.push('imdb')
+    } else if (row.community != null) {
+      audience = row.community
+      sources.push('mediaServer')
+    } else {
+      audience = mapTmdb(row.tmdb)
+      if (audience != null) sources.push('tmdb')
+    }
+
+    let critics: number | null = null
+    if (mediaType === 'movie') {
+      const metacritic = mapMetacritic(row.metacritic)
+      const rt = mapRt(row.rt)
+      if (metacritic != null) sources.push('metacritic')
+      if (rt != null) sources.push('rt')
+      critics = presentMean(metacritic, UNIFIED_RATING_WEIGHTS.metacritic, rt, UNIFIED_RATING_WEIGHTS.rt)
+    }
+
+    const rating = presentMean(audience, UNIFIED_RATING_WEIGHTS.audience, critics, UNIFIED_RATING_WEIGHTS.critics)
+    out.set(row.id, { rating, sources: rating == null ? [] : sources })
   }
   return out
+}
+
+const KNOWN_SOURCES = new Set<string>(['imdb', 'mediaServer', 'tmdb', 'metacritic', 'rt'])
+
+/**
+ * A title's unified rating as stored on its row (`quality_rating`,
+ * `quality_rating_sources`, migration 0213). NULL sources means not computed
+ * yet -- a title synced since the last refresh -- and answers the media
+ * server's own rating, which is what every reader used before the unified one,
+ * named as such. NUMERIC arrives from pg as text, so both numbers are read
+ * through Number(). The one reader of those columns, for the scorers and the
+ * title page alike, so the two can never disagree about a title.
+ */
+export function storedQualityRating(
+  rating: number | string | null | undefined,
+  sources: readonly string[] | null | undefined,
+  communityRating: number | string | null | undefined
+): UnifiedRating {
+  if (sources == null) {
+    const community = toNumber(communityRating)
+    return { rating: community, sources: community == null ? [] : ['mediaServer'] }
+  }
+  const value = toNumber(rating)
+  return {
+    rating: value,
+    sources: value == null ? [] : sources.filter((s): s is UnifiedRatingSource => KNOWN_SOURCES.has(s)),
+  }
+}
+
+/** The rating to score, from the stored columns (storedQualityRating). */
+export function scoringRating(
+  rating: number | string | null | undefined,
+  sources: readonly string[] | null | undefined,
+  communityRating: number | string | null | undefined
+): number | null {
+  return storedQualityRating(rating, sources, communityRating).rating
+}
+
+function toNumber(value: number | string | null | undefined): number | null {
+  if (value == null) return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
 }

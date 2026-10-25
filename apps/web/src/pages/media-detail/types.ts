@@ -69,6 +69,8 @@ export interface BaseMedia {
   quality_rating?: number | null
   /** What quality_rating is made of, decided by the server. Mirrors core's UnifiedRatingSource. */
   quality_rating_sources?: QualityRatingSource[]
+  /** Whole percentages of the audience / critics blend, decided by the server (never the bundle's own copy). */
+  quality_rating_shares?: { audience: number; critics: number }
   languages?: string[] | null
   production_countries?: string[] | null
   // MDBList enrichment

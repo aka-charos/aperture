@@ -8,7 +8,7 @@ import { getStudioLogos, resolveLocalizedSynopsis, type StudioLogo } from '@aper
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { titleInScope } from '../../../lib/viewerScope.js'
-import { qualityRatingFor } from '../../../lib/qualityRating.js'
+import { qualityRatingFields } from '../../../lib/qualityRating.js'
 import { refreshStaleTmdbTotals } from '@aperture/core/watching'
 import { getSeriesSchema } from '../schemas.js'
 import type { SeriesDetailRow } from '../types.js'
@@ -47,6 +47,7 @@ export function registerDetailHandler(fastify: FastifyInstance) {
                 s.keywords, s.rt_critic_score, s.rt_audience_score, s.rt_consensus, s.metacritic_score, s.awards_summary,
                 s.languages, s.plot_full, s.letterboxd_score, s.mdblist_score, s.streaming_providers,
                 s.tmdb_rating, s.tmdb_vote_count, s.imdb_rating, s.imdb_vote_count,
+                s.quality_rating::float8 AS quality_rating, s.quality_rating_sources,
                 s.tmdb_total_episodes, s.tmdb_total_seasons, s.tmdb_seasons, s.tmdb_status,
                 (SELECT ROUND(AVG(e.runtime_minutes))::int
                  FROM episodes e
@@ -70,7 +71,7 @@ export function registerDetailHandler(fastify: FastifyInstance) {
       const studioNames = ((series.studios ?? []) as Array<string | { name: string }>).map((st) =>
         typeof st === 'string' ? st : st.name
       )
-      const [localized_synopsis, logos, quality] = await Promise.all([
+      const [localized_synopsis, logos] = await Promise.all([
         resolveLocalizedSynopsis('series', id, request.query.lang, request.user!.id),
         getStudioLogos(
           series.network ? [series.network, ...studioNames] : studioNames,
@@ -79,8 +80,6 @@ export function registerDetailHandler(fastify: FastifyInstance) {
           request.log.warn({ err, seriesId: id }, 'Studio logo lookup failed')
           return new Map<string, StudioLogo>()
         }),
-        // The unified rating recommendations score on, for the headline.
-        qualityRatingFor('series', id, series),
       ])
       const network_logo = series.network ? (logos.get(series.network) ?? null) : null
       const studio_logos = Object.fromEntries(
@@ -90,7 +89,9 @@ export function registerDetailHandler(fastify: FastifyInstance) {
         })
       )
 
-      return reply.send({ ...series, localized_synopsis, studio_logos, network_logo, ...quality })
+      // The unified rating recommendations score on, for the headline: the
+      // pair stored on the row, read the way the scorer reads it (F-167).
+      return reply.send({ ...series, localized_synopsis, studio_logos, network_logo, ...qualityRatingFields(series) })
     }
   )
 }

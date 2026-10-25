@@ -5,7 +5,12 @@ import { FALLBACK_CONFIG, type Candidate } from '../types.js'
 import { calculateRatingScore } from '../shared/index.js'
 import { scoreCandidates } from './scoring.js'
 
-function candidate(id: string, communityRating: number | null): Candidate {
+function candidate(
+  id: string,
+  communityRating: number | null,
+  qualityRating: number | null,
+  qualityRatingSources: string[] | null
+): Candidate {
   return {
     movieId: id,
     id,
@@ -13,6 +18,8 @@ function candidate(id: string, communityRating: number | null): Candidate {
     year: 2020,
     genres: [],
     communityRating,
+    qualityRating,
+    qualityRatingSources,
     voteCount: null,
     similarity: 0.5,
     normalizedSimilarity: 0,
@@ -24,20 +31,20 @@ function candidate(id: string, communityRating: number | null): Candidate {
   }
 }
 
-test('the rating scored is the unified one, not the media server copy', () => {
+test('the rating scored is the stored unified one, not the media server copy', () => {
   // Media server says 9.3 (stale), the unified rating says 7.5 (F-167).
-  const { candidates } = scoreCandidates([candidate('a', 9.3)], new Map(), FALLBACK_CONFIG, new Map([['a', 7.5]]))
+  const { candidates } = scoreCandidates([candidate('a', 9.3, 7.5, ['imdb'])], new Map(), FALLBACK_CONFIG)
   assert.equal(candidates[0].ratingScore, calculateRatingScore(7.5))
   // The media server's number stays on the candidate for the acclaimed gate.
   assert.equal(candidates[0].communityRating, 9.3)
 })
 
-test('a film the map lacks scores on the media server rating', () => {
-  const { candidates } = scoreCandidates([candidate('new', 6.4)], new Map(), FALLBACK_CONFIG, new Map())
+test('a film not computed yet scores on the media server rating', () => {
+  const { candidates } = scoreCandidates([candidate('new', 6.4, null, null)], new Map(), FALLBACK_CONFIG)
   assert.equal(candidates[0].ratingScore, calculateRatingScore(6.4))
 })
 
-test('a film no source rates gets the neutral score, not a zero', () => {
-  const { candidates } = scoreCandidates([candidate('none', 8)], new Map(), FALLBACK_CONFIG, new Map([['none', null]]))
+test('a film no source rates gets the neutral score, not the fallback', () => {
+  const { candidates } = scoreCandidates([candidate('none', 8, null, [])], new Map(), FALLBACK_CONFIG)
   assert.equal(candidates[0].ratingScore, calculateRatingScore(null))
 })
