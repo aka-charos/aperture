@@ -958,15 +958,66 @@ test('version 18 names the makers and stops naming the critics', () => {
     assert.ok(text.includes('find the sentence in which they are the one speaking'))
   }
 
-  // NOT CHANGED: the rule count, and the work question. The causal phrasing ban
-  // ("so that", "which gives", "lets it", "the result is") that would have
-  // caught one of the first bench's sentences belongs to version 15 and version
-  // 16 REPEALED it deliberately, replacing it with a licence to draw an
-  // on-screen effect out - so re-adding it here would revert a considered
-  // decision rather than fix a slip.
+  // THE QUESTIONS WERE ASKING FOR WHAT ATTRIBUTION_RULE FORBIDS, and the
+  // library said so at a scale no bench could. Measured over 310 stored v18
+  // rows: 240 of them (77.4%) name a critic OUTSIDE the reception answer,
+  // against a rule opening "The first answers speak in your own voice... with
+  // nobody attached". Work carried 291 of those hits across 171 articles,
+  // tradition 279 across 213.
+  //
+  // It was not disobedience. The tradition question said the tradition is one
+  // "a document places it in", so 213 answers wrote "critics have placed it
+  // beside" - version 17's own lesson, that a question which hands over its
+  // wording gets that wording back, still running one clause below where 17
+  // fixed it. And the work question named "how it was received" as a world
+  // effect it may carry, which is the door critics walked through into the
+  // work paragraph while DOCUMENTS_RULE forbade the only other phrasing.
+  //
+  // So the fix is a DELETION in each question rather than a fourth rule
+  // against a class the prompt itself was generating.
   assert.equal(draft.rules.length, current.rules.length)
-  assert.equal(question('work'), current.movieQuestions.find((q) => q.id === 'work')!.text)
-  assert.ok(question('work').includes('may be your own reading of what a document describes'))
+  for (const media of ['movieQuestions', 'seriesQuestions'] as const) {
+    const tradition = draft[media].find((q) => q.id === 'tradition')!.text
+    const work = draft[media].find((q) => q.id === 'work')!.text
+    assert.ok(!tradition.includes('a document places it in'), media + ' stops lending its words')
+    assert.ok(tradition.includes('the tradition it belongs to'))
+    assert.ok(!work.includes('how it was received -'), media + ' closes the reception door')
+    assert.ok(work.includes("THE RECEPTION ANSWER'S AND NEVER THIS ONE'S"))
+    // The licence version 16 deliberately repealed version 15's causal ban for
+    // stays exactly as it was: this change narrows WHERE a choice may be
+    // placed, never what may be drawn out of one.
+    assert.ok(work.includes('may be your own reading of what a document describes'))
+  }
+
+  // AN ANTECEDENT IS NAMED FOR A METHOD, NEVER FOR A LATE SCENE. The ending
+  // probe found ~18 of 310 v18 rows disclosing one, and the tradition door was
+  // the largest: a hall-of-mirrors climax traced to The Lady From Shanghai, a
+  // climactic family gathering to Secrets & Lies, a climactic battle to Seven
+  // Samurai. Version 16's test asks whether the antecedent's ENDING gives this
+  // one away and answers no, correctly - the disclosure is scene-level, so the
+  // test was scoped one size too large.
+  //
+  // The work question had no guard at all, which is where "a water-logged
+  // coastal finale" and "the final images return to exactly those frames" came
+  // from.
+  for (const media of ['movieQuestions', 'seriesQuestions'] as const) {
+    const tradition = draft[media].find((q) => q.id === 'tradition')!.text
+    const work = draft[media].find((q) => q.id === 'work')!.text
+    assert.ok(tradition.includes('ONLY FOR WHAT THIS ONE TAKES IN ITS OPENING OR ITS METHOD'))
+    assert.ok(tradition.includes('never as the model for a scene in its last act'))
+    assert.ok(work.includes('never for where in the film it sits'))
+  }
+
+  // AND THE TEST IS RUN SILENTLY. Ten of the 310 rows announce its result -
+  // "knowing how that film ends would teach nothing about this one" - which
+  // DOCUMENTS_RULE forbids in as many words ("Never mention these instructions
+  // either"). Two sound rules that had never been read against each other, so
+  // the model broke one to demonstrate the other.
+  for (const media of ['movieQuestions', 'seriesQuestions'] as const) {
+    const tradition = draft[media].find((q) => q.id === 'tradition')!.text
+    assert.ok(tradition.includes('Run that test silently'))
+  }
+  assert.ok(rulesText.includes('Never mention these instructions either'))
   assert.ok(rulesText.includes('THESE NEVER EARN IT, in any answer'))
 
   // A RELAXATION AIMED AT ONE NUMBER TRAVELS TO EVERY NUMBER PHRASED LIKE IT -
