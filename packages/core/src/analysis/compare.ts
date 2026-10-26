@@ -657,6 +657,23 @@ async function finishRun(runId: string, status: string, error: string | null): P
   )
 }
 
+/**
+ * Move a run to a status it has not finished in, leaving `finished_at` alone.
+ *
+ * `awaiting` is the one non-terminal status a run can rest at: the prompts are
+ * built and nothing else happens until somebody pastes an answer. Writing
+ * `finished_at` there would say a run with no answers had finished, and every
+ * partial import would push that timestamp later, so the run list would show a
+ * completion time that tracked the last paste. The column stays NULL until the
+ * run genuinely ends, which is what `listComparisonRuns` renders.
+ */
+async function parkRun(runId: string, status: string): Promise<void> {
+  await query(
+    `UPDATE analysis_comparison_runs SET status = $2, error = NULL WHERE id = $1`,
+    [runId, status]
+  )
+}
+
 interface RunRow {
   id: string
   media_type: 'movie' | 'series'
@@ -1056,13 +1073,24 @@ export async function startManualComparison(
   void (async () => {
     try {
       await prepareComparison(run.id, options.mediaType, options.mediaId, choices, null)
-      await finishRun(run.id, MANUAL_AWAITING, null)
+      // COOPERATIVE, exactly as the model lane's cancel is: retrieval is one
+      // search plus its page fetches and is not interruptible, so Stop cannot
+      // cut it short - but it must still decide the outcome, or the button
+      // reports success and the run goes on to collect answers anyway.
+      if (cancelled.has(run.id)) {
+        await finishRun(run.id, 'cancelled', null)
+      } else {
+        await parkRun(run.id, MANUAL_AWAITING)
+      }
     } catch (err) {
       const described = describeAiError(err)
       logger.error({ runId: run.id, ...described }, 'Manual comparison could not build its prompts')
       await finishRun(run.id, 'failed', err instanceof Error ? err.message : String(err))
     } finally {
       running.delete(run.id)
+      // Both sets, as driveComparison's finally does. Leaving the id behind
+      // keeps it in a module-level Set for the life of the process.
+      cancelled.delete(run.id)
     }
   })()
 
@@ -1110,6 +1138,34 @@ export interface ManualExportLine {
 }
 
 /**
+ * Refuse a run that is not this lane's.
+ *
+ * WITHOUT THIS, `MANUAL_PROVIDER` IS WRITTEN AND NEVER READ, and both ends are
+ * open: the download emits lines for any pending row of any run, so a model
+ * bench cancelled part way hands out ids, and importing answers for them
+ * overwrites its rows and relabels a `cancelled` run `completed` - the record
+ * that it was stopped is gone. The provider column already says which lane a
+ * run belongs to; this is the read that makes it mean something.
+ *
+ * A by-hand run that was cancelled CAN still be imported into, deliberately:
+ * pasting an answer into one is the operator resuming it, and the status
+ * follows what is outstanding.
+ */
+async function assertManualRun(runId: string): Promise<void> {
+  const rows = await query<{ provider: string }>(
+    `SELECT DISTINCT provider FROM analysis_comparison_results WHERE run_id = $1`,
+    [runId]
+  )
+  if (rows.rows.length === 0) throw new Error('That comparison has no answers to fill in.')
+  const other = rows.rows.find((row) => row.provider !== MANUAL_PROVIDER)
+  if (other) {
+    throw new Error(
+      `That comparison ran its models through ${other.provider}, so its answers are not entered by hand.`
+    )
+  }
+}
+
+/**
  * Export the prompts of a manual run, one JSONL line per answer still wanted.
  *
  * Each line carries the WHOLE prompt as `prompt`, which is the field to paste
@@ -1132,6 +1188,7 @@ export async function exportManualComparison(
     [runId]
   )
   if (!run) throw new Error('That comparison run does not exist.')
+  await assertManualRun(runId)
   if (!run.prompts && !run.prompt) {
     throw new Error('That run has not built its prompts yet.')
   }
@@ -1218,6 +1275,7 @@ export async function importManualComparison(
     [runId]
   )
   if (!run) throw new Error('That comparison run does not exist.')
+  await assertManualRun(runId)
 
   const rows = await query<{ position: number; prompt_version: number; status: string }>(
     `SELECT position, prompt_version, status
@@ -1277,9 +1335,11 @@ export async function importManualComparison(
 
   summary.remaining = [...byPosition.values()].filter((row) => row.status === 'pending').length
 
-  // A run is only finished once nothing is outstanding. Until then it stays at
-  // `awaiting` so the page keeps offering the download and the paste box.
-  await finishRun(runId, summary.remaining === 0 ? 'completed' : MANUAL_AWAITING, null)
+  // A run is only finished once nothing is outstanding. Until then it is
+  // PARKED rather than finished, so the page keeps offering the download and
+  // the paste box and `finished_at` stays NULL.
+  if (summary.remaining === 0) await finishRun(runId, 'completed', null)
+  else await parkRun(runId, MANUAL_AWAITING)
 
   logger.info({ runId, ...summary, unmatched: summary.unmatched.length }, 'Manual answers imported')
   return summary
