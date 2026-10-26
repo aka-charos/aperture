@@ -161,6 +161,14 @@ export default function AnalysisBenchRoute() {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
+  // The by-hand lane: names the operator types for models this instance
+  // cannot call, then the answers pasted back. See startManualComparison.
+  const [manualLabels, setManualLabels] = useState<string[]>([])
+  const [manualDraft, setManualDraft] = useState('')
+  const [pasted, setPasted] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importNote, setImportNote] = useState<string | null>(null)
+
   const loadRuns = useCallback(async () => {
     const res = await fetch('/api/analysis-compare/runs', { credentials: 'include' })
     if (res.ok) setRuns(((await res.json()) as { runs: RunSummary[] }).runs)
@@ -292,6 +300,114 @@ export default function AnalysisBenchRoute() {
   const openRun = async (id: string) => {
     const res = await fetch(`/api/analysis-compare/${id}`, { credentials: 'include' })
     if (res.ok) setRun((await res.json()) as RunView)
+  }
+
+  /**
+   * A bench for models this instance cannot call - one behind a web interface
+   * with no API. It retrieves and builds the prompts exactly as a model run
+   * does, then waits: the prompts come out as a file and the answers go back
+   * in by paste, scored by the same reader.
+   */
+  const startManual = async () => {
+    if (!picked || manualLabels.length === 0) return
+    setStarting(true)
+    setError(null)
+    setImportNote(null)
+    try {
+      const res = await fetch('/api/analysis-compare/manual', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mediaType: picked.type,
+          mediaId: picked.id,
+          labels: manualLabels,
+          promptVersions: selectedVersions,
+          promptVariants: selectedVariants,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json?.error ?? t('adminAnalysisBench.startFailed'))
+        return
+      }
+      await openRun(json.runId as string)
+    } catch {
+      setError(t('adminAnalysisBench.startFailed'))
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  const addManualLabel = () => {
+    const label = manualDraft.trim()
+    if (!label) return
+    setManualLabels((prev) => (prev.includes(label) ? prev : [...prev, label].slice(0, maxModels)))
+    setManualDraft('')
+  }
+
+  /**
+   * Fetched rather than linked, so a refusal can be shown. A 409 means every
+   * answer is already in, which is a sentence worth reading and not a dead
+   * download.
+   */
+  const downloadPrompts = async () => {
+    if (!run) return
+    setImportNote(null)
+    const res = await fetch(`/api/analysis-compare/${run.id}/download`, { credentials: 'include' })
+    if (!res.ok) {
+      const json = await res.json().catch(() => null)
+      setError(json?.error ?? t('adminAnalysisBench.manualDownloadFailed'))
+      return
+    }
+    const blob = new Blob([await res.text()], { type: 'application/x-ndjson' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `bench-${run.id}.jsonl`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const importAnswers = async () => {
+    if (!run || !pasted.trim()) return
+    setImporting(true)
+    setError(null)
+    setImportNote(null)
+    try {
+      const res = await fetch(`/api/analysis-compare/${run.id}/import`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonl: pasted }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json?.error ?? t('adminAnalysisBench.manualImportFailed'))
+        return
+      }
+      setPasted('')
+      // Unusable answers are a finding, not an import failure: a model that
+      // cannot hold the output contract is usually what a bench discovers.
+      setImportNote(
+        t('adminAnalysisBench.manualImported', {
+          stored: json.stored as number,
+          unusable: json.unusable as number,
+          remaining: json.remaining as number,
+        }) +
+          ((json.unmatched as string[])?.length
+            ? ' ' +
+              t('adminAnalysisBench.manualUnmatched', {
+                count: (json.unmatched as string[]).length,
+              })
+            : '')
+      )
+      await openRun(run.id)
+    } catch {
+      setError(t('adminAnalysisBench.manualImportFailed'))
+    } finally {
+      setImporting(false)
+    }
   }
 
   // Same models, same documents, current prompt. Nothing is retrieved, which
@@ -578,6 +694,67 @@ export default function AnalysisBenchRoute() {
             </Button>
           )}
         </Stack>
+
+        {/* The by-hand lane, for a model this instance cannot call. */}
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="subtitle2" fontWeight={600}>
+          {t('adminAnalysisBench.manualTitle')}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+          {t('adminAnalysisBench.manualHelp')}
+        </Typography>
+        <Stack direction="row" spacing={1} alignItems="flex-start" flexWrap="wrap" useFlexGap>
+          <TextField
+            size="small"
+            value={manualDraft}
+            onChange={(e) => setManualDraft(e.target.value)}
+            onKeyDown={(e) => {
+              // The same cap the Add button carries, or Enter at the limit
+              // clears the box and silently drops what was typed.
+              if (e.key === 'Enter' && manualLabels.length < maxModels) {
+                e.preventDefault()
+                addManualLabel()
+              }
+            }}
+            placeholder={t('adminAnalysisBench.manualPlaceholder')}
+            sx={{ minWidth: 240 }}
+          />
+          <Button
+            variant="outlined"
+            onClick={addManualLabel}
+            disabled={!manualDraft.trim() || manualLabels.length >= maxModels}
+          >
+            {t('adminAnalysisBench.manualAdd')}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={starting ? <CircularProgress size={16} /> : <RunIcon />}
+            disabled={
+              !picked ||
+              manualLabels.length === 0 ||
+              selectedVersions.length === 0 ||
+              starting ||
+              live
+            }
+            onClick={startManual}
+          >
+            {t('adminAnalysisBench.manualStart', {
+              count: manualLabels.length * Math.max(promptCount, 1),
+            })}
+          </Button>
+        </Stack>
+        {manualLabels.length > 0 && (
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
+            {manualLabels.map((label) => (
+              <Chip
+                key={label}
+                label={label}
+                size="small"
+                onDelete={() => setManualLabels((prev) => prev.filter((l) => l !== label))}
+              />
+            ))}
+          </Stack>
+        )}
       </Paper>
 
       {/* 3 — the run */}
@@ -624,6 +801,57 @@ export default function AnalysisBenchRoute() {
             <Alert severity="error" sx={{ mb: 2 }}>
               {run.error}
             </Alert>
+          )}
+
+          {/* Outside the panel below, which unmounts the moment the last
+              answer lands and would take its own confirmation with it. */}
+          {importNote && (
+            <Alert severity="info" sx={{ mb: 2 }} onClose={() => setImportNote(null)}>
+              {importNote}
+            </Alert>
+          )}
+
+          {/* A run waiting on answers typed in by hand. The prompts are built
+              and stored; nothing else happens until they come back. */}
+          {run.status === 'awaiting' && (
+            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 0.5 }}>
+                {t('adminAnalysisBench.manualAwaitingTitle')}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                {t('adminAnalysisBench.manualAwaitingHelp')}
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={downloadPrompts}
+                sx={{ mb: 1.5 }}
+              >
+                {t('adminAnalysisBench.manualDownload')}
+              </Button>
+              <TextField
+                fullWidth
+                multiline
+                minRows={4}
+                size="small"
+                value={pasted}
+                onChange={(e) => setPasted(e.target.value)}
+                placeholder={t('adminAnalysisBench.manualPastePlaceholder')}
+                sx={{ mb: 1.5, '& textarea': { fontFamily: 'monospace', fontSize: 12 } }}
+              />
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={!pasted.trim() || importing}
+                  startIcon={importing ? <CircularProgress size={16} /> : undefined}
+                  onClick={importAnswers}
+                >
+                  {t('adminAnalysisBench.manualImport')}
+                </Button>
+              </Stack>
+            </Paper>
           )}
 
           {/* The control, said out loud: this is what makes the answers below

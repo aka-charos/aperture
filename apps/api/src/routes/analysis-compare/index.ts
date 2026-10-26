@@ -19,6 +19,9 @@ import { requireAdmin } from '../../plugins/auth.js'
 import {
   startComparison,
   replayComparison,
+  startManualComparison,
+  exportManualComparison,
+  importManualComparison,
   ANALYSIS_PROMPT_VERSION,
   BENCH_PROMPT_VARIANTS,
   BENCH_PROMPT_VERSIONS,
@@ -38,6 +41,14 @@ import {
 } from '@aperture/core'
 
 const logger = createChildLogger('analysis-compare-routes')
+
+/**
+ * A pasted results file is a handful of answers at 6-10k characters each, so
+ * this is far more headroom than a bench needs. It matches the offsite import's
+ * limit deliberately: the two take the same file format, and a limit that
+ * differed between them would refuse there what it accepted here.
+ */
+const IMPORT_BODY_LIMIT = 64 * 1024 * 1024
 
 interface StartBody {
   mediaType?: 'movie' | 'series'
@@ -234,6 +245,120 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
         return reply
           .status(400)
           .send({ error: err instanceof Error ? err.message : 'Could not start the comparison.' })
+      }
+    }
+  )
+
+  /**
+   * Start a bench whose answers will be entered by hand.
+   *
+   * For a model this instance cannot call - one behind a web interface with no
+   * API, or an account on somebody else's machine. The run builds its prompts
+   * from one retrieval and then waits at `awaiting`; `GET :runId/download`
+   * hands out the prompts and `POST :runId/import` takes the answers back.
+   *
+   * NOT the offsite-analysis endpoints, which look like they would do this and
+   * would do something else: those write `title_analysis`, so the first answer
+   * for a title becomes the stored article and no second model can answer it.
+   */
+  fastify.post<{
+    Body: {
+      mediaType?: 'movie' | 'series'
+      mediaId?: string
+      labels?: string[]
+      promptVersions?: number[]
+      promptVariants?: string[]
+    }
+  }>(
+    '/api/analysis-compare/manual',
+    { preHandler: requireAdmin, schema: { tags: ['analysis'] } },
+    async (request, reply) => {
+      const { mediaType, mediaId, labels, promptVersions, promptVariants } = request.body ?? {}
+
+      if (mediaType !== 'movie' && mediaType !== 'series') {
+        return reply.status(400).send({ error: 'mediaType must be "movie" or "series".' })
+      }
+      if (!mediaId) return reply.status(400).send({ error: 'Pick a title.' })
+      if (!Array.isArray(labels) || labels.length === 0) {
+        return reply.status(400).send({ error: 'Name at least one model you will run by hand.' })
+      }
+      if (labels.some((label) => typeof label !== 'string' || label.trim() === '')) {
+        return reply.status(400).send({ error: 'Every entry needs a name.' })
+      }
+      if (badVersions(promptVersions)) {
+        return reply.status(400).send({ error: 'promptVersions must be a list of version numbers.' })
+      }
+      if (badVersions(promptVariants)) {
+        return reply.status(400).send({ error: 'promptVariants must be a list of variant ids.' })
+      }
+
+      try {
+        const runId = await startManualComparison({
+          mediaType,
+          mediaId,
+          labels,
+          promptVersions,
+          promptVariants,
+        })
+        return reply.status(202).send({ runId })
+      } catch (err) {
+        logger.error({ err }, 'Could not start a manual comparison')
+        return reply
+          .status(400)
+          .send({ error: err instanceof Error ? err.message : 'Could not start the comparison.' })
+      }
+    }
+  )
+
+  /**
+   * The prompts of a manual run, as JSONL - one line per answer still wanted.
+   *
+   * Each line's `prompt` is the whole thing to paste into whatever is running
+   * the model. Downloading again after a partial import gives exactly what is
+   * still outstanding.
+   */
+  fastify.get<{ Params: { runId: string } }>(
+    '/api/analysis-compare/:runId/download',
+    { preHandler: requireAdmin, schema: { tags: ['analysis'] } },
+    async (request, reply) => {
+      try {
+        const { jsonl, lines } = await exportManualComparison(request.params.runId)
+        const outstanding = lines.filter((line) => !line.answered).length
+        if (outstanding === 0) {
+          return reply.status(409).send({ error: 'Every answer in that run is already in.' })
+        }
+        return reply
+          .header('Content-Type', 'application/x-ndjson; charset=utf-8')
+          .header(
+            'Content-Disposition',
+            `attachment; filename="bench-${request.params.runId}.jsonl"`
+          )
+          .send(jsonl)
+      } catch (err) {
+        return reply
+          .status(400)
+          .send({ error: err instanceof Error ? err.message : 'Could not build that file.' })
+      }
+    }
+  )
+
+  /** Take the answers back. Scored exactly as a provider's answer is scored. */
+  fastify.post<{ Params: { runId: string }; Body: { jsonl?: string } }>(
+    '/api/analysis-compare/:runId/import',
+    { preHandler: requireAdmin, bodyLimit: IMPORT_BODY_LIMIT, schema: { tags: ['analysis'] } },
+    async (request, reply) => {
+      const jsonl = request.body?.jsonl
+      if (typeof jsonl !== 'string' || jsonl.trim() === '') {
+        return reply.status(400).send({ error: 'Paste at least one answer.' })
+      }
+      try {
+        const summary = await importManualComparison(request.params.runId, jsonl)
+        return reply.send(summary)
+      } catch (err) {
+        logger.error({ err, runId: request.params.runId }, 'Could not import manual answers')
+        return reply
+          .status(400)
+          .send({ error: err instanceof Error ? err.message : 'Could not import those answers.' })
       }
     }
   )

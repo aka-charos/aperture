@@ -43,7 +43,8 @@ import {
 import { getCrwConfig } from '../lib/crw.js'
 import { getRetrievalMode } from './mode.js'
 import { loadAnalysisSubject } from './titles.js'
-import { retrieveSources, runWriteAttempt } from './generate.js'
+import { readAnalysis, retrieveSources, runWriteAttempt } from './generate.js'
+import { buildExportLine, parseOffsiteResults } from './offsiteFormat.js'
 import {
   buildAnalysisPrompt,
   extractPromptSources,
@@ -343,10 +344,55 @@ async function driveComparison(
   replaySources: AnalysisSource[] | null
 ): Promise<void> {
   try {
+    const crwConfig = await getCrwConfig()
+    const prompts = await prepareComparison(runId, mediaType, mediaId, choices, replaySources)
+
+    for (const entry of entries) {
+      if (cancelled.has(runId)) break
+      await runOneEntry(
+        runId,
+        entry.position,
+        entry,
+        prompts.get(promptChoiceKey(entry.choice))!,
+        crwConfig.analysisMaxOutputTokens,
+        mediaType,
+        entry.choice.version
+      )
+    }
+
+    await finishRun(runId, cancelled.has(runId) ? 'cancelled' : 'completed', null)
+  } catch (err) {
+    // Only a whole-run failure reaches here — retrieval refused, no sources, a
+    // title that vanished. A model's own failure was recorded against its row.
+    const described = describeAiError(err)
+    logger.error({ runId, ...described }, 'Comparison run failed')
+    await finishRun(runId, 'failed', err instanceof Error ? err.message : String(err))
+  } finally {
+    running.delete(runId)
+    cancelled.delete(runId)
+  }
+}
+
+/**
+ * Retrieve once, build every version's prompt from that one list, and store both.
+ *
+ * SHARED BY THE MODEL LANE AND THE MANUAL ONE, and that is the whole reason it
+ * is a function. A manual run is the same bench with the model call taken out,
+ * so if it retrieved or built its prompts through a second copy of this, the
+ * two lanes would drift and a hand-entered answer would stop being comparable
+ * with a run of the same title through a provider - which is the one property
+ * the bench exists to have.
+ */
+async function prepareComparison(
+  runId: string,
+  mediaType: 'movie' | 'series',
+  mediaId: string,
+  choices: PromptChoice[],
+  replaySources: AnalysisSource[] | null
+): Promise<Map<string, string>> {
+  {
     const subject = await loadAnalysisSubject(mediaType, mediaId)
     if (!subject) throw new Error('That title is not in the library.')
-
-    const crwConfig = await getCrwConfig()
 
     // ONCE, whatever the number of versions. Every prompt below is built from
     // this one list, so two versions' prompts differ below the TASK line and
@@ -425,36 +471,13 @@ async function driveComparison(
       {
         runId,
         title: subject.title,
-        answers: entries.length,
         prompts: choices.map(promptChoiceLabel),
         promptChars: newest.length,
       },
-      'Comparison prompts built — running models'
+      'Comparison prompts built'
     )
 
-    for (const entry of entries) {
-      if (cancelled.has(runId)) break
-      await runOneEntry(
-        runId,
-        entry.position,
-        entry,
-        prompts.get(promptChoiceKey(entry.choice))!,
-        crwConfig.analysisMaxOutputTokens,
-        mediaType,
-        entry.choice.version
-      )
-    }
-
-    await finishRun(runId, cancelled.has(runId) ? 'cancelled' : 'completed', null)
-  } catch (err) {
-    // Only a whole-run failure reaches here — retrieval refused, no sources, a
-    // title that vanished. A model's own failure was recorded against its row.
-    const described = describeAiError(err)
-    logger.error({ runId, ...described }, 'Comparison run failed')
-    await finishRun(runId, 'failed', err instanceof Error ? err.message : String(err))
-  } finally {
-    running.delete(runId)
-    cancelled.delete(runId)
+    return prompts
   }
 }
 
@@ -487,72 +510,142 @@ async function runOneEntry(
     const durationMs = Date.now() - startedAt
 
     if (outcome.kind === 'cancelled') {
-      await query(
-        `UPDATE analysis_comparison_results
-            SET status = 'error', error = 'Cancelled', duration_ms = $3
-          WHERE run_id = $1 AND position = $2`,
-        [runId, position, durationMs]
-      )
+      await writeComparisonFailure(runId, position, 'Cancelled', durationMs)
       return
     }
 
     if (outcome.kind === 'error') {
       const described = describeAiError(outcome.error)
-      await query(
-        `UPDATE analysis_comparison_results
-            SET status = 'error', error = $3, duration_ms = $4
-          WHERE run_id = $1 AND position = $2`,
-        [runId, position, described.message ?? 'The provider call failed.', durationMs]
+      await writeComparisonFailure(
+        runId,
+        position,
+        described.message ?? 'The provider call failed.',
+        durationMs
       )
       return
     }
 
     const result = outcome.result
-    // Judged exactly as the generation path judges it, so a map that would be
-    // discarded there is discarded here — the bench must not flatter a model by
-    // being more forgiving than the job.
-    const map = result.text
-      ? parseParagraphMap(result.mapText, {
-          paragraphCount: splitAnalysisParagraphs(result.text).length,
-          mediaType,
-          // The vocabulary of the version it answered, or a version-8 answer's
-          // `intent` and `dispute` labels read as unrecognised and drop.
-          promptVersion,
-        })
-      : null
-
-    await query(
-      `UPDATE analysis_comparison_results
-          SET status = $3, analysis = $4, grade = $5, map_text = $6, paragraph_map = $7,
-              problem = $8, finish_reason = $9, input_tokens = $10, output_tokens = $11,
-              reasoning_tokens = $12, duration_ms = $13
-        WHERE run_id = $1 AND position = $2`,
-      [
-        runId,
-        position,
-        outcome.kind === 'ok' ? 'ok' : 'unusable',
-        result.text || null,
-        result.grade,
-        result.mapText,
-        map ? JSON.stringify(map) : null,
-        result.problem ? result.problem.kind : null,
-        result.finishReason ?? null,
-        result.usage?.inputTokens ?? null,
-        result.usage?.outputTokens ?? null,
-        result.usage?.reasoningTokens ?? null,
+    await writeComparisonAnswer(
+      runId,
+      position,
+      result,
+      { mediaType, promptVersion },
+      {
+        status: outcome.kind === 'ok' ? 'ok' : 'unusable',
+        finishReason: result.finishReason ?? null,
+        inputTokens: result.usage?.inputTokens ?? null,
+        outputTokens: result.usage?.outputTokens ?? null,
+        reasoningTokens: result.usage?.reasoningTokens ?? null,
         durationMs,
-      ]
+      }
     )
   } catch (err) {
     const described = describeAiError(err)
     logger.warn({ runId, ...entry, ...described }, 'A model failed its comparison entry')
-    await query(
-      `UPDATE analysis_comparison_results
-          SET status = 'error', error = $3, duration_ms = $4
-        WHERE run_id = $1 AND position = $2`,
-      [runId, position, err instanceof Error ? err.message : String(err), Date.now() - startedAt]
+    await writeComparisonFailure(
+      runId,
+      position,
+      err instanceof Error ? err.message : String(err),
+      Date.now() - startedAt
     )
   }
+}
+
+/**
+ * Record that an entry has no answer, and leave nothing of an earlier one.
+ *
+ * EVERY ANSWER FIELD IS CLEARED, which is not housekeeping. The report prints
+ * `entry.analysis?.trim() || failureLine(entry)`, so prose wins over a failure
+ * whenever both are present: a row answered once and then recorded as a
+ * failure would keep printing the old answer under a stat line that says it
+ * failed. `writeComparisonAnswer` clears `error` for the same reason in the
+ * other direction, and the pair of them is what keeps a row's status and its
+ * contents from ever disagreeing.
+ *
+ * Reachable in the model lane only in theory (its rows are pending until they
+ * are answered once) and in practice in the manual one, where an operator can
+ * paste an error line for a position they have already answered.
+ */
+async function writeComparisonFailure(
+  runId: string,
+  position: number,
+  error: string,
+  durationMs: number | null = null
+): Promise<void> {
+  await query(
+    `UPDATE analysis_comparison_results
+        SET status = 'error', error = $3, duration_ms = $4,
+            analysis = NULL, grade = NULL, map_text = NULL, paragraph_map = NULL,
+            problem = NULL, finish_reason = NULL,
+            input_tokens = NULL, output_tokens = NULL, reasoning_tokens = NULL
+      WHERE run_id = $1 AND position = $2`,
+    [runId, position, error, durationMs]
+  )
+}
+
+/**
+ * Store one answer against its pending row.
+ *
+ * SHARED BY THE MODEL LANE AND THE MANUAL ONE for the reason the comment below
+ * gives: an answer typed in by hand has to be held to the same contract as one
+ * a provider returned, or the bench would flatter whichever lane it judged
+ * loosely and the two could not be read beside each other.
+ */
+async function writeComparisonAnswer(
+  runId: string,
+  position: number,
+  reading: {
+    text: string | null
+    grade: string | null
+    mapText: string | null
+    problem: { kind: string } | null
+  },
+  context: { mediaType: 'movie' | 'series'; promptVersion: number },
+  meta: {
+    status: 'ok' | 'unusable'
+    finishReason?: string | null
+    inputTokens?: number | null
+    outputTokens?: number | null
+    reasoningTokens?: number | null
+    durationMs?: number | null
+  }
+): Promise<void> {
+  // Judged exactly as the generation path judges it, so a map that would be
+  // discarded there is discarded here — the bench must not flatter a model by
+  // being more forgiving than the job.
+  const map = reading.text
+    ? parseParagraphMap(reading.mapText, {
+        paragraphCount: splitAnalysisParagraphs(reading.text).length,
+        mediaType: context.mediaType,
+        // The vocabulary of the version it answered, or a version-8 answer's
+        // `intent` and `dispute` labels read as unrecognised and drop.
+        promptVersion: context.promptVersion,
+      })
+    : null
+
+  await query(
+    `UPDATE analysis_comparison_results
+        SET status = $3, analysis = $4, grade = $5, map_text = $6, paragraph_map = $7,
+            problem = $8, finish_reason = $9, input_tokens = $10, output_tokens = $11,
+            reasoning_tokens = $12, duration_ms = $13, error = NULL
+      WHERE run_id = $1 AND position = $2`,
+    [
+      runId,
+      position,
+      meta.status,
+      reading.text || null,
+      reading.grade,
+      reading.mapText,
+      map ? JSON.stringify(map) : null,
+      reading.problem ? reading.problem.kind : null,
+      meta.finishReason ?? null,
+      meta.inputTokens ?? null,
+      meta.outputTokens ?? null,
+      meta.reasoningTokens ?? null,
+      meta.durationMs ?? null,
+    ]
+  )
 }
 
 async function finishRun(runId: string, status: string, error: string | null): Promise<void> {
@@ -835,4 +928,359 @@ export async function listComparisonRuns(limit = 25): Promise<ComparisonRunSumma
 
 export async function deleteComparisonRun(runId: string): Promise<void> {
   await query(`DELETE FROM analysis_comparison_runs WHERE id = $1`, [runId])
+}
+
+/* ------------------------------------------------------------------------ */
+/* THE MANUAL LANE                                                           */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * A bench whose answers are entered by hand.
+ *
+ * WHY THIS IS THE BENCH AND NOT OFFSITE ANALYSIS. Offsite exists for the same
+ * practical reason - prompts built here, a model run somewhere else, answers
+ * imported - but it is a LIBRARY WRITER: its import goes through
+ * `storeAnalysisOutcome`, so the first answer for a title becomes the stored
+ * article, the title stops being pending, and a second model can never answer
+ * it. It also carries one prompt version per batch and produces no report. All
+ * three are exactly wrong for comparing a prompt across models, which needs N
+ * models x M versions on ONE retrieval, written nowhere, read as a table.
+ *
+ * So this is `startComparison` with the provider call taken out. It shares the
+ * retrieval, the prompt building, the output contract and the report with the
+ * model lane - see `prepareComparison` and `writeComparisonAnswer`, which both
+ * exist so the two lanes cannot drift apart.
+ *
+ * THE FILE FORMAT IS OFFSITE'S, deliberately reused rather than invented
+ * again: `buildExportLine` and `parseOffsiteResults` already define a line, and
+ * `parseOffsiteResults` is already tolerant of a file stitched together by hand
+ * (blank lines, a half-written last line, an id answered twice) because it was
+ * written for a killed-and-resumed runner. A hand-made results file needs only
+ * `custom_id` and `text`; everything else on the line is optional.
+ */
+export const MANUAL_PROVIDER = 'manual'
+
+/** How many hand-entered labels one bench may hold. The model lane's ceiling. */
+export const MAX_MANUAL_LABELS = MAX_COMPARISON_MODELS
+
+export interface StartManualComparisonOptions {
+  mediaType: 'movie' | 'series'
+  mediaId: string
+  /**
+   * What to call each answer in the report - "polystrata / some-model". These
+   * are labels the operator types, not model ids anything will be asked to
+   * resolve, because nothing here calls a provider.
+   */
+  labels: string[]
+  promptVersions?: number[]
+  promptVariants?: string[]
+}
+
+/**
+ * `awaiting` is a fourth run status beside running/completed/cancelled/failed.
+ *
+ * No migration: `analysis_comparison_runs.status` is plain TEXT with no CHECK,
+ * which is the shape [F-002] asks for - a vocabulary that lives in one place
+ * rather than in the schema as well.
+ */
+export const MANUAL_AWAITING = 'awaiting'
+
+/**
+ * Build the prompts and stop.
+ *
+ * Returns once the prompts exist, like `startComparison`, because retrieval is
+ * a search plus up to ten page fetches and an HTTP request must not be held
+ * open for it. The page polls, and the run sits at `awaiting` until answers
+ * are imported.
+ */
+export async function startManualComparison(
+  options: StartManualComparisonOptions
+): Promise<string> {
+  const mode = await getRetrievalMode()
+  if (mode !== 'crw') {
+    throw new Error(
+      'Comparison needs retrieval mode "crw". Under grounding each model searches for itself, so the answers would not be built from the same sources and the comparison would mean nothing.'
+    )
+  }
+
+  const subject = await loadAnalysisSubject(options.mediaType, options.mediaId)
+  if (!subject) throw new Error('That title is not in the library.')
+
+  const labels = options.labels
+    .map((label) => label.trim())
+    .filter((label) => label !== '')
+    .slice(0, MAX_MANUAL_LABELS)
+  if (labels.length === 0) throw new Error('Name at least one model you will run by hand.')
+
+  const choices = resolveBenchPromptChoices(options.promptVersions, options.promptVariants)
+
+  const run = await queryOne<{ id: string }>(
+    `INSERT INTO analysis_comparison_runs (media_type, media_id, title, year, prompt_version, status)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id`,
+    [
+      options.mediaType,
+      options.mediaId,
+      subject.title,
+      subject.year,
+      headlineVersion(choices),
+      'running',
+    ]
+  )
+  if (!run) throw new Error('Could not start the comparison.')
+
+  const entries = planEntries(
+    labels.map((label) => ({ provider: MANUAL_PROVIDER, model: label })),
+    choices
+  )
+  for (const entry of entries) {
+    await query(
+      `INSERT INTO analysis_comparison_results
+         (run_id, position, provider, model, prompt_version, prompt_variant)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        run.id,
+        entry.position,
+        entry.provider,
+        entry.model,
+        entry.choice.version,
+        entry.choice.variant,
+      ]
+    )
+  }
+
+  running.add(run.id)
+  // Deliberately not awaited, exactly as the model lane is not: the caller
+  // answers 202 and the page polls. A throw here is the run's own failure and
+  // is recorded against it rather than killing the process.
+  void (async () => {
+    try {
+      await prepareComparison(run.id, options.mediaType, options.mediaId, choices, null)
+      await finishRun(run.id, MANUAL_AWAITING, null)
+    } catch (err) {
+      const described = describeAiError(err)
+      logger.error({ runId: run.id, ...described }, 'Manual comparison could not build its prompts')
+      await finishRun(run.id, 'failed', err instanceof Error ? err.message : String(err))
+    } finally {
+      running.delete(run.id)
+    }
+  })()
+
+  return run.id
+}
+
+/**
+ * The id one exported line carries.
+ *
+ * Run id AND position, so a results file pasted into the wrong run is refused
+ * rather than silently matched - a bare position would be valid in every run
+ * this build has ever made, and the wrong answers would be stored against real
+ * rows with nothing to show for it. Pure and pinned for that reason.
+ */
+export function manualCustomId(runId: string, position: number): string {
+  return `${runId}:${position}`
+}
+
+/**
+ * Which answer of THIS run a line names, or null.
+ *
+ * Null for every way of not belonging: another run's id, a bare position from
+ * a hand-written line, a uuid with no position, a position that is not a whole
+ * number. The caller reports those back as unmatched rather than guessing,
+ * because a guess here writes somebody else's answer into a row.
+ */
+export function readManualCustomId(runId: string, customId: string): number | null {
+  const marker = customId.lastIndexOf(':')
+  if (marker < 1) return null
+  if (customId.slice(0, marker) !== runId) return null
+  const tail = customId.slice(marker + 1)
+  // `Number('')` is 0, not NaN, so a trailing colon would otherwise read as
+  // position 0 and store somebody's answer against the run's first row.
+  if (tail.trim() === '') return null
+  const position = Number(tail)
+  if (!Number.isInteger(position) || position < 0) return null
+  return position
+}
+
+export interface ManualExportLine {
+  position: number
+  model: string
+  promptLabel: string
+  answered: boolean
+}
+
+/**
+ * Export the prompts of a manual run, one JSONL line per answer still wanted.
+ *
+ * Each line carries the WHOLE prompt as `prompt`, which is the field to paste
+ * into whatever interface is running the model. Lines already answered are
+ * left out, so re-downloading after a partial import gives exactly what is
+ * still outstanding.
+ */
+export async function exportManualComparison(
+  runId: string
+): Promise<{ jsonl: string; lines: ManualExportLine[] }> {
+  const run = await queryOne<{
+    media_type: 'movie' | 'series'
+    title: string
+    year: number | null
+    prompts: Record<string, string> | null
+    prompt: string | null
+  }>(
+    `SELECT media_type, title, year, prompts, prompt
+       FROM analysis_comparison_runs WHERE id = $1`,
+    [runId]
+  )
+  if (!run) throw new Error('That comparison run does not exist.')
+  if (!run.prompts && !run.prompt) {
+    throw new Error('That run has not built its prompts yet.')
+  }
+
+  const rows = await query<{
+    position: number
+    model: string
+    prompt_version: number
+    prompt_variant: string | null
+    status: string
+  }>(
+    `SELECT position, model, prompt_version, prompt_variant, status
+       FROM analysis_comparison_results
+      WHERE run_id = $1
+      ORDER BY position`,
+    [runId]
+  )
+
+  const maxOutputTokens = (await getCrwConfig()).analysisMaxOutputTokens
+  const out: string[] = []
+  const lines: ManualExportLine[] = []
+
+  for (const row of rows.rows) {
+    const choice: PromptChoice = { version: row.prompt_version, variant: row.prompt_variant }
+    const prompt = run.prompts?.[promptChoiceKey(choice)] ?? run.prompt
+    if (!prompt) continue
+    const answered = row.status !== 'pending'
+    lines.push({
+      position: row.position,
+      model: row.model,
+      promptLabel: promptChoiceLabel(choice),
+      answered,
+    })
+    if (answered) continue
+    out.push(
+      buildExportLine(
+        {
+          id: manualCustomId(runId, row.position),
+          mediaType: run.media_type,
+          title: run.title,
+          year: run.year,
+          attempt: 0,
+          prompt,
+        },
+        {
+          promptVersion: row.prompt_version,
+          promptVariant: row.prompt_variant,
+          maxOutputTokens: maxOutputTokens > 0 ? maxOutputTokens : null,
+        }
+      )
+    )
+  }
+
+  return { jsonl: out.map((line) => line + '\n').join(''), lines }
+}
+
+export interface ManualImportSummary {
+  stored: number
+  unusable: number
+  errors: number
+  /** Lines whose custom_id names no pending answer in this run. */
+  unmatched: string[]
+  /** 1-based line numbers that were not a result line. */
+  badLines: number[]
+  /** Answers still outstanding after this import. */
+  remaining: number
+}
+
+/**
+ * Take a results file and score it exactly as a provider's answer is scored.
+ *
+ * An answer that breaks the output contract is stored as `unusable` with its
+ * problem, which is the same outcome a model gets and is a real finding rather
+ * than an import failure - a model that cannot hold the contract is usually
+ * what a bench discovers. Only a line nothing matches is reported back as a
+ * mistake.
+ */
+export async function importManualComparison(
+  runId: string,
+  jsonl: string
+): Promise<ManualImportSummary> {
+  const run = await queryOne<{ media_type: 'movie' | 'series'; status: string }>(
+    `SELECT media_type, status FROM analysis_comparison_runs WHERE id = $1`,
+    [runId]
+  )
+  if (!run) throw new Error('That comparison run does not exist.')
+
+  const rows = await query<{ position: number; prompt_version: number; status: string }>(
+    `SELECT position, prompt_version, status
+       FROM analysis_comparison_results WHERE run_id = $1`,
+    [runId]
+  )
+  const byPosition = new Map(rows.rows.map((row) => [row.position, row]))
+
+  const parsed = parseOffsiteResults(jsonl)
+  const summary: ManualImportSummary = {
+    stored: 0,
+    unusable: 0,
+    errors: 0,
+    unmatched: [],
+    badLines: parsed.badLines,
+    remaining: 0,
+  }
+
+  for (const result of parsed.results) {
+    const position = readManualCustomId(runId, result.customId)
+    if (position == null || !byPosition.has(position)) {
+      summary.unmatched.push(result.customId)
+      continue
+    }
+    const row = byPosition.get(position)!
+
+    if (result.kind === 'error') {
+      await writeComparisonFailure(runId, position, result.error)
+      summary.errors++
+      row.status = 'error'
+      continue
+    }
+
+    // The library job's own reader, never a copy: the output contract, the
+    // begin marker, the grade line and the paragraph map are all judged here
+    // the way `analyseTitle` judges them.
+    const reading = readAnalysis(result.text, result.finishReason ?? undefined, {
+      mediaType: run.media_type,
+      promptVersion: row.prompt_version,
+    })
+    const status = reading.problem ? 'unusable' : 'ok'
+    await writeComparisonAnswer(
+      runId,
+      position,
+      reading,
+      { mediaType: run.media_type, promptVersion: row.prompt_version },
+      {
+        status,
+        finishReason: result.finishReason,
+        outputTokens: result.outputTokens,
+      }
+    )
+    if (status === 'ok') summary.stored++
+    else summary.unusable++
+    row.status = status
+  }
+
+  summary.remaining = [...byPosition.values()].filter((row) => row.status === 'pending').length
+
+  // A run is only finished once nothing is outstanding. Until then it stays at
+  // `awaiting` so the page keeps offering the download and the paste box.
+  await finishRun(runId, summary.remaining === 0 ? 'completed' : MANUAL_AWAITING, null)
+
+  logger.info({ runId, ...summary, unmatched: summary.unmatched.length }, 'Manual answers imported')
+  return summary
 }

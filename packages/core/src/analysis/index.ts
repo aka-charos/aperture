@@ -66,10 +66,19 @@ export {
   cancelComparison,
   isComparisonRunning,
   MAX_COMPARISON_MODELS,
+  startManualComparison,
+  exportManualComparison,
+  importManualComparison,
+  MANUAL_PROVIDER,
+  MANUAL_AWAITING,
+  MAX_MANUAL_LABELS,
   type ComparisonModelRequest,
   type ComparisonRunSummary,
   type ComparisonRunView,
   type StartComparisonOptions,
+  type StartManualComparisonOptions,
+  type ManualImportSummary,
+  type ManualExportLine,
 } from './compare.js'
 
 export {
