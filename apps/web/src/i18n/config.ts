@@ -18,13 +18,21 @@ import ar from './locales/ar/translation.json'
 import el from './locales/el/translation.json'
 import enOverrides from './overrides.en.json'
 import { isRtlLocale } from './localeDirection'
+import { REFRESH_EVENT, inlineEditPostProcessor } from './inlineEdit/store'
 
 const i18nInit = i18n
   .use(LanguageDetector)
   .use(initReactI18next)
+  // Registered always, but only listed in `postProcess` while an admin has
+  // inline text editing on (inlineEdit/store.ts), so it costs nothing at rest.
+  .use(inlineEditPostProcessor)
   .init({
     react: {
       useSuspense: false,
+      // REFRESH_EVENT re-renders every translated component when inline
+      // editing switches on or saves a string, so the index of what is on
+      // screen fills and the new text shows without a reload.
+      bindI18n: `languageChanged ${REFRESH_EVENT}`,
     },
     // Cloned rather than handed over directly: addResourceBundle(deep=true)
     // (used by applyRuntimeOverrides below) mutates the stored resource

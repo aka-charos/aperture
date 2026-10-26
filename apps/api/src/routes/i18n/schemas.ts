@@ -11,6 +11,12 @@ export const adminOverrideSchemas = {
     summary: 'List all translation overrides (admin only)',
     description: 'Returns every admin-edited UI string override, across all locales including English.',
   },
+  fileLayer: {
+    tags: ['i18n'],
+    summary: 'Operator file overrides for one locale (admin only)',
+    description:
+      'The I18N_OVERRIDES_DIR/overrides.<locale>.json layer on its own, without the database overrides. The inline text editor uses it as the baseline a string resets to. No response schema: the payload is arbitrary override JSON.',
+  },
   upsert: {
     tags: ['i18n'],
     summary: 'Set or reset a translation override (admin only)',

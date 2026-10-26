@@ -6812,6 +6812,31 @@
     "cardTitle": "Appearance",
     "cardDescription": "Light is a calm gray canvas with white panels; dark is easier on the eyes in a dim room. Remembered in this browser."
   },
+  "inlineEdit": {
+    "turnOn": "Edit text on screen",
+    "turnOff": "Stop editing text",
+    "toolbarTitle": "Editing text",
+    "toolbarHint": "Click any text to change it. Alt+click uses the page as normal.",
+    "compareWith": "Language shown beside English",
+    "stringsOnScreen_one": "{{count}} string on this screen",
+    "stringsOnScreen_other": "{{count}} strings on this screen",
+    "done": "Done",
+    "panelTitle": "Strings on this screen",
+    "panelHint": "Everything this screen has drawn, including text you cannot click, such as tooltips and messages.",
+    "panelFilter": "Filter by key or text",
+    "panelEmpty": "Nothing recorded yet.",
+    "closePanel": "Close the list",
+    "editorTitle": "Edit text",
+    "copyKey": "Copy the key",
+    "copied": "Copied",
+    "severalKeys_one": "This text comes from {{count}} key. Pick the one to edit:",
+    "severalKeys_other": "This text comes from {{count}} keys. Pick the one to edit:",
+    "unknownKey": "This key is not among the bundled English strings, so it may exist only in some languages.",
+    "edited": "Edited",
+    "sameAsEnglish": "Same as English",
+    "allLanguages": "All languages",
+    "saveShortcut": "Ctrl+Enter saves"
+  },
   "newsletters": {
     "status": {
       "draft": "Draft",

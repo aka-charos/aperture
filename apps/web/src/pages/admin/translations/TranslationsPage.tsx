@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Alert,
   Box,
@@ -69,7 +70,10 @@ export function TranslationsPage() {
   const catalog = useTranslationCatalog()
   const { loading, error, locales, defaults, overrides, effective, keys, namespaces } = catalog
 
-  const [search, setSearch] = useState('')
+  // `?q=` arrives from the inline editor's "All languages" link, naming one key.
+  const [searchParams] = useSearchParams()
+  const linkedQuery = searchParams.get('q')
+  const [search, setSearch] = useState(linkedQuery ?? '')
   const [namespace, setNamespace] = useState(NAMESPACE_ALL)
   const [audience, setAudience] = useState<AudienceFilter>(AUDIENCE_ALL)
   const [storedLanguage, setStoredLanguage] = useState(readStoredLanguage)
@@ -77,6 +81,13 @@ export function TranslationsPage() {
   const [onlyUntranslated, setOnlyUntranslated] = useState(false)
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(50)
+  // A new link while the page is already open: back to the first page, as
+  // typing a search does, or a key found on page one shows an empty page N.
+  useEffect(() => {
+    if (linkedQuery === null) return
+    setSearch(linkedQuery)
+    setPage(0)
+  }, [linkedQuery])
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [listVersion, setListVersion] = useState(0)

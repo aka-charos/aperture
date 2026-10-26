@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { requireAdmin } from '../../../plugins/auth.js'
 import { adminOverrideSchemas } from '../schemas.js'
+import { readFileOverrides } from './publicOverrides.js'
 
 export function registerAdminOverridesHandlers(fastify: FastifyInstance) {
   /**
@@ -22,6 +23,28 @@ export function registerAdminOverridesHandlers(fastify: FastifyInstance) {
         fastify.log.error({ err }, 'Failed to list i18n overrides')
         return reply.status(500).send({ error: 'Failed to list translation overrides' })
       }
+    }
+  )
+
+  /**
+   * GET /api/i18n/admin/file-overrides/:locale
+   *
+   * Admin only. The operator file layer alone. The public route merges it
+   * with the database rows, which hides the file's value for any key that
+   * also has a row — and that value is exactly what deleting the row brings
+   * back, so the inline editor needs it to show what Reset will do.
+   */
+  fastify.get<{ Params: { locale: string } }>(
+    '/api/i18n/admin/file-overrides/:locale',
+    { preHandler: requireAdmin, schema: adminOverrideSchemas.fileLayer },
+    async (request, reply) => {
+      void reply.header('Cache-Control', 'no-store')
+      const { locale } = request.params
+      const { isValidAppLocale } = await import('@aperture/core')
+      if (!isValidAppLocale(locale)) {
+        return reply.status(400).send({ error: 'Unknown locale' })
+      }
+      return reply.send(await readFileOverrides(fastify, locale))
     }
   )
 

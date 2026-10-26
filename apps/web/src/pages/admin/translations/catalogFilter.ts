@@ -5,6 +5,8 @@
  * that disagreed with the table is what the export exists to prevent.
  */
 
+import { diffInterpolationTokens } from '../../../i18n/flatten'
+
 export interface CatalogFilter {
   /** Lower-cased, trimmed search text; empty matches everything. */
   query: string
@@ -106,4 +108,23 @@ export function decideInlineSave(input: {
     return hasOverride ? { kind: 'reset' } : { kind: 'none' }
   }
   return { kind: 'save', value: draft }
+}
+
+/**
+ * The warning shown when a translation's `{{tokens}}` differ from the
+ * English, or '' when they match. One wording for every editor: the Edit
+ * dialog, the inline table cell and the in-place text editor.
+ */
+export function tokenMismatchMessage(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  english: string,
+  value: string
+): string {
+  const { missing, extra } = diffInterpolationTokens(english, value)
+  return [
+    missing.length > 0 ? t('admin.translationsPage.tokenMismatchMissing', { tokens: missing.join(', ') }) : '',
+    extra.length > 0 ? t('admin.translationsPage.tokenMismatchExtra', { tokens: extra.join(', ') }) : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 }

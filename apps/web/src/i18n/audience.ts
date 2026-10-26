@@ -69,6 +69,8 @@ export const ADMIN_SURFACE_PATHS: readonly string[] = [
   'components/ImageUpload.tsx',
   'components/ExplorationConfigModal.tsx',
   'components/RunningJobsWidget.tsx',
+  // Inline text editing: Layout renders its button and gate only for admins.
+  'components/inlineEdit/',
   'hooks/AdminSearchProvider.tsx',
   'hooks/useAdminSearch.ts',
 ]
@@ -86,6 +88,7 @@ export const ADMIN_ONLY_NAMESPACES: readonly string[] = [
   'aiFunctionCard',
   'explorationConfig',
   'imageUpload',
+  'inlineEdit',
   'inferenceDashboard',
   'jobsUi',
   'language',
