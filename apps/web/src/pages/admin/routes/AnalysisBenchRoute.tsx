@@ -299,6 +299,10 @@ export default function AnalysisBenchRoute() {
 
   const openRun = async (id: string) => {
     const res = await fetch(`/api/analysis-compare/${id}`, { credentials: 'include' })
+    // The note belongs to the run it was imported into, and this is every way
+    // of arriving at a different one - a replay, a previous run from the list,
+    // a fresh bench.
+    setImportNote(null)
     if (res.ok) setRun((await res.json()) as RunView)
   }
 

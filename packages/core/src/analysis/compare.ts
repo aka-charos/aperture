@@ -273,6 +273,25 @@ export async function replayComparison(
   )
   if (!run) throw new Error('Could not start the replay.')
 
+  // A BY-HAND BASELINE REPLAYS BY HAND. Its stored models are ('manual',
+  // <label>) pairs the operator typed, and driving those through the provider
+  // path builds a ProviderConfig for a provider that does not exist, so every
+  // entry would fail and the replay would be a run full of [failed] rows with
+  // nothing saying why. Replaying one is worth having rather than refusing:
+  // same documents, a prompt version that did not exist when it ran, answered
+  // by the same outside model - which is the controlled pair this lane is for.
+  if (models.every((entry) => entry.provider === MANUAL_PROVIDER)) {
+    await launchManual(
+      run.id,
+      original.media_type,
+      original.media_id,
+      models.map((entry) => entry.model),
+      choices,
+      sources
+    )
+    return run.id
+  }
+
   await launch(run.id, original.media_type, original.media_id, models, choices, sources)
   return run.id
 }
@@ -668,8 +687,17 @@ async function finishRun(runId: string, status: string, error: string | null): P
  * run genuinely ends, which is what `listComparisonRuns` renders.
  */
 async function parkRun(runId: string, status: string): Promise<void> {
+  // `finished_at` is CLEARED, not merely left alone. A by-hand run that was
+  // cancelled during its prompt build has already been stamped by finishRun,
+  // and resuming it by pasting an answer is allowed (see assertManualRun), so
+  // without this the resumed run carries the cancel's timestamp and shows a
+  // completion time while it waits - the symptom this function exists to
+  // remove, reached by the one path that goes backwards out of a terminal
+  // status.
   await query(
-    `UPDATE analysis_comparison_runs SET status = $2, error = NULL WHERE id = $1`,
+    `UPDATE analysis_comparison_runs
+        SET status = $2, error = NULL, finished_at = NULL
+      WHERE id = $1`,
     [runId, status]
   )
 }
@@ -1046,6 +1074,27 @@ export async function startManualComparison(
   )
   if (!run) throw new Error('Could not start the comparison.')
 
+  await launchManual(run.id, options.mediaType, options.mediaId, labels, choices, null)
+  return run.id
+}
+
+/**
+ * Write the pending rows, build the prompts, and park.
+ *
+ * `launch`'s counterpart for this lane, and shared by a fresh by-hand bench
+ * and a replay of one for the same reason `launch` is shared: a second copy
+ * would be the place the two drift. `replaySources` is null for a new run and
+ * the baseline's documents for a replay, which is the only difference between
+ * them - everything below, including the cancel rule, is identical.
+ */
+async function launchManual(
+  runId: string,
+  mediaType: 'movie' | 'series',
+  mediaId: string,
+  labels: string[],
+  choices: PromptChoice[],
+  replaySources: AnalysisSource[] | null
+): Promise<void> {
   const entries = planEntries(
     labels.map((label) => ({ provider: MANUAL_PROVIDER, model: label })),
     choices
@@ -1055,46 +1104,37 @@ export async function startManualComparison(
       `INSERT INTO analysis_comparison_results
          (run_id, position, provider, model, prompt_version, prompt_variant)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [
-        run.id,
-        entry.position,
-        entry.provider,
-        entry.model,
-        entry.choice.version,
-        entry.choice.variant,
-      ]
+      [runId, entry.position, entry.provider, entry.model, entry.choice.version, entry.choice.variant]
     )
   }
 
-  running.add(run.id)
+  running.add(runId)
   // Deliberately not awaited, exactly as the model lane is not: the caller
   // answers 202 and the page polls. A throw here is the run's own failure and
   // is recorded against it rather than killing the process.
   void (async () => {
     try {
-      await prepareComparison(run.id, options.mediaType, options.mediaId, choices, null)
+      await prepareComparison(runId, mediaType, mediaId, choices, replaySources)
       // COOPERATIVE, exactly as the model lane's cancel is: retrieval is one
       // search plus its page fetches and is not interruptible, so Stop cannot
       // cut it short - but it must still decide the outcome, or the button
       // reports success and the run goes on to collect answers anyway.
-      if (cancelled.has(run.id)) {
-        await finishRun(run.id, 'cancelled', null)
+      if (cancelled.has(runId)) {
+        await finishRun(runId, 'cancelled', null)
       } else {
-        await parkRun(run.id, MANUAL_AWAITING)
+        await parkRun(runId, MANUAL_AWAITING)
       }
     } catch (err) {
       const described = describeAiError(err)
-      logger.error({ runId: run.id, ...described }, 'Manual comparison could not build its prompts')
-      await finishRun(run.id, 'failed', err instanceof Error ? err.message : String(err))
+      logger.error({ runId, ...described }, 'Manual comparison could not build its prompts')
+      await finishRun(runId, 'failed', err instanceof Error ? err.message : String(err))
     } finally {
-      running.delete(run.id)
+      running.delete(runId)
       // Both sets, as driveComparison's finally does. Leaving the id behind
       // keeps it in a module-level Set for the life of the process.
-      cancelled.delete(run.id)
+      cancelled.delete(runId)
     }
   })()
-
-  return run.id
 }
 
 /**
