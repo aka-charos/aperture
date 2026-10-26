@@ -5076,7 +5076,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own terracotta and slate teal. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "The light appearance answers the default pair with its own slate teal and deep mauve. Save any other pair and both appearances use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -6859,7 +6859,7 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is a calm gray canvas with white panels; dark is easier on the eyes in a dim room. Remembered in this browser."
+    "cardDescription": "Light is a soft gray canvas with slate and mauve accents; dark is easier on the eyes in a dim room. Remembered in this browser."
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",

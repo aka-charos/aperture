@@ -3942,7 +3942,7 @@
   "settingsThemeColors": {
     "title": "Brand colors",
     "subtitle": "The two accent colors used throughout the app — buttons, highlights, gradients, and badges. Other colors (errors, warnings, success) stay fixed.",
-    "lightModeNote": "The light appearance answers the default pair with its own terracotta and slate teal. Save any other pair and both appearances use it as saved.",
+    "lightModeNote": "The light appearance answers the default pair with its own slate teal and deep mauve. Save any other pair and both appearances use it as saved.",
     "primaryLabel": "Primary",
     "secondaryLabel": "Secondary",
     "invalidHex": "Enter a color like #6366f1",
@@ -6810,7 +6810,7 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is a calm gray canvas with white panels; dark is easier on the eyes in a dim room. Remembered in this browser."
+    "cardDescription": "Light is a soft gray canvas with slate and mauve accents; dark is easier on the eyes in a dim room. Remembered in this browser."
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",
