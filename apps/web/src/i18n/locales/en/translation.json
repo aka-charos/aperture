@@ -6217,7 +6217,7 @@
     "manualAdd": "Add",
     "manualStart": "Build {{count}} prompts",
     "manualAwaitingTitle": "Waiting for answers",
-    "manualAwaitingHelp": "Download the prompts, run each one wherever that model lives, then paste the answers back — one JSON line per answer, carrying the custom_id from the line you downloaded and the model's reply as text.",
+    "manualAwaitingHelp": "Download the prompts, run each one wherever that model lives, then paste the answers back — one JSON line per answer, carrying the custom_id from the line you downloaded and the model's reply as text. Each line names the model it is for in its label field. With the offsite runner, run it once per model: --label <name> --model <model id>.",
     "manualDownload": "Download prompts",
     "manualDownloadFailed": "Could not build that file.",
     "manualPastePlaceholder": "{\"custom_id\": \"…\", \"text\": \"===ANALYSIS===\\n…\"}",

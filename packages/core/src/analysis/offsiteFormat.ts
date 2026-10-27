@@ -36,6 +36,16 @@ export interface OffsiteExportItem {
    */
   attempt: number
   prompt: string
+  /**
+   * Which model this line is meant for, in the bench's by-hand lane: the label
+   * the operator typed for it. A bench file holds one line per model per prompt
+   * version, often with byte-identical prompts, and without this nothing on a
+   * line says which model should answer it - the runner sent every line to the
+   * one `--model` it was given, so a three-model bench came back as one model
+   * answering three times. Absent on offsite batch lines, which are one model's
+   * work by construction; JSON.stringify drops it, so those lines are unchanged.
+   */
+  label?: string
 }
 
 export interface OffsiteExportSettings {
@@ -54,6 +64,7 @@ export function buildExportLine(item: OffsiteExportItem, settings: OffsiteExport
     media_type: item.mediaType,
     title: item.title,
     year: item.year,
+    label: item.label,
     prompt_version: settings.promptVersion,
     prompt_variant: settings.promptVariant,
     max_tokens: settings.maxOutputTokens,

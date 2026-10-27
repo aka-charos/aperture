@@ -37,6 +37,20 @@ test('an exported line carries everything a runner needs, and the format', () =>
   })
 })
 
+test('a bench line names its model; an offsite line has no label key at all', () => {
+  const bench = JSON.parse(
+    buildExportLine(
+      { id: 'r:0', mediaType: 'movie', title: 'Suspiria', year: 1977, attempt: 0, prompt: 'P', label: 'qwen' },
+      settings
+    )
+  )
+  assert.equal(bench.label, 'qwen')
+  const offsite = JSON.parse(
+    buildExportLine({ id: 'abc', mediaType: 'movie', title: 'Suspiria', year: 1977, attempt: 0, prompt: 'P' }, settings)
+  )
+  assert.equal('label' in offsite, false)
+})
+
 test('the file is one line per title, newline-terminated, and survives newlines in a prompt', () => {
   const file = buildExportFile(
     [

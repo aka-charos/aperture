@@ -32,6 +32,11 @@ export const OFFSITE_RUNNER_SCRIPT = String.raw`#!/usr/bin/env node
 // it finishes, and a rerun skips titles the results file already answers, so
 // it can be stopped and resumed at any time.
 //
+// It also runs an analysis bench's by-hand prompts (Admin > AI > Analysis
+// bench). There every line names the model it is for, so run it once per model
+// with --label, each run adding to the same results file:
+//   node run-offsite-analysis.mjs bench.jsonl --label qwen --model qwen3-30b-a3b
+//
 // Requests are streamed on purpose: a non-streamed answer sends nothing until
 // it is finished, and Node gives up on a silent request after five minutes.
 
@@ -48,7 +53,8 @@ const USAGE = [
   '',
   'Options:',
   '  --model <id>           Model to use, as the server lists it. Leave it out to see the list.',
-  '  --out <file>           Results file (default: <batch>.results.jsonl next to the batch).',
+  '  --label <name>         Bench files only: run the lines meant for this model, as named in Aperture.',
+  '  --out <file>         Results file (default: <batch>.results.jsonl next to the batch).',
   '  --base-url <url>       Server address (default: http://localhost:1234/v1, LM Studio).',
   '  --api-key <key>        Sent as a Bearer token, for servers that need one.',
   '  --concurrency <n>      Requests at a time (default: 1).',
@@ -68,6 +74,7 @@ function parseArgs(argv) {
   const opts = {
     batch: null,
     model: null,
+    label: null,
     out: null,
     baseUrl: 'http://localhost:1234/v1',
     apiKey: null,
@@ -78,7 +85,7 @@ function parseArgs(argv) {
     temperature: undefined,
   }
   const takesValue = new Set([
-    '--model', '--out', '--base-url', '--api-key', '--concurrency', '--limit',
+    '--model', '--label', '--out', '--base-url', '--api-key', '--concurrency', '--limit',
     '--stall-seconds', '--max-tokens', '--temperature',
   ])
   for (let i = 0; i < argv.length; i++) {
@@ -92,6 +99,7 @@ function parseArgs(argv) {
       if (value === undefined) fail(arg + ' needs a value.\n\n' + USAGE)
       switch (arg) {
         case '--model': opts.model = value; break
+        case '--label': opts.label = value.trim(); break
         case '--out': opts.out = value; break
         case '--base-url': opts.baseUrl = value.replace(/\/+$/, ''); break
         case '--api-key': opts.apiKey = value; break
@@ -153,6 +161,46 @@ function readBatch(file) {
     items.push(row)
   })
   return items
+}
+
+function quoteArg(value) {
+  return /^[A-Za-z0-9._:\/-]+$/.test(value) ? value : '"' + value.replace(/"/g, '\\"') + '"'
+}
+
+// A bench file names, on every line, the model that line is for, and its
+// prompts are often identical, so the label is the only thing telling them
+// apart. Sent to one --model, every model's line would come back answered by
+// that one model. So with several models in a file the lines are picked first:
+// by --label, or by a --model that is exactly one of the labels. An offsite
+// batch carries no label and runs whole, as before.
+function selectLines(items, opts) {
+  const labels = []
+  for (const item of items) {
+    const name = typeof item.label === 'string' ? item.label.trim() : ''
+    if (name && !labels.includes(name)) labels.push(name)
+  }
+  if (labels.length === 0) {
+    if (opts.label) fail('--label is for analysis bench files, and the lines in ' + opts.batch + ' name no models.')
+    return { items, label: null, labels }
+  }
+  let chosen = opts.label
+  if (!chosen && labels.length === 1) chosen = labels[0]
+  if (!chosen && opts.model && labels.includes(opts.model)) chosen = opts.model
+  const perModel = labels
+    .map((name) => '  node run-offsite-analysis.mjs ' + quoteArg(opts.batch) + ' --label ' + quoteArg(name) + ' --model <model id>')
+    .join('\n')
+  if (!chosen) {
+    fail('This bench file holds prompts for ' + labels.length + ' models, and each must be answered by its own model.\n' +
+      'Run it once per model, naming its lines with --label (every run adds to the same results file):\n' + perModel)
+  }
+  if (!labels.includes(chosen)) {
+    fail('No line in this file is for "' + chosen + '". The models it names:\n' + perModel)
+  }
+  return {
+    items: items.filter((item) => typeof item.label === 'string' && item.label.trim() === chosen),
+    label: chosen,
+    labels,
+  }
 }
 
 // A batch line and a result line name the same answer when both id and attempt match.
@@ -375,25 +423,39 @@ async function main() {
     if (models.length === 0) console.log('  (none loaded; LM Studio loads a model on first use if you name it)')
     process.exit(1)
   }
+  const selection = selectLines(items, opts)
+  const mine = selection.items
+  const others = selection.labels.filter((name) => name !== selection.label)
+  const uploadHint = selection.label != null
+    ? 'Paste the contents of ' + opts.out + ' into the comparison in Aperture: Admin > AI > Analysis bench.'
+    : 'Upload ' + opts.out + ' in Aperture: Admin > AI > Offsite analysis.'
+
   if (models.length > 0 && !models.includes(opts.model)) {
     console.warn('Warning: ' + opts.model + ' is not in the server\'s list (' + models.join(', ') + '). Trying anyway.')
   }
 
   const answered = readAnswered(opts.out)
-  let queue = items.filter((item) => !answered.has(answerKey(item)))
+  const unanswered = mine.filter((item) => !answered.has(answerKey(item)))
+  let queue = unanswered
   if (opts.limit) queue = queue.slice(0, opts.limit)
 
-  console.log('Batch: ' + items.length + ' title(s), ' + answered.size + ' already answered in ' + opts.out)
+  if (selection.label != null) {
+    console.log('Bench prompts for ' + selection.label + ': ' + mine.length + ', ' +
+      (mine.length - unanswered.length) + ' already answered in ' + opts.out)
+    if (others.length > 0) console.log('Other models in this file (run each with its own --label): ' + others.join(', '))
+  } else {
+    console.log('Batch: ' + items.length + ' title(s), ' + answered.size + ' already answered in ' + opts.out)
+  }
   console.log('Running ' + queue.length + ' with ' + opts.model + ' at ' + opts.baseUrl +
     (opts.concurrency > 1 ? ', ' + opts.concurrency + ' at a time' : ''))
-  const first = items[0]
+  const first = mine[0]
   console.log('Prompt v' + first.prompt_version + (first.prompt_variant ? ' ' + first.prompt_variant : '') +
     ', output ceiling ' + (first.max_tokens == null ? 'none' : first.max_tokens) + ' tokens')
   console.log('A prompt is about 20,000 tokens, so load the model with a context of at least 32k.')
   console.log('')
 
   if (queue.length === 0) {
-    console.log('Nothing left to run. Upload ' + opts.out + ' in Aperture: Admin > AI > Offsite analysis.')
+    console.log('Nothing left to run. ' + uploadHint)
     return
   }
 
@@ -477,7 +539,10 @@ async function main() {
   console.log('Finished ' + finished + ' of ' + total + ' in ' + seconds(Date.now() - startedAll) +
     ': ' + succeeded + ' answered, ' + errors + ' failed.')
   if (errors > 0) console.log('Failed titles are retried when you run the same command again.')
-  console.log('Upload ' + opts.out + ' in Aperture: Admin > AI > Offsite analysis.')
+  if (others.length > 0) {
+    console.log('The other models in this file run the same way, each with its own --label: ' + others.join(', '))
+  }
+  console.log(uploadHint)
   if (stopping) process.exit(1)
 }
 

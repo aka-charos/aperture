@@ -80,7 +80,7 @@ function fakeServer(seen: Seen[]) {
   })
 }
 
-function workdir(prompts: string[], maxTokens: number | null = 8000, attempt = 0) {
+function workdir(prompts: string[], maxTokens: number | null = 8000, attempt = 0, labels?: string[]) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'offsite-runner-'))
   const script = path.join(dir, OFFSITE_RUNNER_FILE_NAME)
   fs.writeFileSync(script, OFFSITE_RUNNER_SCRIPT)
@@ -88,7 +88,15 @@ function workdir(prompts: string[], maxTokens: number | null = 8000, attempt = 0
   fs.writeFileSync(
     batch,
     buildExportFile(
-      prompts.map((prompt, i) => ({ id: 'id-' + i, mediaType: 'movie', title: 'T' + i, year: 2000 + i, attempt, prompt })),
+      prompts.map((prompt, i) => ({
+        id: 'id-' + i,
+        mediaType: 'movie',
+        title: 'T' + i,
+        year: 2000 + i,
+        attempt,
+        prompt,
+        label: labels?.[i],
+      })),
       { promptVersion: 18, promptVariant: null, maxOutputTokens: maxTokens }
     )
   )
@@ -242,7 +250,88 @@ test('a title the import rejected runs again: the new batch carries the next att
   }
 })
 
-test('--temperature is sent only when asked for', { timeout: 30000 }, async () => {
+/**
+ * A BENCH FILE IS SEVERAL MODELS' WORK, AND EACH LINE SAYS WHOSE.
+ *
+ * Its prompts are usually byte-identical (one retrieval, one prompt version,
+ * one line per model), so before lines carried a label the runner sent all of
+ * them to the one --model it was given and a three-model bench came back as
+ * one model answering three times - with nothing anywhere saying so.
+ */
+test('a bench file with several models is refused without --label, and nothing is sent', { timeout: 30000 }, async () => {
+  const seen: Seen[] = []
+  const { server, baseUrl } = await fakeServer(seen)
+  try {
+    const w = workdir(['same prompt', 'same prompt'], 8000, 0, ['qwen', 'polystrata / big model'])
+    const result = await run(w.script, [w.batch, '--model', 'test-model', '--base-url', baseUrl])
+    assert.equal(result.code, 1)
+    assert.equal(seen.length, 0)
+    // Both models named, each with a command that runs it; a label with a
+    // space is quoted so the command can be pasted as it stands.
+    assert.match(result.stderr, /--label qwen --model/)
+    assert.match(result.stderr, /--label "polystrata \/ big model" --model/)
+  } finally {
+    server.close()
+  }
+})
+
+test('--label runs one model\'s lines, and a run per model fills one results file', { timeout: 30000 }, async () => {
+  const seen: Seen[] = []
+  const { server, baseUrl } = await fakeServer(seen)
+  try {
+    const w = workdir(['p0', 'p1', 'p2'], 8000, 0, ['alpha', 'beta', 'alpha'])
+    const first = await run(w.script, [w.batch, '--label', 'alpha', '--model', 'test-model', '--base-url', baseUrl])
+    assert.equal(first.code, 0, first.stderr + first.stdout)
+    assert.equal(seen.length, 2)
+    assert.match(first.stdout, /Other models in this file.*beta/)
+
+    seen.length = 0
+    const second = await run(w.script, [w.batch, '--label', 'beta', '--model', 'test-model', '--base-url', baseUrl])
+    assert.equal(second.code, 0, second.stderr + second.stdout)
+    assert.equal(seen.length, 1, 'only beta\'s line; alpha\'s are neither answered again nor sent to beta')
+    assert.match(((seen[0].body.messages as { content: string }[])[0]).content, /p1/)
+
+    const ids = parseOffsiteResults(fs.readFileSync(w.out, 'utf8')).results.map((r) => r.customId).sort()
+    assert.deepEqual(ids, ['id-0', 'id-1', 'id-2'])
+  } finally {
+    server.close()
+  }
+})
+
+test('a --model that is exactly one of the labels picks that model\'s lines', { timeout: 30000 }, async () => {
+  const seen: Seen[] = []
+  const { server, baseUrl } = await fakeServer(seen)
+  try {
+    const w = workdir(['p0', 'p1'], 8000, 0, ['test-model', 'other'])
+    const result = await run(w.script, [w.batch, '--model', 'test-model', '--base-url', baseUrl])
+    assert.equal(result.code, 0, result.stderr + result.stdout)
+    assert.equal(seen.length, 1)
+    assert.match(((seen[0].body.messages as { content: string }[])[0]).content, /p0/)
+  } finally {
+    server.close()
+  }
+})
+
+test('a label no line carries, or --label on an offsite batch, is refused', { timeout: 30000 }, async () => {
+  const seen: Seen[] = []
+  const { server, baseUrl } = await fakeServer(seen)
+  try {
+    const bench = workdir(['p0', 'p1'], 8000, 0, ['alpha', 'beta'])
+    const wrong = await run(bench.script, [bench.batch, '--label', 'gamma', '--model', 'test-model', '--base-url', baseUrl])
+    assert.equal(wrong.code, 1)
+    assert.match(wrong.stderr, /No line in this file is for "gamma"/)
+
+    const offsite = workdir(['p0'])
+    const stray = await run(offsite.script, [offsite.batch, '--label', 'alpha', '--model', 'test-model', '--base-url', baseUrl])
+    assert.equal(stray.code, 1)
+    assert.match(stray.stderr, /name no models/)
+    assert.equal(seen.length, 0)
+  } finally {
+    server.close()
+  }
+})
+
+test('--temperature is sent only when asked for',{ timeout: 30000 }, async () => {
   const seen: Seen[] = []
   const { server, baseUrl } = await fakeServer(seen)
   try {
