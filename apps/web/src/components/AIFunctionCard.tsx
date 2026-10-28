@@ -46,6 +46,7 @@ import {
 } from '@mui/icons-material'
 import {
   PROVIDER_INFO,
+  DEFAULT_PROVIDER_COPY,
   embeddingInputTypeOptions,
   PROVIDERS_WITH_INPUT_TYPE,
   providerHasRateLimit,
@@ -65,6 +66,7 @@ import {
   type ProviderType,
 } from './aiProviderInfo'
 import { AIFallbackModels } from './AIFallbackModels'
+import { emitProviderKeyRemoved, onProviderKeyRemoved } from '../lib/providerKeyEvents'
 
 /**
  * Pacing bounds, mirroring core's `MAX_CALL_SPACING_SECONDS`.
@@ -176,14 +178,16 @@ export interface DiscoveredModel {
 }
 
 /**
- * What an LM Studio server says about itself. A test rather than a ping: the
- * counts are what tell an operator the role they are configuring has nothing
- * suitable installed, which reachability alone cannot.
+ * What a local server (LM Studio or Unsloth Studio) says about itself. A test
+ * rather than a ping: the counts are what tell an operator the role they are
+ * configuring has nothing suitable installed, which reachability alone cannot.
  */
-export interface LmStudioStatus {
+export interface LocalServerStatus {
   reachable: boolean
-  /** Which REST API generation answered, so an old server is visible. */
+  /** Which LM Studio REST API generation answered, so an old server is visible. */
   api?: 'v1' | 'v0'
+  /** Unsloth Studio's version, in place of an API generation. */
+  version?: string
   totalModels: number
   languageModels: number
   embeddingModels: number
@@ -229,6 +233,8 @@ interface DiscoveryResponse {
   models: DiscoveredModel[]
   /** Installed models this role cannot use, with a reason key to translate. */
   skipped: { id: string; reason: 'wrongType' | 'noToolCalling' }[]
+  /** Why the list could not be read, when the server's answer said (Unsloth). */
+  error?: string
 }
 
 /**
@@ -450,6 +456,25 @@ export function AIFunctionCard({
    * for every action on this card. Null until the server has said.
    */
   const [savedKeyAvailable, setSavedKeyAvailable] = useState<boolean | null>(null)
+  /**
+   * The saved key was removed this visit. Held separately because the `config`
+   * prop still says the role has a key until the page reloads it, and the
+   * saved-key check reads that too.
+   */
+  const [keyRemoved, setKeyRemoved] = useState(false)
+  const [removingKey, setRemovingKey] = useState(false)
+
+  // A removal clears the key from every role on the provider, so every card
+  // showing that provider hears of it, not only the one that was clicked.
+  useEffect(
+    () =>
+      onProviderKeyRemoved((removed) => {
+        if (removed !== provider) return
+        setKeyRemoved(true)
+        setSavedKeyAvailable(false)
+      }),
+    [provider]
+  )
   const [initialized, setInitialized] = useState(false)
 
   // Spare keys, tried in order when the one above runs out of quota. Seeded
@@ -516,7 +541,7 @@ export function AIFunctionCard({
    */
   const [discovery, setDiscovery] = useState<DiscoveryResponse | null>(null)
   const [discovering, setDiscovering] = useState(false)
-  const [serverStatus, setServerStatus] = useState<LmStudioStatus | null>(null)
+  const [serverStatus, setServerStatus] = useState<LocalServerStatus | null>(null)
   
   // Valid embedding dimensions. Hand-mirrored from core's
   // VALID_EMBEDDING_DIMENSIONS (the web bundle never imports core); each one
@@ -534,37 +559,29 @@ export function AIFunctionCard({
   const providerInfo = PROVIDER_INFO[provider]
   const selectedModel = models.find(m => m.id === model)
   const selectedModelPrice = selectedModel ? formatModelPrice(selectedModel) : null
-  // Hand-mirrored from core's CUSTOM_MODEL_PROVIDERS (the web bundle never
-  // imports core). A provider missing here has no "add a custom model" option
-  // at all, which for a local server means no way to use it.
-  const supportsCustomModels =
-    provider === 'ollama' ||
-    provider === 'lmstudio' ||
-    provider === 'openai-compatible' ||
-    provider === 'openrouter' ||
-    provider === 'huggingface' ||
-    provider === 'zai'
-
-  /**
-   * Whether this server can be asked what it has installed. Mirrors core's
-   * `isDiscoverableProvider`: LM Studio publishes a catalog, and
-   * `openai-compatible` might BE LM Studio, since it has shipped LM Studio's
-   * port as its default base URL since before the named provider existed.
-   */
-  const supportsDiscovery = provider === 'lmstudio' || provider === 'openai-compatible'
+  // Both read off the provider's entry in PROVIDER_INFO, which mirrors core's
+  // CUSTOM_MODEL_PROVIDERS and isDiscoverableProvider; see the fields there.
+  const supportsCustomModels = providerInfo?.customModels === true
+  const supportsDiscovery = providerInfo?.serverProbe != null
+  // The provider's own wording where it has any, the generic text otherwise.
+  const copy = { ...DEFAULT_PROVIDER_COPY, ...providerInfo?.copy }
 
   /**
    * Whether a failed server probe is an ANSWER or merely a guess that missed.
    *
-   * Only when the operator named LM Studio. `openai-compatible` reaches any
-   * OpenAI-compatible server, and most of them do not serve `/api/v1/models`
-   * at all — they answer it 404, or 401 from behind a gateway that has never
-   * heard of the path. Treating that as "the server is not there" made every
-   * such server untestable from this card, because the probe ran first and its
-   * failure was final. There the probe is a guess about WHICH server this is;
-   * the model test below is the real answer.
+   * Only when the card's provider IS the server being probed. A provider that
+   * owns no probe borrows another's — `openai-compatible` borrows LM Studio's
+   * — and reaches any OpenAI-compatible server, most of which do not serve
+   * `/api/v1/models` at all: they answer it 404, or 401 from behind a gateway
+   * that has never heard of the path. Treating that as "the server is not
+   * there" made every such server untestable from this card, because the probe
+   * ran first and its failure was final. There the probe is a guess about
+   * WHICH server this is; the model test below is the real answer.
+   *
+   * Written against `serverProbe` rather than a provider name so that a
+   * provider added later inherits the right answer by declaring its probe.
    */
-  const probeIsVerdict = provider === 'lmstudio'
+  const probeIsVerdict = providerInfo?.serverProbe === provider
 
   // Sync form state when config prop changes (e.g., loaded from DB)
   useEffect(() => {
@@ -780,12 +797,12 @@ export function AIFunctionCard({
         if (!data) return
         // The role may hold its own key (a grounding role keeps it off the
         // shared store), which counts only while the role is on this provider.
-        const ownKey = config?.provider === provider && config?.hasApiKey === true
+        const ownKey = config?.provider === provider && config?.hasApiKey === true && !keyRemoved
         setSavedKeyAvailable(data.hasApiKey === true || ownKey)
         if (data.baseUrl && !baseUrl) setBaseUrl(data.baseUrl)
       })
       .catch(() => {})
-  }, [apiBase, config?.provider, config?.hasApiKey, provider, baseUrl])
+  }, [apiBase, config?.provider, config?.hasApiKey, keyRemoved, provider, baseUrl])
 
   // Fetch models when provider changes
   useEffect(() => {
@@ -820,6 +837,7 @@ export function AIFunctionCard({
     setProvider(newProvider)
     setModel('')
     setTestResult(null)
+    setKeyRemoved(false)
 
     // Fetch saved credentials for this provider
     try {
@@ -880,9 +898,10 @@ export function AIFunctionCard({
    * faults are an unresolvable host or a closed port, neither of which has
    * anything to do with a model.
    */
-  const runServerCheck = useCallback(async (): Promise<LmStudioStatus | null> => {
+  const runServerCheck = useCallback(async (): Promise<LocalServerStatus | null> => {
     try {
-      const res = await fetch(`${apiBase}/lmstudio/status`, {
+      const server = providerInfo?.serverProbe ?? 'lmstudio'
+      const res = await fetch(`${apiBase}/${server}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -899,11 +918,37 @@ export function AIFunctionCard({
         }),
       })
       if (!res.ok) return null
-      return (await res.json()) as LmStudioStatus
+      return (await res.json()) as LocalServerStatus
     } catch {
       return null
     }
-  }, [apiBase, baseUrl, apiKey, functionType, provider])
+  }, [apiBase, providerInfo?.serverProbe, baseUrl, apiKey, functionType, provider])
+
+  /**
+   * Forget the saved key, for a provider where one is optional. An empty field
+   * means "keep the saved key", so without this a key once saved could never
+   * be dropped: a revoked Unsloth key would be sent on every request and
+   * answered 401 even where keyless access would have let the call in.
+   */
+  const handleRemoveSavedKey = async () => {
+    setRemovingKey(true)
+    setError(null)
+    try {
+      const res = await fetch(`${apiBase}/credentials/${provider}/api-key`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      // This card included: its own listener sets the removed state.
+      emitProviderKeyRemoved(provider)
+      setApiKey('')
+      setSuccess(t('aiFunctionCard.savedKeyRemoved'))
+    } catch {
+      setError(t('aiFunctionCard.removeSavedKeyFailed'))
+    } finally {
+      setRemovingKey(false)
+    }
+  }
 
   const handleTest = async () => {
     setTesting(true)
@@ -1091,6 +1136,9 @@ export function AIFunctionCard({
     try {
       await onSave(newConfig)
       setSuccess(t('aiFunctionCard.configSaved'))
+      // A key typed and saved is a saved key again, whatever was removed
+      // earlier in this visit; the reloaded config is believed from here on.
+      if (apiKey) setKeyRemoved(false)
       setApiKey('') // Clear for security
       // The parent reloads the config after a save and the spare-key slots are
       // reseeded from the hints it returns, so saved keys stay listed and "how
@@ -1634,18 +1682,22 @@ export function AIFunctionCard({
         {/* Spacer to push form fields to bottom */}
         <Box flex={1} />
 
-        {/* API Key */}
-        {providerInfo?.requiresApiKey && (
+        {/* API Key: required, or offered and optional (Unsloth Studio) */}
+        {(providerInfo?.requiresApiKey || providerInfo?.acceptsApiKey) && (
           <TextField
             label={t('aiFunctionCard.apiKey')}
             type={showApiKey ? 'text' : 'password'}
             // Dots stand for a key the server holds and the browser never sees;
             // leaving them untouched keeps it.
-            value={apiKey || ((savedKeyAvailable ?? isConfigured) ? '••••••••••••••••' : '')}
+            value={apiKey || ((savedKeyAvailable ?? (isConfigured && !keyRemoved)) ? '••••••••••••••••' : '')}
             onChange={(e) => setApiKey(e.target.value.replace(/•/g, ''))}
             size="small"
             fullWidth
-            placeholder={t('aiFunctionCard.apiKeyPlaceholder', { provider: providerInfo.name })}
+            placeholder={
+              providerInfo.requiresApiKey
+                ? t('aiFunctionCard.apiKeyPlaceholder', { provider: providerInfo.name })
+                : t('aiFunctionCard.apiKeyOptionalPlaceholder', { provider: providerInfo.name })
+            }
             sx={{ mb: 2 }}
             InputProps={{
               endAdornment: (
@@ -1657,7 +1709,9 @@ export function AIFunctionCard({
               ),
             }}
             helperText={
-              providerInfo.website && (
+              copy.apiKeyHelper ? (
+                t(copy.apiKeyHelper)
+              ) : providerInfo.website && (
                 <span>
                   {t('aiFunctionCard.getApiKeyPrefix')}{' '}
                   <Link href={providerInfo.website} target="_blank" rel="noopener">
@@ -1667,6 +1721,15 @@ export function AIFunctionCard({
               )
             }
           />
+        )}
+        {/* Only where a key is optional: removing a required one only breaks the role. */}
+        {providerInfo?.acceptsApiKey && !providerInfo.requiresApiKey && !isSetup &&
+          savedKeyAvailable === true && !apiKey && (
+          <Box sx={{ mt: -1.5, mb: 2 }}>
+            <Button size="small" onClick={handleRemoveSavedKey} disabled={removingKey}>
+              {removingKey ? <CircularProgress size={14} /> : t('aiFunctionCard.removeSavedKey')}
+            </Button>
+          </Box>
         )}
 
         {/* Spare API keys — tried in order when the key above runs out of quota.
@@ -2209,6 +2272,28 @@ export function AIFunctionCard({
           </Box>
         )}
 
+        {/*
+          Unsloth's setup is three settings in its own UI, each of which decides
+          whether anything here works: where it listens, whether it loads the
+          model a request names, and whether this caller needs a key.
+        */}
+        {provider === 'unsloth' && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 2, color: 'text.secondary' }}>
+            <ComputerIcon sx={{ fontSize: 16 }} />
+            <Typography variant="caption">{t('aiFunctionCard.unslothSetupTitle')}</Typography>
+            <InfoHint
+              title={[
+                t('aiFunctionCard.unslothStepListen'),
+                t('aiFunctionCard.unslothStepSwitch'),
+                t('aiFunctionCard.unslothStepKey'),
+                t('aiFunctionCard.unslothContextNote'),
+                t('aiFunctionCard.unslothOneModelNote'),
+                t('aiFunctionCard.unslothTunnelNote'),
+              ].join('\n\n')}
+            />
+          </Box>
+        )}
+
         {/* Base URL */}
         {providerInfo?.requiresBaseUrl && (
           <TextField
@@ -2219,15 +2304,7 @@ export function AIFunctionCard({
             fullWidth
             placeholder={providerInfo.defaultBaseUrl}
             sx={{ mb: 2 }}
-            helperText={
-              provider === 'ollama'
-                ? t('aiFunctionCard.baseUrlHelperOllama')
-                : provider === 'lmstudio'
-                  ? t('aiFunctionCard.baseUrlHelperLmStudio')
-                  : provider === 'zai'
-                    ? t('aiFunctionCard.baseUrlHelperZai')
-                    : t('aiFunctionCard.baseUrlHelperCompatible')
-            }
+            helperText={t(copy.baseUrlHelper)}
           />
         )}
 
@@ -2281,8 +2358,9 @@ export function AIFunctionCard({
             */}
             {serverStatus?.reachable && (
               <Typography variant="body2" sx={{ mt: 1 }}>
-                {t('aiFunctionCard.serverSummary', {
+                {t(copy.serverSummary, {
                   api: serverStatus.api ?? '?',
+                  version: serverStatus.version ?? '?',
                   total: serverStatus.totalModels,
                   language: serverStatus.languageModels,
                   embedding: serverStatus.embeddingModels,
@@ -2314,14 +2392,7 @@ export function AIFunctionCard({
         <DialogTitle>{t('aiFunctionCard.dialogAddCustomTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {provider === 'ollama' && t('aiFunctionCard.addCustomDialog_ollama')}
-            {provider === 'lmstudio' && t('aiFunctionCard.addCustomDialog_lmstudio')}
-            {provider === 'openrouter' && t('aiFunctionCard.addCustomDialog_openrouter')}
-            {provider === 'huggingface' && t('aiFunctionCard.addCustomDialog_huggingface')}
-            {provider === 'zai' && t('aiFunctionCard.addCustomDialog_zai')}
-            {provider !== 'ollama' && provider !== 'lmstudio' && provider !== 'openrouter' &&
-              provider !== 'huggingface' && provider !== 'zai' &&
-              t('aiFunctionCard.addCustomDialog_compatible')}
+            {t(copy.addCustomDialog)}
           </Typography>
           {/*
             What the server says it has. Shown above the free-text field so the
@@ -2351,14 +2422,17 @@ export function AIFunctionCard({
 
               {!discovering && discovery && !discovery.reachable && (
                 <Alert severity="info">
-                  {t('aiFunctionCard.discoverUnreachable', {
-                    url: baseUrl || providerInfo?.defaultBaseUrl || '',
-                  })}
+                  {t(copy.discoverUnreachable, { url: baseUrl || providerInfo?.defaultBaseUrl || '' })}
+                  {discovery.error && (
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      {discovery.error}
+                    </Typography>
+                  )}
                 </Alert>
               )}
 
               {!discovering && discovery?.reachable && discovery.models.length === 0 && (
-                <Alert severity="info">{t('aiFunctionCard.discoverNoneForRole')}</Alert>
+                <Alert severity="info">{t(copy.discoverNoneForRole)}</Alert>
               )}
 
               {!discovering && discovery?.reachable && discovery.models.length > 0 && (
@@ -2414,17 +2488,7 @@ export function AIFunctionCard({
             }}
             fullWidth
             size="small"
-            placeholder={
-              provider === 'ollama'
-                ? t('aiFunctionCard.placeholderOllama')
-                : provider === 'openrouter'
-                  ? t('aiFunctionCard.placeholderOpenrouter')
-                  : provider === 'huggingface'
-                    ? t('aiFunctionCard.placeholderHuggingface')
-                    : provider === 'zai'
-                      ? t('aiFunctionCard.placeholderZai')
-                      : t('aiFunctionCard.placeholderDefault')
-            }
+            placeholder={t(copy.modelPlaceholder)}
             helperText={supportsDiscovery ? t('aiFunctionCard.discoverManualHint') : undefined}
             disabled={dialogTesting}
             sx={{ mb: 2 }}

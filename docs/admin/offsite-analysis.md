@@ -37,11 +37,23 @@ Released or expired batches can still be imported. If a title was analysed anoth
 
 5. Upload the `.results.jsonl` file the runner wrote (next to the batch file) on the Offsite analysis page.
 
+### Running an Analysis Bench File
+
+The Analysis bench's **Run a model by hand** downloads a file in the same format, and the same runner answers it. The difference is that a bench file holds one prompt **per model**, and each line names the model it is for. Run the runner once per model, naming its lines with `--label` (the name you typed on the bench) and the model to answer them with `--model`:
+
+```
+node run-offsite-analysis.mjs bench-xxxxxxxx.jsonl --label qwen --model qwen3-30b-a3b
+node run-offsite-analysis.mjs bench-xxxxxxxx.jsonl --label gemma --model gemma-3-27b
+```
+
+Every run adds to the same `.results.jsonl`, and a run skips lines already answered, so the models can run one after another (load each in LM Studio in turn). Paste the results file's contents into the comparison's import box. Without `--label`, the runner refuses a file naming more than one model and prints the command for each: sending every line to one model would answer each model's prompt with that one model. If `--model` is exactly one of the names, it picks that model's lines by itself.
+
 ### Runner options
 
 | Option | Default | What it does |
 |--------|---------|--------------|
 | `--model <id>` | (required) | The model, as the server lists it |
+| `--label <name>` | none | Bench files only: run the lines for this model, as named on the bench |
 | `--out <file>` | `<batch>.results.jsonl` | Where answers are written |
 | `--base-url <url>` | `http://localhost:1234/v1` | Any OpenAI-compatible server |
 | `--api-key <key>` | none | Sent as a Bearer token |

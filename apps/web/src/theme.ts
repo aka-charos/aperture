@@ -164,12 +164,12 @@ export const palette = {
 
 /**
  * The light mode, laid out the way a light palette guide lays out a site: two
- * ACCENT colours for calls to action (terracotta, and slate teal as the cool
- * second accent), the CONTRAST colours from dark to pale for text and state
- * (navy ink, a grey-navy for secondary text, sage, pale sage), three BASE
- * colours for the surfaces, all warm beige and none of them white, and the
- * status colours. The accent is the primary colour; the selected page and a
- * selected toggle sit on pale sage; depth comes from the base steps and
+ * ACCENT colours for calls to action (slate teal, and deep mauve as the second
+ * accent), the CONTRAST colours from dark to pale for text and state
+ * (blue-black ink, a slate grey for secondary text, green, pale mauve),
+ * three BASE colours for the surfaces, all soft neutral grey and none of them
+ * white, and the status colours. The accent is the primary colour; the
+ * selected page and a selected toggle sit on pale mauve; depth comes from the base steps and
  * borders rather than from shadows. An admin's own brand pair replaces both
  * accents when one is set.
  *
@@ -182,7 +182,7 @@ export const palette = {
 interface LightScheme {
   /** Accent 1: the primary colour (contained buttons, tabs, switches, progress). */
   accent: string
-  /** Accent 2: the secondary colour, the cool counterpart to the terracotta. */
+  /** Accent 2: the secondary colour, a deep mauve beside the slate teal. */
   accentDeep: string
   /** Text and icons set ON an accent or a status colour (button labels). */
   onAccent: string
@@ -200,7 +200,7 @@ interface LightScheme {
   onHighlight: string
   /** Information: a blue-slate, apart from secondary text and the accents. */
   info: string
-  /** Errors: a crimson, apart from the terracotta accent. */
+  /** Errors: a crimson, apart from both accents. */
   error: string
   warning: string
   /** Base 1: behind everything. */
@@ -228,38 +228,39 @@ interface LightScheme {
 }
 
 /**
- * Vintage: the palette's beige (#e5dac6, taken a shade darker for the canvas so
- * the sheets stand off it) as the base, its navy (#33364d) as
- * ink, sage (#6f9984) as the cool contrast, terracotta (#cc6f57) as the accent
- * and slate teal (#4f6466) as the second accent. Every text-bearing colour is
- * taken a shade deeper than the palette where it had to be to reach 4.5:1 on
- * the beige; the palette's own terracotta and rust read at about 3:1 there.
+ * Dusk: a six-step palette, read from dark to light as #191d23 (ink), #57707a
+ * (slate teal), #7e919f (blue-grey), #979dab (grey-lavender), #c5bac4 (mauve)
+ * and #dedcdc (the lightest, a soft neutral grey, never white). The slate teal is
+ * the accent and a deep mauve the second accent; the selected page sits on a
+ * pale tint of the mauve. The bases step down from #dedcdc so cards stand off
+ * the canvas. Every text-bearing colour is the palette's hue taken deep enough
+ * to reach 4.5:1 on every base and on the highlight.
  */
 const LIGHT_SCHEME: LightScheme = {
-  accent: '#914532',
-  accentDeep: '#4b5f61',
-  onAccent: '#f6f0e6',
-  ink: '#33364d',
-  muted: '#585a6c',
-  sage: '#39634f',
-  highlight: '#cddfd4',
-  highlightHover: '#c0d6c9',
-  onHighlight: '#2f4a3d',
-  info: '#3e5577',
-  error: '#a52a3a',
-  warning: '#795418',
-  canvas: '#ded3bd',
-  sheet: '#ebe3d4',
-  raised: '#efe9dd',
-  raisedHover: '#e5dccb',
-  border: '#d4c7ad',
-  borderStrong: '#bcab8b',
-  borderHover: '#8a7a5c',
-  tableHead: '#e3d8c3',
-  fill: '#d8cbb1',
-  fillDeep: '#d5c8ae',
-  scrollbar: '#c2b394',
-  placeholder: ['#d9ccb2', '#c4b192'],
+  accent: '#40565f',
+  accentDeep: '#5c4a5b',
+  onAccent: '#dedcdc',
+  ink: '#191d23',
+  muted: '#454b57',
+  sage: '#30533f',
+  highlight: '#d4cad3',
+  highlightHover: '#cbbfca',
+  onHighlight: '#191d23',
+  info: '#284a72',
+  error: '#8c2432',
+  warning: '#66410f',
+  canvas: '#d2d0d4',
+  sheet: '#d9d7d9',
+  raised: '#dedcdc',
+  raisedHover: '#d3d1d4',
+  border: '#c6c3c8',
+  borderStrong: '#a9acb7',
+  borderHover: '#7e919f',
+  tableHead: '#d0ced2',
+  fill: '#c8c5ca',
+  fillDeep: '#cdcace',
+  scrollbar: '#979dab',
+  placeholder: ['#c5bac4', '#7e919f'],
 }
 
 /**
@@ -354,7 +355,7 @@ function lightSurfaces(s: LightScheme): SurfaceTokens {
   }
 }
 
-/** The light mode's selected page: a pale sage pill, the palest contrast colour. */
+/** The light mode's selected page: a pale mauve pill, the palest contrast colour. */
 function lightNav(s: LightScheme): NavTokens {
   return { selectedBg: s.highlight, selectedHoverBg: s.highlightHover, selectedText: s.onHighlight, selectedIcon: s.onHighlight }
 }
@@ -465,9 +466,9 @@ const BUTTON_SIZES = { sizeSmall: { fontSize: '0.75rem' }, sizeLarge: { fontSize
 const TAB_TYPE = { fontFamily: SANS_FONT, fontSize: '0.875rem', letterSpacing: '0.02857em' }
 
 /**
- * The light mode's look: crisper 6px corners, every working surface a beige
- * sheet with a 1px border on the beige canvas, terracotta as the primary
- * colour, a pale sage pill for the selected page, tinted table headers, and
+ * The light mode's look: crisper 6px corners, every working surface a soft grey
+ * sheet with a 1px border on a slightly deeper grey canvas, slate teal as the
+ * primary colour, a pale mauve pill for the selected page, tinted table headers, and
  * transitions on colour only. Every colour here comes from the scheme (`lightColourCallSites`
  * in themeColorCallSites.test.ts holds it to that).
  */
@@ -636,7 +637,7 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
       MuiTab: {
         styleOverrides: { root: { ...TAB_TYPE, '&.Mui-selected': { fontWeight: 600 } } },
       },
-      // The active side of a segmented control is filled with the same pale sage
+      // The active side of a segmented control is filled with the same pale mauve
       // as the selected page in the sidebar.
       MuiToggleButton: {
         styleOverrides: {

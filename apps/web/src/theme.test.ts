@@ -49,16 +49,16 @@ test("the browser chrome is told each mode's own page colour", () => {
  * scheme object, so an override that bypasses the scheme is caught too.
  *
  * No surface is white: the operator's rule after paper-white sheets were tried
- * and rejected. The ceiling sits just above the lightest base step (#efe9dd,
- * luminance 0.818), so any background drifting toward white fails here.
+ * and rejected. The ceiling sits just above the lightest base step (#dedcdc,
+ * luminance 0.719), so any background drifting toward white fails here.
  *
  * Every colour that carries text reaches 4.5:1 (WCAG AA for normal text) on
  * every surface it sits on, and every label reaches it on its own fill. The
- * palette's own terracotta and rust read at about 3:1 on the beige, which is
- * how a first version shipped unreadable button labels and tab names.
+ * first Vintage palette's own terracotta and rust read at about 3:1 on its
+ * beige, which is how a version shipped unreadable button labels and tab names.
  */
 const { getLuminance, getContrastRatio } = require('@mui/material/styles') as typeof import('@mui/material/styles')
-const LIGHT_SURFACE_CEILING = 0.83
+const LIGHT_SURFACE_CEILING = 0.75
 const AA_TEXT = 4.5
 
 test('no light-mode surface is white', () => {

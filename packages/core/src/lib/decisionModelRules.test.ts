@@ -8,6 +8,7 @@ import {
   isRetryableDecisionFailure,
   isSystemicDecisionFailure,
   modelsUrlFor,
+  parseDecisionCatalog,
   readNoul,
   readSystemOneUsage,
   sanitizeDecisionModelConfig,
@@ -52,7 +53,10 @@ test('a self-hosted URL is accepted as root, /v1 or the full endpoint', () => {
   assert.equal(systemOneUrl('http://host.docker.internal:11435/v1'), want)
   assert.equal(systemOneUrl('http://host.docker.internal:11435/v1/systemone'), want)
   assert.equal(systemOneUrl('  http://host.docker.internal:11435/v1/  '), want)
-  assert.equal(modelsUrlFor('http://localhost:8009'), 'http://localhost:8009/v1/models')
+  assert.equal(
+    modelsUrlFor('http://localhost:8009'),
+    'http://localhost:8009/v1/models?output_modalities=decisions'
+  )
 })
 
 test('anything that is not an http URL has no endpoint', () => {
@@ -109,4 +113,51 @@ test('only configuration faults stop a run at the first failure', () => {
   }
   for (const status of [429, 529, 500, 503]) assert.equal(isRetryableDecisionFailure(status), true)
   for (const status of [400, 401, 422, undefined]) assert.equal(isRetryableDecisionFailure(status), false)
+})
+
+test('a server that serves chat models too offers only its decision models', () => {
+  // Unsloth Studio's /v1/models, as a live server (v0.1.911-beta) answered it:
+  // a chat GGUF beside two decision models, the second two verbatim.
+  const listed = parseDecisionCatalog({
+    object: 'list',
+    data: [
+      {
+        id: 'ornith-ai/Ornith-1.5-9B-GGUF',
+        object: 'model',
+        owned_by: 'unsloth-studio',
+        loaded: false,
+        quant: 'Q4_K_M',
+      },
+      {
+        id: 'laya-multilingual',
+        object: 'model',
+        owned_by: 'unsloth',
+        architecture: { input_modalities: ['text'], output_modalities: ['decisions'] },
+      },
+      {
+        id: 'clef',
+        object: 'model',
+        owned_by: 'unsloth',
+        architecture: { input_modalities: ['text', 'image'], output_modalities: ['decisions'] },
+      },
+      { id: 'some-text-model', architecture: { output_modalities: ['text'] } },
+    ],
+  })
+  // The chat GGUF names no modality, so it survives the filter: that is why the
+  // URL asks the server for decision models rather than relying on this alone.
+  assert.deepEqual(
+    listed.map((m) => m.id),
+    ['ornith-ai/Ornith-1.5-9B-GGUF', 'laya-multilingual', 'clef']
+  )
+})
+
+test('a catalog that never mentions modality keeps every entry', () => {
+  assert.deepEqual(
+    parseDecisionCatalog({ models: [{ name: 'kev-4b' }, { id: 'jev-1.13', context_length: 8192 }] }),
+    [
+      { id: 'kev-4b', name: null, contextLength: null, inputPricePerMillion: null },
+      { id: 'jev-1.13', name: null, contextLength: 8192, inputPricePerMillion: null },
+    ]
+  )
+  assert.deepEqual(parseDecisionCatalog(null), [])
 })

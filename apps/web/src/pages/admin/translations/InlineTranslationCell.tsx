@@ -4,8 +4,7 @@ import CheckIcon from '@mui/icons-material/Check'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import { useTranslation } from 'react-i18next'
-import { diffInterpolationTokens } from '../../../i18n/flatten'
-import { decideInlineSave, isUntranslated } from './catalogFilter'
+import { decideInlineSave, isUntranslated, tokenMismatchMessage } from './catalogFilter'
 import type { TranslationCatalog } from './useTranslationCatalog'
 
 interface InlineTranslationCellProps {
@@ -92,13 +91,7 @@ export function InlineTranslationCell({ keyPath, locale, catalog }: InlineTransl
     }
   }
 
-  const tokens = diffInterpolationTokens(english, draft)
-  const tokenProblem = [
-    tokens.missing.length > 0 ? t('admin.translationsPage.tokenMismatchMissing', { tokens: tokens.missing.join(', ') }) : '',
-    tokens.extra.length > 0 ? t('admin.translationsPage.tokenMismatchExtra', { tokens: tokens.extra.join(', ') }) : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const tokenProblem = tokenMismatchMessage(t, english, draft)
   const sameAsEnglish = isUntranslated(bundledEnglish, draft)
 
   return (

@@ -13,7 +13,7 @@ Every configured role is priced into one of three states:
 | State | Display |
 |-------|---------|
 | **Priced** | Per-million input/output price from the catalog |
-| **Local** | Self-hosted (Ollama, LM Studio) — free, shown with a green **Local** chip |
+| **Local** | Self-hosted (Ollama, LM Studio, Unsloth Studio) — free, shown with a green **Local** chip |
 | **Unknown** | An em-dash with a tooltip — **"No published price for this model"** |
 
 Unknown pricing triggers a warning: totals are an **undercount**, and unpriced roles are *not counted as free*. Unknown is never rendered as $0.

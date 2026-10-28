@@ -89,10 +89,10 @@ import {
   getLmStudioModelCapabilities,
   lmStudioInferenceBaseUrl,
 } from './local-model-capabilities.js'
+import { unslothInferenceBaseUrl } from './unslothServer.js'
 import { describeAiError } from './aiErrors.js'
 import {
   isCustomModelProvider,
-  isLocalModelProvider,
   type CustomModelProvider,
 } from './ai-capabilities/customModels.js'
 import { formatContextWindow } from './ai-capabilities/contextWindow.js'
@@ -117,6 +117,7 @@ export type ProviderType =
   | 'anthropic'
   | 'ollama'
   | 'lmstudio'
+  | 'unsloth'
   | 'openai-compatible'
   | 'groq'
   | 'google'
@@ -754,6 +755,25 @@ function createProviderInstance(providerConfig: ProviderConfig, role?: AIFunctio
       })
       break
 
+    // Unsloth Studio speaks the OpenAI wire format under /v1, backed by
+    // llama-server, so it takes the same provider LM Studio does, for the same
+    // reason it is named rather than an "OpenAI-Compatible" preset: only a named
+    // Unsloth can read its model list and say what it needs (unslothServer.ts).
+    // Nothing here sends `enable_tools`, Unsloth's opt-in for its own server-
+    // side Python, terminal and web search — the assistant's tools are this
+    // app's, and those must never run on the operator's machine on its behalf.
+    case 'unsloth':
+      instance = createOpenAICompatible({
+        name: 'unsloth',
+        baseURL: unslothInferenceBaseUrl(providerConfig.baseUrl),
+        // Optional: Unsloth's keyless access covers localhost and private
+        // addresses, and a Tailscale or public address needs `sk-unsloth-…`.
+        apiKey: providerConfig.apiKey,
+        // A local generation; a reload after Unsloth's idle unload is minutes.
+        fetch: localInferenceFetch,
+      })
+      break
+
     case 'openai-compatible':
       instance = createOpenAICompatible({
         name: 'openai-compatible',
@@ -837,6 +857,51 @@ function createProviderInstance(providerConfig: ProviderConfig, role?: AIFunctio
  * another role instead of requiring it to be re-entered — and re-persisted —
  * per role. Returns undefined if nothing is found (caller decides what to do).
  */
+/**
+ * Remove a provider's saved API key everywhere one is stored: the shared
+ * per-provider store and every role's own copy. Returns how many places held
+ * one.
+ *
+ * Needed once a key became optional (Unsloth Studio): an empty key field means
+ * "keep the saved one", which is right while a provider cannot work without a
+ * key and leaves no way back to keyless access once one is saved. And it has to
+ * be every copy, because `resolveApiKeyForProvider` lends a role's own key to
+ * the others, so clearing the shared store alone would leave the key in use.
+ */
+export async function forgetProviderApiKey(provider: ProviderType): Promise<number> {
+  let removed = 0
+
+  const credsJson = await getSystemSetting('ai_provider_credentials')
+  if (credsJson) {
+    const creds = JSON.parse(credsJson) as Record<string, { apiKey?: string; baseUrl?: string }>
+    const entry = creds[provider]
+    if (entry?.apiKey) {
+      removed++
+      const { apiKey: _removed, ...rest } = entry
+      if (rest.baseUrl) creds[provider] = rest
+      else delete creds[provider]
+      await setSystemSetting('ai_provider_credentials', JSON.stringify(creds), 'Stored credentials for AI providers')
+    }
+  }
+
+  const config = await getAIConfig()
+  let changed = false
+  for (const fn of AI_FUNCTIONS) {
+    const role = config[fn]
+    if (role?.provider === provider && role.apiKey) {
+      const { apiKey: _removed, ...rest } = role
+      config[fn] = rest
+      removed++
+      changed = true
+    }
+  }
+  if (changed) await setAIConfig(config)
+  // The cached instances were built with the key.
+  cachedProviders.clear()
+
+  return removed
+}
+
 async function resolveApiKeyForProvider(provider: ProviderType): Promise<string | undefined> {
   // 1) Shared per-provider credential store (written by the settings UI)
   const credsJson = await getSystemSetting('ai_provider_credentials')
@@ -1130,6 +1195,9 @@ export async function getEmbeddingInvocation(): Promise<EmbeddingInvocation> {
       // LM Studio is served by the same openai-compatible provider, so it
       // exposes the same method. Omitting it here would not degrade embeddings,
       // it would throw on the first batch — the switch has no working default.
+      // `unsloth` is absent on purpose and falls to that default: its
+      // /v1/embeddings may answer from a model other than the one named, which
+      // would store one space's vectors under another's set id (unsloth.json).
       case 'google':
       case 'lmstudio':
       case 'openai-compatible':
@@ -2119,6 +2187,17 @@ export function assumedCustomModelCapabilities(fn: AIFunction): ModelCapabilitie
 }
 
 /**
+ * Whether a provider's capabilities are read off a server at its base URL,
+ * which callers must resolve first. Not `isLocalModelProvider`: Unsloth Studio
+ * is local but publishes no per-model capabilities to probe, so resolving its
+ * address for a probe that never runs is a settings read for nothing. The
+ * branches of `liveModelCapabilities` below are the ones listed here.
+ */
+function probesLocalServer(providerId: string): boolean {
+  return providerId === 'ollama' || providerId === 'lmstudio' || providerId === 'openai-compatible'
+}
+
+/**
  * Live per-model capability sources, by provider:
  * - OpenRouter: public model catalog (supported parameters per model)
  * - Ollama: the show endpoint's capabilities list
@@ -2202,7 +2281,7 @@ export async function getAICapabilitiesStatus(): Promise<AICapabilitiesStatus> {
     // credential store rather than on this function's config
     const baseUrl =
       fnConfig.baseUrl ??
-      (isLocalModelProvider(fnConfig.provider)
+      (probesLocalServer(fnConfig.provider)
         ? await resolveBaseUrlForProvider(fnConfig.provider)
         : undefined)
 
@@ -2991,7 +3070,7 @@ export async function getModelsForFunctionWithCustom(
   // Local-server probes need the provider's base URL, which lives in the
   // shared credential store or on whichever function uses the provider
   const probeBaseUrl =
-    customModels.length > 0 && isLocalModelProvider(providerId)
+    customModels.length > 0 && probesLocalServer(providerId)
       ? await resolveBaseUrlForProvider(providerId as ProviderType)
       : undefined
 

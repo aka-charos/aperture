@@ -83,6 +83,20 @@ export function explanationBatchSettings(
     return { batchSize: 10, maxTokens: 16000 }
   }
 
+  // Unsloth Studio: a small batch, as for any local server, but a reasoning
+  // ceiling. Unsloth's own launch examples start the models it serves with
+  // reasoning ON, and no reasoning effort can be sent to it (it is set when the
+  // model loads), so at 1,000 tokens the scratchpad alone overruns the cap and
+  // every batch falls back to the template (F-030's failure). The context
+  // objection to raising the local tiers holds less here: Unsloth fixes the
+  // window at load and picks a large one by default, and llama-server stops a
+  // reply at a full context rather than refusing the request. 6,000 is not
+  // measured; it is three explanations of prose plus a typical scratchpad,
+  // well short of the large-context tier's.
+  if (provider === 'unsloth') {
+    return { batchSize: 3, maxTokens: 6000 }
+  }
+
   // Medium context: Groq (8K context)
   if (provider === 'groq') {
     return { batchSize: 5, maxTokens: 1500 }

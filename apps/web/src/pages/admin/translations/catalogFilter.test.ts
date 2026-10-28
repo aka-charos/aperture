@@ -5,6 +5,7 @@ import {
   decideInlineSave,
   isUntranslated,
   keyMatchesFilter,
+  tokenMismatchMessage,
   type CatalogFilter,
 } from './catalogFilter'
 
@@ -89,4 +90,14 @@ test('inline saves follow the edit dialog', () => {
   assert.deepEqual(decideInlineSave({ ...overridden, draft: 'Home' }), { kind: 'reset' })
   assert.deepEqual(decideInlineSave({ ...overridden, draft: '' }), { kind: 'reset' })
   assert.deepEqual(decideInlineSave({ ...overridden, draft: 'Αρχή' }), { kind: 'save', value: 'Αρχή' })
+})
+
+test('tokenMismatchMessage names missing and extra tokens, and is empty when they match', () => {
+  const t = (key: string, options?: Record<string, unknown>) => `${key.split('.').pop()}:${String(options?.tokens)}`
+  assert.equal(tokenMismatchMessage(t, 'Hi {{name}}', 'Γεια {{name}}'), '')
+  assert.equal(tokenMismatchMessage(t, 'Hi {{name}}', 'Γεια'), 'tokenMismatchMissing:name')
+  assert.equal(
+    tokenMismatchMessage(t, 'Hi {{name}}', 'Γεια {{foo}}'),
+    'tokenMismatchMissing:name tokenMismatchExtra:foo'
+  )
 })

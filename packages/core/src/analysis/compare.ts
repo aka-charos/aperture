@@ -1272,6 +1272,9 @@ export async function exportManualComparison(
           year: run.year,
           attempt: 0,
           prompt,
+          // The model this line is for. Without it the runner cannot tell a
+          // bench's lines apart and answers all of them with one model.
+          label: row.model,
         },
         {
           promptVersion: row.prompt_version,

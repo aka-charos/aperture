@@ -827,7 +827,31 @@
       "recommendTooltip": "Envie para as suas conexões",
       "machineTranslated": "Tradução automática",
       "showOriginal": "Mostrar original",
-      "showTranslation": "Mostrar tradução"
+      "showTranslation": "Mostrar tradução",
+      "rating": {
+        "label": {
+          "imdb": "IMDb",
+          "tmdb": "TMDB",
+          "mediaServer": "Media server",
+          "critics": "Critics",
+          "combined": "{{audience}} + critics"
+        },
+        "source": {
+          "imdb": "IMDb",
+          "tmdb": "TMDB",
+          "mediaServer": "your media server",
+          "metacritic": "Metacritic",
+          "rt": "Rotten Tomatoes"
+        },
+        "explain": {
+          "combined": "One rating made of {{audience}} ({{audienceShare}}%) and critics ({{criticsShare}}%: {{critics}}), each put on IMDb's scale first. It's the rating your recommendations use.",
+          "audience": "The {{audience}} rating; there are no critic scores for this title. It's the rating your recommendations use.",
+          "audienceSeries": "The {{audience}} rating. Series use audience ratings only, because critic scores for shows are rare. It's the rating your recommendations use.",
+          "critics": "Made from critic scores ({{critics}}), put on IMDb's scale; there is no audience rating for this title. It's the rating your recommendations use.",
+          "combinedNoShares": "One rating made of {{audience}} and critics ({{critics}}), each put on IMDb's scale first. It's the rating your recommendations use.",
+          "unknown": "It's the rating your recommendations use."
+        }
+      }
     },
     "insights": {
       "recommendedForYou": "Recomendado para você",
@@ -1929,7 +1953,25 @@
     "testFlexRefused": "A test request on flex failed: {{error}}. Flex is never moved to standard capacity, so flex calls fail while this lasts.",
     "testFlexNotSent": "The flex field did not reach the test request, so flex calls would bill at the standard rate.",
     "inputTypeNoneRecommended": "No retrieval mode is recommended for this model",
-    "savedFallbackKey": "Saved key {{hint}}"
+    "savedFallbackKey": "Saved key {{hint}}",
+    "apiKeyOptionalPlaceholder": "Optional: your {{provider}} API key",
+    "unslothApiKeyHelper": "Needed unless {{appName}} reaches Unsloth on localhost or a private network address (10.x, 172.16–31.x, 192.168.x) with Keyless API access on. Create one in Unsloth under Settings → API; it starts with sk-unsloth-.",
+    "unslothSetupTitle": "Connect Unsloth Studio",
+    "unslothStepListen": "Unsloth listens only on localhost unless started with -H 0.0.0.0, and its machine's firewall must let the port through (8888 by default). From a container, the host machine is usually host.docker.internal.",
+    "unslothStepSwitch": "In Unsloth, turn on Settings → API → \"Switch model by request\", so it loads the model {{appName}} names. With it off, only the model you loaded by hand answers. Leave \"Download missing models\" off: a mistyped id would start a large download.",
+    "unslothStepKey": "Keyless API access covers localhost and private addresses (10.x, 172.16–31.x, 192.168.x) only. Reaching Unsloth over Tailscale, a VPN or a public address needs an API key from Settings → API.",
+    "unslothContextNote": "Unsloth fixes a model's context window when it loads it, and a request cannot raise it. A title analysis prompt runs to roughly 20,000 tokens, so load the model with enough context (unsloth run … -c 32768). Test shows the window of a loaded model.",
+    "unslothOneModelNote": "Unsloth normally keeps one chat model loaded, and its idle auto-unload frees it after a quiet spell. Point several roles at different models and it reloads one from disk at every switch; the first call after an unload waits for a reload too.",
+    "baseUrlHelperUnsloth": "Unsloth Studio's address. The default port is 8888; /v1 is added if you leave it off.",
+    "addCustomDialog_unsloth": "Pick from the models Unsloth Studio has downloaded. Anything downloaded in Unsloth shows up here; a model that is not loaded answers once \"Switch model by request\" is on.",
+    "discoverUnreachableUnsloth": "Couldn't read a model list from {{url}}. Check that Unsloth is running and listening on that address (-H 0.0.0.0 for anything but localhost), and that the API key is right: a Tailscale or public address always needs one.",
+    "discoverNoneForRoleUnsloth": "Unsloth answered, but none of its downloaded models is a language model. Download one in Unsloth and refresh.",
+    "unslothServerSummary": "Unsloth Studio {{version}} answered: {{total}} models downloaded ({{language}} language).",
+    "placeholderUnsloth": "e.g., ornith-ai/Ornith-1.5-9B-GGUF",
+    "removeSavedKey": "Remove saved key",
+    "savedKeyRemoved": "Saved API key removed. Requests now go without one.",
+    "removeSavedKeyFailed": "Could not remove the saved API key.",
+    "unslothTunnelNote": "Unsloth's --secure address (a Cloudflare quick tunnel) does not carry streamed replies, and title analysis streams. Reach Unsloth directly, over your network or Tailscale, for that role."
   },
   "tmdbExternalModal": {
     "defaultSource": "TMDb",
@@ -2069,7 +2111,9 @@
     "analysisNotYet": "No analysis has been written for this title yet. Open its page to generate one.",
     "analysisDeclined": "An analysis was attempted, but there was not enough published writing about this title to work from.",
     "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it.",
-    "sectionUntitled": "Results"
+    "sectionUntitled": "Results",
+    "moreLink": "More",
+    "moreAbout": "More about {{title}}"
   },
   "similarityGraph": {
     "loadingFallback": "Carregando…",
@@ -5050,7 +5094,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own terracotta and slate teal. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "The light appearance answers the default pair with its own slate teal and deep mauve. Save any other pair and both appearances use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -5160,7 +5204,8 @@
       "recommendations": "Recommendations",
       "appearance": "Appearance",
       "access": "Access",
-      "ops": "Operations"
+      "ops": "Operations",
+      "communication": "Communication"
     },
     "overview": {
       "title": "Overview",
@@ -5362,6 +5407,14 @@
     "offsiteAnalysis": {
       "title": "Offsite analysis",
       "blurb": "Prepare film analysis prompts here, run them on another machine, and import the answers."
+    },
+    "newsletters": {
+      "title": "Newsletters",
+      "blurb": "Write and send newsletters with titles from the library."
+    },
+    "newsletterGroups": {
+      "title": "Send groups",
+      "blurb": "Who a newsletter goes to: by language, role, or hand-picked."
     }
   },
   "settingsEvaluation": {
@@ -5588,7 +5641,21 @@
     "promptVersionsShort": "prompts {{versions}}",
     "versionDraft": "v{{version}} (draft — bench only)",
     "versionVariant": "v{{version}} · {{label}} (variant — bench only)",
-    "variantsHint": "A variant is a different set of questions and rules for the same version, for a model that cannot hold that version’s own. It is never written to the library."
+    "variantsHint": "A variant is a different set of questions and rules for the same version, for a model that cannot hold that version’s own. It is never written to the library.",
+    "manualTitle": "Run a model by hand",
+    "manualHelp": "For a model this instance cannot call — one behind a web interface with no API. The prompts are built from one retrieval, you run them wherever the model lives, and you paste the answers back. Nothing is written to the library.",
+    "manualPlaceholder": "Name it, e.g. polystrata / some-model",
+    "manualAdd": "Add",
+    "manualStart": "Build {{count}} prompts",
+    "manualAwaitingTitle": "Waiting for answers",
+    "manualAwaitingHelp": "Download the prompts, run each one wherever that model lives, then paste the answers back — one JSON line per answer, carrying the custom_id from the line you downloaded and the model's reply as text.",
+    "manualDownload": "Download prompts",
+    "manualDownloadFailed": "Could not build that file.",
+    "manualPastePlaceholder": "{\"custom_id\": \"…\", \"text\": \"===ANALYSIS===\\n…\"}",
+    "manualImport": "Import answers",
+    "manualImportFailed": "Could not import those answers.",
+    "manualImported": "{{stored}} stored, {{unusable}} unusable, {{remaining}} still wanted.",
+    "manualUnmatched": "{{count}} line(s) named no answer in this run."
   },
   "settingsHomeSections": {
     "title": "Emby Home Screen Rows",
@@ -6810,6 +6877,206 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is a calm gray canvas with white panels; dark is easier on the eyes in a dim room. Remembered in this browser."
+    "cardDescription": "Light is a soft gray canvas with slate and mauve accents; dark is easier on the eyes in a dim room. Remembered in this browser."
+  },
+  "inlineEdit": {
+    "turnOn": "Edit text on screen",
+    "turnOff": "Stop editing text",
+    "toolbarTitle": "Editing text",
+    "toolbarHint": "Click any text to change it. Alt+click uses the page as normal.",
+    "compareWith": "Language shown beside English",
+    "stringsOnScreen_one": "{{count}} string on this screen",
+    "stringsOnScreen_other": "{{count}} strings on this screen",
+    "done": "Done",
+    "panelTitle": "Strings on this screen",
+    "panelHint": "Everything this screen has drawn, including text you cannot click, such as tooltips and messages.",
+    "panelFilter": "Filter by key or text",
+    "panelEmpty": "Nothing recorded yet.",
+    "closePanel": "Close the list",
+    "editorTitle": "Edit text",
+    "copyKey": "Copy the key",
+    "copied": "Copied",
+    "severalKeys_one": "This text comes from {{count}} key. Pick the one to edit:",
+    "severalKeys_other": "This text comes from {{count}} keys. Pick the one to edit:",
+    "unknownKey": "This key is not among the bundled English strings, so it may exist only in some languages.",
+    "edited": "Edited",
+    "sameAsEnglish": "Same as English",
+    "allLanguages": "All languages",
+    "saveShortcut": "Ctrl+Enter saves"
+  },
+  "newsletters": {
+    "status": {
+      "draft": "Draft",
+      "sending": "Sending",
+      "sent": "Sent",
+      "failed": "Not fully sent"
+    },
+    "fields": {
+      "poster": "Poster",
+      "year": "Year",
+      "runtime": "Runtime",
+      "genres": "Genres",
+      "rating": "Rating",
+      "director": "Director",
+      "directorSeries": "Created by",
+      "cast": "Cast",
+      "network": "Network",
+      "languages": "Languages",
+      "countries": "Countries",
+      "plot": "Plot",
+      "fullPlot": "Full synopsis",
+      "analysis": "Film analysis",
+      "link": "Link to the title"
+    },
+    "editor": {
+      "movie": "Movie",
+      "series": "Series",
+      "noFields": "Nothing selected: only the title is shown",
+      "chooseFields": "Choose what to show",
+      "removeTitle": "Remove",
+      "fieldsFor": "What to show for {{title}}",
+      "fullPlotWarning": "The full synopsis often gives the ending away.",
+      "back": "All newsletters",
+      "sendTest": "Send me a test",
+      "save": "Save draft",
+      "saved": "Saved",
+      "send": "Send",
+      "retry": "Send to the rest",
+      "duplicate": "Duplicate as new draft",
+      "cannotSend": "Newsletters cannot be sent yet: {{reason}}.",
+      "lastError": "Some messages did not go out: {{error}}",
+      "sendingProgress": "Sending… {{sent}} of {{total}} sent so far.",
+      "sentSummary": "Sent to {{sent}} people on {{date}}.",
+      "subject": "Subject",
+      "preheader": "Preview text",
+      "preheaderHelp": "The line inbox lists show beside the subject. Optional.",
+      "groups": "Send groups",
+      "noGroups": "No send groups yet. Create one under Send groups.",
+      "noRecipients": "Nobody in these groups will receive it yet: people need an email address and to switch newsletters on in their own settings.",
+      "audience": "Recipients: {{count}} ({{languages}})",
+      "deliveries": "Deliveries ({{count}})",
+      "recipient": "Recipient",
+      "language": "Language",
+      "result": "Result",
+      "delivered": "Delivered",
+      "preview": "Preview",
+      "previewLanguage": "Reader language",
+      "refresh": "Refresh",
+      "previewHelp": "Each person gets the email in their own app language: labels, plots and analyses are translated where a translation exists. Your own text is sent as you wrote it, and titles from libraries a person cannot open are left out of their copy.",
+      "confirmTitle": "Send this newsletter?",
+      "confirmBody": "“{{subject}}” will be emailed now. Recipients: {{count}}. It cannot be unsent.",
+      "sendNow": "Send now",
+      "testSent": "Test sent to {{to}}.",
+      "confirmRetry": "Send “{{subject}}” to the people it has not reached yet? It goes out exactly as the others received it."
+    },
+    "toolbar": {
+      "heading": "Heading",
+      "subheading": "Subheading",
+      "bold": "Bold",
+      "italic": "Italic",
+      "underline": "Underline",
+      "strike": "Strikethrough",
+      "bulletList": "Bulleted list",
+      "orderedList": "Numbered list",
+      "quote": "Quote",
+      "rule": "Divider",
+      "link": "Link",
+      "unlink": "Remove link",
+      "undo": "Undo",
+      "redo": "Redo",
+      "insertTitle": "Insert movie or show",
+      "linkHelp": "A web address starting with http:// or https://"
+    },
+    "picker": {
+      "title": "Insert a movie or show",
+      "search": "Search the library…",
+      "noResults": "Nothing in the library matches.",
+      "chooseFields": "Choose what the card shows. You can change it later from the card.",
+      "back": "Pick another",
+      "insert": "Insert"
+    },
+    "list": {
+      "title": "Newsletters",
+      "description": "Drafts and sent newsletters. Only people who switched newsletters on receive them.",
+      "manageGroups": "Send groups",
+      "new": "New newsletter",
+      "empty": "No newsletters yet.",
+      "status": "Status",
+      "updated": "Last changed",
+      "untitled": "Untitled",
+      "deletedGroup": "Deleted group",
+      "sentCount": "{{sent}} / {{total}}",
+      "confirmDelete": "Delete “{{subject}}”? This cannot be undone."
+    },
+    "groups": {
+      "title": "Send groups",
+      "description": "A group picks people by app language and role, and you can add or leave out anyone by hand. A newsletter goes to everyone in its groups who has switched newsletters on.",
+      "new": "New group",
+      "empty": "No send groups yet.",
+      "who": "Who",
+      "size": "Size",
+      "members": "Members",
+      "edit": "Edit",
+      "confirmDelete": "Delete the group “{{name}}”? Drafts using it will no longer send to it.",
+      "counts": "Members: {{members}} · Receiving: {{recipients}}",
+      "newTitle": "New send group",
+      "editTitle": "Edit send group",
+      "name": "Name",
+      "namePlaceholder": "e.g. Greek readers",
+      "descriptionLabel": "Description",
+      "matchRules": "Choose people by rules",
+      "matchRulesHelp": "Everyone who matches the rules below, plus anyone you add by hand.",
+      "matchNone": "Hand-picked only",
+      "matchNoneHelp": "Only the people you add by hand.",
+      "languages": "App languages",
+      "anyLanguage": "Any language",
+      "role": "Who",
+      "roleAny": "Everyone",
+      "roleViewers": "Viewers only (not admins)",
+      "roleAdmins": "Admins only",
+      "optInNote": "Being in a group does not subscribe anyone: only people who switched newsletters on in their settings, with an email address, receive them.",
+      "membersTitle": "Members of {{name}}",
+      "filter": "Filter by name or email",
+      "person": "Person",
+      "inGroup": "In group",
+      "receives": "Receives it",
+      "override": "By hand",
+      "admin": "Admin",
+      "noEmail": "No email address",
+      "reason": {
+        "rules": "By rules",
+        "included": "Added",
+        "excluded": "Left out",
+        "none": "Not in group"
+      },
+      "yes": "Yes",
+      "ineligible": {
+        "notOptedIn": "Newsletters switched off",
+        "noAddress": "No email address",
+        "noAccess": "No access"
+      },
+      "modeAuto": "Rules",
+      "modeInclude": "Add",
+      "modeExclude": "Leave out",
+      "summaryManual": "Hand-picked",
+      "summary": {
+        "any": "Everyone · {{languages}}",
+        "viewers": "Viewers · {{languages}}",
+        "admins": "Admins · {{languages}}"
+      }
+    },
+    "subscription": {
+      "title": "Newsletters",
+      "description": "Occasional emails from your server’s admins about what is new and worth watching.",
+      "noAddress": "Add an email address to your account to receive newsletters.",
+      "unavailable": "Your server is not sending newsletters at the moment.",
+      "error": "Could not save your choice."
+    },
+    "analysisParts": {
+      "title": "Which parts of the analysis",
+      "all": "All of it",
+      "some": "Only these parts",
+      "unlabelledNote": "An older analysis that is not divided into parts shows nothing here until it is rewritten."
+    }
   }
 }

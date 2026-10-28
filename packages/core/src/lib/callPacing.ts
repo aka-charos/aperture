@@ -57,7 +57,7 @@ const logger = createChildLogger('call-pacing')
  * no way to turn it on; wrongly offering it costs one unticked checkbox. The
  * mirror of this list in the web bundle is `PROVIDERS_WITHOUT_RATE_LIMIT`.
  */
-export const PROVIDERS_WITHOUT_RATE_LIMIT: readonly string[] = ['lmstudio', 'ollama']
+export const PROVIDERS_WITHOUT_RATE_LIMIT: readonly string[] = ['lmstudio', 'unsloth', 'ollama']
 
 /** Whether spacing a provider's calls can mean anything. Unknown reads as yes. */
 export function providerHasRateLimit(provider: string | null | undefined): boolean {

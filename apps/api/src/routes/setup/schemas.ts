@@ -443,7 +443,7 @@ const discoverAIModels = {
   tags: ['setup'],
   summary: 'Discover models installed on a local AI server',
   description:
-    'Read the installed models from a local inference server (LM Studio) and keep the ones that can hold the given role.',
+    'Read the installed models from a local inference server (LM Studio, Unsloth Studio) and keep the ones that can hold the given role.',
   body: {
     type: 'object' as const,
     additionalProperties: true,
@@ -460,7 +460,7 @@ const discoverAIModels = {
 const addCustomModel = {
   tags: ['setup'],
   summary: 'Add custom AI model',
-  description: 'Add a custom AI model definition for providers that support custom models (e.g., Ollama, LM Studio).',
+  description: 'Add a custom AI model definition for providers that support custom models (e.g., Ollama, LM Studio, Unsloth Studio).',
   body: {
     type: 'object' as const,
     additionalProperties: true,

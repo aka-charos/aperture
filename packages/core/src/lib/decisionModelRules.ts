@@ -157,10 +157,67 @@ export function systemOneUrl(baseUrl: string): string | null {
   return `${root}/v1/systemone`
 }
 
-/** The models list beside a self-hosted server's System One endpoint. */
+/**
+ * The models list beside a self-hosted server's System One endpoint, asked for
+ * decision models only.
+ *
+ * The modality is required for OpenRouter's reason (above): a server that also
+ * serves chat models lists THOSE under a bare `/v1/models`. Unsloth Studio is
+ * the case, measured live: the bare list held its four chat GGUFs and none of
+ * its fifteen decision models, so the card offered chat models as judges and
+ * every one of them failed. A server with only decision models ignores the
+ * parameter, and `parseDecisionCatalog` keeps any entry that says nothing about
+ * its modality, so asking costs nothing where it is not needed.
+ */
 export function modelsUrlFor(baseUrl: string): string | null {
   const url = systemOneUrl(baseUrl)
-  return url ? url.replace(/\/systemone$/, '/models') : null
+  return url ? url.replace(/\/systemone$/, '/models?output_modalities=decisions') : null
+}
+
+/** One entry of a decision catalog, as the card offers it. */
+export interface DecisionModelOption {
+  id: string
+  name: string | null
+  contextLength: number | null
+  /** USD per million input tokens; output is free on every listed model. */
+  inputPricePerMillion: number | null
+}
+
+/**
+ * Whether a catalog entry can answer System One. An entry that names its
+ * output modalities must include `decisions`; one that names none is kept,
+ * because a server that only serves decision models has no reason to say so,
+ * and dropping its whole list would read as "nothing installed".
+ */
+function answersDecisions(entry: Record<string, unknown>): boolean {
+  const modalities = (entry.architecture as { output_modalities?: unknown } | undefined)?.output_modalities
+  return !Array.isArray(modalities) || modalities.includes('decisions')
+}
+
+/**
+ * Read a decision catalog: OpenRouter's, or a self-hosted server's `/v1/models`.
+ * Pure. Accepts `data` (OpenAI's shape) or `models`, and `id` or `name`.
+ */
+export function parseDecisionCatalog(json: unknown): DecisionModelOption[] {
+  const data = (json as { data?: unknown; models?: unknown })?.data ?? (json as { models?: unknown })?.models
+  if (!Array.isArray(data)) return []
+  const out: DecisionModelOption[] = []
+  for (const entry of data) {
+    if (!entry || typeof entry !== 'object') continue
+    const e = entry as Record<string, unknown>
+    if (!answersDecisions(e)) continue
+    const id = typeof e.id === 'string' ? e.id : typeof e.name === 'string' ? e.name : null
+    if (!id) continue
+    const pricing = e.pricing as { prompt?: unknown } | undefined
+    const prompt = pricing?.prompt != null ? Number(pricing.prompt) : NaN
+    out.push({
+      id,
+      name: typeof e.name === 'string' && e.name !== id ? e.name : null,
+      contextLength: typeof e.context_length === 'number' ? e.context_length : null,
+      inputPricePerMillion: Number.isFinite(prompt) ? prompt * 1_000_000 : null,
+    })
+  }
+  return out
 }
 
 /** A yes/no question. The only kind this app asks. */

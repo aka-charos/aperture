@@ -17,7 +17,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import CheckIcon from '@mui/icons-material/Check'
 import { useTranslation } from 'react-i18next'
-import { diffInterpolationTokens } from '../../../i18n/flatten'
+import { tokenMismatchMessage } from './catalogFilter'
 import type { TranslationCatalog } from './useTranslationCatalog'
 
 interface EditKeyDialogProps {
@@ -117,9 +117,7 @@ export function EditKeyDialog({ open, keyPath, onClose, catalog }: EditKeyDialog
           {orderedLocales.map((locale) => {
             const defaultValue = defaults[locale.code]?.[keyPath] ?? ''
             const hasOverride = overrides[locale.code]?.[keyPath] !== undefined
-            const tokenDiff =
-              locale.code === 'en' ? null : diffInterpolationTokens(enDraft, drafts[locale.code] ?? '')
-            const hasTokenIssue = !!tokenDiff && (tokenDiff.missing.length > 0 || tokenDiff.extra.length > 0)
+            const tokenProblem = locale.code === 'en' ? '' : tokenMismatchMessage(t, enDraft, drafts[locale.code] ?? '')
 
             return (
               <Box key={locale.code}>
@@ -153,13 +151,9 @@ export function EditKeyDialog({ open, keyPath, onClose, catalog }: EditKeyDialog
                     {t('admin.translationsPage.defaultValueLabel')} {defaultValue}
                   </Typography>
                 )}
-                {hasTokenIssue && (
+                {tokenProblem && (
                   <Alert severity="warning" sx={{ mt: 0.5, py: 0 }}>
-                    {tokenDiff!.missing.length > 0 &&
-                      t('admin.translationsPage.tokenMismatchMissing', { tokens: tokenDiff!.missing.join(', ') })}
-                    {tokenDiff!.missing.length > 0 && tokenDiff!.extra.length > 0 && ' '}
-                    {tokenDiff!.extra.length > 0 &&
-                      t('admin.translationsPage.tokenMismatchExtra', { tokens: tokenDiff!.extra.join(', ') })}
+                    {tokenProblem}
                   </Alert>
                 )}
                 {errors[locale.code] && (

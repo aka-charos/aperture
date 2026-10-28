@@ -52,6 +52,8 @@ import { useAssistantDock } from '@/hooks/useAssistantDock'
 import { ExplorationConfigModal } from './ExplorationConfigModal'
 import { RunningJobsWidget } from './RunningJobsWidget'
 import { AdminMenuButton } from './AdminMenuButton'
+import { InlineEditButton } from './inlineEdit/InlineEditButton'
+import { InlineEditGate } from './inlineEdit/InlineEditGate'
 import { ImpersonationBanner, IMPERSONATION_BANNER_HEIGHT } from './ImpersonationBanner'
 import { AdminSearchProvider } from '@/hooks/AdminSearchProvider'
 import { GlobalSearch } from './GlobalSearch'
@@ -609,6 +611,9 @@ function AppShell() {
   // otherwise each need a copy of this arithmetic — and would each be a place
   // for it to go stale.
   const bannerHeight = impersonation ? IMPERSONATION_BANNER_HEIGHT : 0
+  // An assumed session is read-only (every override save would be refused),
+  // so inline text editing is offered only to an admin as themselves.
+  const canEditText = !!user?.isAdmin && !impersonation
 
   return (
     <Box
@@ -707,6 +712,15 @@ function AppShell() {
 
           {/* Administration */}
           {user?.isAdmin && <AdminMenuButton />}
+
+          {/* Inline text editing: click any string on screen to reword it, in
+              English and one other language, without the Translations page.
+              Not on a phone, where the bar has no room for it. */}
+          {canEditText && (
+            <Box sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
+              <InlineEditButton />
+            </Box>
+          )}
 
           {/* Global Search */}
           <GlobalSearch />
@@ -912,6 +926,8 @@ function AppShell() {
 
       {/* Exploration Config Modal - prompts admins to configure new AI provider */}
       <ExplorationConfigModal />
+
+      <InlineEditGate canEdit={canEditText} />
     </Box>
   )
 }

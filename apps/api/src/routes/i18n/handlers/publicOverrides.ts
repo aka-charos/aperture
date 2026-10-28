@@ -10,7 +10,9 @@ function overridesDir(): string {
   return process.env.I18N_OVERRIDES_DIR || '/config/i18n'
 }
 
-async function readFileOverrides(fastify: FastifyInstance, lng: string): Promise<Record<string, unknown>> {
+/** The operator file layer for one locale, `{}` when there is none. Also
+ *  read by the admin route the inline text editor uses (adminOverrides.ts). */
+export async function readFileOverrides(fastify: FastifyInstance, lng: string): Promise<Record<string, unknown>> {
   const file = path.join(overridesDir(), `overrides.${lng}.json`)
   try {
     const raw = await fs.readFile(file, 'utf8')

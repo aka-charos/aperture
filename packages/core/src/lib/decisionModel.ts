@@ -22,12 +22,16 @@ import {
   OPENROUTER_SYSTEMONE_URL,
   isRetryableDecisionFailure,
   modelsUrlFor,
+  parseDecisionCatalog,
   readSystemOneUsage,
   sanitizeDecisionModelConfig,
   systemOneUrl,
   type DecisionModelConfig,
+  type DecisionModelOption,
   type SystemOneCall,
 } from './decisionModelRules.js'
+
+export type { DecisionModelOption }
 
 const logger = createChildLogger('decision-model')
 
@@ -248,14 +252,6 @@ export async function callSystemOne(
   }
 }
 
-export interface DecisionModelOption {
-  id: string
-  name: string | null
-  contextLength: number | null
-  /** USD per million input tokens; output is free on every listed model. */
-  inputPricePerMillion: number | null
-}
-
 export interface DecisionModelCatalog {
   /** False when the server could not be asked — not the same as "lists nothing". */
   reachable: boolean
@@ -264,27 +260,6 @@ export interface DecisionModelCatalog {
 
 const CATALOG_TTL_MS = 10 * 60 * 1000
 let openRouterCatalog: { fetchedAt: number; catalog: DecisionModelCatalog } | null = null
-
-function parseCatalog(json: unknown): DecisionModelOption[] {
-  const data = (json as { data?: unknown; models?: unknown })?.data ?? (json as { models?: unknown })?.models
-  if (!Array.isArray(data)) return []
-  const out: DecisionModelOption[] = []
-  for (const entry of data) {
-    if (!entry || typeof entry !== 'object') continue
-    const e = entry as Record<string, unknown>
-    const id = typeof e.id === 'string' ? e.id : typeof e.name === 'string' ? e.name : null
-    if (!id) continue
-    const pricing = e.pricing as { prompt?: unknown } | undefined
-    const prompt = pricing?.prompt != null ? Number(pricing.prompt) : NaN
-    out.push({
-      id,
-      name: typeof e.name === 'string' && e.name !== id ? e.name : null,
-      contextLength: typeof e.context_length === 'number' ? e.context_length : null,
-      inputPricePerMillion: Number.isFinite(prompt) ? prompt * 1_000_000 : null,
-    })
-  }
-  return out
-}
 
 /**
  * What the configured source offers.
@@ -304,7 +279,7 @@ export async function listDecisionModels(config: DecisionModelConfig): Promise<D
         signal: AbortSignal.timeout(10_000),
       })
       if (!response.ok) return { reachable: false, models: [] }
-      const catalog = { reachable: true, models: parseCatalog(await response.json()) }
+      const catalog = { reachable: true, models: parseDecisionCatalog(await response.json()) }
       openRouterCatalog = { fetchedAt: Date.now(), catalog }
       return catalog
     } catch (err) {
@@ -324,7 +299,7 @@ export async function listDecisionModels(config: DecisionModelConfig): Promise<D
       signal: AbortSignal.timeout(10_000),
     })
     if (!response.ok) return { reachable: false, models: [] }
-    return { reachable: true, models: parseCatalog(await response.json()) }
+    return { reachable: true, models: parseDecisionCatalog(await response.json()) }
   } catch {
     return { reachable: false, models: [] }
   }

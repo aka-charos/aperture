@@ -131,8 +131,9 @@ describe('waitForCallSlot', () => {
 })
 
 describe('pacing and local providers', () => {
-  test('LM Studio and Ollama have no rate limit; hosted providers and gateways do', () => {
+  test('LM Studio, Unsloth and Ollama have no rate limit; hosted providers and gateways do', () => {
     assert.equal(providerHasRateLimit('lmstudio'), false)
+    assert.equal(providerHasRateLimit('unsloth'), false)
     assert.equal(providerHasRateLimit('ollama'), false)
     for (const p of ['openrouter', 'google', 'openai', 'zai', 'groq', 'deepseek']) {
       assert.equal(providerHasRateLimit(p), true, p)
@@ -145,8 +146,8 @@ describe('pacing and local providers', () => {
     assert.equal(providerHasRateLimit(null), true)
   })
 
-  test('the list is exactly the two providers it claims', () => {
-    assert.deepEqual([...PROVIDERS_WITHOUT_RATE_LIMIT].sort(), ['lmstudio', 'ollama'])
+  test('the list is exactly the three providers it claims', () => {
+    assert.deepEqual([...PROVIDERS_WITHOUT_RATE_LIMIT].sort(), ['lmstudio', 'ollama', 'unsloth'])
   })
 
   test('a stored value never delays a local provider', () => {

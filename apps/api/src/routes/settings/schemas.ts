@@ -653,6 +653,19 @@ export const aiCredentialsSchema = {
   description: 'Get which AI providers have credentials configured. Does not expose actual keys (admin only).',
 }
 
+/** Removing a saved key, for a provider where a key is optional. */
+export const forgetAiCredentialKeySchema = {
+  tags: ['settings'],
+  summary: "Remove a provider's saved API key",
+  description:
+    "Remove the saved API key for a provider from the shared store and from every role using it, leaving its base URL (admin only).",
+  params: {
+    type: 'object' as const,
+    properties: { provider: { type: 'string' as const } },
+    required: ['provider'] as string[],
+  },
+}
+
 export const updateAiCredentialSchema = {
   tags: ['settings'],
   summary: 'Update AI provider credentials',
@@ -716,7 +729,7 @@ export const discoverAiModelsSchema = {
   tags: ['settings'],
   summary: 'Discover models installed on a local AI server',
   description:
-    'Read the installed models from a local inference server (LM Studio) and keep the ones that can hold the given role (admin only).',
+    'Read the installed models from a local inference server (LM Studio, Unsloth Studio) and keep the ones that can hold the given role (admin only).',
   body: {
     type: 'object' as const,
     additionalProperties: true,
@@ -755,7 +768,32 @@ export const lmStudioStatusSchema = {
       provider: {
         type: 'string' as const,
         description:
-          "Which provider the card is on, so the saved key is looked up where it was stored. Anything but 'lmstudio' or 'openai-compatible' is read as 'lmstudio'",
+          "Which provider the card is on, so the saved key is looked up where it was stored. A provider that owns another probe, or is unrecognised, is read as this route's own server",
+      },
+    },
+  },
+}
+
+/** The same check for Unsloth Studio. See probeUnslothServer. */
+export const unslothStatusSchema = {
+  tags: ['settings'],
+  summary: 'Check an Unsloth Studio server and report what it holds',
+  description:
+    'Reach an Unsloth Studio server, report its version, how many models it has downloaded, and which are loaded with what context window (admin only).',
+  body: {
+    type: 'object' as const,
+    additionalProperties: true,
+    properties: {
+      baseUrl: { type: 'string' as const, description: 'Base URL as typed, before saving' },
+      apiKey: {
+        type: 'string' as const,
+        description: 'API key as typed, before saving. Optional - many local servers have none',
+      },
+      function: { type: 'string' as const, description: 'The role whose saved address and key to fall back to' },
+      provider: {
+        type: 'string' as const,
+        description:
+          'Which provider the card is on, so the saved key is looked up where it was stored. A provider that owns another probe, or is unrecognised, is read as this route\'s own server',
       },
     },
   },
@@ -782,7 +820,7 @@ export const lmStudioLoadSchema = {
       provider: {
         type: 'string' as const,
         description:
-          "Which provider the card is on, so the saved key is looked up where it was stored. Anything but 'lmstudio' or 'openai-compatible' is read as 'lmstudio'",
+          "Which provider the card is on, so the saved key is looked up where it was stored. A provider that owns another probe, or is unrecognised, is read as this route's own server",
       },
       contextLength: { type: 'integer' as const, minimum: 1 },
       flashAttention: { type: 'boolean' as const },

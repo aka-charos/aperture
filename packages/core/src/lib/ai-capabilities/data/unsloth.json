@@ -1,0 +1,17 @@
+{
+  "id": "unsloth",
+  "name": "Unsloth Studio",
+  "type": "self-hosted",
+  "website": "https://unsloth.ai/docs/basics/api",
+  "supportsEmbeddings": false,
+  "supportsChat": true,
+  "supportsTextGeneration": true,
+  "supportsExploration": true,
+  "requiresApiKey": false,
+  "requiresBaseUrl": true,
+  "defaultBaseUrl": "http://localhost:8888/v1",
+  "embeddingModels": [],
+  "chatModels": [],
+  "textGenerationModels": [],
+  "explorationModels": []
+}
