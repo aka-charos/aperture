@@ -553,6 +553,19 @@ export function AIFunctionCard({
    */
   const supportsDiscovery = provider === 'lmstudio' || provider === 'openai-compatible'
 
+  /**
+   * Whether a failed server probe is an ANSWER or merely a guess that missed.
+   *
+   * Only when the operator named LM Studio. `openai-compatible` reaches any
+   * OpenAI-compatible server, and most of them do not serve `/api/v1/models`
+   * at all — they answer it 404, or 401 from behind a gateway that has never
+   * heard of the path. Treating that as "the server is not there" made every
+   * such server untestable from this card, because the probe ran first and its
+   * failure was final. There the probe is a guess about WHICH server this is;
+   * the model test below is the real answer.
+   */
+  const probeIsVerdict = provider === 'lmstudio'
+
   // Sync form state when config prop changes (e.g., loaded from DB)
   useEffect(() => {
     if (config && !initialized) {
@@ -873,11 +886,16 @@ export function AIFunctionCard({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        // The role travels so the server can fall back to the key saved on it.
+        // The role AND the provider travel, so the server can fall back to the
+        // address and key saved on this card. The provider is load-bearing: a
+        // card on `openai-compatible` has its key saved under that provider,
+        // and a lookup that assumes `lmstudio` finds nothing, sends no
+        // Authorization header, and reports the server as needing a token.
         body: JSON.stringify({
           baseUrl: baseUrl || undefined,
           apiKey: apiKey || undefined,
           function: functionType,
+          provider,
         }),
       })
       if (!res.ok) return null
@@ -885,27 +903,39 @@ export function AIFunctionCard({
     } catch {
       return null
     }
-  }, [apiBase, baseUrl, apiKey, functionType])
+  }, [apiBase, baseUrl, apiKey, functionType, provider])
 
   const handleTest = async () => {
     setTesting(true)
     setTestResult(null)
     setServerStatus(null)
     try {
-      // Stage one, for a server we can interrogate. A failure here is final —
-      // testing a model against a server that is not there produces a second,
-      // less informative error about the same fault.
+      // Stage one, for a server we can interrogate. A failure here is final
+      // only where the probe is a verdict (see `probeIsVerdict`): testing a
+      // model against an LM Studio that is not there produces a second, less
+      // informative error about the same fault, whereas an `openai-compatible`
+      // server that does not publish LM Studio's catalog is perfectly healthy
+      // and must go on to the model test.
+      //
+      // With no model chosen there is nothing to go on to, so the probe's
+      // error is reported whatever the provider — it is the only thing we know.
       if (supportsDiscovery) {
         const status = await runServerCheck()
         setServerStatus(status)
-        if (status && !status.reachable) {
+        if (status && !status.reachable && (probeIsVerdict || !model)) {
           setTestResult({ success: false, error: status.error })
           return
         }
-        // No model chosen is a perfectly good place to stop: the question was
-        // whether the server is there, and now it is answered.
+        // No model chosen means there is nothing to go on to, so the probe is
+        // the whole test. It answers success only when it actually answered —
+        // a probe that never got a reply used to report success here, which is
+        // a pass claimed on no evidence at all.
         if (!model) {
-          setTestResult({ success: true })
+          setTestResult(
+            status?.reachable
+              ? { success: true }
+              : { success: false, error: t('aiFunctionCard.connectionFailed') }
+          )
           return
         }
       }

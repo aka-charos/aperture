@@ -747,7 +747,16 @@ export const lmStudioStatusSchema = {
     additionalProperties: true,
     properties: {
       baseUrl: { type: 'string' as const, description: 'Base URL as typed, before saving' },
-      apiKey: { type: 'string' as const, description: 'API key as typed, before saving' },
+      apiKey: {
+        type: 'string' as const,
+        description: 'API key as typed, before saving. Optional - many local servers have none',
+      },
+      function: { type: 'string' as const, description: 'The role whose saved address and key to fall back to' },
+      provider: {
+        type: 'string' as const,
+        description:
+          "Which provider the card is on, so the saved key is looked up where it was stored. Anything but 'lmstudio' or 'openai-compatible' is read as 'lmstudio'",
+      },
     },
   },
 }

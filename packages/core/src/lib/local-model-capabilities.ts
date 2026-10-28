@@ -504,11 +504,16 @@ async function probeApi(
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
     if (!response.ok) {
-      // A token problem reads nothing like a 404, which means this server does
-      // not serve LM Studio's API at all.
+      // A 401 HAS TWO READINGS AND THE OLD WORDING ASSERTED ONE OF THEM. It is
+      // an LM Studio with auth switched on, or it is a server that never
+      // served this path sitting behind a gateway that challenges everything —
+      // and the second is the common case, since `openai-compatible` reaches
+      // any OpenAI-compatible server. "The server requires an API token, enter
+      // it above" sent operators hunting for a token they had already saved.
+      // The key is optional here, so this may name it and may not demand it.
       const detail =
         response.status === 401 || response.status === 403
-          ? 'the server requires an API token — enter it above'
+          ? `HTTP ${response.status} — it wants a token for this path, or does not serve it`
           : `HTTP ${response.status}`
       return { ok: false, error: `${path} answered ${detail}` }
     }

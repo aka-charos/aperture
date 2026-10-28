@@ -470,7 +470,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
    * especially from a container, where the usual faults are an unresolvable
    * host or a closed port rather than anything about a model.
    */
-  fastify.post<{ Body: { baseUrl?: string; apiKey?: string; function?: string } }>(
+  fastify.post<{ Body: { baseUrl?: string; apiKey?: string; function?: string; provider?: string } }>(
     '/api/settings/ai/lmstudio/status',
     { preHandler: requireAdmin, schema: lmStudioStatusSchema },
     async (request, reply) => {
@@ -481,8 +481,22 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         const fn: AIFunction = isAIFunction(request.body?.function ?? '')
           ? (request.body!.function as AIFunction)
           : 'textGeneration'
-        const url = baseUrl || (await storedBaseUrlFor(fn, 'lmstudio'))
-        const key = apiKey || (await storedApiKeyFor(fn, 'lmstudio', baseUrl))
+        // THE PROVIDER IS PART OF THE KEY'S ADDRESS, not decoration. This route
+        // hardcoded 'lmstudio' while /models/discover above passes the real
+        // provider, so a card on `openai-compatible` had its saved key looked
+        // up under a provider it was never stored against: nothing came back,
+        // the probe went out unauthenticated, and the server answered 401 —
+        // which the card then reported as needing a token the operator had
+        // already entered. Only a discoverable provider is honoured, so a
+        // client naming something else cannot aim another provider's key at
+        // an LM Studio path.
+        const named = request.body?.provider ?? ''
+        const provider: ProviderType = isDiscoverableProvider(named) ? named : 'lmstudio'
+        const url = baseUrl || (await storedBaseUrlFor(fn, provider))
+        // The key stays OPTIONAL throughout: a local server commonly has no
+        // token at all, and `authHeaders` simply omits the header when there
+        // is none. Nothing here may turn a missing key into a failure.
+        const key = apiKey || (await storedApiKeyFor(fn, provider, baseUrl))
         return reply.send(await probeLmStudioServer(url, key))
       } catch (err) {
         fastify.log.error({ err }, 'Failed to probe LM Studio')
