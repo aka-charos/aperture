@@ -140,6 +140,7 @@ export {
   getModelsForFunction,
   getModelsForFunctionWithCustom,
   resolveProviderEndpoint,
+  forgetProviderApiKey,
   getPricingForModel,
   getPricingForModelAsync,
   PROVIDERS,
@@ -205,8 +206,16 @@ export {
 } from './local-model-capabilities.js'
 
 export {
+  probeUnslothServer,
+  DEFAULT_UNSLOTH_BASE_URL,
+  type UnslothServerStatus,
+  type UnslothLoadedModel,
+} from './unslothServer.js'
+
+export {
   discoverLocalModels,
   lmStudioModelsForRole,
+  unslothModelsForRole,
   isDiscoverableProvider,
   type DiscoveredModel,
   type SkippedModel,

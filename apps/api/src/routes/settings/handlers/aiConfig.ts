@@ -60,6 +60,8 @@ import {
   isDiscoverableProvider,
   probeLmStudioServer,
   loadLmStudioModel,
+  probeUnslothServer,
+  forgetProviderApiKey,
   getSystemSetting,
   setSystemSetting,
   getEpisodeEmbeddingsEnabled,
@@ -115,11 +117,13 @@ import {
   aiFeaturesSchema,
   aiCredentialsSchema,
   updateAiCredentialSchema,
+  forgetAiCredentialKeySchema,
   aiProvidersSchema,
   aiModelsSchema,
   discoverAiModelsSchema,
   lmStudioStatusSchema,
   lmStudioLoadSchema,
+  unslothStatusSchema,
   testAiProviderSchema,
   addCustomModelSchema,
   deleteCustomModelSchema,
@@ -361,6 +365,33 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
   })
 
   /**
+   * DELETE /api/settings/ai/credentials/:provider/api-key
+   *
+   * The way back to no key. An empty key field means "keep the saved one",
+   * which is right for a provider that cannot work without one and is a trap
+   * for one where the key is optional (Unsloth Studio): a revoked key, once
+   * saved, would be sent on every request, and Unsloth answers a real but bad
+   * key with 401 even where keyless access would have admitted the call.
+   */
+  fastify.delete<{ Params: { provider: string } }>(
+    '/api/settings/ai/credentials/:provider/api-key',
+    { preHandler: requireAdmin, schema: forgetAiCredentialKeySchema },
+    async (request, reply) => {
+      try {
+        const { provider } = request.params
+        if (!PROVIDERS.some((p) => p.id === provider)) {
+          return reply.status(400).send({ error: `Unknown provider: ${provider}` })
+        }
+        const removed = await forgetProviderApiKey(provider as ProviderType)
+        return reply.send({ success: true, provider, removed })
+      } catch (err) {
+        fastify.log.error({ err }, 'Failed to remove a provider API key')
+        return reply.status(500).send({ error: 'Failed to remove the API key' })
+      }
+    }
+  )
+
+  /**
    * GET /api/settings/ai/providers
    */
   fastify.get<{
@@ -448,9 +479,14 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         const url = baseUrl || (await storedBaseUrlFor(fn, provider as ProviderType))
         const key = apiKey || (await storedApiKeyFor(fn, provider as ProviderType, baseUrl))
 
-        const result = await discoverLocalModels(provider, fn, url, key)
+        let reason: string | undefined
+        const result = await discoverLocalModels(provider, fn, url, key, {
+          onUnreachable: (why) => {
+            reason = why
+          },
+        })
         if (!result) {
-          return reply.send({ reachable: false, models: [], skipped: [] })
+          return reply.send({ reachable: false, models: [], skipped: [], ...(reason && { error: reason }) })
         }
 
         return reply.send({ reachable: true, ...result })
@@ -463,33 +499,45 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
 
   /**
    * POST /api/settings/ai/lmstudio/status
+   * POST /api/settings/ai/unsloth/status
    *
    * The connectivity half of testing a local server, with no model involved.
-   * A single pass/fail that needs a model selected cannot tell "LM Studio is
+   * A single pass/fail that needs a model selected cannot tell "the server is
    * unreachable" from "this model failed", and those have different fixes —
    * especially from a container, where the usual faults are an unresolvable
-   * host or a closed port rather than anything about a model.
+   * host or a closed port rather than anything about a model. Unsloth's also
+   * reports the context window a loaded model runs at, which it fixes at load
+   * and no request can raise.
+   *
+   * One handler for both servers: only the probe, the schema and the name in
+   * the log differ.
    */
-  fastify.post<{ Body: { baseUrl?: string; apiKey?: string; function?: string } }>(
-    '/api/settings/ai/lmstudio/status',
-    { preHandler: requireAdmin, schema: lmStudioStatusSchema },
-    async (request, reply) => {
-      try {
-        const { baseUrl, apiKey } = request.body ?? {}
-        // The card names its role; an older client that does not is read as
-        // Text Generation, which is what this route assumed before.
-        const fn: AIFunction = isAIFunction(request.body?.function ?? '')
-          ? (request.body!.function as AIFunction)
-          : 'textGeneration'
-        const url = baseUrl || (await storedBaseUrlFor(fn, 'lmstudio'))
-        const key = apiKey || (await storedApiKeyFor(fn, 'lmstudio', baseUrl))
-        return reply.send(await probeLmStudioServer(url, key))
-      } catch (err) {
-        fastify.log.error({ err }, 'Failed to probe LM Studio')
-        return reply.status(500).send({ error: 'Failed to reach LM Studio' })
+  const localServerProbes = [
+    { provider: 'lmstudio', name: 'LM Studio', probe: probeLmStudioServer, schema: lmStudioStatusSchema },
+    { provider: 'unsloth', name: 'Unsloth Studio', probe: probeUnslothServer, schema: unslothStatusSchema },
+  ] as const
+  for (const server of localServerProbes) {
+    fastify.post<{ Body: { baseUrl?: string; apiKey?: string; function?: string } }>(
+      `/api/settings/ai/${server.provider}/status`,
+      { preHandler: requireAdmin, schema: server.schema },
+      async (request, reply) => {
+        try {
+          const { baseUrl, apiKey } = request.body ?? {}
+          // The card names its role; an older client that does not is read as
+          // Text Generation, which is what this route assumed before.
+          const fn: AIFunction = isAIFunction(request.body?.function ?? '')
+            ? (request.body!.function as AIFunction)
+            : 'textGeneration'
+          const url = baseUrl || (await storedBaseUrlFor(fn, server.provider))
+          const key = apiKey || (await storedApiKeyFor(fn, server.provider, baseUrl))
+          return reply.send(await server.probe(url, key))
+        } catch (err) {
+          fastify.log.error({ err }, `Failed to probe ${server.name}`)
+          return reply.status(500).send({ error: `Failed to reach ${server.name}` })
+        }
       }
-    }
-  )
+    )
+  }
 
   /**
    * POST /api/settings/ai/lmstudio/load

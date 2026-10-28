@@ -354,6 +354,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
       'ollama',
       'lm studio',
       'lmstudio',
+      'unsloth',
       'local model',
       'model',
       'provider',

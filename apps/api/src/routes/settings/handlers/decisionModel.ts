@@ -143,6 +143,18 @@ function validate(config: DecisionModelConfig, body: DecisionModelUpdateBody): s
   if (config.model.startsWith('~')) {
     return 'Use a versioned model id rather than an alias (for example typesafe/jev-1.13, not ~typesafe/jev-latest)'
   }
+  // The same fault in a self-hosted spelling: Unsloth Studio lists `default`
+  // beside its named decision models, and it answers with whichever one the
+  // server's own settings pick, so it can change under stored verdicts.
+  // Checked only when this request sets the model: a config that already holds
+  // `default` must still be able to save anything else, switching off included.
+  if (
+    body.model !== undefined &&
+    config.source === 'custom' &&
+    config.model.trim().toLowerCase() === 'default'
+  ) {
+    return 'Choose a named decision model (for example laya-multilingual) rather than "default", which follows the server\'s own setting and can change under stored verdicts'
+  }
   if (config.source === 'custom' && (config.enabled || config.baseUrl) && !systemOneUrl(config.baseUrl)) {
     return 'A self-hosted server needs a base URL starting with http:// or https://'
   }

@@ -26,6 +26,9 @@
 export const CUSTOM_MODEL_PROVIDERS = [
   'ollama',
   'lmstudio',
+  // Unsloth Studio publishes no shipped catalog: what it serves is whatever the
+  // operator downloaded, read off `/v1/models` (unslothServer.ts).
+  'unsloth',
   'openai-compatible',
   'openrouter',
   'huggingface',
@@ -54,7 +57,7 @@ export function isCustomModelProvider(value: string): value is CustomModelProvid
  * existed, so anyone who wired LM Studio up the old way keeps the probe. The
  * probes fail harmlessly against anything else (vLLM, llama.cpp, TGI).
  */
-export const LOCAL_MODEL_PROVIDERS = ['ollama', 'lmstudio', 'openai-compatible'] as const
+export const LOCAL_MODEL_PROVIDERS = ['ollama', 'lmstudio', 'unsloth', 'openai-compatible'] as const
 
 export type LocalModelProvider = (typeof LOCAL_MODEL_PROVIDERS)[number]
 

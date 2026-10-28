@@ -17,6 +17,10 @@
 
 import { createChildLogger } from './logger.js'
 import type { ModelCapabilities } from './ai-capabilities.js'
+import {
+  describeLocalFetchFailure,
+  localServerAuthHeaders as authHeaders,
+} from './localServerFetch.js'
 
 const logger = createChildLogger('local-model-capabilities')
 
@@ -221,18 +225,6 @@ export function lmStudioInferenceBaseUrl(baseUrl?: string): string {
   return trimmed.toLowerCase().endsWith('/v1') ? trimmed : `${trimmed}/v1`
 }
 
-/**
- * LM Studio can be configured to require a bearer token. Sending one it did not
- * ask for is harmless, so the key rides along whenever the operator has entered
- * it — the alternative is a probe that fails with 401 on a locked-down server
- * while the actual inference calls, which do send it, work perfectly.
- */
-function authHeaders(apiKey?: string): Record<string, string> {
-  const headers: Record<string, string> = { Accept: 'application/json' }
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
-  return headers
-}
-
 /** `GET /api/v0/models` — the enhanced sibling of the OpenAI-compatible list. */
 async function fetchV0Models(base: string, apiKey?: string): Promise<LmStudioModel[] | null> {
   const response = await fetch(`${base}/api/v0/models`, {
@@ -431,37 +423,12 @@ export function lmStudioCapabilities(entry: LmStudioModel): ModelCapabilities | 
 // LM Studio: server status and model loading
 // ============================================================================
 
-/**
- * Why a request to the server did not arrive.
- *
- * A connection failure carries its reason in `error.cause.code`, and for this
- * integration that code IS the diagnosis: `ENOTFOUND host.docker.internal` says
- * the container cannot resolve the host, `ECONNREFUSED` says nothing is
- * listening on that port, `ETIMEDOUT` says a firewall ate it. Collapsing all
- * three into "could not connect" throws away the only sentence that tells an
- * operator what to change — which matters most here, because Aperture in Docker
- * reaching LM Studio on the host is the normal deployment and every one of
- * those failures has a different fix.
- */
+/** What a failed connection to LM Studio means; the mapping is shared (localServerFetch.ts). */
 function describeFetchFailure(err: unknown): string {
-  const cause = (err as { cause?: { code?: string } })?.cause
-  const code = cause?.code
-  const message = err instanceof Error ? err.message : String(err)
-
-  switch (code) {
-    case 'ENOTFOUND':
-    case 'EAI_AGAIN':
-      return `Host not found (${code}). From a container, the host machine is usually host.docker.internal.`
-    case 'ECONNREFUSED':
-      return `Connection refused (${code}). Nothing is listening there — check LM Studio's server is started and on this port.`
-    case 'ETIMEDOUT':
-    case 'UND_ERR_CONNECT_TIMEOUT':
-      return `Timed out reaching the server (${code}). A firewall between the container and the host does this.`
-    case 'ECONNRESET':
-      return `Connection reset (${code}).`
-    default:
-      return code ? `${message} (${code})` : message
-  }
+  return describeLocalFetchFailure(err, {
+    refused: "Nothing is listening there — check LM Studio's server is started and on this port.",
+    timedOut: 'A firewall between the container and the host does this.',
+  })
 }
 
 /** What one loaded instance of a model is running with. */

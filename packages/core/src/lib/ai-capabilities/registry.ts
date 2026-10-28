@@ -17,6 +17,7 @@ export const PROVIDERS: ProviderMetadata[] = loadProviders()
 const CHAT_WITHOUT_BUILTIN_TOOL_MODELS = new Set([
   'ollama',
   'lmstudio',
+  'unsloth',
   'openai-compatible',
   'openrouter',
 ])

@@ -3,6 +3,7 @@ export type ProviderType =
   | 'anthropic'
   | 'ollama'
   | 'lmstudio'
+  | 'unsloth'
   | 'groq'
   | 'google'
   | 'openai-compatible'
@@ -11,15 +12,67 @@ export type ProviderType =
   | 'huggingface'
   | 'zai'
 
+/**
+ * The translation keys a role card shows for one provider, where it says
+ * something of its own. Each field absent means the card's generic text. Kept
+ * here rather than as `provider === …` branches in the card, so a new provider
+ * is one entry and cannot be half-wired across a dozen conditionals.
+ */
+export interface ProviderCopy {
+  /** Under the API key field, in place of the "get your key from" link. */
+  apiKeyHelper?: string
+  baseUrlHelper?: string
+  /** The add-custom-model dialog's introduction. */
+  addCustomDialog?: string
+  /** The model id field's placeholder in that dialog. */
+  modelPlaceholder?: string
+  /** The installed-model list could not be read. */
+  discoverUnreachable?: string
+  /** The list was read and nothing in it fits the role. */
+  discoverNoneForRole?: string
+  /** What the server-status check found. Gets api, version, total, language, embedding. */
+  serverSummary?: string
+}
+
+export const DEFAULT_PROVIDER_COPY: Required<Omit<ProviderCopy, 'apiKeyHelper'>> = {
+  baseUrlHelper: 'aiFunctionCard.baseUrlHelperCompatible',
+  addCustomDialog: 'aiFunctionCard.addCustomDialog_compatible',
+  modelPlaceholder: 'aiFunctionCard.placeholderDefault',
+  discoverUnreachable: 'aiFunctionCard.discoverUnreachable',
+  discoverNoneForRole: 'aiFunctionCard.discoverNoneForRole',
+  serverSummary: 'aiFunctionCard.serverSummary',
+}
+
 export interface ProviderInfo {
   id: ProviderType
   name: string
   type: 'cloud' | 'self-hosted' | 'openai-compatible'
   requiresApiKey: boolean
+  /**
+   * Takes a key without needing one, so the field is shown and may be left
+   * empty. Unsloth Studio is the case: its keyless access covers localhost and
+   * private addresses, and a Tailscale or public address needs a key.
+   */
+  acceptsApiKey?: boolean
   requiresBaseUrl: boolean
   defaultBaseUrl?: string
   website?: string
   logoPath?: string
+  /**
+   * Stores its models in `custom_ai_models`. Mirrors core's
+   * `CUSTOM_MODEL_PROVIDERS` (the web bundle never imports core): a provider
+   * without it has no "add a custom model" option, which for a local server
+   * means no way to use it.
+   */
+  customModels?: boolean
+  /**
+   * The server can be asked what it holds: which status route the card's Test
+   * checks first, and whether the add dialog reads the installed-model list.
+   * Mirrors core's `isDiscoverableProvider`. `openai-compatible` takes LM
+   * Studio's, since it has shipped LM Studio's port as its default address.
+   */
+  serverProbe?: 'lmstudio' | 'unsloth'
+  copy?: ProviderCopy
 }
 
 /**
@@ -322,7 +375,7 @@ export const PROVIDERS_WITH_INPUT_TYPE: readonly ProviderType[] = ['openrouter',
  * `openai-compatible` is deliberately absent: it is also how a hosted gateway
  * with a real per-minute cap is reached, and the address cannot say which one.
  */
-export const PROVIDERS_WITHOUT_RATE_LIMIT: readonly ProviderType[] = ['lmstudio', 'ollama']
+export const PROVIDERS_WITHOUT_RATE_LIMIT: readonly ProviderType[] = ['lmstudio', 'unsloth', 'ollama']
 
 /** Whether the free-tier pacing option means anything for this provider. */
 export function providerHasRateLimit(provider: ProviderType | null | undefined): boolean {
@@ -389,6 +442,12 @@ export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {
     defaultBaseUrl: 'http://localhost:11434',
     website: 'https://ollama.ai',
     logoPath: '/ollama.svg',
+    customModels: true,
+    copy: {
+      baseUrlHelper: 'aiFunctionCard.baseUrlHelperOllama',
+      addCustomDialog: 'aiFunctionCard.addCustomDialog_ollama',
+      modelPlaceholder: 'aiFunctionCard.placeholderOllama',
+    },
   },
   lmstudio: {
     id: 'lmstudio',
@@ -400,6 +459,34 @@ export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {
     requiresBaseUrl: true,
     defaultBaseUrl: 'http://localhost:1234/v1',
     website: 'https://lmstudio.ai',
+    customModels: true,
+    serverProbe: 'lmstudio',
+    copy: {
+      baseUrlHelper: 'aiFunctionCard.baseUrlHelperLmStudio',
+      addCustomDialog: 'aiFunctionCard.addCustomDialog_lmstudio',
+    },
+  },
+  unsloth: {
+    id: 'unsloth',
+    // No logoPath, for LM Studio's reason: an invented logo is worse than none.
+    name: 'Unsloth Studio',
+    type: 'self-hosted',
+    requiresApiKey: false,
+    acceptsApiKey: true,
+    requiresBaseUrl: true,
+    defaultBaseUrl: 'http://localhost:8888/v1',
+    website: 'https://unsloth.ai/docs/basics/api',
+    customModels: true,
+    serverProbe: 'unsloth',
+    copy: {
+      apiKeyHelper: 'aiFunctionCard.unslothApiKeyHelper',
+      baseUrlHelper: 'aiFunctionCard.baseUrlHelperUnsloth',
+      addCustomDialog: 'aiFunctionCard.addCustomDialog_unsloth',
+      modelPlaceholder: 'aiFunctionCard.placeholderUnsloth',
+      discoverUnreachable: 'aiFunctionCard.discoverUnreachableUnsloth',
+      discoverNoneForRole: 'aiFunctionCard.discoverNoneForRoleUnsloth',
+      serverSummary: 'aiFunctionCard.unslothServerSummary',
+    },
   },
   'openai-compatible': {
     id: 'openai-compatible',
@@ -408,6 +495,8 @@ export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {
     requiresApiKey: false,
     requiresBaseUrl: true,
     defaultBaseUrl: 'http://localhost:1234/v1',
+    customModels: true,
+    serverProbe: 'lmstudio',
   },
   openrouter: {
     id: 'openrouter',
@@ -417,6 +506,11 @@ export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {
     requiresBaseUrl: false,
     website: 'https://openrouter.ai/keys',
     logoPath: '/openrouter.svg',
+    customModels: true,
+    copy: {
+      addCustomDialog: 'aiFunctionCard.addCustomDialog_openrouter',
+      modelPlaceholder: 'aiFunctionCard.placeholderOpenrouter',
+    },
   },
   zai: {
     id: 'zai',
@@ -430,6 +524,12 @@ export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {
     requiresBaseUrl: true,
     defaultBaseUrl: 'https://api.z.ai/api/paas/v4',
     website: 'https://z.ai/manage-apikey/apikey-list',
+    customModels: true,
+    copy: {
+      baseUrlHelper: 'aiFunctionCard.baseUrlHelperZai',
+      addCustomDialog: 'aiFunctionCard.addCustomDialog_zai',
+      modelPlaceholder: 'aiFunctionCard.placeholderZai',
+    },
     // No logoPath: the card falls back to a cloud icon, which is honest. An
     // invented logo would be worse than none.
   },
@@ -441,5 +541,10 @@ export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {
     requiresBaseUrl: false,
     website: 'https://huggingface.co/settings/tokens',
     logoPath: '/huggingface.svg',
+    customModels: true,
+    copy: {
+      addCustomDialog: 'aiFunctionCard.addCustomDialog_huggingface',
+      modelPlaceholder: 'aiFunctionCard.placeholderHuggingface',
+    },
   },
 }

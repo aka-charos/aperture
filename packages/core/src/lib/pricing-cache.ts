@@ -58,6 +58,7 @@ const PROVIDER_MAP: Record<string, string[]> = {
   deepseek: ['DEEPSEEK'],
   // Self-hosted providers don't have API costs
   ollama: [],
+  unsloth: [],
   'openai-compatible': [],
 }
 

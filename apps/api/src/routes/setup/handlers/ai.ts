@@ -126,9 +126,14 @@ export async function registerAIHandlers(fastify: FastifyInstance) {
         const url = baseUrl || (await storedBaseUrlFor(fn, provider as ProviderType))
         const key = apiKey || (await storedApiKeyFor(fn, provider as ProviderType, baseUrl))
 
-        const result = await discoverLocalModels(provider, fn, url, key)
+        let reason: string | undefined
+        const result = await discoverLocalModels(provider, fn, url, key, {
+          onUnreachable: (why) => {
+            reason = why
+          },
+        })
         if (!result) {
-          return reply.send({ reachable: false, models: [], skipped: [] })
+          return reply.send({ reachable: false, models: [], skipped: [], ...(reason && { error: reason }) })
         }
 
         return reply.send({ reachable: true, ...result })

@@ -25,6 +25,11 @@ import {
   lmStudioCapabilities,
   type LmStudioModel,
 } from './local-model-capabilities.js'
+import {
+  isUnslothLanguageModel,
+  listUnslothModels,
+  type UnslothModel,
+} from './unslothServer.js'
 
 /** A model the server reports having, described well enough to choose between. */
 export interface DiscoveredModel {
@@ -33,8 +38,9 @@ export interface DiscoveredModel {
   description?: string
   capabilities: ModelCapabilities
   contextWindow?: string
-  /** LM Studio loads on demand, so a not-loaded model is still usable — this is
-   *  purely so the picker can say which one answers instantly. */
+  /** LM Studio loads on demand, and Unsloth does with "Switch model by request"
+   *  on, so a not-loaded model is still usable — this is purely so the picker
+   *  can say which one answers instantly. */
   loaded?: boolean
 }
 
@@ -56,10 +62,10 @@ export interface DiscoveryResult {
 }
 
 /** Providers whose catalog can be read straight off the operator's server. */
-export type DiscoverableProvider = 'lmstudio' | 'openai-compatible'
+export type DiscoverableProvider = 'lmstudio' | 'unsloth' | 'openai-compatible'
 
 export function isDiscoverableProvider(value: string): value is DiscoverableProvider {
-  return value === 'lmstudio' || value === 'openai-compatible'
+  return value === 'lmstudio' || value === 'unsloth' || value === 'openai-compatible'
 }
 
 /** Roles that write or converse, as opposed to embedding. */
@@ -168,6 +174,41 @@ export function lmStudioModelsForRole(
 }
 
 /**
+ * Which of an Unsloth server's models can hold this role. Pure.
+ *
+ * Unsloth's catalog says less than LM Studio's: no tool support and no type,
+ * only a `task` on image, audio and video models. So a language role is offered
+ * every entry without one, with the capabilities the role needs assumed, which
+ * is the same assumption a hand-added custom model gets and the reason the add
+ * dialog refuses to save a model that has not tested successfully. Embeddings
+ * and Web Search get nothing: the provider holds neither role (unsloth.json).
+ */
+export function unslothModelsForRole(entries: UnslothModel[], fn: AIFunction): DiscoveryResult {
+  if (fn === 'webSearch' || fn === 'embeddings') return { models: [], skipped: [] }
+
+  const models: DiscoveredModel[] = []
+  const skipped: SkippedModel[] = []
+  for (const entry of entries) {
+    if (!isUnslothLanguageModel(entry)) {
+      skipped.push({ id: entry.id, reason: 'wrongType' })
+      continue
+    }
+    const parts = [entry.displayName, entry.quant].filter(
+      (p): p is string => typeof p === 'string' && p.length > 0
+    )
+    models.push({
+      id: entry.id,
+      name: entry.id,
+      ...(parts.length > 0 && { description: parts.join(' · ') }),
+      capabilities: assumedFor(fn),
+      ...(entry.contextLength != null && { contextWindow: formatContextWindow(entry.contextLength) }),
+      loaded: entry.loaded,
+    })
+  }
+  return { models, skipped }
+}
+
+/**
  * Read a local server's installed models and keep the ones this role can use.
  *
  * Returns null when the catalog could not be read — the server is not running,
@@ -179,12 +220,25 @@ export async function discoverLocalModels(
   providerId: string,
   fn: AIFunction,
   baseUrl?: string,
-  apiKey?: string
+  apiKey?: string,
+  options: {
+    /**
+     * Why the list could not be read, when the server said. Only Unsloth's
+     * reader reports one; LM Studio's probe falls back across two APIs and has
+     * no single reason to give.
+     */
+    onUnreachable?: (reason: string) => void
+  } = {}
 ): Promise<DiscoveryResult | null> {
   if (!isDiscoverableProvider(providerId)) return null
 
   // Always a fresh read. Discovery is asked for by hand, and the point of
   // asking is usually that something changed on the server a moment ago.
+  if (providerId === 'unsloth') {
+    const unsloth = await listUnslothModels(baseUrl, apiKey, options.onUnreachable)
+    return unsloth ? unslothModelsForRole(unsloth, fn) : null
+  }
+
   const entries = await listLmStudioModels(baseUrl, apiKey, true)
   if (!entries) return null
 

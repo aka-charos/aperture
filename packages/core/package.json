@@ -90,7 +90,7 @@
     "test:service-tier": "node --import tsx --test src/lib/serviceTier.test.ts src/lib/serviceTierWire.test.ts",
     "test:taste-synopsis": "node --import tsx --test src/lib/tasteEvidence.test.ts src/lib/tasteSynopsisPrompt.test.ts src/lib/tasteSynopsisRefresh.test.ts",
     "test:seerr": "node --import tsx --test src/seerr/userMapping.test.ts",
-    "test:local-models": "node --import tsx --test src/lib/localModelDiscovery.test.ts src/lib/lmstudioChat.test.ts",
+    "test:local-models": "node --import tsx --test src/lib/localModelDiscovery.test.ts src/lib/lmstudioChat.test.ts src/lib/unslothServer.test.ts",
     "test:inference": "node --import tsx --test src/lib/usageFetch.test.ts src/lib/zai-usage.test.ts",
     "test:translation": "node --import tsx --test src/translation/rules.test.ts src/translation/pending.test.ts src/translation/analysisText.test.ts src/translation/client.test.ts",
     "test:collections": "node --import tsx --test src/tmdb/collectionParts.test.ts src/tmdb/genreNames.test.ts",
