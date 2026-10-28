@@ -66,6 +66,7 @@ import {
   type ProviderType,
 } from './aiProviderInfo'
 import { AIFallbackModels } from './AIFallbackModels'
+import { emitProviderKeyRemoved, onProviderKeyRemoved } from '../lib/providerKeyEvents'
 
 /**
  * Pacing bounds, mirroring core's `MAX_CALL_SPACING_SECONDS`.
@@ -462,6 +463,18 @@ export function AIFunctionCard({
    */
   const [keyRemoved, setKeyRemoved] = useState(false)
   const [removingKey, setRemovingKey] = useState(false)
+
+  // A removal clears the key from every role on the provider, so every card
+  // showing that provider hears of it, not only the one that was clicked.
+  useEffect(
+    () =>
+      onProviderKeyRemoved((removed) => {
+        if (removed !== provider) return
+        setKeyRemoved(true)
+        setSavedKeyAvailable(false)
+      }),
+    [provider]
+  )
   const [initialized, setInitialized] = useState(false)
 
   // Spare keys, tried in order when the one above runs out of quota. Seeded
@@ -904,8 +917,8 @@ export function AIFunctionCard({
         credentials: 'include',
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setKeyRemoved(true)
-      setSavedKeyAvailable(false)
+      // This card included: its own listener sets the removed state.
+      emitProviderKeyRemoved(provider)
       setApiKey('')
       setSuccess(t('aiFunctionCard.savedKeyRemoved'))
     } catch {
@@ -1079,6 +1092,9 @@ export function AIFunctionCard({
     try {
       await onSave(newConfig)
       setSuccess(t('aiFunctionCard.configSaved'))
+      // A key typed and saved is a saved key again, whatever was removed
+      // earlier in this visit; the reloaded config is believed from here on.
+      if (apiKey) setKeyRemoved(false)
       setApiKey('') // Clear for security
       // The parent reloads the config after a save and the spare-key slots are
       // reseeded from the hints it returns, so saved keys stay listed and "how

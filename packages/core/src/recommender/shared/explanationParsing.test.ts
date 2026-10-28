@@ -34,6 +34,14 @@ test('small-context providers are left alone', () => {
   assert.deepEqual(explanationBatchSettings(undefined), { batchSize: 3, maxTokens: 1000 })
 })
 
+test('Unsloth keeps a small batch but leaves room for the reasoning it runs with', () => {
+  const settings = explanationBatchSettings('unsloth')
+  assert.equal(settings.batchSize, 3)
+  // The small tier's 1,000 is what a reasoning model overruns.
+  assert.ok(settings.maxTokens > 1000)
+  assert.ok(settings.maxTokens < explanationBatchSettings('openai').maxTokens)
+})
+
 // ============================================================================
 // Reading a complete response
 // ============================================================================

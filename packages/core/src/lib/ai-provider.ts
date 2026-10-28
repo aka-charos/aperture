@@ -93,7 +93,6 @@ import { unslothInferenceBaseUrl } from './unslothServer.js'
 import { describeAiError } from './aiErrors.js'
 import {
   isCustomModelProvider,
-  isLocalModelProvider,
   type CustomModelProvider,
 } from './ai-capabilities/customModels.js'
 import { formatContextWindow } from './ai-capabilities/contextWindow.js'
@@ -2188,6 +2187,17 @@ export function assumedCustomModelCapabilities(fn: AIFunction): ModelCapabilitie
 }
 
 /**
+ * Whether a provider's capabilities are read off a server at its base URL,
+ * which callers must resolve first. Not `isLocalModelProvider`: Unsloth Studio
+ * is local but publishes no per-model capabilities to probe, so resolving its
+ * address for a probe that never runs is a settings read for nothing. The
+ * branches of `liveModelCapabilities` below are the ones listed here.
+ */
+function probesLocalServer(providerId: string): boolean {
+  return providerId === 'ollama' || providerId === 'lmstudio' || providerId === 'openai-compatible'
+}
+
+/**
  * Live per-model capability sources, by provider:
  * - OpenRouter: public model catalog (supported parameters per model)
  * - Ollama: the show endpoint's capabilities list
@@ -2271,7 +2281,7 @@ export async function getAICapabilitiesStatus(): Promise<AICapabilitiesStatus> {
     // credential store rather than on this function's config
     const baseUrl =
       fnConfig.baseUrl ??
-      (isLocalModelProvider(fnConfig.provider)
+      (probesLocalServer(fnConfig.provider)
         ? await resolveBaseUrlForProvider(fnConfig.provider)
         : undefined)
 
@@ -3060,7 +3070,7 @@ export async function getModelsForFunctionWithCustom(
   // Local-server probes need the provider's base URL, which lives in the
   // shared credential store or on whichever function uses the provider
   const probeBaseUrl =
-    customModels.length > 0 && isLocalModelProvider(providerId)
+    customModels.length > 0 && probesLocalServer(providerId)
       ? await resolveBaseUrlForProvider(providerId as ProviderType)
       : undefined
 

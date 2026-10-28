@@ -133,6 +133,20 @@ export const UNSLOTH_KEY_REQUIRED =
   'Keyless access covers only localhost and private network addresses (10.x, 172.16–31.x, 192.168.x); ' +
   'a Tailscale or public address always needs a key.'
 
+/**
+ * The sentence for a 200 that is not JSON. Unsloth serves its web app for any
+ * path it does not route, so an older Studio without the external API, or an
+ * address that is some other web server, answers `/v1/models` with a page of
+ * HTML — and parsing that reads as "Unexpected token '<'", which names nothing
+ * an operator can act on.
+ */
+export function notUnslothApi(path: string): string {
+  return (
+    `${path} answered with a web page, not Unsloth's API. Update Unsloth Studio ` +
+    '(older versions do not expose the external API), or check that this address is Unsloth.'
+  )
+}
+
 type Fetched = { ok: true; json: unknown } | { ok: false; error: string }
 
 async function getJson(root: string, path: string, apiKey?: string): Promise<Fetched> {
@@ -147,7 +161,14 @@ async function getJson(root: string, path: string, apiKey?: string): Promise<Fet
       }
       return { ok: false, error: `${path} answered HTTP ${response.status}` }
     }
-    return { ok: true, json: await response.json() }
+    // Read as text first, so a reply that is not JSON is named for what it is
+    // rather than surfacing as a parser's error.
+    const body = await response.text()
+    try {
+      return { ok: true, json: JSON.parse(body) }
+    } catch {
+      return { ok: false, error: notUnslothApi(path) }
+    }
   } catch (err) {
     return { ok: false, error: describeFetchFailure(err) }
   }

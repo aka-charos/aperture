@@ -379,8 +379,17 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { provider } = request.params
-        if (!PROVIDERS.some((p) => p.id === provider)) {
+        const info = PROVIDERS.find((p) => p.id === provider)
+        if (!info) {
           return reply.status(400).send({ error: `Unknown provider: ${provider}` })
+        }
+        // Only where a key is optional, the rule the card's button is drawn
+        // under: removing a required key would break every role on it, and the
+        // grounding roles' spare keys would be left behind a missing primary.
+        if (info.requiresApiKey) {
+          return reply
+            .status(400)
+            .send({ error: `${info.name} needs an API key; replace it on the role's card instead of removing it` })
         }
         const removed = await forgetProviderApiKey(provider as ProviderType)
         return reply.send({ success: true, provider, removed })

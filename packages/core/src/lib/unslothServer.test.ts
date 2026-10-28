@@ -1,8 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { isDiscoverableProvider, unslothModelsForRole } from './localModelDiscovery.js'
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import {
+  UNSLOTH_KEY_REQUIRED,
+  listUnslothModels,
+  notUnslothApi,
   parseUnslothModels,
+  probeUnslothServer,
   readUnslothProps,
   unslothInferenceBaseUrl,
   unslothServerRoot,
@@ -140,4 +146,91 @@ test('props report the loaded context window, and nothing when nothing is loaded
 
 test('Unsloth is a provider whose installed models can be listed', () => {
   assert.equal(isDiscoverableProvider('unsloth'), true)
+})
+
+// ============================================================================
+// Against a server: what reaches the operator when the answer is not a list
+// ============================================================================
+
+/**
+ * A stand-in Unsloth on a free local port. `mode` decides how it answers:
+ * keyed (401 without the right bearer, as Unsloth does off its keyless
+ * addresses), html (its web app, as an older Studio or another web server
+ * answers an API path), or open.
+ */
+async function withServer(
+  mode: 'keyed' | 'html' | 'open',
+  run: (base: string) => Promise<void>
+): Promise<void> {
+  const server: Server = createServer((req, res) => {
+    if (mode === 'keyed' && req.headers.authorization !== 'Bearer sk-unsloth-good') {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: { message: 'Not authenticated', type: 'authentication_error' } }))
+      return
+    }
+    if (mode === 'html') {
+      res.writeHead(200, { 'Content-Type': 'text/html' })
+      res.end('<!doctype html><html><body>Unsloth Studio</body></html>')
+      return
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    if (req.url === '/v1/models') res.end(JSON.stringify(LIVE_LIST))
+    else if (req.url === '/version') res.end(JSON.stringify({ version: 'v0.1.911-beta' }))
+    else if (req.url === '/v1/props')
+      res.end(
+        JSON.stringify({
+          model_path: 'bartowski/Altworld_Hemmingway-1-GGUF',
+          default_generation_settings: { n_ctx: 16384 },
+        })
+      )
+    else res.end('{}')
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const { port } = server.address() as AddressInfo
+  try {
+    await run(`http://127.0.0.1:${port}/v1`)
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+}
+
+test('a 401 says a key is needed, and where keyless access does not reach', { timeout: 15_000 }, async () => {
+  await withServer('keyed', async (base) => {
+    const status = await probeUnslothServer(base)
+    assert.equal(status.reachable, false)
+    assert.equal(status.error, UNSLOTH_KEY_REQUIRED)
+
+    let reason: string | undefined
+    const listed = await listUnslothModels(base, undefined, (why) => {
+      reason = why
+    })
+    assert.equal(listed, null)
+    assert.equal(reason, UNSLOTH_KEY_REQUIRED)
+
+    // The right key opens the same routes.
+    const keyed = await probeUnslothServer(base, 'sk-unsloth-good')
+    assert.equal(keyed.reachable, true)
+  })
+})
+
+test('a web page where the API should be is named, never a parser error', { timeout: 15_000 }, async () => {
+  await withServer('html', async (base) => {
+    const status = await probeUnslothServer(base)
+    assert.equal(status.reachable, false)
+    assert.equal(status.error, notUnslothApi('/v1/models'))
+    assert.doesNotMatch(status.error ?? '', /Unexpected token/)
+  })
+})
+
+test('a reachable server reports its version, counts and the loaded window', { timeout: 15_000 }, async () => {
+  await withServer('open', async (base) => {
+    const status = await probeUnslothServer(base)
+    assert.equal(status.reachable, true)
+    assert.equal(status.version, 'v0.1.911-beta')
+    assert.equal(status.totalModels, 3)
+    assert.equal(status.languageModels, 2)
+    // The row's own context_length wins over /v1/props.
+    assert.deepEqual(status.loaded, [{ modelId: 'bartowski/Altworld_Hemmingway-1-GGUF', contextLength: 32768 }])
+  })
 })
