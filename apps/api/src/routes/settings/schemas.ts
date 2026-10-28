@@ -778,6 +778,12 @@ export const lmStudioLoadSchema = {
       model: { type: 'string' as const },
       baseUrl: { type: 'string' as const },
       apiKey: { type: 'string' as const },
+      function: { type: 'string' as const, description: 'The role whose saved address and key to fall back to' },
+      provider: {
+        type: 'string' as const,
+        description:
+          "Which provider the card is on, so the saved key is looked up where it was stored. Anything but 'lmstudio' or 'openai-compatible' is read as 'lmstudio'",
+      },
       contextLength: { type: 'integer' as const, minimum: 1 },
       flashAttention: { type: 'boolean' as const },
       evalBatchSize: { type: 'integer' as const, minimum: 1 },

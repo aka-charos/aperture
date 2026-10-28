@@ -916,25 +916,35 @@ export function AIFunctionCard({
       // informative error about the same fault, whereas an `openai-compatible`
       // server that does not publish LM Studio's catalog is perfectly healthy
       // and must go on to the model test.
-      //
-      // With no model chosen there is nothing to go on to, so the probe's
-      // error is reported whatever the provider — it is the only thing we know.
       if (supportsDiscovery) {
         const status = await runServerCheck()
         setServerStatus(status)
-        if (status && !status.reachable && (probeIsVerdict || !model)) {
+        if (status && !status.reachable && probeIsVerdict) {
           setTestResult({ success: false, error: status.error })
           return
         }
-        // No model chosen means there is nothing to go on to, so the probe is
-        // the whole test. It answers success only when it actually answered —
-        // a probe that never got a reply used to report success here, which is
-        // a pass claimed on no evidence at all.
         if (!model) {
+          // With no model there is nothing to go on to, so the probe is the
+          // whole test — and it reports success only when it actually
+          // answered, since a probe that never got a reply used to report one,
+          // which is a pass claimed on no evidence.
+          //
+          // A FAILURE THAT REACHES HERE IS NOT A VERDICT (a verdict returned
+          // above), so it says only that this is not an LM Studio catalog, not
+          // that the server is unwell. Repeating its error would print the
+          // exact message this path exists to stop printing, at the one moment
+          // a first-time configurer meets it: the dropdown is empty PRECISELY
+          // because discovery found no catalog, so `model` is always '' here.
+          // Ask for a model instead.
           setTestResult(
             status?.reachable
               ? { success: true }
-              : { success: false, error: t('aiFunctionCard.connectionFailed') }
+              : {
+                  success: false,
+                  error: status
+                    ? t('aiFunctionCard.testNeedsModel')
+                    : t('aiFunctionCard.connectionFailed'),
+                }
           )
           return
         }

@@ -136,6 +136,26 @@ import {
   refreshAiPricingSchema,
 } from '../schemas.js'
 
+/**
+ * Which provider's saved address and key a local-server route should read.
+ *
+ * ONE COPY, because this is precisely the rule that drifted. `/lmstudio/status`
+ * and `/lmstudio/load` each hardcoded 'lmstudio' while `/models/discover`
+ * passed the real provider, so a card on `openai-compatible` had its key looked
+ * up under a provider it was never stored against: nothing came back, the
+ * request went out with no Authorization header, and the server answered 401 —
+ * which the card then reported as needing a token the operator had already
+ * saved. Two spellings of one question is how that survived.
+ *
+ * Only a discoverable provider is honoured, so a client naming something else
+ * cannot aim another provider's key at an LM Studio path. An absent one reads
+ * as 'lmstudio', which is what both routes assumed before they took the field.
+ */
+function localServerProvider(named: string | undefined): ProviderType {
+  const value = named ?? ''
+  return isDiscoverableProvider(value) ? value : 'lmstudio'
+}
+
 export function registerAiConfigHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/settings/ai
@@ -481,17 +501,10 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
         const fn: AIFunction = isAIFunction(request.body?.function ?? '')
           ? (request.body!.function as AIFunction)
           : 'textGeneration'
-        // THE PROVIDER IS PART OF THE KEY'S ADDRESS, not decoration. This route
-        // hardcoded 'lmstudio' while /models/discover above passes the real
-        // provider, so a card on `openai-compatible` had its saved key looked
-        // up under a provider it was never stored against: nothing came back,
-        // the probe went out unauthenticated, and the server answered 401 —
-        // which the card then reported as needing a token the operator had
-        // already entered. Only a discoverable provider is honoured, so a
-        // client naming something else cannot aim another provider's key at
-        // an LM Studio path.
-        const named = request.body?.provider ?? ''
-        const provider: ProviderType = isDiscoverableProvider(named) ? named : 'lmstudio'
+        // THE PROVIDER IS PART OF THE KEY'S ADDRESS, not decoration — see
+        // `localServerProvider`, which both local-server routes share so the
+        // rule cannot drift between them again.
+        const provider = localServerProvider(request.body?.provider)
         const url = baseUrl || (await storedBaseUrlFor(fn, provider))
         // The key stays OPTIONAL throughout: a local server commonly has no
         // token at all, and `authHeaders` simply omits the header when there
@@ -517,6 +530,7 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
       baseUrl?: string
       apiKey?: string
       function?: string
+      provider?: string
       contextLength?: number
       flashAttention?: boolean
       evalBatchSize?: number
@@ -528,11 +542,21 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
     { preHandler: requireAdmin, schema: lmStudioLoadSchema },
     async (request, reply) => {
       try {
-        const { model, baseUrl, apiKey, function: role, ...options } = request.body
+        // `provider` is destructured out rather than left to `...options`,
+        // which sweeps up every field it is not given a name — it would reach
+        // LM Studio's load endpoint as an unknown setting.
+        const { model, baseUrl, apiKey, function: role, provider: named, ...options } = request.body
         if (!model) return reply.status(400).send({ error: 'model is required' })
         const fn: AIFunction = isAIFunction(role ?? '') ? (role as AIFunction) : 'textGeneration'
-        const key = apiKey || (await storedApiKeyFor(fn, 'lmstudio', baseUrl))
-        return reply.send(await loadLmStudioModel(model, baseUrl, key, options))
+        // Same resolution as /lmstudio/status: the saved key and address are
+        // read under the provider the card is on, not under a hardcoded one.
+        // This route also had no address fallback at all, so a request that
+        // named no baseUrl silently went to the shipped default rather than
+        // to the server the role is configured against.
+        const provider = localServerProvider(named)
+        const url = baseUrl || (await storedBaseUrlFor(fn, provider))
+        const key = apiKey || (await storedApiKeyFor(fn, provider, baseUrl))
+        return reply.send(await loadLmStudioModel(model, url, key, options))
       } catch (err) {
         fastify.log.error({ err }, 'Failed to load an LM Studio model')
         return reply.status(500).send({ error: 'Failed to load the model' })

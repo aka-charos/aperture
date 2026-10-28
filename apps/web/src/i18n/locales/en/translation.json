@@ -1449,6 +1449,7 @@
     "failedToSave": "Failed to save",
     "connectionSuccess": "Connection successful!",
     "connectionFailedWithError": "Connection failed: {{error}}",
+    "testNeedsModel": "This server does not publish an LM Studio model list, which is normal for most OpenAI-compatible servers. Choose or add a model and test again.",
     "provider": "Provider",
     "onlyProvider": "Only provider for this role",
     "model": "Model",
