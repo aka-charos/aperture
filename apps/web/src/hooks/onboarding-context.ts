@@ -46,6 +46,12 @@ export interface OnboardingContextValue {
   /** The tour offer was closed with × in this sign-in: it is not answered, only put off. */
   offerSnoozed: boolean
   snoozeOffer: () => void
+  /**
+   * The getting-started checklist is on screen. While it is, the tour offer is
+   * one of its rows instead of a card floating over the page: one thing at a time.
+   */
+  checklistShown: boolean
+  setChecklistShown: (shown: boolean) => void
 }
 
 export const OnboardingContext = createContext<OnboardingContextValue | null>(null)

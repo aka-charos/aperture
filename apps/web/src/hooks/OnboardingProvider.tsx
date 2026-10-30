@@ -48,6 +48,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [summary, setSummary] = useState<OnboardingSummary | null>(null)
   const lastFetch = useRef(0)
   const [offerSnoozed, setOfferSnoozed] = useState(() => readOfferSnooze(userId))
+  const [checklistShown, setChecklistShown] = useState(false)
   const { open: explainerOpen, showWelcome, hideWelcome } = useWelcomeModal()
 
   const load = useCallback(async () => {
@@ -118,8 +119,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       canSave,
       offerSnoozed,
       snoozeOffer,
+      checklistShown,
+      setChecklistShown,
     }),
-    [summary, record, refresh, showWelcome, explainerOpen, canSave, offerSnoozed, snoozeOffer]
+    [summary, record, refresh, showWelcome, explainerOpen, canSave, offerSnoozed, snoozeOffer, checklistShown]
   )
 
   return (

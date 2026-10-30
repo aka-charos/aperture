@@ -436,6 +436,15 @@ function buildThemeOptions(mode: ColorMode): ThemeOptions {
 const SANS_FONT = '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
 
 /**
+ * Button labels: Plex Mono, with Inter behind it for every letter Plex Mono
+ * does not draw. Plex Mono has Latin and Cyrillic and no Greek, Arabic or CJK,
+ * and a browser falls back letter by letter through the list, so with the
+ * code stack behind it a Greek button came out in the phone's own typewriter
+ * face. Code keeps MONO_FONT: there a fixed width matters more than the face.
+ */
+export const BUTTON_FONT = `"IBM Plex Mono", ${SANS_FONT}`
+
+/**
  * One type system for both modes, so switching never reflows a page: Inter for
  * reading, IBM Plex Mono for button labels, IDs and code. The button size is a
  * step down from MUI's 14px because a monospace label sets wider than Inter at
@@ -450,7 +459,7 @@ const TYPOGRAPHY: ThemeOptions['typography'] = {
   h4: { fontWeight: 600, fontSize: '1.5rem' },
   h5: { fontWeight: 600, fontSize: '1.25rem' },
   h6: { fontWeight: 600, fontSize: '1rem' },
-  button: { fontFamily: MONO_FONT, textTransform: 'none', fontWeight: 500, fontSize: '0.8125rem', letterSpacing: 0 },
+  button: { fontFamily: BUTTON_FONT, textTransform: 'none', fontWeight: 500, fontSize: '0.8125rem', letterSpacing: 0 },
 }
 
 /** Code-shaped markup in the monospace face, in both modes. */

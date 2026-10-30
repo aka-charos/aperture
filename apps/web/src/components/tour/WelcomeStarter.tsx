@@ -38,7 +38,7 @@ export function WelcomeStarter() {
   const { t } = useTranslation()
   const theme = useTheme()
   const { pathname } = useLocation()
-  const { summary, record, canSave, offerSnoozed, snoozeOffer } = useOnboarding()
+  const { summary, record, canSave, offerSnoozed, snoozeOffer, checklistShown } = useOnboarding()
   const { active, startTour } = useTour()
   const started = useRef(false)
   const [offerHidden, setOfferHidden] = useState(false)
@@ -63,7 +63,9 @@ export function WelcomeStarter() {
     return () => clearTimeout(timer)
   }, [mode, quiet, startTour])
 
-  const showOffer = mode === 'offer' && !active && !offerHidden && !offerSnoozed && !quiet
+  // While Home's checklist is on screen the offer is one of its rows; floating
+  // here as well, it covered the checklist on a phone.
+  const showOffer = mode === 'offer' && !active && !offerHidden && !offerSnoozed && !quiet && !checklistShown
 
   return (
     <Slide direction="up" in={showOffer} mountOnEnter unmountOnExit>

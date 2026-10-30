@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { alpha, Box, Button, CircularProgress, Paper, Typography, useTheme } from '@mui/material'
+import { alpha, Box, Button, CircularProgress, IconButton, Paper, Typography, useTheme } from '@mui/material'
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
@@ -11,8 +11,10 @@ import MovieOutlinedIcon from '@mui/icons-material/MovieOutlined'
 import StarRoundedIcon from '@mui/icons-material/StarRounded'
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
+import ExploreOutlinedIcon from '@mui/icons-material/ExploreOutlined'
 import LiveTvOutlinedIcon from '@mui/icons-material/LiveTvOutlined'
 import { useOnboarding } from '@/hooks/useOnboarding'
+import { useTour } from '@/hooks/useTour'
 import { Badge, IconTile } from '@/components/tour/IconTile'
 
 /**
@@ -40,26 +42,43 @@ type Item = { id: string; done: boolean; progress?: number; goal?: number }
  *
  * The first item left that has somewhere to go is drawn as "next up", so the
  * card says what to do rather than only what is missing.
+ *
+ * While it is on screen it also carries the welcome tour's offer, which
+ * otherwise floats over the page (`WelcomeStarter`) and on a phone covered
+ * this very card.
  */
 export function GettingStartedCard() {
   const { t } = useTranslation()
   const theme = useTheme()
-  const { summary, record, refresh } = useOnboarding()
+  const { summary, record, refresh, canSave, offerSnoozed, snoozeOffer, setChecklistShown } = useOnboarding()
+  const { active: tourActive, startTour } = useTour()
 
   // Coming back to Home after rating something is when the list should move.
   useEffect(() => {
     refresh()
   }, [refresh])
 
-  if (!summary) return null
-  const { checklist, state } = summary
-  if (checklist.complete || state.checklistDismissed) return null
+  const shown = Boolean(summary && !summary.checklist.complete && !summary.state.checklistDismissed)
+  useEffect(() => {
+    setChecklistShown(shown)
+    return () => setChecklistShown(false)
+  }, [shown, setChecklistShown])
+
+  if (!summary || !shown) return null
+  const { checklist } = summary
+  const offerTour = canSave && summary.mode === 'offer' && !offerSnoozed && !tourActive
 
   const done = checklist.items.filter((item) => item.done).length
   const total = checklist.items.length
   const nextUp = checklist.items.find((item) => !item.done && ITEMS[item.id]?.path)?.id
   const progressLabel = t('onboarding.checklist.progress', { done, total })
   const track = alpha(theme.palette.text.primary, 0.1)
+  // Hiding the list with the tour still unanswered puts the offer off for this
+  // sign-in too, or it would float up the moment the list was gone.
+  const hide = () => {
+    if (offerTour) snoozeOffer()
+    record({ checklistDismissed: true })
+  }
 
   return (
     <Paper
@@ -106,17 +125,35 @@ export function GettingStartedCard() {
             {t('onboarding.checklist.subtitle')}
           </Typography>
         </Box>
+        {/* A labelled button on wider screens; on a phone the label took the
+            row from the subtitle, which wrapped two words to a line. */}
         <Button
           variant="outlined"
           color="inherit"
           startIcon={<CloseRoundedIcon />}
           aria-label={t('onboarding.checklist.dismiss')}
-          onClick={() => record({ checklistDismissed: true })}
-          sx={{ minHeight: 44, borderRadius: 2.5, color: 'text.secondary', borderColor: alpha(theme.palette.text.primary, 0.12), flex: '0 0 auto' }}
+          onClick={hide}
+          sx={{
+            display: { xs: 'none', sm: 'inline-flex' },
+            minHeight: 44,
+            borderRadius: 2.5,
+            color: 'text.secondary',
+            borderColor: alpha(theme.palette.text.primary, 0.12),
+            flex: '0 0 auto',
+          }}
         >
           {t('onboarding.checklist.hide')}
         </Button>
+        <IconButton
+          aria-label={t('onboarding.checklist.dismiss')}
+          onClick={hide}
+          sx={{ display: { sm: 'none' }, alignSelf: 'flex-start', color: 'text.secondary', width: 44, height: 44, mt: -1, me: -1 }}
+        >
+          <CloseRoundedIcon />
+        </IconButton>
       </Box>
+
+      {offerTour && <TourOffer onTake={() => startTour('welcome')} onDecline={() => record({ welcome: 'dismissed' })} />}
 
       <Box
         component="ul"
@@ -142,6 +179,48 @@ export function GettingStartedCard() {
         </StatusBand>
       )}
     </Paper>
+  )
+}
+
+/** The welcome tour's offer as a row of the checklist; its words are the floating card's. */
+function TourOffer({ onTake, onDecline }: { onTake: () => void; onDecline: () => void }) {
+  const { t } = useTranslation()
+  const theme = useTheme()
+  return (
+    <Box
+      role="region"
+      aria-label={t('onboarding.offer.title')}
+      sx={{
+        display: 'flex',
+        gap: 1.75,
+        p: 2,
+        borderRadius: 3.5,
+        bgcolor: alpha(theme.palette.primary.main, 0.08),
+        border: 1.5,
+        borderColor: 'primary.main',
+      }}
+    >
+      <IconTile tone="primary">
+        <ExploreOutlinedIcon />
+      </IconTile>
+      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+          <Typography component="h3" sx={{ fontSize: 14, fontWeight: 600 }}>
+            {t('onboarding.offer.heading')}
+          </Typography>
+          <Badge>{t('onboarding.offer.badge')}</Badge>
+        </Box>
+        <Typography sx={{ fontSize: 13, lineHeight: 1.45, color: 'text.secondary' }}>{t('onboarding.offer.body')}</Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, pt: 1 }}>
+          <Button variant="contained" disableElevation onClick={onTake} sx={{ minHeight: 40, borderRadius: 2.5, px: 1.75, fontWeight: 600 }}>
+            {t('onboarding.offer.take')}
+          </Button>
+          <Button color="inherit" onClick={onDecline} sx={{ minHeight: 40, color: 'text.secondary' }}>
+            {t('onboarding.offer.decline')}
+          </Button>
+        </Box>
+      </Box>
+    </Box>
   )
 }
 

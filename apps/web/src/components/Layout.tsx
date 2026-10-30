@@ -661,31 +661,33 @@ function AppShell() {
             <MenuIcon />
           </IconButton>
 
-          {/* Mobile: Centered logo and name */}
+          {/* Mobile: logo and name beside the menu button. In the flow rather
+              than centred over the bar: a centred name sat under the search and
+              help buttons on a phone, since nothing kept the right-hand
+              controls out of the middle. Here the name gives way instead. */}
           <Box
             sx={{
               display: { xs: 'flex', md: 'none' },
               alignItems: 'center',
               gap: 1,
-              position: 'absolute',
-              left: '50%',
-              transform: 'translateX(-50%)',
+              minWidth: 0,
+              flexShrink: 1,
             }}
           >
             <Box
               component="img"
               src={logoUrl}
               alt={appName}
-              sx={{ width: 28, height: 28 }}
+              sx={{ width: 28, height: 28, flexShrink: 0 }}
             />
             <Typography
               noWrap
               sx={{
                 // An admin's bar carries two more controls on the right, which
-                // reach the centre on a phone; the logo alone still says where
-                // you are.
+                // leave the name no room on a phone; the logo alone still says
+                // where you are.
                 display: { xs: user?.isAdmin ? 'none' : 'block', sm: 'block' },
-                maxWidth: '40vw',
+                minWidth: 0,
                 fontFamily: '"Open Sans", sans-serif',
                 fontWeight: 600,
                 fontSize: '1.1rem',
