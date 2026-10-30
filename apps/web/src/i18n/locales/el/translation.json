@@ -2399,6 +2399,41 @@
       "refreshEvery": "Πόσο συχνά ξαναδιαβάζεται: {{type}}",
       "errSaveWeight": "Δεν ήταν δυνατή η αποθήκευση της αλλαγής. Δοκιμάστε ξανά.",
       "errRemove": "Δεν ήταν δυνατή η αφαίρεση. Η λίστα φορτώθηκε ξανά."
+    },
+    "notifications": {
+      "title": "Ειδοποιήσεις",
+      "description": "Επιλέξτε για τι θα σας στέλνει email το {{appName}}.",
+      "descriptionWithApp": "Επιλέξτε για τι θα σας ενημερώνει το {{appName}}, με email ή στο κινητό σας.",
+      "email": "Email",
+      "app": "Εφαρμογή",
+      "error": "Δεν ήταν δυνατή η αποθήκευση των ρυθμίσεων ειδοποιήσεων. Δοκιμάστε ξανά.",
+      "noAddress": "Προσθέστε τη διεύθυνση email σας για να τις λαμβάνετε με email.",
+      "emailNotAllowed": "Οι ειδοποιήσεις μέσω email δεν είναι ενεργοποιημένες για τον λογαριασμό σας.",
+      "phones": "Τα κινητά σας",
+      "unknownPhone": "Κινητό",
+      "appVersion": "εφαρμογή {{version}}",
+      "lastSeen": "Τελευταία φορά {{when}}",
+      "signedOut": "Αποσυνδεδεμένο για πάνω από 30 ημέρες. Ανοίξτε την εφαρμογή και συνδεθείτε ξανά για να λαμβάνετε ειδοποιήσεις σε αυτό.",
+      "blocked": "Οι ειδοποιήσεις για την εφαρμογή είναι αποκλεισμένες στις ρυθμίσεις αυτού του κινητού.",
+      "removePhone": "Αφαίρεση",
+      "events": {
+        "watchThis": {
+          "title": "Watch This",
+          "description": "Κάποιος σας έστειλε έναν τίτλο"
+        },
+        "requests": {
+          "title": "Αιτήματα",
+          "description": "Ένα αίτημα εγκρίθηκε, απορρίφθηκε ή έγινε διαθέσιμο"
+        },
+        "issueReplies": {
+          "title": "Απαντήσεις σε προβλήματα",
+          "description": "Κάποιος απάντησε σε πρόβλημα που αναφέρατε ή το επέλυσε"
+        },
+        "recommendations": {
+          "title": "Νέες προτάσεις",
+          "description": "Οι προτάσεις σας ανανεώθηκαν"
+        }
+      }
     }
   },
   "watching": {
@@ -4432,7 +4467,24 @@
         "confirmRemove": "Remove for good",
         "removeError": "Could not remove the account.",
         "removed": "{{name}} removed"
-      }
+      },
+      "colApp": "Εφαρμογή",
+      "appColTooltip": "Κινητά με την εφαρμογή {{appName}} και πώς φτάνουν οι ειδοποιήσεις σε αυτό το άτομο. Περάστε τον δείκτη από μια γραμμή για λεπτομέρειες.",
+      "notifyEmailEvents_one": "Email: {{count}} γεγονός",
+      "notifyEmailEvents_other": "Email: {{count}} γεγονότα",
+      "notifyEmailUnreachable": {
+        "noAddress": "Email: χωρίς διεύθυνση",
+        "notAllowed": "Email: δεν επιτρέπεται",
+        "noAccess": "Email: χωρίς πρόσβαση"
+      },
+      "notifyAppEvents_one": "Εφαρμογή: {{count}} γεγονός",
+      "notifyAppEvents_other": "Εφαρμογή: {{count}} γεγονότα",
+      "notifyNoPhone": "Εφαρμογή: κανένα κινητό",
+      "notifyPhone": "Κινητό",
+      "notifyLastSeen": "τελευταία φορά {{when}}",
+      "notifySignedOut": "αποσυνδεδεμένο",
+      "notifyBlocked": "ειδοποιήσεις αποκλεισμένες",
+      "notifyNothing": "Τίποτα δεν φτάνει σε αυτό το άτομο."
     },
     "userDetail": {
       "userNotFound": "Ο χρήστης δεν βρέθηκε",
@@ -4510,10 +4562,10 @@
       "dateWeeksAgo": "πριν από {{count}} εβδομάδες",
       "dateMonthsAgo": "πριν από {{count}} μήνες",
       "emailNotificationsAccessUpdated": "Email notifications permission updated!",
-      "emailNotificationsTitle": "Email Notifications",
-      "emailNotificationsBody": "Controls whether the Email Notifications opt-in appears in this user's settings. Feature coming soon — enabling this only reveals the setting, no emails are sent yet.",
-      "emailNotificationsToggleTitle": "Show Email Notifications Setting",
-      "emailNotificationsToggleHint": "User can enter an email and opt in to future notification emails from their settings",
+      "emailNotificationsTitle": "Ειδοποιήσεις email",
+      "emailNotificationsBody": "Επιτρέπει σε αυτόν τον χρήστη να λαμβάνει ειδοποιήσεις μέσω email. Επιλέγει ο ίδιος τα γεγονότα στις ρυθμίσεις του· τίποτα δεν στέλνεται μέχρι να ενεργοποιήσει κάποιο.",
+      "emailNotificationsToggleTitle": "Να επιτρέπονται οι ειδοποιήσεις email",
+      "emailNotificationsToggleHint": "Ο χρήστης μπορεί να ορίσει διεύθυνση email και να επιλέξει για ποια γεγονότα θα του στέλνει email το {{appName}}",
       "permissionHistoryTitle": "Permission history",
       "permissionHistoryHelper": "Every permission granted or revoked on this account, newest first — including the ones that followed automatically from another switch.",
       "permissionHistoryEmpty": "No permission changes recorded for this account yet.",

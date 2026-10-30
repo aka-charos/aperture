@@ -141,7 +141,7 @@ export const GLOBAL_JOB_CATEGORIES: JobCategory[] = [
     titleKey: 'admin.jobsPage.categories.globalIntegrations.title',
     descriptionKey: 'admin.jobsPage.categories.globalIntegrations.description',
     color: '#ed1c24',
-    jobs: ['sync-trakt-ratings', 'refresh-ai-pricing', 'sync-lldap-emails'],
+    jobs: ['sync-trakt-ratings', 'refresh-ai-pricing', 'sync-lldap-emails', 'send-notification-emails'],
   },
 ]
 

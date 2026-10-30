@@ -181,6 +181,7 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
   // ratings that were refreshed the same night rather than the previous day's.
   'refresh-ratings': { scheduleType: 'daily', hour: 2, minute: 30 },
   'sync-lldap-emails': { scheduleType: 'daily', hour: 3, minute: 15 },
+  'send-notification-emails': { scheduleType: 'interval', hour: 0, minute: 0, intervalMinutes: 15 },
   'cleanup-auth-state': { scheduleType: 'daily', hour: 3, minute: 30 },
   'refresh-top-picks': { scheduleType: 'daily', hour: 5, minute: 0 },
   'enrich-studio-logos': { scheduleType: 'daily', hour: 5, minute: 30 },

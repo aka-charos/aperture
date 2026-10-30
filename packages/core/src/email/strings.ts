@@ -52,6 +52,12 @@ const EN = {
   'newsletter.page.alreadyBody': 'You are not subscribed to {{appName}} newsletters, so there is nothing to do.',
   'newsletter.page.unknownHeading': 'This link does not work',
   'newsletter.page.unknownBody': 'It may be incomplete. You can switch newsletters off in your {{appName}} settings instead.',
+  'notifications.subjectOne': '{{appName}}: {{title}}',
+  'notifications.subjectMany': '{{appName}}: {{count}} updates',
+  'notifications.heading': 'What’s new for you',
+  'notifications.intro': 'Here is what happened since the last email.',
+  'notifications.why':
+    'You get these emails because you switched email notifications on in your {{appName}} settings, where you can switch them off.',
 } as const satisfies Record<string, string>
 
 export type EmailStringKey = keyof typeof EN
@@ -214,6 +220,11 @@ const TRANSLATIONS: Readonly<Record<Exclude<AppLocaleCode, 'en'>, Translations>>
     'newsletter.page.unknownHeading': 'Αυτός ο σύνδεσμος δεν λειτουργεί',
     'newsletter.page.unknownBody':
       'Ίσως είναι ελλιπής. Μπορείτε να απενεργοποιήσετε τα ενημερωτικά δελτία από τις ρυθμίσεις σας στο {{appName}}.',
+    'notifications.subjectMany': '{{appName}}: {{count}} ενημερώσεις',
+    'notifications.heading': 'Τα νέα σας',
+    'notifications.intro': 'Αυτά συνέβησαν από το τελευταίο email.',
+    'notifications.why':
+      'Λαμβάνετε αυτά τα email επειδή ενεργοποιήσατε τις ειδοποιήσεις μέσω email στις ρυθμίσεις σας στο {{appName}}, όπου μπορείτε και να τις απενεργοποιήσετε.',
   },
 }
 

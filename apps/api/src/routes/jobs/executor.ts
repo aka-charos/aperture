@@ -44,6 +44,7 @@ import {
   RATING_SOURCE_IDS,
   syncUsersFromMediaServer,
   syncLldapEmails,
+  sendNotificationEmails,
   createChildLogger,
   runLibraryGapAnalysis,
   rebuildAllTasteProfiles,
@@ -736,6 +737,24 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           },
           `✅ LLDAP email sync complete`
         )
+        break
+      }
+      // === Notification emails ===
+      case 'send-notification-emails': {
+        createJobProgress(jobId, 'send-notification-emails', 1)
+        setJobStep(jobId, 0, 'Sending notification emails')
+        const result = await sendNotificationEmails({
+          shouldCancel: () => isJobCancelled(jobId),
+          log: (level, message) => addLog(jobId, level, message),
+        })
+        if (result.cancelled) break
+        addLog(
+          jobId,
+          'info',
+          `${result.sent} sent, ${result.nothingNew} with nothing new, ${result.started} started, ${result.failed} not sent`
+        )
+        completeJob(jobId, { ...result })
+        logger.info({ job: name, jobId, ...result }, `✅ Notification emails complete`)
         break
       }
       // === Trakt Sync Job ===

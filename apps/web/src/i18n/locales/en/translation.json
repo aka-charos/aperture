@@ -376,7 +376,24 @@
         "confirmRemove": "Remove for good",
         "removeError": "Could not remove the account.",
         "removed": "{{name}} removed"
-      }
+      },
+      "colApp": "App",
+      "appColTooltip": "Phones running the {{appName}} app, and how notifications reach this person. Hover a row for details.",
+      "notifyEmailEvents_one": "Email: {{count}} event",
+      "notifyEmailEvents_other": "Email: {{count}} events",
+      "notifyEmailUnreachable": {
+        "noAddress": "Email: no address",
+        "notAllowed": "Email: not allowed",
+        "noAccess": "Email: no access"
+      },
+      "notifyAppEvents_one": "App: {{count}} event",
+      "notifyAppEvents_other": "App: {{count}} events",
+      "notifyNoPhone": "App: no phone",
+      "notifyPhone": "Phone",
+      "notifyLastSeen": "last seen {{when}}",
+      "notifySignedOut": "signed out",
+      "notifyBlocked": "notifications blocked",
+      "notifyNothing": "Nothing reaches this person."
     },
     "userDetail": {
       "userNotFound": "User not found",
@@ -410,9 +427,9 @@
       "watchHistoryToggleTitle": "Allow Watch History Management",
       "watchHistoryToggleHint": "User can mark items as unwatched from their Watch History page and movie detail pages",
       "emailNotificationsTitle": "Email Notifications",
-      "emailNotificationsBody": "Controls whether the Email Notifications opt-in appears in this user's settings. Feature coming soon — enabling this only reveals the setting, no emails are sent yet.",
-      "emailNotificationsToggleTitle": "Show Email Notifications Setting",
-      "emailNotificationsToggleHint": "User can enter an email and opt in to future notification emails from their settings",
+      "emailNotificationsBody": "Lets this user receive notification emails. They choose which events in their own settings; nothing is emailed until they switch an event on.",
+      "emailNotificationsToggleTitle": "Allow Email Notifications",
+      "emailNotificationsToggleHint": "User can enter an email address and choose which events {{appName}} emails them about",
       "discoveryTitle": "Discovery Permissions",
       "discoveryBody": "Control this user's access to the Discovery feature, which suggests content not currently in your library based on their taste profile.",
       "discoverySuggestionsTitle": "Enable Discovery Suggestions",
@@ -2266,6 +2283,41 @@
       "previewEmpty": "Your home screen has no rows.",
       "previewNew": "New",
       "previewSort": "Titles within each row: {{sort}}."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Choose what {{appName}} emails you about.",
+      "descriptionWithApp": "Choose what {{appName}} tells you about, by email or on your phone.",
+      "email": "Email",
+      "app": "App",
+      "error": "Your notification settings could not be saved. Try again.",
+      "noAddress": "Add your email address to get these by email.",
+      "emailNotAllowed": "Email notifications are not enabled for your account.",
+      "phones": "Your phones",
+      "unknownPhone": "Phone",
+      "appVersion": "app {{version}}",
+      "lastSeen": "Last seen {{when}}",
+      "signedOut": "Signed out for over 30 days. Open the app and sign in again to get notifications on it.",
+      "blocked": "Notifications are blocked for the app in this phone’s settings.",
+      "removePhone": "Remove",
+      "events": {
+        "watchThis": {
+          "title": "Watch This",
+          "description": "Someone sent you a title"
+        },
+        "requests": {
+          "title": "Requests",
+          "description": "A request was approved, declined or became available"
+        },
+        "issueReplies": {
+          "title": "Issue replies",
+          "description": "Someone replied to an issue you reported, or resolved it"
+        },
+        "recommendations": {
+          "title": "New recommendations",
+          "description": "Your recommendations were refreshed"
+        }
+      }
     }
   },
   "watcherIdentity": {

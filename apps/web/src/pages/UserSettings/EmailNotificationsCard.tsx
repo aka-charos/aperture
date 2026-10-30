@@ -1,10 +1,12 @@
-import { Alert, CircularProgress, Switch, TextField } from '@mui/material'
+import { Alert, CircularProgress, TextField } from '@mui/material'
 import MailOutlineIcon from '@mui/icons-material/MailOutline'
 import { useTranslation } from 'react-i18next'
-import { SettingRow, SettingsCard } from './SettingsCard'
+import { SettingsCard } from './SettingsCard'
 
 /**
- * Email address and notification opt-in.
+ * The person's email address. What is sent to it is chosen per event on the
+ * Notifications card; the old single opt-in switch here was never read by
+ * anything, so it went when notifications arrived.
  *
  * Lifted out of the Profile tab when that tab was deleted. Everything else on
  * it was a read-only echo of the account menu header -- avatar, username,
@@ -20,14 +22,12 @@ import { SettingRow, SettingsCard } from './SettingsCard'
 interface EmailNotificationsCardProps {
   email: string
   emailLocked: boolean
-  emailNotificationsEnabled: boolean
   loadingEmail: boolean
   savingEmail: boolean
   emailSuccess: string | null
   emailError: string | null
   onEmailChange: (value: string) => void
   onEmailBlur: () => void
-  onNotificationsChange: (enabled: boolean) => void
   onDismissSuccess: () => void
   onDismissEmailError: () => void
 }
@@ -35,14 +35,12 @@ interface EmailNotificationsCardProps {
 export function EmailNotificationsCard({
   email,
   emailLocked,
-  emailNotificationsEnabled,
   loadingEmail,
   savingEmail,
   emailSuccess,
   emailError,
   onEmailChange,
   onEmailBlur,
-  onNotificationsChange,
   onDismissSuccess,
   onDismissEmailError,
 }: EmailNotificationsCardProps) {
@@ -67,32 +65,17 @@ export function EmailNotificationsCard({
       {loadingEmail ? (
         <CircularProgress size={22} />
       ) : (
-        <>
-          <TextField
-            label={t('userSettings.emailAddress')}
-            value={email}
-            onChange={(e) => onEmailChange(e.target.value)}
-            onBlur={onEmailBlur}
-            fullWidth
-            size="small"
-            placeholder={t('userSettings.emailPlaceholder')}
-            helperText={emailLocked ? t('userSettings.emailHelperCustom') : t('userSettings.emailHelperSynced')}
-            InputProps={{ endAdornment: savingEmail ? <CircularProgress size={16} /> : null }}
-            sx={{ mb: 1.5 }}
-          />
-          <SettingRow
-            label={t('userSettings.emailNotificationsTitle')}
-            description={t('userSettings.emailNotificationsSubtitle')}
-            control={
-              <Switch
-                checked={emailNotificationsEnabled}
-                onChange={(e) => onNotificationsChange(e.target.checked)}
-                disabled={savingEmail}
-                slotProps={{ input: { 'aria-label': t('userSettings.emailNotificationsTitle') } }}
-              />
-            }
-          />
-        </>
+        <TextField
+          label={t('userSettings.emailAddress')}
+          value={email}
+          onChange={(e) => onEmailChange(e.target.value)}
+          onBlur={onEmailBlur}
+          fullWidth
+          size="small"
+          placeholder={t('userSettings.emailPlaceholder')}
+          helperText={emailLocked ? t('userSettings.emailHelperCustom') : t('userSettings.emailHelperSynced')}
+          InputProps={{ endAdornment: savingEmail ? <CircularProgress size={16} /> : null }}
+        />
       )}
     </SettingsCard>
   )

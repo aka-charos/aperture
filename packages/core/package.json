@@ -99,6 +99,7 @@
     "test:accounts": "node --import tsx --test src/lldap/rules.test.ts src/users/accountDrift.test.ts src/users/providerPresence.test.ts src/recommender/historySyncUsers.test.ts",
     "test:library-scope": "node --import tsx --test src/lib/libraryScope.test.ts",
     "test:social": "node --import tsx --test src/social/rules.test.ts",
+    "test:notifications": "node --import tsx --test src/notifications/rules.test.ts",
     "test:onboarding": "node --import tsx --test src/onboarding/rules.test.ts",
     "test:trails": "node --import tsx --test src/trails/trails.test.ts",
     "test:next-from-here": "node --import tsx --test src/nextFromHere/nextFromHere.test.ts",

@@ -45,7 +45,7 @@ Every email has an HTML version and a plain-text version with the same content, 
 
 ## Who Receives Email
 
-Not decided here. Each user's address and opt-in live in their own settings (the **Email & Notifications** card on their settings' Preferences tab), shown only to users an admin has granted it on the Users page. The addresses come from the media server sync, from [LLDAP](lldap.md), or from the user. Each must be one plain address: a list, a display-name form or a typo with spaces is refused when typed in and skipped when imported.
+Not decided here. Each user's address and their choices live in their own settings (Settings → Account: the **Email & Notifications** card for the address, the **Notifications** card for which events email them), shown only to users an admin has granted email on the Users page. Notification email is off for every event until the user switches it on. The `send-notification-emails` job runs every 15 minutes and sends each of them one email listing everything new since the last; a refused message is retried on the next run, and while outgoing email is off nothing is queued up. The addresses come from the media server sync, from [LLDAP](lldap.md), or from the user. Each must be one plain address: a list, a display-name form or a typo with spaces is refused when typed in and skipped when imported.
 
 ## Account Drift
 

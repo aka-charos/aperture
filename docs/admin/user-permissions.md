@@ -14,7 +14,7 @@ Most switches sit on each row of the [Users page](user-management.md) (`/admin/a
 | **Request** | Users list, detail page | Request buttons that send titles to Seerr. Needs Discover: switching Discover off switches this off too, and it cannot be switched on without it. |
 | **Collections** | Users list, detail page | Creating [collections](../features/collections.md), which are written to the media server as Box Sets everyone can see |
 | **Assistant** | Users list | The AI assistant. Every message costs model calls. On for everyone by default. |
-| **Email** | Users list, detail page | Shows the Email & Notifications card in their settings, where they can enter an address and opt in. No email is sent yet. |
+| **Email** | Users list, detail page | Lets the user receive notification email: their settings show their address and an Email switch per event on the Notifications card. Nothing is emailed until they switch an event on. |
 | **AI Override** | Users list, detail page | Lets the user choose their own AI-explanation preference; only meaningful while **Allow Per-User Overrides** is on (see [AI explanations](ai-explanations.md)) |
 | **Watch history management** | Detail page | Marking titles watched or unwatched from their watch history and detail pages |
 | **Seerr mapping** | Detail page | Overrides which Seerr account their requests and issues are made as. Leave empty to match automatically by email or username. |

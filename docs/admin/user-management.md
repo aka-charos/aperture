@@ -20,6 +20,7 @@ Columns, left to right:
 | **Imported** | Whether Aperture has the account yet |
 | **Recommendations** | Personal recommendations, home rows and (legacy) generated libraries. Whether that means movies, series or both follows from the libraries the media server lets the account see; hover the chip for which. |
 | **Discover**, **Request**, **Collections**, **Assistant**, **Email**, **AI Override** | Feature permissions; see [User permissions](user-permissions.md) |
+| **App** | Shown only once a phone running a companion app has checked in. The chip counts the account's phones and is green when one of them can show notifications for at least one event. Hover it for how notifications reach the person (email events, app events) and each phone's model, app version, last check-in and whether notifications are blocked. A phone not seen for over 30 days reads as signed out: its sign-in has expired. A phone checks in only while its screen is on, so a long gap means it was not used, not that the app was removed. |
 | **Actions** | **More user settings** opens the detail page; the **⌄ menu** holds the per-user operations below |
 
 Sort by email, last sign-in or last streaming activity.

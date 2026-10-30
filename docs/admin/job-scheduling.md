@@ -37,6 +37,7 @@ A run that is still going when its next firing is due makes that firing skip, so
 
 | Cadence | Jobs |
 |---------|------|
+| Every 15 min | `send-notification-emails` |
 | Every 30 min | `sync-users` |
 | Hourly | `sync-series-watch-history` (:00), `sync-watching-favorites` (:30) |
 | Every 2 h | `sync-movie-watch-history` |

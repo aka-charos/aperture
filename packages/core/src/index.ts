@@ -2111,3 +2111,9 @@ export {
   type NextTrailLink,
   type NextWalkStep,
 } from './nextFromHere/index.js'
+
+// The name to show for a Seerr user (issues panel and issue notifications)
+export { seerrDisplayName } from './seerr/displayName.js'
+
+// Notifications (email and the Android app)
+export * from './notifications/index.js'

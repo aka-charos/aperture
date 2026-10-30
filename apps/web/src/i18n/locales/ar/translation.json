@@ -321,7 +321,24 @@
         "confirmRemove": "Remove for good",
         "removeError": "Could not remove the account.",
         "removed": "{{name}} removed"
-      }
+      },
+      "colApp": "App",
+      "appColTooltip": "Phones running the {{appName}} app, and how notifications reach this person. Hover a row for details.",
+      "notifyEmailEvents_one": "Email: {{count}} event",
+      "notifyEmailEvents_other": "Email: {{count}} events",
+      "notifyEmailUnreachable": {
+        "noAddress": "Email: no address",
+        "notAllowed": "Email: not allowed",
+        "noAccess": "Email: no access"
+      },
+      "notifyAppEvents_one": "App: {{count}} event",
+      "notifyAppEvents_other": "App: {{count}} events",
+      "notifyNoPhone": "App: no phone",
+      "notifyPhone": "Phone",
+      "notifyLastSeen": "last seen {{when}}",
+      "notifySignedOut": "signed out",
+      "notifyBlocked": "notifications blocked",
+      "notifyNothing": "Nothing reaches this person."
     },
     "userDetail": {
       "userNotFound": "المستخدم غير موجود",
@@ -1479,6 +1496,41 @@
       "refreshEvery": "How often to re-read {{type}}",
       "errSaveWeight": "Could not save that change. Try again.",
       "errRemove": "Could not remove that. The list has been reloaded."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Choose what {{appName}} emails you about.",
+      "descriptionWithApp": "Choose what {{appName}} tells you about, by email or on your phone.",
+      "email": "Email",
+      "app": "App",
+      "error": "Your notification settings could not be saved. Try again.",
+      "noAddress": "Add your email address to get these by email.",
+      "emailNotAllowed": "Email notifications are not enabled for your account.",
+      "phones": "Your phones",
+      "unknownPhone": "Phone",
+      "appVersion": "app {{version}}",
+      "lastSeen": "Last seen {{when}}",
+      "signedOut": "Signed out for over 30 days. Open the app and sign in again to get notifications on it.",
+      "blocked": "Notifications are blocked for the app in this phone’s settings.",
+      "removePhone": "Remove",
+      "events": {
+        "watchThis": {
+          "title": "Watch This",
+          "description": "Someone sent you a title"
+        },
+        "requests": {
+          "title": "Requests",
+          "description": "A request was approved, declined or became available"
+        },
+        "issueReplies": {
+          "title": "Issue replies",
+          "description": "Someone replied to an issue you reported, or resolved it"
+        },
+        "recommendations": {
+          "title": "New recommendations",
+          "description": "Your recommendations were refreshed"
+        }
+      }
     }
   },
   "settingsPage": {
@@ -1983,7 +2035,8 @@
     "removeSavedKey": "Remove saved key",
     "savedKeyRemoved": "Saved API key removed. Requests now go without one.",
     "removeSavedKeyFailed": "Could not remove the saved API key.",
-    "unslothTunnelNote": "Unsloth's --secure address (a Cloudflare quick tunnel) does not carry streamed replies, and title analysis streams. Reach Unsloth directly, over your network or Tailscale, for that role."
+    "unslothTunnelNote": "Unsloth's --secure address (a Cloudflare quick tunnel) does not carry streamed replies, and title analysis streams. Reach Unsloth directly, over your network or Tailscale, for that role.",
+    "testNeedsModel": "This server does not publish an LM Studio model list, which is normal for most OpenAI-compatible servers. Choose or add a model and test again."
   },
   "tmdbExternalModal": {
     "defaultSource": "TMDb",
