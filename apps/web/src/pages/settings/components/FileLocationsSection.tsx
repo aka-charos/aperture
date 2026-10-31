@@ -183,7 +183,9 @@ export function FileLocationsSection() {
               <Typography variant="body2" fontWeight={500}>
                 {t('settingsFileLocations.detectedMapping')}
               </Typography>
-              <Typography variant="caption" component="div" sx={{ mt: 0.5, fontFamily: 'monospace' }}>
+              {/* The paths are <code>, which is monospace already; the labels are
+                  translated words and stay in the reading face. */}
+              <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
                 {t('settingsFileLocations.mediaServerSample')} <code>{detectionResult.sampleMediaServerPath}</code>
                 <br />
                 {t('settingsFileLocations.apertureSample')} <code>{detectionResult.sampleAperturePath}</code>

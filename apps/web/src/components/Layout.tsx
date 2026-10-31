@@ -671,7 +671,6 @@ function AppShell() {
               alignItems: 'center',
               gap: 1,
               minWidth: 0,
-              flexShrink: 1,
             }}
           >
             <Box

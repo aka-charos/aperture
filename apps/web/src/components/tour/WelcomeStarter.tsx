@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import { alpha, Box, Button, IconButton, Paper, Slide, Typography, useTheme } from '@mui/material'
-import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
-import ExploreOutlinedIcon from '@mui/icons-material/ExploreOutlined'
+import { alpha, Box, Paper, Slide, useTheme } from '@mui/material'
 import { useOnboarding } from '@/hooks/useOnboarding'
+import { checklistOnScreen } from '@/hooks/onboardingState'
 import { useTour } from '@/hooks/useTour'
-import { Badge, IconTile } from './IconTile'
+import { TourOffer } from './TourOffer'
 
 /** Long enough for the first screen to draw, so the tour does not land on a blank page. */
 const START_DELAY_MS = 900
@@ -35,10 +33,9 @@ function isQuietPath(pathname: string): boolean {
  * and nothing they did would be saved anyway.
  */
 export function WelcomeStarter() {
-  const { t } = useTranslation()
   const theme = useTheme()
   const { pathname } = useLocation()
-  const { summary, record, canSave, offerSnoozed, snoozeOffer, checklistShown } = useOnboarding()
+  const { summary, record, canSave, offerSnoozed, snoozeOffer } = useOnboarding()
   const { active, startTour } = useTour()
   const started = useRef(false)
   const [offerHidden, setOfferHidden] = useState(false)
@@ -65,13 +62,12 @@ export function WelcomeStarter() {
 
   // While Home's checklist is on screen the offer is one of its rows; floating
   // here as well, it covered the checklist on a phone.
-  const showOffer = mode === 'offer' && !active && !offerHidden && !offerSnoozed && !quiet && !checklistShown
+  const showOffer =
+    mode === 'offer' && !active && !offerHidden && !offerSnoozed && !quiet && !checklistOnScreen(summary, pathname)
 
   return (
     <Slide direction="up" in={showOffer} mountOnEnter unmountOnExit>
       <Paper
-        role="region"
-        aria-label={t('onboarding.offer.title')}
         sx={{
           position: 'fixed',
           // Clear of the assistant's floating button, bottom inline-end.
@@ -89,54 +85,21 @@ export function WelcomeStarter() {
         }}
       >
         <Box aria-hidden="true" sx={{ height: 6, bgcolor: 'primary.main' }} />
-        <Box sx={{ p: 2.25, display: 'flex', gap: 1.75 }}>
-          <IconTile>
-            <ExploreOutlinedIcon />
-          </IconTile>
-          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Badge>{t('onboarding.offer.badge')}</Badge>
-              <Typography component="h2" sx={{ fontSize: 15, fontWeight: 700 }}>
-                {t('onboarding.offer.heading')}
-              </Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.5 }}>
-              {t('onboarding.offer.body')}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1, pt: 1.25 }}>
-              <Button
-                variant="contained"
-                disableElevation
-                onClick={() => {
-                  setOfferHidden(true)
-                  startTour('welcome')
-                }}
-                sx={{ minHeight: 40, borderRadius: 2.5, px: 1.75, fontWeight: 600 }}
-              >
-                {t('onboarding.offer.take')}
-              </Button>
-              <Button
-                color="inherit"
-                onClick={() => {
-                  setOfferHidden(true)
-                  record({ welcome: 'dismissed' })
-                }}
-                sx={{ minHeight: 40, color: 'text.secondary' }}
-              >
-                {t('onboarding.offer.decline')}
-              </Button>
-            </Box>
-          </Box>
-          {/* Closing for now is not an answer: the offer comes back at the next
-              sign-in, and the tips are free to show meanwhile. */}
-          <IconButton
-            aria-label={t('onboarding.offer.later')}
-            onClick={snoozeOffer}
-            sx={{ alignSelf: 'flex-start', mt: -0.75, me: -0.75, color: 'text.secondary', width: 40, height: 40 }}
-          >
-            <CloseRoundedIcon fontSize="small" />
-          </IconButton>
-        </Box>
+        {/* Closing for now is not an answer: the offer comes back at the next
+            sign-in, and the tips are free to show meanwhile. */}
+        <TourOffer
+          headingComponent="h2"
+          sx={{ p: 2.25 }}
+          onTake={() => {
+            setOfferHidden(true)
+            startTour('welcome')
+          }}
+          onDecline={() => {
+            setOfferHidden(true)
+            record({ welcome: 'dismissed' })
+          }}
+          onLater={snoozeOffer}
+        />
       </Paper>
     </Slide>
   )

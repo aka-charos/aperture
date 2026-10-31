@@ -1,4 +1,4 @@
-import { createTheme, alpha, type Theme, type ThemeOptions, type Shadows } from '@mui/material/styles'
+import { createTheme, alpha, type Theme, type ThemeOptions, type Shadows, type TypographyVariantsOptions } from '@mui/material/styles'
 
 /** The two appearances. Dark is the original; light is the calm, bordered one. */
 export type ColorMode = 'light' | 'dark'
@@ -445,21 +445,38 @@ const SANS_FONT = '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
 export const BUTTON_FONT = `"IBM Plex Mono", ${SANS_FONT}`
 
 /**
- * One type system for both modes, so switching never reflows a page: Inter for
- * reading, IBM Plex Mono for button labels, IDs and code. The button size is a
- * step down from MUI's 14px because a monospace label sets wider than Inter at
- * the same size.
+ * UI languages whose letters IBM Plex Mono draws (Latin and Cyrillic). Any
+ * other language gets its button labels in Inter outright: behind Plex Mono a
+ * Greek label set its Latin words and digits monospace and its Greek letters
+ * in Inter, two faces of different widths in one word run. A language not on
+ * this list falls to Inter, which is the safe side: an Inter label looks
+ * ordinary, a mixed one looks broken.
  */
-const TYPOGRAPHY: ThemeOptions['typography'] = {
-  fontFamily: SANS_FONT,
-  fontFamilyMonospace: MONO_FONT,
-  h1: { fontWeight: 700, fontSize: '2.5rem' },
-  h2: { fontWeight: 700, fontSize: '2rem' },
-  h3: { fontWeight: 600, fontSize: '1.75rem' },
-  h4: { fontWeight: 600, fontSize: '1.5rem' },
-  h5: { fontWeight: 600, fontSize: '1.25rem' },
-  h6: { fontWeight: 600, fontSize: '1rem' },
-  button: { fontFamily: BUTTON_FONT, textTransform: 'none', fontWeight: 500, fontSize: '0.8125rem', letterSpacing: 0 },
+const PLEX_MONO_LANGUAGES = new Set(['en', 'de', 'es', 'fr', 'it', 'nl', 'pt', 'ru'])
+
+/** The button face for a UI language. */
+export function buttonFontFor(language: string): string {
+  return PLEX_MONO_LANGUAGES.has(language.split('-')[0].toLowerCase()) ? BUTTON_FONT : SANS_FONT
+}
+
+/**
+ * One type system for both modes, so switching never reflows a page: Inter for
+ * reading, IBM Plex Mono for button labels (in a language it can draw; see
+ * `buttonFontFor`), IDs and code. The button size is a step down from MUI's
+ * 14px because a monospace label sets wider than Inter at the same size.
+ */
+function typographyFor(language: string): TypographyVariantsOptions {
+  return {
+    fontFamily: SANS_FONT,
+    fontFamilyMonospace: MONO_FONT,
+    h1: { fontWeight: 700, fontSize: '2.5rem' },
+    h2: { fontWeight: 700, fontSize: '2rem' },
+    h3: { fontWeight: 600, fontSize: '1.75rem' },
+    h4: { fontWeight: 600, fontSize: '1.5rem' },
+    h5: { fontWeight: 600, fontSize: '1.25rem' },
+    h6: { fontWeight: 600, fontSize: '1rem' },
+    button: { fontFamily: buttonFontFor(language), textTransform: 'none', fontWeight: 500, fontSize: '0.8125rem', letterSpacing: 0 },
+  }
 }
 
 /** Code-shaped markup in the monospace face, in both modes. */
@@ -498,7 +515,6 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
       mediaType: { movie: brand.primary.main, series: s.sage },
       gradient: gradientTokens(brand.primary, brand.secondary),
     },
-    typography: TYPOGRAPHY,
     shape: { borderRadius: 6 },
     shadows: lightShadows(s.ink),
     components: {
@@ -674,7 +690,6 @@ function buildDarkOptions(): ThemeOptions {
       mediaType: { movie: palette.primary.light, series: '#10b981' },
       gradient: gradientTokens(palette.primary, palette.secondary),
     },
-    typography: TYPOGRAPHY,
     shape: {
       borderRadius: 8,
     },
@@ -829,8 +844,8 @@ export function documentChromeColor(mode: ColorMode): string {
   return mode === 'light' ? LIGHT_SCHEME.sheet : palette.background.default
 }
 
-export function createAppTheme(direction: 'ltr' | 'rtl', mode: ColorMode = 'dark'): Theme {
-  return createTheme({ ...buildThemeOptions(mode), direction })
+export function createAppTheme(direction: 'ltr' | 'rtl', mode: ColorMode = 'dark', language = 'en'): Theme {
+  return createTheme({ ...buildThemeOptions(mode), typography: typographyFor(language), direction })
 }
 
 /** @deprecated Prefer `createAppTheme('ltr')` from RtlProviders; kept for Storybook or tests. */

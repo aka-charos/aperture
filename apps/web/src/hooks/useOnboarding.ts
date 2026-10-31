@@ -10,8 +10,6 @@ const NO_ONBOARDING: OnboardingContextValue = {
   canSave: false,
   offerSnoozed: false,
   snoozeOffer: () => {},
-  checklistShown: false,
-  setChecklistShown: () => {},
 }
 
 /** Onboarding state for the person signed in; inert outside Layout. */
