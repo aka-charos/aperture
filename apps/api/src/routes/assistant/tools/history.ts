@@ -8,7 +8,7 @@ import { query } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext } from '../types.js'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, displayRatingSql } from '@aperture/core'
 
 export function createHistoryTools(ctx: ToolContext) {
   return {
@@ -37,7 +37,7 @@ export function createHistoryTools(ctx: ToolContext) {
             last_played_at: Date
             play_count: number
           }>(
-            `SELECT m.id, m.title, m.year, m.poster_url, m.genres, m.community_rating,
+            `SELECT m.id, m.title, m.year, m.poster_url, m.genres, ${displayRatingSql('m')} AS community_rating,
              m.provider_item_id, m.directors, wh.last_played_at, wh.play_count
              FROM watch_history wh JOIN movies m ON m.id = wh.movie_id
              WHERE wh.user_id = $1 AND wh.movie_id IS NOT NULL
@@ -88,14 +88,14 @@ export function createHistoryTools(ctx: ToolContext) {
             episodes_watched: string
             last_watched: Date
           }>(
-            `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating,
+            `SELECT s.id, s.title, s.year, s.poster_url, s.genres, ${displayRatingSql('s')} AS community_rating,
              s.provider_item_id, s.directors, COUNT(DISTINCT wh.episode_id) as episodes_watched,
              MAX(wh.last_played_at) as last_watched
              FROM watch_history wh JOIN episodes e ON e.id = wh.episode_id
              JOIN series s ON s.id = e.series_id
              WHERE wh.user_id = $1 AND wh.episode_id IS NOT NULL
                AND ${WATCH_HISTORY_PLAYED_SQL}
-             GROUP BY s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating, s.provider_item_id, s.directors
+             GROUP BY s.id
              ORDER BY last_watched DESC LIMIT $2`,
             [ctx.userId, limit]
           )
@@ -177,7 +177,7 @@ export function createHistoryTools(ctx: ToolContext) {
           directors: string[] | null
           rating: number
         }>(
-          `SELECT m.id, m.title, m.year, m.poster_url, m.genres, m.community_rating,
+          `SELECT m.id, m.title, m.year, m.poster_url, m.genres, ${displayRatingSql('m')} AS community_rating,
            m.provider_item_id, m.directors, ur.rating
            FROM user_ratings ur JOIN movies m ON m.id = ur.movie_id
            ${whereClause} AND ur.movie_id IS NOT NULL
@@ -220,7 +220,7 @@ export function createHistoryTools(ctx: ToolContext) {
           directors: string[] | null
           rating: number
         }>(
-          `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating,
+          `SELECT s.id, s.title, s.year, s.poster_url, s.genres, ${displayRatingSql('s')} AS community_rating,
            s.provider_item_id, s.directors, ur.rating
            FROM user_ratings ur JOIN series s ON s.id = ur.series_id
            ${whereClause} AND ur.series_id IS NOT NULL

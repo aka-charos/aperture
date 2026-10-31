@@ -4,7 +4,7 @@
  * GET /api/series - List all series with pagination, filtering, and sorting
  */
 import type { FastifyInstance } from 'fastify'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, displayRatingSql } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
@@ -141,7 +141,7 @@ export function registerListHandler(fastify: FastifyInstance) {
         const rating = parseFloat(minCommunityRating)
         if (!isNaN(rating)) {
           whereClause += whereClause ? ' AND ' : ' WHERE '
-          whereClause += `community_rating >= $${paramIndex++}`
+          whereClause += `${displayRatingSql()} >= $${paramIndex++}`
           params.push(rating)
         }
       }
@@ -228,7 +228,7 @@ export function registerListHandler(fastify: FastifyInstance) {
           orderClause = `year ${order} ${nullsPosition}, title ASC`
           break
         case 'rating':
-          orderClause = `community_rating ${order} ${nullsPosition}, title ASC`
+          orderClause = `${displayRatingSql()} ${order} ${nullsPosition}, title ASC`
           break
         case 'rtScore':
           orderClause = `rt_critic_score ${order} ${nullsPosition}, title ASC`
@@ -250,7 +250,7 @@ export function registerListHandler(fastify: FastifyInstance) {
       params.push(pageSize, offset)
       const result = await query<SeriesRow>(
         `SELECT id, provider_item_id, title, original_title, year, end_year, genres, overview,
-                community_rating, status, ${LIBRARY_SEASON_COUNT_SQL} AS total_seasons, total_episodes, network,
+                ${displayRatingSql()} AS community_rating, status, ${LIBRARY_SEASON_COUNT_SQL} AS total_seasons, total_episodes, network,
                 poster_url, backdrop_url, created_at, updated_at,
                 rt_critic_score, awards_summary
          FROM series${whereClause}

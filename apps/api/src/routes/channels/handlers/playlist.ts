@@ -5,6 +5,7 @@ import {
   updateChannelPlaylist,
   updateChannelCollection,
   buildChannelItems,
+  displayRatingSql,
   generateChannelPickReasons,
   getMediaServerProvider,
   getMediaServerApiKey,
@@ -73,10 +74,10 @@ async function hydratePreviewItems(recommendations: ChannelRecommendation[]) {
     community_rating: string | number | null
     genres: string[] | null
   }>(
-    `SELECT id, poster_url, runtime_minutes AS runtime, overview, community_rating, genres
+    `SELECT id, poster_url, runtime_minutes AS runtime, overview, ${displayRatingSql()} AS community_rating, genres
      FROM movies WHERE id = ANY($1)
      UNION ALL
-     SELECT id, poster_url, NULL AS runtime, overview, community_rating, genres
+     SELECT id, poster_url, NULL AS runtime, overview, ${displayRatingSql()} AS community_rating, genres
      FROM series WHERE id = ANY($2)`,
     [movieIds, seriesIds]
   )

@@ -6,7 +6,7 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, displayRatingSql } from '@aperture/core'
 import { query, queryOne } from '../../lib/db.js'
 import { requireAuth } from '../../plugins/auth.js'
 import {
@@ -144,7 +144,7 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
        )
        SELECT s.id AS series_id, uws.id AS watching_id, uws.added_at,
               s.title, s.year, s.poster_url, s.backdrop_url, s.genres,
-              s.overview, s.community_rating, s.network, s.status,
+              s.overview, ${displayRatingSql('s')} AS community_rating, s.network, s.status,
               s.total_seasons, s.total_episodes, s.tmdb_id,
               s.tmdb_total_episodes, s.tmdb_total_seasons, s.tmdb_seasons, s.tmdb_status,
               h.episodes_watched, h.last_played_at,

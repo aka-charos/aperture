@@ -8,7 +8,7 @@ import { query, queryOne } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ContentCarouselI18nKey } from '../schemas/contentCarousel.js'
 import type { ToolContext } from '../types.js'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, displayRatingSql } from '@aperture/core'
 
 function rankingTitleKey(
   rankBy:
@@ -151,9 +151,9 @@ export function createLibraryTools(ctx: ToolContext) {
               provider_item_id: string | null
               community_rating: number
             }>(
-              `SELECT id, title, year, poster_url, provider_item_id, community_rating
-               FROM series WHERE community_rating IS NOT NULL
-               ORDER BY community_rating ${order} LIMIT $1`,
+              `SELECT id, title, year, poster_url, provider_item_id, ${displayRatingSql()} AS community_rating
+               FROM series WHERE ${displayRatingSql()} IS NOT NULL
+               ORDER BY ${displayRatingSql()} ${order} LIMIT $1`,
               [limit]
             )
             return {
@@ -251,9 +251,9 @@ export function createLibraryTools(ctx: ToolContext) {
               provider_item_id: string | null
               community_rating: number
             }>(
-              `SELECT id, title, year, poster_url, provider_item_id, community_rating
-               FROM movies WHERE community_rating IS NOT NULL
-               ORDER BY community_rating ${order} LIMIT $1`,
+              `SELECT id, title, year, poster_url, provider_item_id, ${displayRatingSql()} AS community_rating
+               FROM movies WHERE ${displayRatingSql()} IS NOT NULL
+               ORDER BY ${displayRatingSql()} ${order} LIMIT $1`,
               [limit]
             )
             return {
@@ -322,7 +322,7 @@ export function createLibraryTools(ctx: ToolContext) {
           avg_rating: number
           total_runtime: string
         }>(
-          `SELECT COUNT(*) as count, ROUND(AVG(community_rating)::numeric, 2) as avg_rating,
+          `SELECT COUNT(*) as count, ROUND(AVG(${displayRatingSql()})::numeric, 2) as avg_rating,
            SUM(runtime_minutes) as total_runtime FROM movies`
         )
 
@@ -332,7 +332,7 @@ export function createLibraryTools(ctx: ToolContext) {
           avg_rating: number
         }>(
           `SELECT COUNT(DISTINCT s.id) as count, COUNT(e.id) as episode_count,
-           ROUND(AVG(s.community_rating)::numeric, 2) as avg_rating
+           ROUND(AVG(${displayRatingSql('s')})::numeric, 2) as avg_rating
            FROM series s LEFT JOIN episodes e ON e.series_id = s.id`
         )
 

@@ -3,7 +3,7 @@ import { resolveStudioLogo, studioLogoColumns, type StudioLogoRow } from '@apert
 import { query, queryOne } from '../../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
 import { requireSelfOrAdmin } from './shared.js'
-import { WATCHED_SQL } from './watchStatsFilters.js'
+import { MOVIE_RATING_SQL, WATCHED_SQL } from './watchStatsFilters.js'
 
 export function registerWatchStatsHandlers(fastify: FastifyInstance) {
   /**
@@ -133,7 +133,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
         // Rating distribution (rounded to nearest 0.5)
         const ratingResult = await query<{ rating: string; count: string }>(
           `SELECT 
-             ROUND(m.community_rating * 2) / 2 as rating,
+             ROUND(${MOVIE_RATING_SQL} * 2) / 2 as rating,
              COUNT(*) as count
            FROM watch_history wh
            JOIN movies m ON m.id = wh.movie_id
@@ -141,9 +141,9 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
            WHERE wh.user_id = $1
              AND wh.movie_id IS NOT NULL
              AND ${WATCHED}
-             AND m.community_rating IS NOT NULL
+             AND ${MOVIE_RATING_SQL} IS NOT NULL
              AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
-           GROUP BY ROUND(m.community_rating * 2) / 2
+           GROUP BY ROUND(${MOVIE_RATING_SQL} * 2) / 2
            ORDER BY rating ASC`,
           [id]
         )
@@ -459,14 +459,14 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
         // Taste vs. the crowd: overall average community rating of watched
         // movies, plus per-genre averages to surface "guilty pleasures".
         const avgRatingRow = await queryOne<{ avg_rating: string | null }>(
-          `SELECT ROUND(AVG(m.community_rating)::numeric, 2) as avg_rating
+          `SELECT ROUND(AVG(${MOVIE_RATING_SQL})::numeric, 2) as avg_rating
            FROM watch_history wh
            JOIN movies m ON m.id = wh.movie_id
            LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
            WHERE wh.user_id = $1
              AND wh.movie_id IS NOT NULL
              AND ${WATCHED}
-             AND m.community_rating IS NOT NULL
+             AND ${MOVIE_RATING_SQL} IS NOT NULL
              AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)`,
           [id]
         )
@@ -474,17 +474,17 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
 
         const genreRatingResult = await query<{ genre: string; count: string; avg_rating: string }>(
           `WITH watched AS (
-             SELECT m.genres, m.community_rating
+             SELECT m.genres, ${MOVIE_RATING_SQL} AS rating
              FROM watch_history wh
              JOIN movies m ON m.id = wh.movie_id
              LEFT JOIN library_config lc ON lc.provider_library_id = m.provider_library_id
              WHERE wh.user_id = $1
                AND wh.movie_id IS NOT NULL
                AND ${WATCHED}
-               AND m.community_rating IS NOT NULL
+               AND ${MOVIE_RATING_SQL} IS NOT NULL
                AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
            )
-           SELECT g.genre, COUNT(*) as count, ROUND(AVG(w.community_rating)::numeric, 1) as avg_rating
+           SELECT g.genre, COUNT(*) as count, ROUND(AVG(w.rating)::numeric, 1) as avg_rating
            FROM watched w, unnest(w.genres) as g(genre)
            GROUP BY g.genre
            HAVING COUNT(*) >= 2

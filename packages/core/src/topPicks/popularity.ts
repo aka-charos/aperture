@@ -11,6 +11,7 @@ import { createChildLogger } from '../lib/logger.js'
 import { getTopPicksConfig, type TopPicksConfig, type PopularitySource, type HybridExternalSource } from './config.js'
 import { getListItems, isMDBListConfigured, type MDBListItem } from '../mdblist/index.js'
 import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
+import { displayRatingSql } from '../ratings/displayRating.js'
 import {
   getPopularMoviesBatch,
   getTrendingMoviesBatch,
@@ -173,7 +174,7 @@ async function getTopMoviesLocalPublic(
       m.backdrop_url,
       m.overview,
       m.genres,
-      m.community_rating,
+      ${displayRatingSql('m')} AS community_rating,
       m.path,
       ms.unique_viewers,
       ms.play_count,
@@ -342,7 +343,7 @@ async function getTopSeriesLocalPublic(
       s.backdrop_url,
       s.overview,
       s.genres,
-      s.community_rating,
+      ${displayRatingSql('s')} AS community_rating,
       s.network,
       ss.unique_viewers,
       ss.total_episodes_watched,
@@ -543,7 +544,7 @@ async function matchMDBListMoviesToLibrary(
     `
     SELECT 
       id, title, year, poster_url, backdrop_url, overview, genres,
-      community_rating, path, imdb_id, tmdb_id, languages
+      ${displayRatingSql()} AS community_rating, path, imdb_id, tmdb_id, languages
     FROM movies
     WHERE (imdb_id = ANY($1) OR tmdb_id = ANY($2))
       AND path IS NOT NULL
@@ -669,7 +670,7 @@ async function matchMDBListSeriesToLibrary(
     `
     SELECT 
       id, title, year, poster_url, backdrop_url, overview, genres,
-      community_rating, network, imdb_id, tmdb_id, tvdb_id, languages
+      ${displayRatingSql()} AS community_rating, network, imdb_id, tmdb_id, tvdb_id, languages
     FROM series
     WHERE (imdb_id = ANY($1) OR tmdb_id = ANY($2) OR tvdb_id = ANY($3))
       AND EXISTS (
@@ -943,7 +944,7 @@ async function matchTMDBMoviesToLibrary(
     `
     SELECT 
       id, title, year, poster_url, backdrop_url, overview, genres,
-      community_rating, path, tmdb_id
+      ${displayRatingSql()} AS community_rating, path, tmdb_id
     FROM movies
     WHERE tmdb_id = ANY($1)
       AND path IS NOT NULL
@@ -1045,7 +1046,7 @@ async function matchTMDBSeriesToLibrary(
     `
     SELECT 
       id, title, year, poster_url, backdrop_url, overview, genres,
-      community_rating, network, tmdb_id
+      ${displayRatingSql()} AS community_rating, network, tmdb_id
     FROM series
     WHERE tmdb_id = ANY($1)
       AND EXISTS (
@@ -1432,7 +1433,7 @@ async function getTopMoviesLocal(
       m.backdrop_url,
       m.overview,
       m.genres,
-      m.community_rating,
+      ${displayRatingSql('m')} AS community_rating,
       m.path,
       ms.unique_viewers,
       ms.play_count,
@@ -1541,7 +1542,7 @@ async function getTopSeriesLocal(
       s.backdrop_url,
       s.overview,
       s.genres,
-      s.community_rating,
+      ${displayRatingSql('s')} AS community_rating,
       s.network,
       ss.unique_viewers,
       ss.total_episodes_watched,

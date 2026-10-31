@@ -1072,7 +1072,7 @@
     "heatmapMore": "More",
     "emptyHeatmapData": "No activity data available",
     "sectionTasteVsCrowd": "Your Taste vs. the Crowd",
-    "avgCommunityRating": "Avg community rating of what you watch",
+    "avgCommunityRating": "Avg rating of what you watch",
     "guiltyPleasuresTitle": "Guilty pleasures",
     "guiltyPleasuresHint": "Genres you love that critics rate below your average",
     "guiltyPleasureRating": "avg {{rating}}",
@@ -1931,7 +1931,7 @@
       "watchStatus": "WATCH STATUS",
       "audience": "AUDIENCE"
     },
-    "communityRating": "Community Rating",
+    "communityRating": "Rating",
     "rtCriticScore": "RT Critic Score",
     "metacritic": "Metacritic",
     "releaseYear": "Release Year",
@@ -2343,7 +2343,7 @@
     "weightSimilarityDesc": "How strongly to favour titles close to your taste profile. Usually the one to keep highest",
     "weightNovelty": "Genre Discovery",
     "weightNoveltyDesc": "Rewards a familiar anchor plus a genre you rarely watch — partly new, rather than as strange as possible",
-    "weightRating": "Community Rating",
+    "weightRating": "Rating",
     "weightRatingDesc": "How much to favour highly-rated titles. This score never changes, so a high value makes your list repeat itself",
     "weightDiversity": "Diversity",
     "weightDiversityDesc": "How hard to push for variety across genres when your final list is picked",
@@ -3825,7 +3825,7 @@
         "example": "10-20% is enough to move a few slots. Set to almost zero and the term stops doing anything at all."
       },
       "ratingWeight": {
-        "title": "Community Rating",
+        "title": "Rating",
         "description": "Favours highly-rated titles. This score never changes for a given title, so the more weight it carries the more static every list becomes — and the more every user's list resembles everyone else's.",
         "increase": "Useful for new users with too little history to match against.",
         "decrease": "Trusts the taste profile over the crowd.",

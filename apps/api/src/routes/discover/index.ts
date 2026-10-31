@@ -5,6 +5,7 @@
 
 import type { FastifyPluginAsync } from 'fastify'
 import {
+  displayRatingSql,
   listPeopleForBrowse,
   resolveTmdbPersonProfileImageUrl,
   getPersonCreditsGap,
@@ -244,7 +245,7 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
           ${alias}.poster_url,
           ${alias}.backdrop_url,
           ${alias}.genres,
-          ${alias}.community_rating,
+          ${displayRatingSql(alias)} AS community_rating,
           EXISTS(
             SELECT 1 FROM jsonb_array_elements(${alias}.actors) AS a
             WHERE a->>'name' ILIKE $1
@@ -393,7 +394,7 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
           m.poster_url,
           m.backdrop_url,
           m.genres,
-          m.community_rating
+          ${displayRatingSql('m')} AS community_rating
         FROM movies m
         WHERE EXISTS(
           SELECT 1 FROM jsonb_array_elements(m.studios) AS s
@@ -420,7 +421,7 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
           s.poster_url,
           s.backdrop_url,
           s.genres,
-          s.community_rating
+          ${displayRatingSql('s')} AS community_rating
         FROM series s
         WHERE (
           EXISTS(

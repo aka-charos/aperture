@@ -6,6 +6,7 @@ import { getSeriesEmbedding } from '../recommender/series/embeddings.js'
 import { averageEmbeddings } from '../recommender/shared/embeddings.js'
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../lib/ai-provider.js'
 import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
+import { displayRatingSql } from '../ratings/displayRating.js'
 import type { ChannelMediaType, ChannelRecommendation } from './types.js'
 import { weightedRandomSample } from './utils.js'
 
@@ -158,10 +159,10 @@ async function fetchCandidatePool(
     year: number | null
     community_rating: number | null
   }>(
-    `SELECT t.id, t.provider_item_id, t.title, t.year, t.community_rating
+    `SELECT t.id, t.provider_item_id, t.title, t.year, ${displayRatingSql('t')} AS community_rating
      FROM ${source.table} t
      ${whereClause}
-     ORDER BY t.community_rating DESC NULLS LAST
+     ORDER BY ${displayRatingSql('t')} DESC NULLS LAST
      LIMIT $${paramIndex}`,
     [...params, fetchLimit]
   )

@@ -26,7 +26,7 @@ The **Filters** button (it shows a count when anything is active) opens the full
 
 | Section | Filters |
 |---------|---------|
-| **Scores** | Community rating, Rotten Tomatoes critic score, Metacritic |
+| **Scores** | Rating (the same number as the title page's headline), Rotten Tomatoes critic score, Metacritic |
 | **Year** | Release-year range |
 | **Watch status** | Any / Watched / Unwatched — watched means you finished playing it; a title you only favourited, or stopped partway through, counts as unwatched |
 | **Audience** | **Min/max watchers** — how many distinct users on your server have played it |
@@ -85,11 +85,11 @@ Any combination of filters can be saved as a **preset** from the Presets menu:
 
 ## Reading the Results
 
-**Grid view** — posters with overlays: watched tick, your star rating on hover, episode-progress badge for series, community rating badge. Under each poster, **more** opens the plot; it opens the plots of the whole row at once, so the row stays even.
+**Grid view** — posters with overlays: watched tick, your star rating on hover, episode-progress badge for series, rating badge. Under each poster, **more** opens the plot; it opens the plots of the whole row at once, so the row stays even.
 
 **List view** — poster beside the details:
 
-- Title, year, **community rating**
+- Title, year, **rating**
 - **Genre chips** (up to four)
 - A two-line **overview** (with "View on TMDb" alongside)
 - Your rating, inline; series add their **status** (Airing/Ended) and **season count**, plus an **Add to Watching** toggle

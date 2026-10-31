@@ -39,7 +39,7 @@ In list view, each title shows:
 |------|-------------|
 | **Unique Viewers** | How many different users watched it — broadly popular |
 | **Play Count** | Total plays ("10+ plays" caps the chip) — high plays with few viewers means a few people rewatch it |
-| **Community Rating** | Average rating from your media server |
+| **Rating** | The title's rating, the same number its title page shows |
 
 Series add their own stats: **episodes watched**, **% avg completion** (how much of each episode the household actually watches), and a **network** chip.
 

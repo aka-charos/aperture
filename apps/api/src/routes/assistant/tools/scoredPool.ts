@@ -15,6 +15,7 @@ import {
   getActiveEmbeddingTableName,
   createChildLogger,
   binderFor,
+  displayRatingSql,
   libraryScopeSql,
   scopedAnnQuery,
 } from '@aperture/core'
@@ -201,7 +202,7 @@ export async function searchScoredPool(
               ORDER BY e.embedding <=> $3::halfvec
               LIMIT $5
            )
-           SELECT c.id, c.title, c.year, c.genres, c.overview, c.community_rating,
+           SELECT c.id, c.title, c.year, c.genres, c.overview, ${displayRatingSql('c')} AS community_rating,
                   c.poster_url, c.provider_item_id, c.directors,
                   near.query_score, rc.final_score, rc.score_breakdown
              FROM near
