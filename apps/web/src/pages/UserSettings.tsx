@@ -18,6 +18,8 @@ import { TipsCard } from './UserSettings/TipsCard'
 import { TraktIntegrationCard } from './UserSettings/TraktIntegrationCard'
 import { NewsletterCard } from './UserSettings/NewsletterCard'
 import { useNewsletterSubscription } from './UserSettings/hooks/useNewsletterSubscription'
+import { NotificationsCard } from './UserSettings/NotificationsCard'
+import { useNotificationSettings } from './UserSettings/hooks/useNotificationSettings'
 import { SettingsGrid } from './UserSettings/SettingsCard'
 import { RecommendationsTab } from './UserSettings/recommendations/RecommendationsTab'
 import { HomeScreenTab } from './UserSettings/homeScreen/HomeScreenTab'
@@ -43,7 +45,6 @@ export function UserSettingsPage() {
   const [email, setEmail] = useState('')
   const [originalEmail, setOriginalEmail] = useState('')
   const [emailLocked, setEmailLocked] = useState(false)
-  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true)
   const [emailNotificationsAllowed, setEmailNotificationsAllowed] = useState(false)
   const [emailLoaded, setEmailLoaded] = useState(false)
   const [loadingEmail, setLoadingEmail] = useState(false)
@@ -67,6 +68,7 @@ export function UserSettingsPage() {
     showCallbackResult: showTraktCallback,
   } = useTraktIntegration()
   const newsletter = useNewsletterSubscription()
+  const notifications = useNotificationSettings()
 
   /**
    * Which tabs this viewer gets. Emby home rows exist on Emby only. Account is
@@ -75,12 +77,14 @@ export function UserSettingsPage() {
    * address naming it still lands there while the answers arrive.
    */
   const visibleTabs = useMemo<UserSettingsTabKey[]>(() => {
-    const accountKnown = emailLoaded && traktChecked && libraryOutputEnabled !== null && newsletter.loaded
+    const accountKnown =
+      emailLoaded && traktChecked && libraryOutputEnabled !== null && newsletter.loaded && notifications.loaded
     const accountHasCards =
       emailNotificationsAllowed ||
       traktStatus?.traktConfigured === true ||
       libraryOutputEnabled === true ||
-      newsletter.offered
+      newsletter.offered ||
+      notifications.offered
     return USER_SETTINGS_TAB_KEYS.filter((key) => {
       if (key === 'home') return user?.provider === 'emby'
       if (key === 'account') return !accountKnown || accountHasCards
@@ -92,6 +96,8 @@ export function UserSettingsPage() {
     libraryOutputEnabled,
     newsletter.loaded,
     newsletter.offered,
+    notifications.loaded,
+    notifications.offered,
     traktChecked,
     traktStatus,
     user?.provider,
@@ -139,7 +145,6 @@ export function UserSettingsPage() {
         setEmail(emailValue)
         setOriginalEmail(emailValue)
         setEmailLocked(data.emailLocked || false)
-        setEmailNotificationsEnabled(data.emailNotificationsEnabled ?? true)
         setEmailNotificationsAllowed(data.emailNotificationsAllowed ?? false)
       }
     } catch {
@@ -170,7 +175,7 @@ export function UserSettingsPage() {
     void fetchTraktStatus().finally(() => setTraktChecked(true))
   }, [fetchEmailSettings, fetchLibraryOutput, fetchTraktStatus])
 
-  const saveEmailSettings = async (newEmail?: string, newNotificationsEnabled?: boolean) => {
+  const saveEmailSettings = async (newEmail?: string) => {
     if (!user?.id) return
 
     if (newEmail !== undefined && newEmail.trim() === originalEmail) {
@@ -180,12 +185,9 @@ export function UserSettingsPage() {
     setSavingEmail(true)
     setEmailError(null)
     try {
-      const body: { email?: string | null; emailNotificationsEnabled?: boolean } = {}
+      const body: { email?: string | null } = {}
       if (newEmail !== undefined) {
         body.email = newEmail.trim() || null
-      }
-      if (newNotificationsEnabled !== undefined) {
-        body.emailNotificationsEnabled = newNotificationsEnabled
       }
 
       const response = await fetch(`/api/users/${user.id}/email-settings`, {
@@ -205,8 +207,9 @@ export function UserSettingsPage() {
         setEmail(emailValue)
         setOriginalEmail(emailValue)
         setEmailLocked(data.emailLocked || false)
-        setEmailNotificationsEnabled(data.emailNotificationsEnabled ?? true)
         setEmailNotificationsAllowed(data.emailNotificationsAllowed ?? false)
+        // The address decides whether notification email can reach them.
+        void notifications.reload()
         setEmailSuccess(t('userSettings.emailSettingsSaved'))
         window.setTimeout(() => setEmailSuccess(null), 3000)
       } else {
@@ -287,21 +290,25 @@ export function UserSettingsPage() {
                 <EmailNotificationsCard
                   email={email}
                   emailLocked={emailLocked}
-                  emailNotificationsEnabled={emailNotificationsEnabled}
                   loadingEmail={loadingEmail}
                   savingEmail={savingEmail}
                   emailSuccess={emailSuccess}
                   emailError={emailError}
                   onEmailChange={setEmail}
                   onEmailBlur={() => void saveEmailSettings(email)}
-                  onNotificationsChange={(enabled) => {
-                    setEmailNotificationsEnabled(enabled)
-                    void saveEmailSettings(undefined, enabled)
-                  }}
                   onDismissSuccess={() => setEmailSuccess(null)}
                   onDismissEmailError={() => setEmailError(null)}
                 />
               )}
+              <NotificationsCard
+                settings={notifications.settings}
+                offered={notifications.offered}
+                saving={notifications.saving}
+                error={notifications.error}
+                onChange={(event, channel, value) => void notifications.setChannel(event, channel, value)}
+                onRemoveDevice={(id) => void notifications.removeDevice(id)}
+                onDismissError={notifications.dismissError}
+              />
               <NewsletterCard
                 subscription={newsletter.subscription}
                 offered={newsletter.offered}

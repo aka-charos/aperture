@@ -19,11 +19,12 @@ const cacheRtl = createCache({
 
 export function RtlProviders({ children }: { children: ReactNode }) {
   const { i18n } = useTranslation()
-  const [dir, setDir] = useState<'ltr' | 'rtl'>(() => (isRtlLocale(i18n.language) ? 'rtl' : 'ltr'))
+  const [language, setLanguage] = useState(i18n.language)
+  const dir = isRtlLocale(language) ? 'rtl' : 'ltr'
 
   useEffect(() => {
     const handler = (lng: string) => {
-      setDir(isRtlLocale(lng) ? 'rtl' : 'ltr')
+      setLanguage(lng)
     }
     i18n.on('languageChanged', handler)
     return () => {
@@ -31,7 +32,7 @@ export function RtlProviders({ children }: { children: ReactNode }) {
     }
   }, [i18n])
 
-  const theme = useAppTheme(dir, useColorMode())
+  const theme = useAppTheme(dir, useColorMode(), language)
   const cache = dir === 'rtl' ? cacheRtl : cacheLtr
 
   return (

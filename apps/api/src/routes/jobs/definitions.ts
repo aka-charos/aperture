@@ -218,6 +218,13 @@ export const jobDefinitions: JobDefinition[] = [
     description: 'Import user emails from LLDAP by matching usernames (optional, admin-configured)',
     cron: '15 3 * * *', // Daily at 3:15 AM
   },
+  // === Notification emails ===
+  {
+    name: 'send-notification-emails',
+    description:
+      'Email each person who switched email notifications on what is new for them (Watch This, requests, issue replies, recommendations)',
+    cron: '*/15 * * * *', // Every 15 minutes
+  },
   // === Shows You Watch (favorites sync) ===
   {
     name: 'sync-watching-favorites',

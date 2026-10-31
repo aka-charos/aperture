@@ -58,6 +58,9 @@ import SmartToyIcon from '@mui/icons-material/SmartToy'
 import GroupIcon from '@mui/icons-material/Group'
 import { UserConnectionsDialog } from './UserConnectionsDialog'
 import { GoneAccountsSection, type GoneAccount } from './users/GoneAccountsSection'
+import { NotificationReachCell } from './users/NotificationReachCell'
+import { useNotificationReach } from './users/useNotificationReach'
+import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid'
 import { usePageHeader } from '@/hooks/usePageHeader'
 import { useAuth } from '@/hooks/useAuth'
 import { useLegacyLibraryOutput } from '@/hooks/legacyLibraryOutput'
@@ -161,6 +164,9 @@ export function UsersPage() {
   // Sort control for the email / web login / streaming activity columns
   const [sortField, setSortField] = useState<SortField>('default')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  // Hidden until a phone has ever checked in, so an instance without the app never sees it.
+  const notificationReach = useNotificationReach()
+  const showAppColumn = notificationReach?.anyDevices === true
 
   const fetchGlobalAiConfig = useCallback(async () => {
     try {
@@ -1271,6 +1277,16 @@ export function UsersPage() {
                   </Box>
                 </Tooltip>
               </TableCell>
+              {showAppColumn && (
+                <TableCell align="center">
+                  <Tooltip title={t('admin.usersPage.appColTooltip')}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                      <PhoneAndroidIcon fontSize="small" />
+                      {t('admin.usersPage.colApp')}
+                    </Box>
+                  </Tooltip>
+                </TableCell>
+              )}
               {globalAiConfig?.userOverrideAllowed && (
                 <TableCell align="center">
                   <Tooltip title={t('admin.usersPage.aiOverrideColTooltip')}>
@@ -1287,7 +1303,7 @@ export function UsersPage() {
           <TableBody>
             {sortedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={globalAiConfig?.userOverrideAllowed ? 12 : 11} align="center">
+                <TableCell colSpan={11 + (globalAiConfig?.userOverrideAllowed ? 1 : 0) + (showAppColumn ? 1 : 0)} align="center">
                   <Typography variant="body2" color="text.secondary" py={4}>
                     {t('admin.usersPage.noUsers', { provider: providerLabel })}
                   </Typography>
@@ -1459,6 +1475,13 @@ export function UsersPage() {
                       <Typography variant="body2" color="text.secondary">—</Typography>
                     )}
                   </TableCell>
+                  {showAppColumn && (
+                    <TableCell align="center">
+                      <NotificationReachCell
+                        reach={user.apertureUserId ? notificationReach?.byUser.get(user.apertureUserId) : undefined}
+                      />
+                    </TableCell>
+                  )}
                   {globalAiConfig?.userOverrideAllowed && (
                     <TableCell align="center">
                       {user.isImported ? (

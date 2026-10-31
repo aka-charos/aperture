@@ -63,6 +63,7 @@ A title analysis takes roughly one to three minutes, so size the per-run limit t
 | `sync-trakt-ratings` | every 6 h at :30 | One-way Trakt → Aperture rating import for connected users (push on rate is immediate) |
 | `sync-watching-favorites` | hourly at :30 | Two-way reconcile of [Shows You Watch](shows-you-watch.md) with media-server favorites |
 | `sync-lldap-emails` | daily 03:15 | Import emails from [LLDAP](lldap.md) by username match |
+| `send-notification-emails` | every 15 min | Email each user who switched email notifications on one message listing what is new for them ([Outgoing email](smtp.md#who-receives-email)) |
 | `sync-users` | every 30 min | User import from the media server (new users, email/admin status) |
 | `backup-database` | daily 02:00 | Scheduled backup ([Backup & restore](backup-restore.md)) |
 | `cleanup-auth-state` | daily 03:30 | Delete expired/idle sessions and stale failed-login counters |

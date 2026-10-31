@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link as RouterLink } from 'react-router-dom'
+import { Link as RouterLink, useSearchParams } from 'react-router-dom'
 import {
   Box,
   Typography,
@@ -145,7 +145,9 @@ function MyRequestsContent() {
   const [error, setError] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
   const [allUsers, setAllUsers] = useState(false)
-  const [tab, setTab] = useState<'requests' | 'issues'>('requests')
+  // `?tab=issues` is where an issue notification opens, so it lands on the right list.
+  const [searchParams] = useSearchParams()
+  const [tab, setTab] = useState<'requests' | 'issues'>(searchParams.get('tab') === 'issues' ? 'issues' : 'requests')
   const [deciding, setDeciding] = useState<string | null>(null)
   const [snackbar, setSnackbar] = useState<{
     open: boolean

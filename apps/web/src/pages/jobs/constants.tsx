@@ -17,6 +17,7 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney'
 import ExploreIcon from '@mui/icons-material/Explore'
 import SendIcon from '@mui/icons-material/Send'
 import AlternateEmailIcon from '@mui/icons-material/AlternateEmail'
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive'
 import FingerprintIcon from '@mui/icons-material/Fingerprint'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import TheatersIcon from '@mui/icons-material/Theaters'
@@ -60,6 +61,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'generate-discovery-suggestions': <ExploreIcon />,
   'reconcile-discovery-requests': <SyncIcon />,
   'sync-lldap-emails': <AlternateEmailIcon />,
+  'send-notification-emails': <NotificationsActiveIcon />,
   'rebuild-taste-profiles': <FingerprintIcon />,
   'evaluate-recommender': <BiotechIcon />,
   'refresh-embedding-centering': <PsychologyIcon />,
@@ -97,6 +99,7 @@ export const JOB_COLORS: Record<string, string> = {
   'generate-discovery-suggestions': '#ec4899',
   'reconcile-discovery-requests': '#db2777',
   'sync-lldap-emails': '#0ea5e9',
+  'send-notification-emails': '#f59e0b',
   'rebuild-taste-profiles': '#a855f7',
   'evaluate-recommender': '#14b8a6',
   'refresh-embedding-centering': '#a855f7',

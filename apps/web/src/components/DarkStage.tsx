@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ThemeProvider, useTheme } from '@mui/material/styles'
 import { useAppTheme } from '@/lib/useAppTheme'
 import { holdDarkDocument } from '@/lib/colorMode'
@@ -15,7 +16,8 @@ import { holdDarkDocument } from '@/lib/colorMode'
  */
 export function DarkStage({ children, fullPage = false }: { children: ReactNode; fullPage?: boolean }) {
   const outer = useTheme()
-  const dark = useAppTheme(outer.direction, 'dark')
+  const { i18n } = useTranslation()
+  const dark = useAppTheme(outer.direction, 'dark', i18n.language)
   useEffect(() => (fullPage ? holdDarkDocument() : undefined), [fullPage])
   return <ThemeProvider theme={outer.palette.mode === 'dark' ? outer : dark}>{children}</ThemeProvider>
 }

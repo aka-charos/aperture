@@ -165,8 +165,8 @@ export function MediaServerStep({ wizard }: MediaServerStepProps) {
               />
               {existingMediaServer.baseUrl}
             </Typography>
-            <Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'text.secondary', display: 'block', mt: 0.5 }}>
-              {t('setup.mediaServer.apiKeyLabel')} {existingMediaServer.maskedApiKey}
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>
+              {t('setup.mediaServer.apiKeyLabel')} <code>{existingMediaServer.maskedApiKey}</code>
             </Typography>
           </Box>
         </Alert>

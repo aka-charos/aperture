@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { alpha, Box, Button, CircularProgress, Paper, Typography, useTheme } from '@mui/material'
+import { alpha, Box, Button, CircularProgress, IconButton, Paper, Typography, useTheme } from '@mui/material'
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
@@ -13,6 +13,9 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'
 import LiveTvOutlinedIcon from '@mui/icons-material/LiveTvOutlined'
 import { useOnboarding } from '@/hooks/useOnboarding'
+import { useTour } from '@/hooks/useTour'
+import { checklistPending } from '@/hooks/onboardingState'
+import { TourOffer } from '@/components/tour/TourOffer'
 import { Badge, IconTile } from '@/components/tour/IconTile'
 
 /**
@@ -40,26 +43,37 @@ type Item = { id: string; done: boolean; progress?: number; goal?: number }
  *
  * The first item left that has somewhere to go is drawn as "next up", so the
  * card says what to do rather than only what is missing.
+ *
+ * While it is on screen it also carries the welcome tour's offer, which
+ * otherwise floats over the page (`WelcomeStarter`) and on a phone covered
+ * this very card.
  */
 export function GettingStartedCard() {
   const { t } = useTranslation()
   const theme = useTheme()
-  const { summary, record, refresh } = useOnboarding()
+  const { summary, record, refresh, canSave, offerSnoozed, snoozeOffer } = useOnboarding()
+  const { active: tourActive, startTour } = useTour()
 
   // Coming back to Home after rating something is when the list should move.
   useEffect(() => {
     refresh()
   }, [refresh])
 
-  if (!summary) return null
-  const { checklist, state } = summary
-  if (checklist.complete || state.checklistDismissed) return null
+  if (!summary || !checklistPending(summary)) return null
+  const { checklist } = summary
+  const offerTour = canSave && summary.mode === 'offer' && !offerSnoozed && !tourActive
 
   const done = checklist.items.filter((item) => item.done).length
   const total = checklist.items.length
   const nextUp = checklist.items.find((item) => !item.done && ITEMS[item.id]?.path)?.id
   const progressLabel = t('onboarding.checklist.progress', { done, total })
   const track = alpha(theme.palette.text.primary, 0.1)
+  // Hiding the list with the tour still unanswered puts the offer off for this
+  // sign-in too, or it would float up the moment the list was gone.
+  const hide = () => {
+    if (offerTour) snoozeOffer()
+    record({ checklistDismissed: true })
+  }
 
   return (
     <Paper
@@ -106,17 +120,49 @@ export function GettingStartedCard() {
             {t('onboarding.checklist.subtitle')}
           </Typography>
         </Box>
+        {/* A labelled button on wider screens; on a phone the label took the
+            row from the subtitle, which wrapped two words to a line. */}
         <Button
           variant="outlined"
           color="inherit"
           startIcon={<CloseRoundedIcon />}
           aria-label={t('onboarding.checklist.dismiss')}
-          onClick={() => record({ checklistDismissed: true })}
-          sx={{ minHeight: 44, borderRadius: 2.5, color: 'text.secondary', borderColor: alpha(theme.palette.text.primary, 0.12), flex: '0 0 auto' }}
+          onClick={hide}
+          sx={{
+            display: { xs: 'none', sm: 'inline-flex' },
+            minHeight: 44,
+            borderRadius: 2.5,
+            color: 'text.secondary',
+            borderColor: alpha(theme.palette.text.primary, 0.12),
+            flex: '0 0 auto',
+          }}
         >
           {t('onboarding.checklist.hide')}
         </Button>
+        <IconButton
+          aria-label={t('onboarding.checklist.dismiss')}
+          onClick={hide}
+          sx={{ display: { sm: 'none' }, alignSelf: 'flex-start', color: 'text.secondary', width: 44, height: 44, mt: -1, me: -1 }}
+        >
+          <CloseRoundedIcon />
+        </IconButton>
       </Box>
+
+      {offerTour && (
+        <TourOffer
+          headingComponent="h3"
+          sx={{
+            p: 2,
+            borderRadius: 3.5,
+            bgcolor: alpha(theme.palette.primary.main, 0.08),
+            border: 1.5,
+            borderColor: 'primary.main',
+          }}
+          onTake={() => startTour('welcome')}
+          onDecline={() => record({ welcome: 'dismissed' })}
+          onLater={snoozeOffer}
+        />
+      )}
 
       <Box
         component="ul"

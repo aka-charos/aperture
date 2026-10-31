@@ -1,9 +1,9 @@
 /**
  * Seerr issue -> Aperture issue.
  *
- * Imports nothing at runtime (types only), so the mapping can be pinned by a
- * test without pulling the core barrel and its database pool into the test
- * process — the same reason `seerr/sources/seerrMapping.ts` is split out.
+ * Its one runtime import is core's `seerrDisplayName`, the name rule issue
+ * notifications share; the core barrel loads without a database (the pool is
+ * made on the first query), so the mapping is still pinned by a plain test.
  *
  * The shape that matters here is not obvious from the API docs: Seerr has no
  * "description" column on an issue. `POST /issue` stores the reporter's
@@ -11,7 +11,7 @@
  * followed by replies, and rendering every comment uniformly would show the
  * report twice — once as the summary and once as the opening reply.
  */
-import type { SeerrIssue, SeerrIssueComment, SeerrUser } from '@aperture/core'
+import { seerrDisplayName, type SeerrIssue, type SeerrIssueComment } from '@aperture/core'
 
 /** Decided values, never Seerr's integers — the bundle must not learn its enums. */
 export type IssueKind = 'video' | 'audio' | 'subtitles' | 'other'
@@ -56,22 +56,8 @@ export interface IssueView {
   updatedAt: string
 }
 
-/**
- * Seerr sets `displayName` on load (username || plexUsername ||
- * jellyfinUsername || email). The fallback chain is repeated rather than
- * trusted, because an Emby-imported user has an EMPTY `username` and their
- * name in `jellyfinUsername` — so picking the wrong field shows a blank
- * author, or an email address, next to every comment.
- */
-export function displayNameOf(user: SeerrUser | undefined): string | null {
-  if (!user) return null
-  const candidates = [user.displayName, user.username, user.jellyfinUsername, user.email]
-  for (const candidate of candidates) {
-    const trimmed = (candidate ?? '').trim()
-    if (trimmed) return trimmed
-  }
-  return null
-}
+/** The name to show for a Seerr user; the rule lives in core so notifications share it. */
+export const displayNameOf = seerrDisplayName
 
 function mapComment(comment: SeerrIssueComment): IssueCommentView {
   return {
