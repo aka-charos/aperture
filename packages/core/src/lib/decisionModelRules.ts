@@ -165,13 +165,34 @@ export function systemOneUrl(baseUrl: string): string | null {
  * serves chat models lists THOSE under a bare `/v1/models`. Unsloth Studio is
  * the case, measured live: the bare list held its four chat GGUFs and none of
  * its fifteen decision models, so the card offered chat models as judges and
- * every one of them failed. A server with only decision models ignores the
- * parameter, and `parseDecisionCatalog` keeps any entry that says nothing about
- * its modality, so asking costs nothing where it is not needed.
+ * every one of them failed. `parseDecisionCatalog` keeps any entry that says
+ * nothing about its modality, so a server with only decision models loses
+ * nothing by being asked.
+ *
+ * That such a server IGNORES the parameter is measured on Unsloth only. One that
+ * validates its query string answers 400 or 422 instead, and the card would call
+ * a healthy server unreachable, so `retryCatalogUnfiltered` says when to ask
+ * again at `unfilteredModelsUrlFor`.
  */
 export function modelsUrlFor(baseUrl: string): string | null {
+  const url = unfilteredModelsUrlFor(baseUrl)
+  return url ? `${url}?output_modalities=decisions` : null
+}
+
+/** The same list without the modality filter, for a server that refuses it. */
+export function unfilteredModelsUrlFor(baseUrl: string): string | null {
   const url = systemOneUrl(baseUrl)
-  return url ? url.replace(/\/systemone$/, '/models?output_modalities=decisions') : null
+  return url ? url.replace(/\/systemone$/, '/models') : null
+}
+
+/**
+ * Whether a refusal of the filtered list is a refusal of the PARAMETER, worth
+ * asking again without it. Only a request-validation answer: a 401, 404 or 5xx
+ * would answer the bare list identically, and asking twice would only double
+ * the wait on a server that is down.
+ */
+export function retryCatalogUnfiltered(status: number): boolean {
+  return status === 400 || status === 422
 }
 
 /** One entry of a decision catalog, as the card offers it. */

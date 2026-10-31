@@ -4,6 +4,7 @@ import { isDiscoverableProvider, unslothModelsForRole } from './localModelDiscov
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import {
+  UNSLOTH_KEY_REFUSED,
   UNSLOTH_KEY_REQUIRED,
   listUnslothModels,
   notUnslothApi,
@@ -211,6 +212,12 @@ test('a 401 says a key is needed, and where keyless access does not reach', { ti
     // The right key opens the same routes.
     const keyed = await probeUnslothServer(base, 'sk-unsloth-good')
     assert.equal(keyed.reachable, true)
+
+    // A key that is sent and refused is named as refused: telling this operator
+    // to create a key would leave the revoked one being sent.
+    const refused = await probeUnslothServer(base, 'sk-unsloth-revoked')
+    assert.equal(refused.reachable, false)
+    assert.equal(refused.error, UNSLOTH_KEY_REFUSED)
   })
 })
 

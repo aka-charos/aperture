@@ -851,13 +851,6 @@ function createProviderInstance(providerConfig: ProviderConfig, role?: AIFunctio
 // ============================================================================
 
 /**
- * Resolve an API key for a provider from the shared per-provider credential
- * store, falling back to any other configured function that already uses the
- * same provider. Lets optional roles (e.g. Web Search) reuse a key entered for
- * another role instead of requiring it to be re-entered — and re-persisted —
- * per role. Returns undefined if nothing is found (caller decides what to do).
- */
-/**
  * Remove a provider's saved API key everywhere one is stored: the shared
  * per-provider store and every role's own copy. Returns how many places held
  * one.
@@ -872,8 +865,19 @@ export async function forgetProviderApiKey(provider: ProviderType): Promise<numb
   let removed = 0
 
   const credsJson = await getSystemSetting('ai_provider_credentials')
+  // Read as `resolveApiKeyForProvider` reads it: a row that does not parse is
+  // skipped, not thrown. Nothing can borrow a key from a store nobody can read,
+  // so the roles' own copies below are what is still in use, and a throw here
+  // would leave exactly those behind.
+  let creds: Record<string, { apiKey?: string; baseUrl?: string }> | null = null
   if (credsJson) {
-    const creds = JSON.parse(credsJson) as Record<string, { apiKey?: string; baseUrl?: string }>
+    try {
+      creds = JSON.parse(credsJson) as Record<string, { apiKey?: string; baseUrl?: string }>
+    } catch (e) {
+      logger.warn({ error: e }, 'Failed to parse ai_provider_credentials; clearing role keys only')
+    }
+  }
+  if (creds) {
     const entry = creds[provider]
     if (entry?.apiKey) {
       removed++
@@ -902,6 +906,13 @@ export async function forgetProviderApiKey(provider: ProviderType): Promise<numb
   return removed
 }
 
+/**
+ * Resolve an API key for a provider from the shared per-provider credential
+ * store, falling back to any other configured function that already uses the
+ * same provider. Lets optional roles (e.g. Web Search) reuse a key entered for
+ * another role instead of requiring it to be re-entered — and re-persisted —
+ * per role. Returns undefined if nothing is found (caller decides what to do).
+ */
 async function resolveApiKeyForProvider(provider: ProviderType): Promise<string | undefined> {
   // 1) Shared per-provider credential store (written by the settings UI)
   const credsJson = await getSystemSetting('ai_provider_credentials')
@@ -2187,24 +2198,40 @@ export function assumedCustomModelCapabilities(fn: AIFunction): ModelCapabilitie
 }
 
 /**
- * Whether a provider's capabilities are read off a server at its base URL,
- * which callers must resolve first. Not `isLocalModelProvider`: Unsloth Studio
- * is local but publishes no per-model capabilities to probe, so resolving its
- * address for a probe that never runs is a settings read for nothing. The
- * branches of `liveModelCapabilities` below are the ones listed here.
+ * The local servers whose per-model capabilities are read off the server at its
+ * base URL, and how. ONE TABLE, read by `liveModelCapabilities` to probe and by
+ * `probesLocalServer` to decide whether the address must be resolved first:
+ * two hand-written lists of the same providers is how a probe ends up running
+ * with no address, against the shipped default, which inside a container is the
+ * container itself.
+ *
+ * Unsloth Studio is local and deliberately absent: it publishes no per-model
+ * capabilities, so resolving its address would be a settings read for a probe
+ * that never runs.
+ *
+ * `openai-compatible` might BE LM Studio (it has shipped LM Studio's port as
+ * its default base URL since before the named provider existed), so it keeps
+ * the probe for anyone who wired it up that way. It fails harmlessly against
+ * any other server.
  */
+const LOCAL_CAPABILITY_PROBES: Record<
+  string,
+  (modelId: string, baseUrl?: string, apiKey?: string) => Promise<ModelCapabilities | null>
+> = {
+  ollama: (modelId, baseUrl) => getOllamaModelCapabilities(modelId, baseUrl),
+  lmstudio: (modelId, baseUrl, apiKey) => getLmStudioModelCapabilities(modelId, baseUrl, apiKey),
+  'openai-compatible': (modelId, baseUrl, apiKey) => getLmStudioModelCapabilities(modelId, baseUrl, apiKey),
+}
+
+/** Whether a provider's capabilities are probed at its base URL, which callers must resolve first. */
 function probesLocalServer(providerId: string): boolean {
-  return providerId === 'ollama' || providerId === 'lmstudio' || providerId === 'openai-compatible'
+  return Object.hasOwn(LOCAL_CAPABILITY_PROBES, providerId)
 }
 
 /**
  * Live per-model capability sources, by provider:
  * - OpenRouter: public model catalog (supported parameters per model)
- * - Ollama: the show endpoint's capabilities list
- * - LM Studio: its native REST API reports a type and, since 0.3.16, tool
- *   support per model
- * - openai-compatible: might be LM Studio, so it takes the same probe; other
- *   servers just fail it harmlessly
+ * - the local servers in `LOCAL_CAPABILITY_PROBES`
  * Returns null when the source is unavailable or doesn't know the model.
  */
 async function liveModelCapabilities(
@@ -2219,17 +2246,7 @@ async function liveModelCapabilities(
   if (providerId === 'openrouter' && fn !== 'embeddings') {
     return getOpenRouterModelCapabilities(modelId)
   }
-  if (providerId === 'ollama') {
-    return getOllamaModelCapabilities(modelId, baseUrl)
-  }
-  // `openai-compatible` might BE LM Studio — it has shipped LM Studio's port as
-  // its default base URL since before the named provider existed — so it keeps
-  // the probe for anyone who wired it up that way. It fails harmlessly against
-  // any other server.
-  if (providerId === 'lmstudio' || providerId === 'openai-compatible') {
-    return getLmStudioModelCapabilities(modelId, baseUrl, apiKey)
-  }
-  return null
+  return probesLocalServer(providerId) ? LOCAL_CAPABILITY_PROBES[providerId](modelId, baseUrl, apiKey) : null
 }
 
 /**

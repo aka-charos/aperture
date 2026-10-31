@@ -66,7 +66,7 @@ import {
   type ProviderType,
 } from './aiProviderInfo'
 import { AIFallbackModels } from './AIFallbackModels'
-import { emitProviderKeyRemoved, onProviderKeyRemoved } from '../lib/providerKeyEvents'
+import { emitProviderKeyChanged, onProviderKeyChanged } from '../lib/providerKeyEvents'
 
 /**
  * Pacing bounds, mirroring core's `MAX_CALL_SPACING_SECONDS`.
@@ -463,15 +463,24 @@ export function AIFunctionCard({
    */
   const [keyRemoved, setKeyRemoved] = useState(false)
   const [removingKey, setRemovingKey] = useState(false)
+  /** Bumped when another card changed this provider's key, so the saved-key check asks again. */
+  const [keyCheckRound, setKeyCheckRound] = useState(0)
 
-  // A removal clears the key from every role on the provider, so every card
-  // showing that provider hears of it, not only the one that was clicked.
+  // A key is shared by every role on the provider, so every card showing that
+  // provider hears of a change, not only the one that was clicked. A removal
+  // reaches this role's own copy too, which is what `keyRemoved` records and
+  // keeps recording: a key saved later on ANOTHER card goes to the shared store
+  // (or stays on that card's role), never back onto this role, so only the
+  // check below is asked again and the answer comes from the server.
   useEffect(
     () =>
-      onProviderKeyRemoved((removed) => {
-        if (removed !== provider) return
-        setKeyRemoved(true)
-        setSavedKeyAvailable(false)
+      onProviderKeyChanged((changed, change) => {
+        if (changed !== provider) return
+        if (change === 'removed') {
+          setKeyRemoved(true)
+          setSavedKeyAvailable(false)
+        }
+        setKeyCheckRound((n) => n + 1)
       }),
     [provider]
   )
@@ -802,7 +811,7 @@ export function AIFunctionCard({
         if (data.baseUrl && !baseUrl) setBaseUrl(data.baseUrl)
       })
       .catch(() => {})
-  }, [apiBase, config?.provider, config?.hasApiKey, keyRemoved, provider, baseUrl])
+  }, [apiBase, config?.provider, config?.hasApiKey, keyRemoved, keyCheckRound, provider, baseUrl])
 
   // Fetch models when provider changes
   useEffect(() => {
@@ -940,7 +949,7 @@ export function AIFunctionCard({
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       // This card included: its own listener sets the removed state.
-      emitProviderKeyRemoved(provider)
+      emitProviderKeyChanged(provider, 'removed')
       setApiKey('')
       setSuccess(t('aiFunctionCard.savedKeyRemoved'))
     } catch {
@@ -1138,7 +1147,12 @@ export function AIFunctionCard({
       setSuccess(t('aiFunctionCard.configSaved'))
       // A key typed and saved is a saved key again, whatever was removed
       // earlier in this visit; the reloaded config is believed from here on.
-      if (apiKey) setKeyRemoved(false)
+      if (apiKey) {
+        setKeyRemoved(false)
+        // The other cards on this provider read the shared store and may now
+        // have a key to show; this card's own check runs again with them.
+        emitProviderKeyChanged(provider, 'saved')
+      }
       setApiKey('') // Clear for security
       // The parent reloads the config after a save and the spare-key slots are
       // reseeded from the hints it returns, so saved keys stay listed and "how
@@ -2244,52 +2258,23 @@ export function AIFunctionCard({
         )}
 
         {/*
-          LM Studio's equivalent is not a list of commands to run — models are
-          downloaded in its own UI — so the help it needs is the two settings
-          that decide whether anything here can reach it at all: the local
-          server has to be started, and for the Embeddings role it will not
-          answer without an embedding model loaded.
+          A local server set up in its own UI (LM Studio, Unsloth Studio) needs
+          no list of commands, only the settings over there that decide whether
+          anything here can reach it; each provider's are its `setupHint`.
+          One line and an icon, where this used to be a boxed panel of numbered
+          steps: all of it is still true and almost none of it is needed twice,
+          since an operator reads the setup once and then scrolls past it on
+          every visit afterwards, on every role's card.
         */}
-        {/*
-          One line and an icon, where this used to be a boxed panel of three
-          numbered steps and two paragraphs. All of it is still true and almost
-          none of it is needed twice: an operator reads the setup once and then
-          scrolls past it on every visit afterwards, on every role's card.
-        */}
-        {provider === 'lmstudio' && (
+        {providerInfo?.setupHint && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 2, color: 'text.secondary' }}>
             <ComputerIcon sx={{ fontSize: 16 }} />
-            <Typography variant="caption">{t('aiFunctionCard.lmStudioSetupTitle')}</Typography>
+            <Typography variant="caption">{t(providerInfo.setupHint.title)}</Typography>
             <InfoHint
-              title={[
-                t('aiFunctionCard.lmStudioStepDownload'),
-                t('aiFunctionCard.lmStudioStepServer'),
-                t('aiFunctionCard.lmStudioStepDetect'),
-                ...(functionType === 'embeddings' ? [t('aiFunctionCard.lmStudioEmbeddingNote')] : []),
-                t('aiFunctionCard.lmStudioAutoEvictNote'),
-              ].join('\n\n')}
-            />
-          </Box>
-        )}
-
-        {/*
-          Unsloth's setup is three settings in its own UI, each of which decides
-          whether anything here works: where it listens, whether it loads the
-          model a request names, and whether this caller needs a key.
-        */}
-        {provider === 'unsloth' && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 2, color: 'text.secondary' }}>
-            <ComputerIcon sx={{ fontSize: 16 }} />
-            <Typography variant="caption">{t('aiFunctionCard.unslothSetupTitle')}</Typography>
-            <InfoHint
-              title={[
-                t('aiFunctionCard.unslothStepListen'),
-                t('aiFunctionCard.unslothStepSwitch'),
-                t('aiFunctionCard.unslothStepKey'),
-                t('aiFunctionCard.unslothContextNote'),
-                t('aiFunctionCard.unslothOneModelNote'),
-                t('aiFunctionCard.unslothTunnelNote'),
-              ].join('\n\n')}
+              title={providerInfo.setupHint.notes
+                .filter((note) => note.onlyForRole == null || note.onlyForRole === functionType)
+                .map((note) => t(note.key))
+                .join('\n\n')}
             />
           </Box>
         )}
@@ -2358,9 +2343,9 @@ export function AIFunctionCard({
             */}
             {serverStatus?.reachable && (
               <Typography variant="body2" sx={{ mt: 1 }}>
-                {t(copy.serverSummary, {
+                {t(serverStatus.version || !copy.serverSummaryNoVersion ? copy.serverSummary : copy.serverSummaryNoVersion, {
                   api: serverStatus.api ?? '?',
-                  version: serverStatus.version ?? '?',
+                  version: serverStatus.version ?? '',
                   total: serverStatus.totalModels,
                   language: serverStatus.languageModels,
                   embedding: serverStatus.embeddingModels,

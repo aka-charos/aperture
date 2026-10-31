@@ -23,6 +23,8 @@ import {
   isRetryableDecisionFailure,
   modelsUrlFor,
   parseDecisionCatalog,
+  retryCatalogUnfiltered,
+  unfilteredModelsUrlFor,
   readSystemOneUsage,
   sanitizeDecisionModelConfig,
   systemOneUrl,
@@ -289,15 +291,21 @@ export async function listDecisionModels(config: DecisionModelConfig): Promise<D
   }
 
   const url = modelsUrlFor(config.baseUrl)
-  if (!url) return { reachable: false, models: [] }
-  try {
-    const response = await fetch(url, {
+  const unfiltered = unfilteredModelsUrlFor(config.baseUrl)
+  if (!url || !unfiltered) return { reachable: false, models: [] }
+  const ask = (target: string) =>
+    fetch(target, {
       headers: {
         Accept: 'application/json',
         ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
       },
       signal: AbortSignal.timeout(10_000),
     })
+  try {
+    let response = await ask(url)
+    // A server that validates its query string refuses the modality filter;
+    // the bare list is then the answer (see modelsUrlFor).
+    if (retryCatalogUnfiltered(response.status)) response = await ask(unfiltered)
     if (!response.ok) return { reachable: false, models: [] }
     return { reachable: true, models: parseDecisionCatalog(await response.json()) }
   } catch {

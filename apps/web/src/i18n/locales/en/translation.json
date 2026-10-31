@@ -1532,6 +1532,7 @@
     "discoverSkipped_other": "{{count}} other installed models aren't suitable for this role.",
     "serverSummary": "LM Studio answered on its {{api}} API: {{total}} models installed ({{language}} language, {{embedding}} embedding).",
     "unslothServerSummary": "Unsloth Studio {{version}} answered: {{total}} models downloaded ({{language}} language).",
+    "unslothServerSummaryNoVersion": "Unsloth Studio answered: {{total}} models downloaded ({{language}} language).",
     "serverLoaded": "Currently loaded: {{models}}.",
     "discoverManualHint": "Or type a model ID by hand, exactly as the server reports it.",
     "detectedDimensions": "Detected {{dim}} dimensions, and selected it below.",
