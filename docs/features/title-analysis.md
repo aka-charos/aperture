@@ -18,11 +18,12 @@ The feature must be configured by an administrator (a dedicated AI model role an
 
 ## Reading an analysis
 
-The section is **collapsed by default** — expand it when you want to read. Inside:
+The section is **collapsed by default**. Closed, it shows a short summary — how many sections it has and roughly how long it takes to read — with a pill for each section name; click the header (or a pill) to open it. Inside:
 
-- **Section headings**, in reading order: *Context* (where the work comes from and the tradition it belongs to), *Form and Style*, *Narrative Structure* (series only), *Making* (how it was made and what its makers said they intended), and *Critical Reception* (what critics valued and faulted, and what it went on to influence). Analyses written before prompt version 9 may still show the older *Lineage and Influence*, *Stated Intent*, *Production Context* and *Critical Debate* labels until they are rewritten. The essay's paragraphs are indexed as they are written, so a heading only appears when there is substance under it.
+- **One section per tab**, so you read one part at a time and move on with the button at the bottom, or choose **Read all** for the whole piece in one scroll. An analysis without section labels shows as a single page. The sections, in reading order: *Context* (where the work comes from and the tradition it belongs to), *Form and Style*, *Narrative Structure* (series only), *Making* (how it was made and what its makers said they intended), and *Critical Reception* (what critics valued and faulted, and what it went on to influence). Analyses written before prompt version 9 may still show the older *Lineage and Influence*, *Stated Intent*, *Production Context* and *Critical Debate* labels until they are rewritten. The essay's paragraphs are indexed as they are written, so a heading only appears when there is substance under it.
 - If your admin has synopsis translation on with film analyses included, the analysis appears in the language you're reading Aperture in, marked **Machine-translated**, with **Show original** one click away.
-- A **Sources** chip showing how much published writing the analysis is grounded in, with a grade: **Well documented**, **Reviews only**, or **Sparse sources**.
+- A status chip in the header showing how well the analysis is grounded: **Available**, **Partial** (reviews only) or **Sparse sources**.
+- A **Based on N sources** line at the bottom; **View** lists the sites the analysis was written from, and each one with a link opens in a new tab.
 
 ### Spoiler stance
 
