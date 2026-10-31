@@ -33,6 +33,7 @@ import watchStatusRoutes from './watch-status/index.js'
 import titleTranslationRoutes from './title-translations/index.js'
 import onboardingRoutes from './onboarding/index.js'
 import newslettersRoutes from './newsletters/index.js'
+import notificationRoutes from './notifications/index.js'
 import socialRoutes from './social/index.js'
 import discoveryRoutes from './discovery/index.js'
 import seerrRoutes from './seerr/index.js'
@@ -143,6 +144,9 @@ const routes: FastifyPluginAsync = async (fastify) => {
 
   // Newsletters: admin-written email to send groups, the opt-in, unsubscribe
   await fastify.register(newslettersRoutes)
+
+  // Notifications by email and the Android app, and the phones running it
+  await fastify.register(notificationRoutes)
 
   // Social layer: connections, Watch This (received and sent), connections' recent watches
   await fastify.register(socialRoutes)

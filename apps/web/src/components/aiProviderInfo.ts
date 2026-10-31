@@ -32,9 +32,24 @@ export interface ProviderCopy {
   discoverNoneForRole?: string
   /** What the server-status check found. Gets api, version, total, language, embedding. */
   serverSummary?: string
+  /**
+   * `serverSummary` for a server that did not say its version, where that one
+   * names it. Without it the line would read "Unsloth Studio ? answered".
+   */
+  serverSummaryNoVersion?: string
 }
 
-export const DEFAULT_PROVIDER_COPY: Required<Omit<ProviderCopy, 'apiKeyHelper'>> = {
+/**
+ * A local server's own setup, in its own UI, as one caption with the steps
+ * behind an info icon. A note with `onlyForRole` is shown on that role's card
+ * alone.
+ */
+export interface ProviderSetupHint {
+  title: string
+  notes: { key: string; onlyForRole?: string }[]
+}
+
+export const DEFAULT_PROVIDER_COPY: Required<Omit<ProviderCopy, 'apiKeyHelper' | 'serverSummaryNoVersion'>> = {
   baseUrlHelper: 'aiFunctionCard.baseUrlHelperCompatible',
   addCustomDialog: 'aiFunctionCard.addCustomDialog_compatible',
   modelPlaceholder: 'aiFunctionCard.placeholderDefault',
@@ -73,6 +88,7 @@ export interface ProviderInfo {
    */
   serverProbe?: 'lmstudio' | 'unsloth'
   copy?: ProviderCopy
+  setupHint?: ProviderSetupHint
 }
 
 /**
@@ -465,6 +481,19 @@ export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {
       baseUrlHelper: 'aiFunctionCard.baseUrlHelperLmStudio',
       addCustomDialog: 'aiFunctionCard.addCustomDialog_lmstudio',
     },
+    // Models are downloaded in LM Studio's own UI, so what it needs is the two
+    // settings that decide whether anything here can reach it: the local
+    // server started, and for Embeddings an embedding model downloaded.
+    setupHint: {
+      title: 'aiFunctionCard.lmStudioSetupTitle',
+      notes: [
+        { key: 'aiFunctionCard.lmStudioStepDownload' },
+        { key: 'aiFunctionCard.lmStudioStepServer' },
+        { key: 'aiFunctionCard.lmStudioStepDetect' },
+        { key: 'aiFunctionCard.lmStudioEmbeddingNote', onlyForRole: 'embeddings' },
+        { key: 'aiFunctionCard.lmStudioAutoEvictNote' },
+      ],
+    },
   },
   unsloth: {
     id: 'unsloth',
@@ -486,6 +515,21 @@ export const PROVIDER_INFO: Record<ProviderType, ProviderInfo> = {
       discoverUnreachable: 'aiFunctionCard.discoverUnreachableUnsloth',
       discoverNoneForRole: 'aiFunctionCard.discoverNoneForRoleUnsloth',
       serverSummary: 'aiFunctionCard.unslothServerSummary',
+      serverSummaryNoVersion: 'aiFunctionCard.unslothServerSummaryNoVersion',
+    },
+    // Three settings in Unsloth's own UI each decide whether anything here
+    // works: where it listens, whether it loads the model a request names, and
+    // whether this caller needs a key.
+    setupHint: {
+      title: 'aiFunctionCard.unslothSetupTitle',
+      notes: [
+        { key: 'aiFunctionCard.unslothStepListen' },
+        { key: 'aiFunctionCard.unslothStepSwitch' },
+        { key: 'aiFunctionCard.unslothStepKey' },
+        { key: 'aiFunctionCard.unslothContextNote' },
+        { key: 'aiFunctionCard.unslothOneModelNote' },
+        { key: 'aiFunctionCard.unslothTunnelNote' },
+      ],
     },
   },
   'openai-compatible': {

@@ -11,8 +11,7 @@ export function ToolResultError({ message }: { message: string }) {
       <Typography
         variant="body2"
         color="text.secondary"
-        component="pre"
-        sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', m: 0 }}
+        sx={{ whiteSpace: 'pre-wrap', m: 0 }}
       >
         {t('assistant.toolErrorBody', { message })}
       </Typography>

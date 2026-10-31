@@ -41,6 +41,9 @@ test('every translation key a provider names exists in English', () => {
   const keys = [
     ...Object.values(DEFAULT_PROVIDER_COPY),
     ...Object.values(PROVIDER_INFO).flatMap((info) => Object.values(info.copy ?? {})),
+    ...Object.values(PROVIDER_INFO).flatMap((info) =>
+      info.setupHint ? [info.setupHint.title, ...info.setupHint.notes.map((note) => note.key)] : []
+    ),
   ]
   for (const key of keys) assert.ok(resolves(key), `${key} is missing from en/translation.json`)
 })
@@ -63,6 +66,16 @@ test('the providers whose server can be probed are exactly core’s discoverable
   assert.ok(union, 'DiscoverableProvider not found')
   const core = [...union[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort()
   assert.deepEqual(web, core)
+})
+
+test('a setup note kept to one role names a role that exists', () => {
+  const roles = coreList('ai-capabilities/types.ts', 'export const AI_FUNCTIONS')
+  for (const info of Object.values(PROVIDER_INFO)) {
+    for (const note of info.setupHint?.notes ?? []) {
+      if (note.onlyForRole == null) continue
+      assert.ok(roles.includes(note.onlyForRole), `${info.id}: ${note.key} is kept to ${note.onlyForRole}`)
+    }
+  }
 })
 
 test('a key is optional only where it is offered', () => {

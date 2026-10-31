@@ -18,7 +18,7 @@ import type { ColorMode } from './theme'
 // export map, so node's ESM loader can neither resolve it nor see its named
 // exports, while tsx's CommonJS hook loads theme.ts and MUI as the bundler would.
 const require = createRequire(import.meta.url)
-const { createAppTheme, documentChromeColor, MONO_FONT } = require('./theme') as typeof import('./theme')
+const { BUTTON_FONT, buttonFontFor, createAppTheme, documentChromeColor, MONO_FONT } = require('./theme') as typeof import('./theme')
 
 const MODES: ColorMode[] = ['light', 'dark']
 
@@ -30,10 +30,28 @@ test("an sx fontFamily of 'monospace' resolves to IBM Plex Mono in both modes", 
   }
 })
 
+test('a letter Plex Mono does not draw falls back to Inter, never to a system monospace', () => {
+  // Plex Mono has no Greek: behind the code stack a Greek button label came out
+  // in the phone's typewriter face. Inter must be the very next face.
+  const faces = BUTTON_FONT.split(',').map((face) => face.trim())
+  assert.deepEqual(faces.slice(0, 2), ['"IBM Plex Mono"', '"Inter"'])
+  assert.ok(!faces.includes('monospace'), 'no generic monospace in the button stack')
+})
+
+test('a language Plex Mono cannot draw gets its buttons in Inter outright, and an unknown one too', () => {
+  // Behind Plex Mono a Greek label mixed two faces: Latin words and digits
+  // monospace, Greek letters in Inter.
+  for (const language of ['el', 'ar', 'hi', 'ja', 'ko', 'zh', 'he', 'xx']) {
+    assert.ok(!buttonFontFor(language).includes('Plex'), language)
+    assert.ok(!createAppTheme('ltr', 'dark', language).typography.button.fontFamily?.includes('Plex'), language)
+  }
+  for (const language of ['en', 'en-GB', 'de', 'ru']) assert.equal(buttonFontFor(language), BUTTON_FONT, language)
+})
+
 test('button labels are monospace and tabs stay in the reading face', () => {
   for (const mode of MODES) {
     const theme = createAppTheme('ltr', mode)
-    assert.equal(theme.typography.button.fontFamily, MONO_FONT, mode)
+    assert.equal(theme.typography.button.fontFamily, BUTTON_FONT, mode)
     const tab = theme.components?.MuiTab?.styleOverrides?.root as { fontFamily?: string } | undefined
     assert.ok(tab?.fontFamily && !tab.fontFamily.includes('Plex'), `${mode}: tabs must not inherit the button face`)
   }

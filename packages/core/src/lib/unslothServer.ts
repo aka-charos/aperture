@@ -134,6 +134,21 @@ export const UNSLOTH_KEY_REQUIRED =
   'a Tailscale or public address always needs a key.'
 
 /**
+ * The sentence a 401 deserves when a key WAS sent: Unsloth refused it. Telling
+ * this operator to create a key sends them to make a second one while the
+ * revoked or mistyped one goes on being sent, and replacing or removing the
+ * saved key is the fix.
+ */
+export const UNSLOTH_KEY_REFUSED =
+  'Unsloth refused the API key. It may have been revoked or mistyped: create a new one under Settings → API ' +
+  'in Unsloth and enter it here, or remove the saved key if this address is covered by keyless access.'
+
+/** Which of the two a refusal means, decided by whether a key went with the request. */
+export function unslothAuthFailure(sentKey: boolean): string {
+  return sentKey ? UNSLOTH_KEY_REFUSED : UNSLOTH_KEY_REQUIRED
+}
+
+/**
  * The sentence for a 200 that is not JSON. Unsloth serves its web app for any
  * path it does not route, so an older Studio without the external API, or an
  * address that is some other web server, answers `/v1/models` with a page of
@@ -157,7 +172,7 @@ async function getJson(root: string, path: string, apiKey?: string): Promise<Fet
     })
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
-        return { ok: false, error: UNSLOTH_KEY_REQUIRED }
+        return { ok: false, error: unslothAuthFailure(Boolean(apiKey)) }
       }
       return { ok: false, error: `${path} answered HTTP ${response.status}` }
     }
