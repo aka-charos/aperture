@@ -14,6 +14,7 @@ import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
+import { displayRatingSql } from '@aperture/core'
 import { ALL_COUNTRIES_SQL, PRIMARY_COUNTRIES_SQL } from '../../../lib/countryFilter.js'
 import {
   genresSchema,
@@ -277,8 +278,8 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
           MAX(year) as max_year,
           MIN(runtime_minutes) as min_runtime,
           MAX(runtime_minutes) as max_runtime,
-          MIN(community_rating) as min_rating,
-          MAX(community_rating) as max_rating
+          MIN(${displayRatingSql()}) as min_rating,
+          MAX(${displayRatingSql()}) as max_rating
          FROM movies 
          WHERE ${inScope} AND year IS NOT NULL`,
         params

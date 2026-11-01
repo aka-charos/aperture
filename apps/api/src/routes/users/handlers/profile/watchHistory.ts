@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { displayRatingSql } from '@aperture/core'
 import { query, queryOne } from '../../../../lib/db.js'
 import { scopeClause, viewerScope } from '../../../../lib/viewerScope.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
@@ -102,7 +103,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
            m.year,
            m.poster_url,
            m.genres,
-           m.community_rating,
+           ${displayRatingSql('m')} AS community_rating,
            m.overview
          FROM watch_history wh
          JOIN movies m ON m.id = wh.movie_id
@@ -215,7 +216,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
            s.year,
            s.poster_url,
            s.genres,
-           s.community_rating,
+           ${displayRatingSql('s')} AS community_rating,
            s.overview,
            ${watchedExpr} as episodes_watched,
            ${totalExpr} as total_episodes,
@@ -229,7 +230,7 @@ export function registerWatchHistoryHandlers(fastify: FastifyInstance) {
          WHERE wh.user_id = $1
            AND wh.episode_id IS NOT NULL
            AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)${searchClause}${scopeFilter}
-         GROUP BY s.id, s.title, s.year, s.poster_url, s.genres, s.community_rating, s.overview
+         GROUP BY s.id
          ${havingClause}
          ORDER BY ${orderBy}
          LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,

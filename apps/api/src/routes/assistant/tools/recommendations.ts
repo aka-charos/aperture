@@ -11,7 +11,7 @@ import { buildPlayLink } from '../helpers/mediaServer.js'
 import { formatContentItem, pickSource, searchScoredPool } from './scoredPool.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, displayRatingSql } from '@aperture/core'
 
 
 export function createRecommendationTools(ctx: ToolContext) {
@@ -48,7 +48,7 @@ export function createRecommendationTools(ctx: ToolContext) {
             ai_explanation: string | null
           }>(
             `SELECT m.id, m.title, m.year, rc.selected_rank as rank, m.genres, m.overview, m.poster_url,
-             m.community_rating, m.provider_item_id, m.directors, rc.score_breakdown,
+             ${displayRatingSql('m')} AS community_rating, m.provider_item_id, m.directors, rc.score_breakdown,
              rc.ai_explanation
              FROM recommendation_candidates rc
              JOIN recommendation_runs rr ON rr.id = rc.run_id
@@ -100,7 +100,7 @@ export function createRecommendationTools(ctx: ToolContext) {
             ai_explanation: string | null
           }>(
             `SELECT s.id, s.title, s.year, rc.selected_rank as rank, s.genres, s.overview, s.poster_url,
-             s.community_rating, s.provider_item_id, s.directors, rc.score_breakdown,
+             ${displayRatingSql('s')} AS community_rating, s.provider_item_id, s.directors, rc.score_breakdown,
              rc.ai_explanation
              FROM recommendation_candidates rc
              JOIN recommendation_runs rr ON rr.id = rc.run_id
@@ -226,7 +226,7 @@ export function createRecommendationTools(ctx: ToolContext) {
         const items: ContentItem[] = []
 
         if (type === 'movies' || type === 'both') {
-          let whereClause = 'WHERE community_rating IS NOT NULL'
+          let whereClause = `WHERE ${displayRatingSql()} IS NOT NULL`
           const params: unknown[] = []
           let paramIndex = 1
 
@@ -238,9 +238,9 @@ export function createRecommendationTools(ctx: ToolContext) {
           params.push(limit)
 
           const movies = await query<MovieResult & { provider_item_id?: string }>(
-            `SELECT id, title, year, genres, overview, community_rating, poster_url, provider_item_id, directors
+            `SELECT id, title, year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url, provider_item_id, directors
              FROM movies ${whereClause}
-             ORDER BY community_rating DESC LIMIT $${paramIndex}`,
+             ORDER BY ${displayRatingSql()} DESC LIMIT $${paramIndex}`,
             params
           )
 
@@ -251,7 +251,7 @@ export function createRecommendationTools(ctx: ToolContext) {
         }
 
         if (type === 'series' || type === 'both') {
-          let whereClause = 'WHERE community_rating IS NOT NULL'
+          let whereClause = `WHERE ${displayRatingSql()} IS NOT NULL`
           const params: unknown[] = []
           let paramIndex = 1
 
@@ -263,9 +263,9 @@ export function createRecommendationTools(ctx: ToolContext) {
           params.push(limit)
 
           const series = await query<SeriesResult & { provider_item_id?: string }>(
-            `SELECT id, title, year, genres, network, overview, community_rating, poster_url, provider_item_id, directors
+            `SELECT id, title, year, genres, network, overview, ${displayRatingSql()} AS community_rating, poster_url, provider_item_id, directors
              FROM series ${whereClause}
-             ORDER BY community_rating DESC LIMIT $${paramIndex}`,
+             ORDER BY ${displayRatingSql()} DESC LIMIT $${paramIndex}`,
             params
           )
 
@@ -312,16 +312,16 @@ export function createRecommendationTools(ctx: ToolContext) {
             paramIndex++
           }
           if (minRating) {
-            whereClause += ` AND m.community_rating >= $${paramIndex}`
+            whereClause += ` AND ${displayRatingSql('m')} >= $${paramIndex}`
             params.push(minRating)
             paramIndex++
           }
           params.push(limit)
 
           const movies = await query<MovieResult & { provider_item_id?: string }>(
-            `SELECT m.id, m.title, m.year, m.genres, m.overview, m.community_rating, m.poster_url, m.provider_item_id, m.directors
+            `SELECT m.id, m.title, m.year, m.genres, m.overview, ${displayRatingSql('m')} AS community_rating, m.poster_url, m.provider_item_id, m.directors
              FROM movies m ${whereClause}
-             ORDER BY m.community_rating DESC NULLS LAST LIMIT $${paramIndex}`,
+             ORDER BY ${displayRatingSql('m')} DESC NULLS LAST LIMIT $${paramIndex}`,
             params
           )
 
@@ -345,16 +345,16 @@ export function createRecommendationTools(ctx: ToolContext) {
             paramIndex++
           }
           if (minRating) {
-            whereClause += ` AND s.community_rating >= $${paramIndex}`
+            whereClause += ` AND ${displayRatingSql('s')} >= $${paramIndex}`
             params.push(minRating)
             paramIndex++
           }
           params.push(limit)
 
           const series = await query<SeriesResult & { provider_item_id?: string }>(
-            `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, s.community_rating, s.poster_url, s.provider_item_id, s.directors
+            `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, ${displayRatingSql('s')} AS community_rating, s.poster_url, s.provider_item_id, s.directors
              FROM series s ${whereClause}
-             ORDER BY s.community_rating DESC NULLS LAST LIMIT $${paramIndex}`,
+             ORDER BY ${displayRatingSql('s')} DESC NULLS LAST LIMIT $${paramIndex}`,
             params
           )
 

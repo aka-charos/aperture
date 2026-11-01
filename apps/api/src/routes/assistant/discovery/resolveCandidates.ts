@@ -13,6 +13,7 @@
  * row's English title against the candidate's French one, found no overlap, and
  * threw the correct row away.
  */
+import { displayRatingSql } from '@aperture/core'
 import { query } from '../../../lib/db.js'
 import { normalizeTitle, anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
@@ -35,8 +36,7 @@ interface LibraryRow {
   directors: string[] | null
 }
 
-const COLUMNS =
-  'id, title, original_title, sort_title, year, genres, overview, community_rating, poster_url, provider_item_id, imdb_id, tmdb_id, directors'
+const COLUMNS = `id, title, original_title, sort_title, year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url, provider_item_id, imdb_id, tmdb_id, directors`
 
 /** Every name a library row is known by: localized, original, and sort. */
 function rowTitles(row: LibraryRow): string[] {

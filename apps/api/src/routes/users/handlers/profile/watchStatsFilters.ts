@@ -1,5 +1,7 @@
+import { displayRatingSql } from '@aperture/core'
+
 /**
- * The two predicates every watch-stats query shares.
+ * The predicates every watch-stats query shares.
  *
  * They live here because the drill-in has to agree with the number on the
  * chip it was opened from: a "7 films" badge that opens a list of five is a
@@ -23,3 +25,10 @@ export const WATCHED_SQL =
  */
 export const LIBRARY_ENABLED_SQL =
   '(NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)'
+
+/**
+ * A watched film's rating: the one the app shows everywhere (the unified
+ * rating, F-167). The histogram buckets on it and the drill-in filters on it,
+ * so both read this one text. `m` is the `movies` alias in every caller.
+ */
+export const MOVIE_RATING_SQL = displayRatingSql('m')

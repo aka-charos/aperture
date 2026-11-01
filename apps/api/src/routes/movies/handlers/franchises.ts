@@ -4,6 +4,7 @@
  * GET /api/movies/franchises - Get franchises with their movies and watch progress
  */
 import type { FastifyInstance } from 'fastify'
+import { displayRatingSql } from '@aperture/core'
 import { query } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
@@ -128,7 +129,7 @@ export function registerFranchisesHandler(fastify: FastifyInstance) {
            m.title as movie_title,
            m.year,
            m.poster_url,
-           m.community_rating,
+           ${displayRatingSql('m')} AS community_rating,
            m.rt_critic_score,
            CASE WHEN wh.id IS NOT NULL THEN true ELSE false END as watched
          FROM movies m

@@ -19,7 +19,7 @@ The page is deliberately simple:
 - Two count chips: **"N Movies"** and **"N Series"**
 - Two poster carousels — **Movies** and **TV Series** — everything from this studio in your library
 
-Carousel cards carry the standard overlays: community rating, watched tick, **episode-progress badge** for series, your **star rating** (hover-rateable), and the **Shows You Watch** toggle on series entries. Click any poster for its detail page.
+Carousel cards carry the standard overlays: rating, watched tick, **episode-progress badge** for series, your **star rating** (hover-rateable), and the **Shows You Watch** toggle on series entries. Click any poster for its detail page.
 
 There are no extra filters or sorting here — for that, use [Browse](browse.md) with its filters, or the [Watch Stats](watch-stats.md) drill-downs, which treat studios and networks as first-class dimensions you can click through.
 

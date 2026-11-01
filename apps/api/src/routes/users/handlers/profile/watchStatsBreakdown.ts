@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify'
 import { query } from '../../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
 import { requireSelfOrAdmin } from './shared.js'
-import { WATCHED_SQL, LIBRARY_ENABLED_SQL } from './watchStatsFilters.js'
+import { displayRatingSql } from '@aperture/core'
+import { WATCHED_SQL, LIBRARY_ENABLED_SQL, MOVIE_RATING_SQL } from './watchStatsFilters.js'
 
 /**
  * Drill-in behind every number on the Watch Stats page.
@@ -70,7 +71,7 @@ function resolve(dimension: string, value: string, value2: string): Resolved | n
       const rating = Number.parseFloat(value)
       if (!Number.isFinite(rating)) return null
       return {
-        movieWhere: 'ROUND(m.community_rating * 2) / 2 = $2::numeric',
+        movieWhere: `ROUND(${MOVIE_RATING_SQL} * 2) / 2 = $2::numeric`,
         seriesWhere: null,
         params: [rating],
       }
@@ -213,7 +214,7 @@ export function registerWatchStatsBreakdownHandlers(fastify: FastifyInstance) {
             last_played_at: Date | null
             total: string
           }>(
-            `SELECT m.id, m.title, m.year, m.poster_url, m.community_rating,
+            `SELECT m.id, m.title, m.year, m.poster_url, ${MOVIE_RATING_SQL} AS community_rating,
                     wh.play_count, wh.last_played_at,
                     COUNT(*) OVER() as total
              FROM watch_history wh
@@ -258,7 +259,7 @@ export function registerWatchStatsBreakdownHandlers(fastify: FastifyInstance) {
             last_played_at: Date | null
             total: string
           }>(
-            `SELECT s.id, s.title, s.year, s.poster_url, s.community_rating,
+            `SELECT s.id, s.title, s.year, s.poster_url, ${displayRatingSql('s')} AS community_rating,
                     COUNT(*) as episodes_watched,
                     MAX(wh.last_played_at) as last_played_at,
                     COUNT(*) OVER() as total
@@ -269,7 +270,7 @@ export function registerWatchStatsBreakdownHandlers(fastify: FastifyInstance) {
                AND wh.episode_id IS NOT NULL
                AND ${watched}
                AND ${spec.seriesWhere}
-             GROUP BY s.id, s.title, s.year, s.poster_url, s.community_rating
+             GROUP BY s.id
              ORDER BY MAX(wh.last_played_at) DESC NULLS LAST, s.title ASC
              LIMIT ${limit}`,
             [id, ...spec.params]

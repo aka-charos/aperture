@@ -42,21 +42,24 @@
  * A panel that renders identically for "we looked and there is nothing" and
  * "nobody has looked" would send people clicking at a wall.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Alert,
   Box,
   Button,
+  ButtonBase,
   Chip,
   CircularProgress,
+  Collapse,
+  Paper,
+  Tab,
+  Tabs,
   Tooltip,
   Typography,
 } from '@mui/material'
 import {
+  ArrowForward as ArrowForwardIcon,
   AutoStories as AutoStoriesIcon,
   Autorenew as AutorenewIcon,
   ExpandMore as ExpandMoreIcon,
@@ -65,6 +68,7 @@ import {
 import type { TFunction } from 'i18next'
 import { useAuth } from '../../../hooks/useAuth'
 import { pollOutcome } from '../analysisPoll'
+import { readMinutes, sectionHeading } from '../analysisText'
 import type { MediaType } from '../types'
 
 interface AnalysisSource {
@@ -201,6 +205,10 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Collapsed by default on every title — see the spoiler note above.
+  const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<number | 'all'>(0)
+  const [showSources, setShowSources] = useState(false)
 
   // `analysisUrl` carries the title and the display language, so a change of
   // either reloads — and a new title starts on its translation again.
@@ -236,6 +244,20 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
       cancelled = true
     }
   }, [analysisUrl])
+
+  // Keyed on the TITLE, not `analysisUrl`: a change of display language reloads
+  // the text but must not close a panel somebody is reading.
+  useEffect(() => {
+    setOpen(false)
+    setTab(0)
+    setShowSources(false)
+  }, [mediaType, mediaId])
+
+  // A failed run is reported inside the panel, and the Write button that starts
+  // it sits in the header — so a failure while collapsed would be invisible.
+  useEffect(() => {
+    if (error) setOpen(true)
+  }, [error])
 
   /**
    * THE WAIT LIVES HERE, NOT IN THE REQUEST.
@@ -335,6 +357,16 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
     [mediaType, mediaId, t]
   )
 
+  // The text the reader is shown, for the read-time line. A memo (and above the
+  // early return, with the other hooks) because it scans the whole text.
+  const shownText = useMemo(() => {
+    const shownTranslation = data?.translation
+    return !showOriginal && shownTranslation && shownTranslation.paragraphs.length > 0
+      ? shownTranslation.text
+      : (data?.analysis ?? '')
+  }, [data, showOriginal])
+  const minutes = useMemo(() => readMinutes(shownText), [shownText])
+
   if (loading) return null
 
   const hasAnalysis = Boolean(data?.attempted && data.analysis)
@@ -371,80 +403,172 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   const provenanceLine = data ? describeProvenance(data, t) : null
   const chip = analysisChip(data, t)
 
+  // THE SECTIONS ARE TABS ONLY WHEN EVERY RUN CARRIES A HEADING. A row with no
+  // paragraph map (older rows, a map the writer got wrong) arrives as one
+  // unlabelled run, and a single tab named nothing is worse than the plain page
+  // those rows had before.
+  const headings = segments.map((segment) =>
+    sectionHeading(segment.questions, (question) => questionLabel(t, question))
+  )
+  const tabbed = segments.length > 1 && headings.every(Boolean)
+  const activeTab: number | 'all' =
+    !tabbed || tab === 'all' ? 'all' : Math.min(tab, segments.length - 1)
+  const sourceCount = data?.sources?.length ?? 0
+  const subtitle = hasAnalysis
+    ? tabbed
+      ? t('mediaDetail.analysis.summary', { count: segments.length, minutes })
+      : t('mediaDetail.analysis.summaryPlain', { minutes })
+    : null
+
   // No outer padding or margin: this renders inside the detail page's left
   // column, which supplies both. It used to be a full-width band above the
   // two-column grid, where the prose ran the whole width of the page and the
   // panel's right edge had nothing to line up with.
   return (
     <Box data-tour="title-analysis">
-      <Accordion
-        // Collapsed by default even when present — see the spoiler note above.
-        defaultExpanded={false}
-        disableGutters
-        sx={{ borderRadius: 2, '&:before': { display: 'none' } }}
-      >
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          {/* Wraps rather than overflowing: "No published sources" beside the
-              heading is wider than a phone's column. */}
+      <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden' }}>
+        {/* The header is the toggle. A div-backed ButtonBase rather than a
+            button, because the generate button can sit inside it and a button
+            inside a button is invalid; ButtonBase supplies the role, the
+            keyboard activation and the focus ring, and ignores key presses
+            that start on the nested button. */}
+        <ButtonBase
+          component="div"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+          sx={{
+            display: 'flex',
+            width: '100%',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            textAlign: 'start',
+            gap: 1.5,
+            px: 2,
+            py: 1.5,
+          }}
+        >
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              bgcolor: 'action.selected',
+              color: 'primary.main',
+            }}
+          >
+            <AutoStoriesIcon fontSize="small" />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            {/* Wraps rather than overflowing: "No published sources" beside the
+                heading is wider than a phone's column. */}
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                columnGap: 1,
+                rowGap: 0.5,
+              }}
+            >
+              <Typography variant="subtitle1" fontWeight={600}>
+                {t(
+                  mediaType === 'series'
+                    ? 'mediaDetail.analysis.headingSeries'
+                    : 'mediaDetail.analysis.headingMovie'
+                )}
+              </Typography>
+              {/* What state this title is in, before anyone spends a click
+                  finding out. See `analysisChip` for the five readings.
+
+                  A title nobody has asked about yet gets no chip at all — it
+                  gets the button, here rather than inside, because the panel is
+                  collapsed by default and an action nobody can see is an action
+                  nobody takes. */}
+              {chip ? (
+                <Tooltip title={chip.tooltip}>
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color={chip.color}
+                    label={chip.label}
+                    sx={{ height: 20, fontSize: '0.7rem' }}
+                  />
+                </Tooltip>
+              ) : (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  disabled={generating}
+                  startIcon={generating ? <CircularProgress size={12} /> : undefined}
+                  // The header toggles the panel. Without this the press
+                  // toggles it instead of starting the run.
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    run(false)
+                  }}
+                  sx={{ py: 0, minHeight: 24, fontSize: '0.7rem', textTransform: 'none' }}
+                >
+                  {generating
+                    ? t('mediaDetail.analysis.generating')
+                    : t('mediaDetail.analysis.generate')}
+                </Button>
+              )}
+            </Box>
+            {subtitle && (
+              <Typography variant="caption" color="text.secondary" display="block">
+                {subtitle}
+              </Typography>
+            )}
+          </Box>
+          <Box
+            aria-hidden
+            sx={{
+              display: 'flex',
+              color: 'text.secondary',
+              transition: 'transform 0.2s',
+              transform: open ? 'rotate(180deg)' : 'none',
+            }}
+          >
+            <ExpandMoreIcon />
+          </Box>
+        </ButtonBase>
+
+        {/* What is inside, before anyone opens it. Names only — no prose, so
+            nothing here can brush against an ending. */}
+        {!open && hasAnalysis && tabbed && (
           <Box
             sx={{
               display: 'flex',
               flexWrap: 'wrap',
-              alignItems: 'center',
-              columnGap: 1,
-              rowGap: 0.5,
+              gap: 0.75,
+              px: 2,
+              pb: 1.5,
+              pl: { xs: 2, sm: 8.5 },
             }}
           >
-            <AutoStoriesIcon fontSize="small" color="primary" />
-            <Typography variant="subtitle1" fontWeight={600}>
-              {t(
-                mediaType === 'series'
-                  ? 'mediaDetail.analysis.headingSeries'
-                  : 'mediaDetail.analysis.headingMovie'
-              )}
-            </Typography>
-            {/* What state this title is in, before anyone spends a click
-                finding out. See `analysisChip` for the five readings.
-
-                A title nobody has asked about yet gets no chip at all — it
-                gets the button, here rather than inside, because the panel is
-                collapsed by default and an action nobody can see is an action
-                nobody takes. */}
-            {chip ? (
-              <Tooltip title={chip.tooltip}>
-                <Chip
-                  size="small"
-                  variant="outlined"
-                  color={chip.color}
-                  label={chip.label}
-                  sx={{ height: 20, fontSize: '0.7rem' }}
-                />
-              </Tooltip>
-            ) : (
-              <Button
+            {headings.map((heading, i) => (
+              <Chip
+                key={i}
                 size="small"
                 variant="outlined"
-                disabled={generating}
-                startIcon={generating ? <CircularProgress size={12} /> : undefined}
-                // AccordionSummary is itself a button. Without this the press
-                // toggles the panel instead of starting the run.
-                onClick={(event) => {
-                  event.stopPropagation()
-                  run(false)
+                label={heading}
+                onClick={() => {
+                  setTab(i)
+                  setOpen(true)
                 }}
-                sx={{ py: 0, minHeight: 24, fontSize: '0.7rem', textTransform: 'none' }}
-              >
-                {generating
-                  ? t('mediaDetail.analysis.generating')
-                  : t('mediaDetail.analysis.generate')}
-              </Button>
-            )}
+                sx={{ height: 22, fontSize: '0.72rem' }}
+              />
+            ))}
           </Box>
-        </AccordionSummary>
+        )}
 
-        <AccordionDetails>
+        <Collapse in={open} unmountOnExit>
           {error && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
+            <Alert severity="warning" sx={{ m: 2 }}>
               {error}
             </Alert>
           )}
@@ -458,30 +582,51 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                   and note that it cannot be a plain blank-line split, because
                   some rows arrive with no blank lines in them at all.
 
-                  The text and its sources sit side by side rather than stacked.
-                  The measure has to be capped — an uncapped line here runs past
-                  what the eye tracks — but capping it alone left the panel half
-                  empty, which reads as a rendering fault rather than a margin.
-                  The rail puts something worth reading in that space and keeps
-                  provenance beside the claim.
+                  One section at a time, with the whole thing a tab away: the
+                  panel used to print every run in a single scroll, which made
+                  it a wall on exactly the titles with the most to say. The
+                  measure is still capped so a line stays trackable.
 
                   No breakpoints: this page also renders inside MediaDetailModal
                   and beside the assistant dock, where a window-width media
-                  query would be wrong. flex-wrap collapses the rail underneath
-                  the text on its own when the container is narrow. */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'flex-start',
-                  gap: 3,
-                }}
-              >
-                <Box sx={{ flex: '1 1 26rem', maxWidth: '84ch' }}>
+                  query would be wrong. */}
+              {tabbed && (
+                <Tabs
+                  value={activeTab}
+                  onChange={(_, value: number | 'all') => setTab(value)}
+                  variant="scrollable"
+                  scrollButtons="auto"
+                  sx={{ borderBottom: 1, borderColor: 'divider', px: 1, minHeight: 40 }}
+                >
+                  {headings.map((heading, i) => (
+                    <Tab
+                      key={i}
+                      value={i}
+                      label={heading}
+                      sx={{ textTransform: 'none', minHeight: 40 }}
+                    />
+                  ))}
+                  <Tab
+                    value="all"
+                    label={t('mediaDetail.analysis.readAll')}
+                    sx={{ textTransform: 'none', minHeight: 40, marginInlineStart: 'auto' }}
+                  />
+                </Tabs>
+              )}
+              <Box sx={{ px: 2.5, pt: 2, pb: 1 }}>
+                <Box sx={{ maxWidth: '84ch' }}>
                   {/* The same control the synopsis has, with its strings, so
                       a reader meets one convention for machine translation. */}
                   {translation && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 1,
+                        mb: 1,
+                      }}
+                    >
                       {showingTranslation && (
                         <Typography variant="caption" color="text.secondary">
                           {t('mediaDetail.hero.machineTranslated')}
@@ -490,21 +635,48 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                       <Button
                         size="small"
                         startIcon={<TranslateIcon />}
-                        onClick={() => setShowOriginal((shown) => !shown)}
+                        onClick={() => {
+                          setShowOriginal((shown) => !shown)
+                          // The two texts are cut into sections separately, so
+                          // a tab index from one does not belong to the other.
+                          setTab(0)
+                        }}
                         sx={{ textTransform: 'none' }}
                       >
-                        {showOriginal ? t('mediaDetail.hero.showTranslation') : t('mediaDetail.hero.showOriginal')}
+                        {showOriginal
+                          ? t('mediaDetail.hero.showTranslation')
+                          : t('mediaDetail.hero.showOriginal')}
                       </Button>
                     </Box>
                   )}
-                  {segments.map((segment, i) => (
-                    <AnalysisSection
-                      key={i}
-                      text={segment.text}
-                      questions={segment.questions}
-                      reflow={reflow}
-                    />
-                  ))}
+                  {segments.map((segment, i) =>
+                    activeTab === 'all' || activeTab === i ? (
+                      <AnalysisSection
+                        key={i}
+                        text={segment.text}
+                        questions={segment.questions}
+                        reflow={reflow}
+                        // A single tab already says what it is.
+                        showHeading={activeTab === 'all'}
+                      />
+                    ) : null
+                  )}
+
+                  {tabbed && activeTab !== 'all' && activeTab < segments.length - 1 && (
+                    <Button
+                      size="small"
+                      endIcon={
+                        <ArrowForwardIcon
+                          fontSize="small"
+                          sx={(theme) => (theme.direction === 'rtl' ? { transform: 'scaleX(-1)' } : {})}
+                        />
+                      }
+                      onClick={() => setTab(activeTab + 1)}
+                      sx={{ textTransform: 'none', mt: 0.5 }}
+                    >
+                      {headings[activeTab + 1]}
+                    </Button>
+                  )}
 
                   {canRewrite && (
                     <Box sx={{ mt: 1.5 }}>
@@ -525,13 +697,65 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                     </Box>
                   )}
                 </Box>
+              </Box>
 
-                {data?.sources && data.sources.length > 0 && (
-                  <Box sx={{ flex: '1 1 12rem', maxWidth: 260 }}>
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+              {(sourceCount > 0 || (tabbed && activeTab !== 'all')) && (
+                <Box
+                  sx={{
+                    borderTop: 1,
+                    borderColor: 'divider',
+                    bgcolor: 'action.hover',
+                    px: 2,
+                    py: 1,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 1,
+                    }}
+                  >
+                    <Box
+                      sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 1.5, alignItems: 'center' }}
+                    >
+                      {tabbed && activeTab !== 'all' && (
+                        <Typography variant="caption" color="text.secondary">
+                          {t('mediaDetail.analysis.sectionOf', {
+                            current: activeTab + 1,
+                            total: segments.length,
+                          })}
+                        </Typography>
+                      )}
+                      {sourceCount > 0 && (
+                        <Typography variant="caption" color="text.secondary">
+                          {t('mediaDetail.analysis.basedOnSources', { count: sourceCount })}
+                        </Typography>
+                      )}
+                    </Box>
+                    {sourceCount > 0 && (
+                      <Button
+                        size="small"
+                        onClick={() => setShowSources((shown) => !shown)}
+                        sx={{ textTransform: 'none', minHeight: 24, py: 0 }}
+                      >
+                        {showSources
+                          ? t('mediaDetail.analysis.hideSources')
+                          : t('mediaDetail.analysis.viewSources')}
+                      </Button>
+                    )}
+                  </Box>
+                  <Collapse in={showSources} unmountOnExit>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      display="block"
+                      sx={{ mt: 1, mb: 0.5 }}
+                    >
                       {t('mediaDetail.analysis.sourcesLabel')}
                     </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, pb: 0.5 }}>
                       {/* The domain is the label because it is the part that
                           says something — whether this came from a film journal
                           or a listicle — while article titles are long and
@@ -539,7 +763,7 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                           underneath, and only when the row carries one:
                           analyses written under native grounding store no URL
                           by design. */}
-                      {data.sources.map((source, i) => (
+                      {(data?.sources ?? []).map((source, i) => (
                         <Chip
                           key={`${source.domain}-${i}`}
                           size="small"
@@ -559,41 +783,42 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                         />
                       ))}
                     </Box>
-                  </Box>
-                )}
-              </Box>
+                  </Collapse>
+                </Box>
+              )}
             </>
           )}
 
-          {declined && (
-            <Typography variant="body2" color="text.secondary">
-              {t(
-                data?.declineReason === 'thin_sources'
-                  ? 'mediaDetail.analysis.declinedThinSources'
-                  : 'mediaDetail.analysis.declinedNoCraft'
-              )}
-            </Typography>
-          )}
+          <Box sx={{ px: 2.5, pb: 2, pt: hasAnalysis ? 1 : 2 }}>
+            {declined && (
+              <Typography variant="body2" color="text.secondary">
+                {t(
+                  data?.declineReason === 'thin_sources'
+                    ? 'mediaDetail.analysis.declinedThinSources'
+                    : 'mediaDetail.analysis.declinedNoCraft'
+                )}
+              </Typography>
+            )}
 
-          {/* No button down here: it is in the header, where it is reachable
+            {/* No button down here: it is in the header, where it is reachable
               without opening the panel first. */}
-          {!hasAnalysis && !declined && (
-            <Typography variant="body2" color="text.secondary">
-              {generating
-                ? t('mediaDetail.analysis.generating')
-                : t('mediaDetail.analysis.notYetGenerated')}
-            </Typography>
-          )}
-          {/* The wait is minutes, and nothing on screen used to say so — which
+            {!hasAnalysis && !declined && (
+              <Typography variant="body2" color="text.secondary">
+                {generating
+                  ? t('mediaDetail.analysis.generating')
+                  : t('mediaDetail.analysis.notYetGenerated')}
+              </Typography>
+            )}
+            {/* The wait is minutes, and nothing on screen used to say so — which
               is most of why a slow run read as a broken one. It also says the
               page may be left, which is true now that the work outlives the
               request rather than merely happening to survive it. */}
-          {generating && (
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-              {t('mediaDetail.analysis.generatingNote')}
-            </Typography>
-          )}
-          {/* Admin re-run.
+            {generating && (
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                {t('mediaDetail.analysis.generatingNote')}
+              </Typography>
+            )}
+            {/* Admin re-run.
 
               Offered only over a row that already exists, because that is the
               case the cache otherwise makes a dead end: an ordinary POST is
@@ -608,41 +833,46 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
               what makes the re-run worth having at all: without knowing which
               model and which mode wrote the text on screen, a before and after
               compares nothing. */}
-          {isAdmin && data?.attempted && (
-            <Box sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: 'divider' }}>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  color="secondary"
-                  onClick={() => run(true)}
-                  disabled={generating}
-                  startIcon={
-                    generating ? <CircularProgress size={16} /> : <AutorenewIcon fontSize="small" />
-                  }
-                >
-                  {generating
-                    ? t('mediaDetail.analysis.generating')
-                    : t('mediaDetail.analysis.admin.rerun')}
-                </Button>
-                <Typography variant="caption" color="text.secondary" sx={{ flex: '1 1 16rem' }}>
-                  {t('mediaDetail.analysis.admin.hint')}
-                </Typography>
+            {isAdmin && data?.attempted && (
+              <Box sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="secondary"
+                    onClick={() => run(true)}
+                    disabled={generating}
+                    startIcon={
+                      generating ? (
+                        <CircularProgress size={16} />
+                      ) : (
+                        <AutorenewIcon fontSize="small" />
+                      )
+                    }
+                  >
+                    {generating
+                      ? t('mediaDetail.analysis.generating')
+                      : t('mediaDetail.analysis.admin.rerun')}
+                  </Button>
+                  <Typography variant="caption" color="text.secondary" sx={{ flex: '1 1 16rem' }}>
+                    {t('mediaDetail.analysis.admin.hint')}
+                  </Typography>
+                </Box>
+                {provenanceLine && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    sx={{ mt: 1, fontFamily: 'monospace', fontSize: '0.68rem' }}
+                  >
+                    {provenanceLine}
+                  </Typography>
+                )}
               </Box>
-              {provenanceLine && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                  sx={{ mt: 1, fontFamily: 'monospace', fontSize: '0.68rem' }}
-                >
-                  {provenanceLine}
-                </Typography>
-              )}
-            </Box>
-          )}
-        </AccordionDetails>
-      </Accordion>
+            )}
+          </Box>
+        </Collapse>
+      </Paper>
     </Box>
   )
 }
@@ -668,6 +898,11 @@ function AnalysisProse({ text, reflow }: { text: string; reflow: boolean }) {
   )
 }
 
+/** An id with no translation renders no heading rather than a raw key. */
+function questionLabel(t: TFunction, question: string): string {
+  return t(`mediaDetail.analysis.section.${question}`, { defaultValue: '' })
+}
+
 /**
  * One run of the analysis, under a heading for what it answers.
  *
@@ -683,24 +918,19 @@ function AnalysisSection({
   text,
   questions,
   reflow,
+  showHeading = true,
 }: {
   text: string
   questions: AnalysisQuestionId[]
   reflow: boolean
+  showHeading?: boolean
 }) {
   const { t } = useTranslation()
-  // Both labels survive when a paragraph answers two questions, in the order
-  // the model listed them on its own map line: rule 3 tells it to merge what
-  // belongs together, so that is a normal shape and dropping one would
-  // misdescribe the run.
-  const heading = questions
-    .map((question) => t(`mediaDetail.analysis.section.${question}`, { defaultValue: '' }))
-    .filter(Boolean)
-    .join(' · ')
+  const heading = sectionHeading(questions, (question) => questionLabel(t, question))
 
   return (
     <Box sx={{ mb: 1 }}>
-      {heading && (
+      {showHeading && heading && (
         <Typography
           variant="overline"
           color="text.secondary"

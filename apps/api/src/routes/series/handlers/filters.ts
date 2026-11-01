@@ -13,6 +13,7 @@ import type { FastifyInstance } from 'fastify'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
+import { displayRatingSql } from '@aperture/core'
 import { ALL_COUNTRIES_SQL, PRIMARY_COUNTRIES_SQL } from '../../../lib/countryFilter.js'
 import { LIBRARY_SEASON_COUNT_SQL } from '../seasonCount.js'
 import {
@@ -231,8 +232,8 @@ export function registerFiltersHandlers(fastify: FastifyInstance) {
           MAX(year) as max_year,
           MIN(${LIBRARY_SEASON_COUNT_SQL}) as min_seasons,
           MAX(${LIBRARY_SEASON_COUNT_SQL}) as max_seasons,
-          MIN(community_rating) as min_rating,
-          MAX(community_rating) as max_rating
+          MIN(${displayRatingSql()}) as min_rating,
+          MAX(${displayRatingSql()}) as max_rating
          FROM series 
          WHERE ${inScope} AND year IS NOT NULL`,
         params

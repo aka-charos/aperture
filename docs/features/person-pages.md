@@ -29,7 +29,7 @@ Roles come from your media server's credits (cast, directors, writers) plus a sh
 - Watched tick, or an **episode-progress badge** (8/24) for series
 - Your **star rating**, hover-rateable
 - The **Shows You Watch** toggle on series entries
-- Community rating where known
+- Rating where known
 
 Click any poster for its detail page.
 

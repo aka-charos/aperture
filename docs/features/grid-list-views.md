@@ -36,9 +36,9 @@ The same poster beside a row of details. What the row carries depends on the pag
 
 | Page | The row adds |
 |------|--------------|
-| **Browse** | Year, community rating, genre chips, two-line overview, your rating inline; series add Airing/Ended status, season count, and an **Add to Watching** toggle |
+| **Browse** | Year, rating, genre chips, two-line overview, your rating inline; series add Airing/Ended status, season count, and an **Add to Watching** toggle |
 | **Recommendations** | Match score and **Similarity / Novelty / Rating** bars, reason line, Watch trailer, View on TMDb |
-| **Most Watched Lately** | **Unique viewers**, **play count**, community rating; series add episodes watched and % avg completion |
+| **Most Watched Lately** | **Unique viewers**, **play count**, rating; series add episodes watched and % avg completion |
 | **Discover** | Full metadata (year, runtime, genres), synopsis, match score, request actions |
 | **Watch History** | Plays chip ("3x", "5+" past five), resume bar with % tooltip, last-watched date, management actions |
 | **Shows You Watch** | **Episode availability bar**, upcoming-episode countdown, source chip |
