@@ -71,7 +71,7 @@ export function registerRatingsHandlers(fastify: FastifyInstance) {
     {
       preHandler: requireAdmin,
       schema: {
-        tags: ['Settings'],
+        tags: ['settings'],
         summary: 'Get ratings refresh configuration and coverage',
       },
     },
@@ -94,7 +94,7 @@ export function registerRatingsHandlers(fastify: FastifyInstance) {
     {
       preHandler: requireAdmin,
       schema: {
-        tags: ['Settings'],
+        tags: ['settings'],
         summary: 'Enable or disable rating refresh sources',
         body: {
           type: 'object',

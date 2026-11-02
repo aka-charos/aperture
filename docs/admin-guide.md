@@ -44,7 +44,14 @@ Start here if you're new to Aperture:
 | [TMDb](admin/tmdb.md) | Metadata enrichment |
 | [OMDb](admin/omdb.md) | Rotten Tomatoes, Metacritic |
 | [MDBList](admin/mdblist.md) | Curated lists, Top Picks source |
-| [Seerr](admin/seerr.md) | Discovery requests |
+| [Seerr](admin/seerr.md) | Discovery requests and problem reports |
+| [LLDAP](admin/lldap.md) | Email import and the account drift report |
+| [Outgoing email](admin/smtp.md) | SMTP connection for notifications and newsletters |
+| [n8n](admin/n8n.md) | Webhook tools for the assistant |
+| [Tavily](admin/tavily.md) | Second web-search source |
+| [fastCRW](admin/crw.md) | Self-hosted search and scraping for title analysis |
+| [Streaming providers](admin/streaming.md) | JustWatch availability |
+| [Ratings refresh](admin/ratings-refresh.md) | Nightly IMDb ratings, feeding the unified rating |
 
 ---
 
@@ -54,10 +61,15 @@ Start here if you're new to Aperture:
 
 | Topic | Description |
 |-------|-------------|
-| [AI Providers](admin/ai-providers.md) | OpenAI, Ollama, Groq, etc. |
+| [AI Providers](admin/ai-providers.md) | OpenAI, OpenRouter, Z.AI, Ollama, LM Studio, Unsloth Studio, etc. |
 | [Embedding Models](admin/embedding-models.md) | Model selection for vectors |
 | [Text Generation Models](admin/text-models.md) | Model for explanations |
-| [Chat Models](admin/chat-models.md) | Model for Encore assistant |
+| [Chat Models](admin/chat-models.md) | Model for the assistant |
+| [AI Spend](admin/ai-spend.md) / [Cost Estimate](admin/cost-estimate.md) | What calls cost, measured and projected |
+| [Decision Model](admin/decision-model.md) | Optional yes/no judge for evidence and analysis sources |
+| [Synopsis Translation](admin/synopsis-translation.md) | Plots and film analyses in every enabled language |
+| [Analysis Bench](admin/analysis-bench.md) | Compare models and prompt versions on the same sources |
+| [Offsite Analysis](admin/offsite-analysis.md) | Run title analysis on another machine |
 
 ---
 
@@ -67,8 +79,9 @@ Start here if you're new to Aperture:
 
 | Topic | Description |
 |-------|-------------|
-| [Output Format](admin/output-format.md) | STRM vs Symlinks |
-| [Library Title Templates](admin/library-titles.md) | Name patterns for libraries |
+| [Emby Home Rows](admin/home-rows.md) | Recommendations as rows on each viewer's Emby home screen |
+| [Output Format](admin/output-format.md) | Legacy STRM/symlink libraries (off on a new install) |
+| [Library Title Templates](admin/library-titles.md) | Name patterns for legacy libraries |
 
 ### AI Features
 
@@ -83,8 +96,9 @@ Start here if you're new to Aperture:
 
 | Feature | Description |
 |---------|-------------|
-| [Top Picks](admin/top-picks.md) | Global trending libraries |
+| [Top Picks](admin/top-picks.md) | Global trending lists ("Most Watched Lately" to viewers) |
 | [Shows You Watch](admin/shows-you-watch.md) | Track ongoing series |
+| [Newsletters](admin/newsletters.md) | Email with library title cards, sent to groups who opted in |
 
 ### Language defaults (admin)
 
@@ -106,7 +120,7 @@ Under **Admin console → Appearance → Language defaults**, the instance-wide 
 - Gap-initiated requests are stored with `source: gap_analysis` and appear on **My Requests** with a **Gap Analysis** badge; they can be filtered with the Source dropdown.
 - Re-run analysis after large library syncs so counts stay accurate.
 
-**API** — See [Gap analysis (Admin)](api-reference.md#gap-analysis-admin) in the API reference.
+**API** — The `/api/admin/gap-analysis/*` routes are in the [API reference](api-reference.md); search the page for `gap-analysis`.
 
 ---
 
@@ -161,22 +175,37 @@ Under **Admin console → Appearance → Language defaults**, the instance-wide 
 
 ### Admin Console Map
 
-Groups in the admin nav (one page per route): **Overview**, **Library** (Media server, Libraries, File locations, Gap analysis), **Integrations** (12 pages), **AI models** (Providers & roles, Embeddings, AI Spend, Cost estimate, Analysis bench), **Recommendations** (Algorithm, Evaluation, Explanations, Output format, Library naming, Top Picks, Shows You Watch, Discovery tuning, Genre strips, Channels web expand), **Appearance** (Branding, Theme colours, Poster display, Language defaults, Translations), **Access** (Users, API keys), **Operations** (Jobs, Backup & restore, Database, Poster repair).
+Groups in the admin nav (one page per route):
+
+| Group | Sections |
+|-------|----------|
+| **Overview** | Overview |
+| **Library** | Media server, Libraries, File locations, Gap analysis |
+| **Integrations** | TMDB, OMDb, MDBList, Trakt, Seerr, LLDAP, Outgoing email, n8n, Tavily, fastCRW, Streaming providers, Ratings refresh |
+| **AI models** | Providers & roles, Spend, Cost estimate, Embeddings, Decision model, Synopsis translation, Analysis bench, Offsite analysis |
+| **Recommendations** | Algorithm & weights, Evaluation, Explanations, Output format, Library naming, Top Picks, Emby Home Rows, Shows You Watch, Discovery tuning, Genre strips, Channel web expansion |
+| **Appearance** | Instance name & logo, Theme colours, Poster display, Language defaults, Translations |
+| **Access** | Users, API keys, Deployment & security |
+| **Communication** | Newsletters, Send groups |
+| **Operations** | Jobs, Backup & restore, Poster repair, Logs, Database |
+| **Help** | Admin guide |
 
 ### Default Job Schedule (seeds)
 
 | Schedule | Jobs |
 |----------|------|
+| Every 15 min | `send-notification-emails` |
 | Every 30 min | `sync-users` |
-| Hourly | `sync-series-watch-history` (movies every 2 h) |
-| Every 3 h | `sync-movies` / `sync-series`, staggered library builds |
-| Every 6 h | `enrich-metadata`, movie/series embeddings (staggered) |
-| Daily 02:00–03:30 | `backup-database` 02:00, `refresh-ratings` 02:30, `reconcile-discovery-requests` 04:30, `sync-lldap-emails` 03:15, `cleanup-auth-state` 03:30 |
-| Daily 02:00–03:30 | `backup-database` 02:00, `refresh-ratings` 02:30, `sync-lldap-emails` 03:15, `cleanup-auth-state` 03:30, `reconcile-discovery-requests` 04:30 |
-| Daily 05:00–07:00 | `refresh-top-picks` 05:00, `enrich-studio-logos` 05:30, `generate-discovery-suggestions` 06:00, `enrich-mdblist` 07:00 |
-| Weekly (Sunday) | `generate-movie/series-recommendations` 04:00, `auto-request-top-picks` 00:00, `refresh-assistant-suggestions` 00:00, `refresh-ai-pricing` 00:00 |
+| Hourly | `sync-series-watch-history`, `sync-watching-favorites` (:30) |
+| Every 2 h | `sync-movie-watch-history` |
+| Every 3 h | `sync-movies`, `sync-series` (:10), `sync-movie-libraries` (:20), `sync-series-libraries` (:30) |
+| Every 6 h | `enrich-metadata`, `generate-movie-embeddings` (:10), `generate-series-embeddings` (:20), `sync-trakt-ratings` (:30) |
+| Daily 02:00–04:30 | `backup-database` 02:00, `refresh-ratings` 02:30, `sync-lldap-emails` 03:15, `cleanup-auth-state` 03:30, `reconcile-discovery-requests` 04:30 |
+| Daily 05:00–07:00 | `refresh-top-picks` 05:00, `enrich-studio-logos` 05:30, `sync-home-sections` 05:45, `generate-discovery-suggestions` 06:00, `enrich-mdblist` 07:00 |
+| Weekly (Sunday) | `generate-movie-recommendations` and `generate-series-recommendations` 04:00, `auto-request-top-picks`, `refresh-assistant-suggestions` and `refresh-ai-pricing` 00:00 |
+| Manual until given a schedule | `full-reset-movie-recommendations`, `full-reset-series-recommendations`, `refresh-library-gaps`, `rebuild-taste-profiles`, `evaluate-recommender`, `refresh-embedding-centering`, `refresh-recommendation-explanations`, `check-recommendation-explanations`, `remove-legacy-libraries`, `generate-title-analysis`, `translate-title-synopses`, `translate-title-analyses` |
 
-All 34 jobs, seeded — edit per job in **Operations → Jobs** (see [Job scheduling](admin/job-scheduling.md)). The scheduler reads the `job_config` table seeded from these defaults (the definitions file's cron fields are not what it reads). Times follow `TZ` (default `America/New_York`). Missed runs do not catch up.
+All 40 jobs, seeded — edit per job in **Operations → Jobs** (see [Job scheduling](admin/job-scheduling.md)). The scheduler reads the `job_config` table seeded from these defaults (the definitions file's cron fields are not what it reads). Times follow `TZ` (default `America/New_York`). Missed runs do not catch up.
 
 ### Algorithm Defaults
 
@@ -187,15 +216,13 @@ All 34 jobs, seeded — edit per job in **Operations → Jobs** (see [Job schedu
 | Rating | 0.2 | 0.2 |
 | Diversity | 0.2 | 0.2 |
 
+The first three are blended into the match score; only their shares matter, so they need not sum to 1. Diversity is applied afterwards, when the list is picked. The quality term scores each title's unified rating (IMDb with the critic scores for films, IMDb for series), not the media server's own rating.
+
 Per-user picks default to **20** from a candidate pool of up to 50,000; reserved slots cover interest, taste-twin, and acclaimed picks. See [Algorithm tuning](admin/algorithm-tuning.md).
 
 ### Embedding Models
 
-| Model | Dimensions | Cost |
-|-------|------------|------|
-| text-embedding-3-small | 1536 | $0.02/1M tokens |
-| text-embedding-3-large | 3072 | $0.13/1M tokens |
-| nomic-embed-text (Ollama) | 768 | Free (local) |
+Embeddings run on OpenAI, Google, OpenRouter, Ollama, LM Studio or any OpenAI-compatible server, in tables from 256 to 4096 dimensions. Changing the model keeps the old set beside the new one. See [Embedding models](admin/embedding-models.md) for the catalog, the stored-sets panel and what switching costs.
 
 ---
 
@@ -241,6 +268,8 @@ All admin documentation files:
 - [admin/chat-models.md](admin/chat-models.md)
 - [admin/ai-spend.md](admin/ai-spend.md)
 - [admin/cost-estimate.md](admin/cost-estimate.md)
+- [admin/decision-model.md](admin/decision-model.md)
+- [admin/synopsis-translation.md](admin/synopsis-translation.md)
 - [admin/analysis-bench.md](admin/analysis-bench.md)
 - [admin/offsite-analysis.md](admin/offsite-analysis.md)
 
@@ -254,6 +283,7 @@ All admin documentation files:
 ### AI Recommendations
 - [admin/algorithm-tuning.md](admin/algorithm-tuning.md)
 - [admin/ai-explanations.md](admin/ai-explanations.md)
+- [admin/home-rows.md](admin/home-rows.md)
 - [admin/output-format.md](admin/output-format.md)
 - [admin/library-titles.md](admin/library-titles.md)
 - [admin/evaluation.md](admin/evaluation.md)
@@ -266,6 +296,9 @@ All admin documentation files:
 - [admin/shows-you-watch.md](admin/shows-you-watch.md)
 - [admin/gap-analysis.md](admin/gap-analysis.md)
 - [admin/overview.md](admin/overview.md)
+
+### Communication
+- [admin/newsletters.md](admin/newsletters.md)
 
 ### Jobs
 - [admin/jobs-overview.md](admin/jobs-overview.md)

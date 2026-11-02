@@ -18,7 +18,8 @@
     "clean": "rm -rf dist",
     "test:assistant": "node --import tsx --test src/routes/assistant/discovery/enrichReasons.test.ts src/routes/assistant/tools/tasteBlend.test.ts src/routes/assistant/tools/episodes.test.ts src/routes/assistant/helpers/routeIntent.test.ts src/routes/assistant/helpers/titleMatch.test.ts src/routes/assistant/helpers/countryMatch.test.ts",
     "test:search": "node --import tsx --test src/routes/search/searchSql.test.ts src/routes/seerr/sources/seerrMapping.test.ts src/routes/seerr/requestOptions.test.ts",
-    "test:issues": "node --import tsx --test src/routes/issues/issueMapping.test.ts"
+    "test:issues": "node --import tsx --test src/routes/issues/issueMapping.test.ts",
+    "docs:api": "node --import tsx scripts/api-reference.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.0",

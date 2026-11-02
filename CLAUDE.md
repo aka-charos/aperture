@@ -36,6 +36,7 @@ pnpm typecheck          # builds packages/* FIRST, then pnpm -r typecheck
 pnpm lint / validate    # eslint --max-warnings 0 / lint + typecheck
 pnpm db:migrate|db:status
 pnpm --filter @aperture/web i18n:sync   # propagate new en strings to 13 locales
+pnpm --filter @aperture/api docs:api    # regenerate docs/api-reference.md from the OpenAPI document (no DB needed)
 ```
 
 **Critical:** apps consume the compiled `dist/` of core/ui. After adding/changing any export in `packages/core` or `packages/ui`, run `pnpm --filter "./packages/*" build` or app typecheck fails with TS2305/TS2307.
@@ -376,6 +377,7 @@ Embedding tables are shared consumers: recommender, `/api/similarity` graph, sem
 - **Moving or renaming an element a tour points at, or a guide heading a ? icon opens** → `tours.test.ts` fails until `components/tour/tours.ts` (or the `<HelpHint>`) is updated; a new screen's tour or tip is a `tour`/`hint` on its `ROUTE_DOCS` entry plus strings under `onboarding.tours.<id>` / `onboarding.hints.<id>`.
 - **Adding, moving or renaming an app screen, or editing `docs/features/` or `docs/user-guide.md`** → the user guide ships in the web bundle and its contents are `docs/user-guide.md`'s own list, so `guide.test.ts` fails on a page that list does not reach and on a page the Help button names (`pages/guide/routeDocs.ts`) that does not exist, and `components/docs/docs.test.ts` fails on a link in either guide that lands on no file or heading. A new screen gets a `ROUTE_DOCS` entry or its Help button opens the contents. **Editing an English page leaves its Greek copy in `docs/el/features/` saying the old thing** — nothing detects that, so change both; a NEW English page with no Greek copy simply shows in English to Greek readers. `guide.test.ts` fails on a Greek page with no English page, and on one `docs/el/user-guide.md` does not reach.
 - **Renaming/removing an API route** → grep `apps/web/src` for the literal `/api/...` string (no typed client to catch it).
+- **Adding, renaming or removing a route, or changing its tag or summary** → run `pnpm --filter @aperture/api docs:api`; `serverBoot.test.ts` (`test:boot`, run in CI) fails while `docs/api-reference.md` differs from what the routes render (`apps/api/src/lib/apiReference.ts`).
 - **Integration client changes** (tmdb/omdb/trakt/mdblist/seerr/justwatch) → they log to `errors/` (`api_errors`) and often have DB caches with TTLs; check retry gating (`shouldAutoRetry`).
 - **Job behavior** → schedule comes from DB `job_config`, not `definitions.ts`; progress API is in core.
 

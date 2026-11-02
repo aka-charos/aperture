@@ -26,6 +26,15 @@ The page shows live coverage: *"N of M titles have a stored IMDb rating"* and wh
 
 Nothing enabled → the job completes cleanly with "No rating sources are enabled — nothing to refresh" (not a failure). Per-source failures are logged and other sources still run.
 
+## The Unified Rating
+
+The IMDb figure is not scored on its own. Each title carries one **unified rating**, the number shown as the headline on its page, in Browse and on posters, and the one the recommender's quality term scores:
+
+- **Films**: 60% audience (the refreshed IMDb rating, else the media server's, else TMDb's) and 40% critics (Metacritic 60%, Rotten Tomatoes 40%), the critic scores mapped onto IMDb's scale before they are mixed. A film no critic reviewed uses the audience part alone.
+- **Series**: the audience part alone.
+
+It is recomputed for the whole table at the end of every job that writes a rating (`sync-movies`, `sync-series`, `enrich-metadata`, `enrich-mdblist` and this one), so the refreshed numbers reach the headline and the next recommendation run the same night. Only titles whose rating changed are written, and nothing is re-embedded. A Rotten Tomatoes score that disagrees with the same title's Metacritic by more than 50 points is left out, since it usually belongs to another film with the same name.
+
 ## Why It's Not Part of Enrichment
 
 Enrichment's predicate is "never enriched or schema behind" — no TTL — which is right for a plot and wrong for a moving number. That separation is deliberate; see the job's own description on the [Jobs](jobs-overview.md) console.
