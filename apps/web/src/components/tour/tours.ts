@@ -66,6 +66,11 @@ export interface TourStep {
   icon: TourIcon
   /** The `data-tour` value of the element this step points at. */
   anchor?: string
+  /**
+   * Pointed at instead when the anchor is not on screen: a sidebar item on a
+   * phone, where the sidebar is a closed menu, falls back to the menu button.
+   */
+  fallbackAnchor?: string
   /** Shown only when the server grants this capability. */
   capability?: string
   feature?: TourFeature
@@ -91,6 +96,7 @@ export const TOURS: Record<TourId, Tour> = {
         id: 'recommendations',
         icon: 'sparkle',
         anchor: 'nav-recommendations',
+        fallbackAnchor: 'app-menu',
         placement: 'right',
         action: 'recommenderExplainer',
         doc: { slug: 'recommendations' },
@@ -101,6 +107,7 @@ export const TOURS: Record<TourId, Tour> = {
         id: 'assistant',
         icon: 'chat',
         anchor: 'nav-assistant',
+        fallbackAnchor: 'app-menu',
         placement: 'right',
         capability: 'assistant',
         doc: { slug: 'ai-assistant' },

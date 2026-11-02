@@ -28,6 +28,8 @@ For Top Picks use, the built-in list selector searches your MDBList lists or acc
 
 A separate scheduled job — **daily at 07:00**, deliberately its own job rather than part of `enrich-metadata`. Adds **Letterboxd scores, MDBList scores, streaming providers, and keywords** to your titles. MDBList titles are also a [Discovery](../features/discovery.md) candidate source.
 
+Each title is asked again 30 days after its last answer, because streaming providers change. A request MDBList does not answer (an outage, a refused key, a spent daily quota) stamps nothing: those titles are retried on the next run, and a run stops after three failed requests in a row rather than spending the rest of the library on refusals; such a run is marked failed in the job history.
+
 ## Using MDBList for Top Picks
 
 In [Top Picks](top-picks.md) settings:

@@ -3123,7 +3123,8 @@
     "sharedWithMeBadge_other": "{{count}} νέες συστάσεις",
     "watchThis": "Δείτε το",
     "userMenu": "Μενού λογαριασμού",
-    "nextFromHere": "Τι να δω μετά"
+    "nextFromHere": "Τι να δω μετά",
+    "openMenu": "Άνοιγμα μενού"
   },
   "settingsMdblist": {
     "title": "Ενσωμάτωση MDBList",
@@ -6501,6 +6502,7 @@
       "back": "Πίσω",
       "readMore": "Περισσότερα",
       "howPicksAreMade": "Πώς γίνονται οι προτάσεις",
+      "inMenu": "Θα το βρείτε στο μενού: πατήστε ☰ επάνω.",
       "showMeAround": "Δείξε μου",
       "keysMove": "για μετακίνηση",
       "keysClose": "για κλείσιμο"

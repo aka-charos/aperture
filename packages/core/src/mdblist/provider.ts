@@ -17,6 +17,7 @@ import {
   type MDBListSearchResult,
   type MDBListEnrichmentData,
 } from './types.js'
+import { MDBListRequestError, dedupeStreamingProviders, readBatchItems } from './rules.js'
 
 const logger = createChildLogger('mdblist')
 
@@ -132,6 +133,8 @@ export async function isMDBListSupporterTier(): Promise<boolean> {
 
 interface MDBListRequestOptions {
   apiKey?: string
+  /** Throw on anything but an answer or a 404 (see mdblistRequest). */
+  throwOnFailure?: boolean
 }
 
 /** Read a failed response's body for diagnostics (truncated, never throws). */
@@ -175,7 +178,70 @@ async function recordMDBListError(
 }
 
 /**
- * Make a rate-limited request to the MDBList API
+ * Send one MDBList request, rate-limited, retrying a 429 (honouring
+ * Retry-After) and a dropped connection up to MAX_RETRIES times. Returns the
+ * response only when it is OK; every other outcome is recorded and thrown as
+ * MDBListRequestError, so no caller can read a failure as "no data". Shared by
+ * the GET lookups and the batch POST, which used to keep separate copies and
+ * only one of them retried.
+ */
+async function sendMDBListRequest(endpoint: string, send: () => Promise<Response>): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    await rateLimit()
+
+    let response: Response
+    try {
+      response = await send()
+    } catch (err) {
+      if (attempt >= MAX_RETRIES) {
+        logger.error({ err, endpoint }, 'MDBList API request failed after retries')
+        throw new MDBListRequestError(
+          `MDBList request failed: ${err instanceof Error ? err.message : String(err)}`
+        )
+      }
+      logger.warn({ err, attempt, endpoint }, 'MDBList API request failed, retrying...')
+      await sleep(RETRY_DELAY_MS * attempt)
+      continue
+    }
+
+    if (response.status === 429) {
+      // Rate limit hit - log to database for user notification
+      const retryAfter = response.headers.get('Retry-After')
+      const retryAfterSeconds = retryAfter ? Number.parseInt(retryAfter, 10) : NaN
+      const waitMs = Number.isFinite(retryAfterSeconds)
+        ? retryAfterSeconds * 1000
+        : RETRY_DELAY_MS * attempt
+      await recordMDBListError(429, endpoint, { retryAfterHeader: retryAfter || undefined })
+      if (attempt >= MAX_RETRIES) {
+        throw new MDBListRequestError('MDBList rate limit still hit after retries', 429)
+      }
+      logger.warn({ attempt, waitMs }, 'MDBList rate limit hit, waiting...')
+      await sleep(waitMs)
+      continue
+    }
+
+    if (!response.ok) {
+      await recordMDBListError(response.status, endpoint, {
+        responseBody: await readErrorBody(response),
+      })
+      throw new MDBListRequestError(`MDBList answered ${response.status}`, response.status)
+    }
+
+    return response
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Make a rate-limited GET to the MDBList API.
+ *
+ * Lenient by default: any failure answers null, which list and lookup callers
+ * treat as "nothing to show". With `throwOnFailure`, null means only "MDBList
+ * has no entry" (a 404) and every other failure throws MDBListRequestError,
+ * which is what enrichment needs before it stamps a title.
  */
 async function mdblistRequest<T>(
   endpoint: string,
@@ -184,6 +250,7 @@ async function mdblistRequest<T>(
   const apiKey = options.apiKey || (await getMDBListApiKey())
 
   if (!apiKey) {
+    if (options.throwOnFailure) throw new MDBListRequestError('MDBList API key not configured')
     logger.warn('MDBList API key not configured')
     return null
   }
@@ -201,48 +268,18 @@ async function mdblistRequest<T>(
   // The endpoint, never the URL: MDBList takes its key as a query parameter.
   logger.debug({ endpoint }, 'MDBList API request')
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    await rateLimit()
-
-    try {
-      const response = await fetch(url.toString(), {
-        headers: {
-          Accept: 'application/json',
-        },
-      })
-
-      if (response.status === 429) {
-        // Rate limit hit - log to database for user notification
-        const retryAfter = response.headers.get('Retry-After')
-        const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : RETRY_DELAY_MS * attempt
-        logger.warn({ attempt, waitMs }, 'MDBList rate limit hit, waiting...')
-
-        await recordMDBListError(429, endpoint, { retryAfterHeader: retryAfter || undefined })
-
-        await new Promise((resolve) => setTimeout(resolve, waitMs))
-        continue
-      }
-
-      if (!response.ok) {
-        await recordMDBListError(response.status, endpoint, {
-          responseBody: await readErrorBody(response),
-        })
-
-        return null
-      }
-
-      return (await response.json()) as T
-    } catch (err) {
-      if (attempt === MAX_RETRIES) {
-        logger.error({ err, endpoint }, 'MDBList API request failed after retries')
-        return null
-      }
-      logger.warn({ err, attempt, endpoint }, 'MDBList API request failed, retrying...')
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt))
-    }
+  try {
+    const response = await sendMDBListRequest(endpoint, () =>
+      fetch(url.toString(), { headers: { Accept: 'application/json' } })
+    )
+    return (await response.json()) as T
+  } catch (err) {
+    if (!options.throwOnFailure) return null
+    if (err instanceof MDBListRequestError && err.status === 404) return null
+    throw err instanceof MDBListRequestError
+      ? err
+      : new MDBListRequestError(`Unreadable MDBList answer: ${err instanceof Error ? err.message : String(err)}`)
   }
-
-  return null
 }
 
 // ============================================================================
@@ -550,6 +587,15 @@ export async function getMediaInfoByImdb(imdbId: string): Promise<MDBListMediaIn
 }
 
 /**
+ * The same lookup for enrichment: null means MDBList has no entry (404), and
+ * every request that did not answer throws MDBListRequestError, so a failure
+ * is never stamped as "no data".
+ */
+export async function getMediaInfoByImdbOrThrow(imdbId: string): Promise<MDBListMediaInfo | null> {
+  return mdblistRequest<MDBListMediaInfo>(`/?i=${imdbId}`, { throwOnFailure: true })
+}
+
+/**
  * Get media info by TMDB ID
  */
 export async function getMediaInfoByTmdb(
@@ -584,7 +630,48 @@ export async function getMediaInfoByTmdbBatch(
   }
 
   const results: MDBListMediaInfo[] = []
+  for (let i = 0; i < tmdbIds.length; i += TMDB_BATCH_SIZE) {
+    try {
+      results.push(...(await requestTmdbBatch(tmdbIds.slice(i, i + TMDB_BATCH_SIZE), mediaType, apiKey)))
+    } catch (err) {
+      logger.error({ err, batchStart: i }, 'MDBList batch request error')
+    }
+  }
+  return results
+}
 
+/**
+ * The same lookup for enrichment, where a failed request must never read as
+ * "MDBList has nothing on these titles": the job stamps titles it got no
+ * answer for, and a stamp from a failed request kept 13,400 titles without
+ * data for ten months. Throws MDBListRequestError on any request that did not
+ * answer; an answer that leaves a title out still means "no entry".
+ */
+export async function getMediaInfoByTmdbBatchOrThrow(
+  tmdbIds: string[],
+  mediaType: 'movie' | 'show'
+): Promise<MDBListMediaInfo[]> {
+  if (tmdbIds.length === 0) return []
+
+  const apiKey = await getMDBListApiKey()
+  if (!apiKey) throw new MDBListRequestError('MDBList API key not configured')
+
+  const results: MDBListMediaInfo[] = []
+  for (let i = 0; i < tmdbIds.length; i += TMDB_BATCH_SIZE) {
+    results.push(...(await requestTmdbBatch(tmdbIds.slice(i, i + TMDB_BATCH_SIZE), mediaType, apiKey)))
+  }
+  return results
+}
+
+/** MDBList's batch POST takes up to 100 ids. */
+const TMDB_BATCH_SIZE = 100
+
+/** One batch POST to /tmdb/{type}. Throws MDBListRequestError when MDBList did not answer. */
+async function requestTmdbBatch(
+  batch: string[],
+  mediaType: 'movie' | 'show',
+  apiKey: string
+): Promise<MDBListMediaInfo[]> {
   // Response item type from API (has nested ids)
   interface ApiResponseItem {
     id: number
@@ -599,74 +686,29 @@ export async function getMediaInfoByTmdbBatch(
     [key: string]: unknown
   }
 
-  // Batch up to 100 at a time
-  const batchSize = 100
-  for (let i = 0; i < tmdbIds.length; i += batchSize) {
-    const batch = tmdbIds.slice(i, i + batchSize)
+  const url = `${MDBLIST_API_BASE_URL}/tmdb/${mediaType}?apikey=${apiKey}`
+  logger.debug({ mediaType, batchSize: batch.length }, 'MDBList batch POST request')
 
-    try {
-      const url = `${MDBLIST_API_BASE_URL}/tmdb/${mediaType}?apikey=${apiKey}`
-      logger.debug({ mediaType, batchSize: batch.length }, 'MDBList batch POST request')
+  // API expects { ids: ["id1", "id2"], append_to_response: [...] }
+  const response = await sendMDBListRequest(`POST /tmdb/${mediaType}`, () =>
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: batch, append_to_response: ['keyword'] }),
+    })
+  )
 
-      // API expects { ids: ["id1", "id2"], append_to_response: [...] }
-      const requestBody = {
-        ids: batch, // IDs as strings
-        append_to_response: ['keyword'],
-      }
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      })
-
-      if (!response.ok) {
-        await recordMDBListError(response.status, `POST /tmdb/${mediaType}`, {
-          responseBody: await readErrorBody(response),
-        })
-
-        continue
-      }
-
-      const data = (await response.json()) as ApiResponseItem[] | Record<string, ApiResponseItem>
-
-      // Handle array or object response
-      let items: ApiResponseItem[]
-      if (Array.isArray(data)) {
-        items = data
-      } else if (typeof data === 'object' && data !== null) {
-        // Response might be keyed by ID
-        items = Object.values(data)
-      } else {
-        logger.warn({ responseType: typeof data }, 'Unexpected MDBList batch response type')
-        continue
-      }
-
-      for (const item of items) {
-        // Skip error/info pages
-        if ('website' in item || 'documentation' in item) {
-          continue
-        }
-
-        // Normalize: copy ids to top-level for consistency
-        const normalizedItem: MDBListMediaInfo = {
-          ...item,
-          imdbid: item.ids?.imdb || undefined,
-          traktid: item.ids?.trakt || undefined,
-          tmdbid: item.ids?.tmdb || undefined,
-          tvdbid: item.ids?.tvdb || undefined,
-        } as MDBListMediaInfo
-
-        results.push(normalizedItem)
-      }
-    } catch (err) {
-      logger.error({ err, batchStart: i }, 'MDBList batch request error')
-    }
-  }
-
-  return results
+  // Normalize: copy ids to top-level for consistency
+  return readBatchItems<ApiResponseItem>(await response.json()).map(
+    (item) =>
+      ({
+        ...item,
+        imdbid: item.ids?.imdb || undefined,
+        traktid: item.ids?.trakt || undefined,
+        tmdbid: item.ids?.tmdb || undefined,
+        tvdbid: item.ids?.tvdb || undefined,
+      }) as MDBListMediaInfo
+  )
 }
 
 /**
@@ -781,11 +823,8 @@ export function extractEnrichmentData(info: MDBListMediaInfo): MDBListEnrichment
     }
   }
 
-  // Extract streaming providers
-  const streamingProviders = (info.watch_providers || info.streams || []).map((p) => ({
-    id: p.id,
-    name: p.name,
-  }))
+  // Extract streaming providers, one entry per provider
+  const streamingProviders = dedupeStreamingProviders(info.watch_providers || info.streams || [])
 
   // Extract keywords
   const keywords = (info.keywords || []).map((k) => k.name)

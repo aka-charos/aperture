@@ -53,7 +53,8 @@
     "sharedWithMeBadge_other": "{{count}} 个新分享",
     "watchThis": "值得一看",
     "userMenu": "Account menu",
-    "nextFromHere": "Next from here"
+    "nextFromHere": "Next from here",
+    "openMenu": "Open menu"
   },
   "admin": {
     "title": "管理",
@@ -6515,7 +6516,8 @@
       "howPicksAreMade": "How picks are made",
       "showMeAround": "Show me around",
       "keysMove": "to move",
-      "keysClose": "to close"
+      "keysClose": "to close",
+      "inMenu": "You will find it in the menu: tap ☰ at the top."
     },
     "tours": {
       "welcome": {
