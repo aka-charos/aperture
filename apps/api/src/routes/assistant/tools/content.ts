@@ -9,7 +9,7 @@ import type { ToolContext } from '../types.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
 import type { ContentDetail } from '../schemas/index.js'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, displayRatingSql } from '@aperture/core'
 
 export function createContentTools(ctx: ToolContext) {
   return {
@@ -38,7 +38,7 @@ export function createContentTools(ctx: ToolContext) {
             content_rating: string | null
             critic_rating: number | null
           }>(
-            `SELECT id, title, year, genres, overview, community_rating, poster_url,
+            `SELECT id, title, year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url,
            provider_item_id, runtime_minutes, directors, actors, tagline, content_rating, critic_rating
            FROM movies WHERE ${anyTitleMatchesSql('$1')}
            ORDER BY ${titleMatchRankSql('$2')} LIMIT 1`,
@@ -123,7 +123,7 @@ export function createContentTools(ctx: ToolContext) {
             content_rating: string | null
             critic_rating: number | null
           }>(
-            `SELECT id, title, year, end_year, genres, overview, community_rating, poster_url,
+            `SELECT id, title, year, end_year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url,
            provider_item_id, network, status, content_rating, critic_rating
            FROM series WHERE ${anyTitleMatchesSql('$1')}
            ORDER BY ${titleMatchRankSql('$2')} LIMIT 1`,

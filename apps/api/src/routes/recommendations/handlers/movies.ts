@@ -21,7 +21,13 @@ import { resolveTwinDonor, resolveTwinShared, twinCameClose } from '../../../lib
 import { publicScoreBreakdown } from '../../../lib/scoreBreakdown.js'
 import { withInterestEvidenceOnRead } from '../../../lib/interestEvidenceOnRead.js'
 import type { MovieRecommendationCandidate, RecommendationRun } from '../types.js'
-import { WATCH_HISTORY_TASTE_SQL, binderFor, getLibraryScopeForUser, libraryScopeSql } from '@aperture/core'
+import {
+  WATCH_HISTORY_TASTE_SQL,
+  binderFor,
+  displayRatingSql,
+  getLibraryScopeForUser,
+  libraryScopeSql,
+} from '@aperture/core'
 
 export async function registerMovieHandlers(fastify: FastifyInstance) {
   /**
@@ -79,7 +85,7 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
                   'year', m.year,
                   'poster_url', m.poster_url,
                   'genres', m.genres,
-                  'community_rating', m.community_rating,
+                  'community_rating', ${displayRatingSql('m')},
                   'overview', m.overview,
                   'runtime_minutes', m.runtime_minutes,
                   'tmdb_id', m.tmdb_id

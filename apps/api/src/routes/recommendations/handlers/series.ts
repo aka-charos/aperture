@@ -18,7 +18,13 @@ import { resolveTwinDonor, resolveTwinShared, twinCameClose } from '../../../lib
 import { publicScoreBreakdown } from '../../../lib/scoreBreakdown.js'
 import { withInterestEvidenceOnRead } from '../../../lib/interestEvidenceOnRead.js'
 import type { SeriesRecommendationCandidate, RecommendationRun } from '../types.js'
-import { WATCH_HISTORY_TASTE_SQL, binderFor, getLibraryScopeForUser, libraryScopeSql } from '@aperture/core'
+import {
+  WATCH_HISTORY_TASTE_SQL,
+  binderFor,
+  displayRatingSql,
+  getLibraryScopeForUser,
+  libraryScopeSql,
+} from '@aperture/core'
 
 export async function registerSeriesHandlers(fastify: FastifyInstance) {
   /**
@@ -76,7 +82,7 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
                   'year', s.year,
                   'poster_url', s.poster_url,
                   'genres', s.genres,
-                  'community_rating', s.community_rating,
+                  'community_rating', ${displayRatingSql('s')},
                   'overview', s.overview,
                   'total_seasons', s.total_seasons,
                   'total_episodes', s.total_episodes,

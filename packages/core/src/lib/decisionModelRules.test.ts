@@ -11,8 +11,10 @@ import {
   parseDecisionCatalog,
   readNoul,
   readSystemOneUsage,
+  retryCatalogUnfiltered,
   sanitizeDecisionModelConfig,
   systemOneUrl,
+  unfilteredModelsUrlFor,
   type SystemOneUsage,
 } from './decisionModelRules.js'
 
@@ -57,6 +59,16 @@ test('a self-hosted URL is accepted as root, /v1 or the full endpoint', () => {
     modelsUrlFor('http://localhost:8009'),
     'http://localhost:8009/v1/models?output_modalities=decisions'
   )
+  assert.equal(unfilteredModelsUrlFor('http://localhost:8009'), 'http://localhost:8009/v1/models')
+})
+
+test('only a refusal of the request is asked again without the modality filter', () => {
+  assert.equal(retryCatalogUnfiltered(400), true)
+  assert.equal(retryCatalogUnfiltered(422), true)
+  // These would answer the bare list the same way, so asking again only waits twice.
+  for (const status of [200, 401, 403, 404, 500, 503]) {
+    assert.equal(retryCatalogUnfiltered(status), false, String(status))
+  }
 })
 
 test('anything that is not an http URL has no endpoint', () => {

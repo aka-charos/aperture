@@ -1393,7 +1393,8 @@
     "savedKeyRemoved": "Saved API key removed. Requests now go without one.",
     "removeSavedKeyFailed": "Could not remove the saved API key.",
     "unslothTunnelNote": "Unsloth's --secure address (a Cloudflare quick tunnel) does not carry streamed replies, and title analysis streams. Reach Unsloth directly, over your network or Tailscale, for that role.",
-    "testNeedsModel": "This server does not publish an LM Studio model list, which is normal for most OpenAI-compatible servers. Choose or add a model and test again."
+    "testNeedsModel": "This server does not publish an LM Studio model list, which is normal for most OpenAI-compatible servers. Choose or add a model and test again.",
+    "unslothServerSummaryNoVersion": "Unsloth Studio answered: {{total}} models downloaded ({{language}} language)."
   },
   "aiCapability": {
     "configure": "Configureer",

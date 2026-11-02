@@ -11,4 +11,5 @@
 export * from './types.js'
 export * from './provider.js'
 export * from './enrichment.js'
+export * from './rules.js'
 

@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { query } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import type { ToolContext } from '../types.js'
-import { WATCH_HISTORY_PLAYED_SQL, binderFor, libraryScopeSql } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, binderFor, displayRatingSql, libraryScopeSql } from '@aperture/core'
 
 export function createDiscoveryTools(ctx: ToolContext) {
   return {
@@ -139,7 +139,7 @@ export function createDiscoveryTools(ctx: ToolContext) {
              m.collection_name,
              COUNT(m.id)::text as movie_count,
              COUNT(wh.id)::text as watched_count,
-             ROUND(AVG(m.community_rating)::numeric, 1) as avg_rating,
+             ROUND(AVG(${displayRatingSql('m')})::numeric, 1) as avg_rating,
              ARRAY_AGG(m.title ORDER BY m.year) as movies,
              ARRAY_AGG(m.year ORDER BY m.year) as years
            FROM movies m
@@ -437,7 +437,7 @@ export function createDiscoveryTools(ctx: ToolContext) {
         }>(
           `SELECT 
              m.id, m.title, m.year, m.poster_url, m.provider_item_id, 
-             m.community_rating, m.rt_critic_score,
+             ${displayRatingSql('m')} AS community_rating, m.rt_critic_score,
              CASE WHEN wh.id IS NOT NULL THEN true ELSE false END as watched
            FROM movies m
            LEFT JOIN watch_history wh ON wh.movie_id = m.id AND wh.user_id = $1

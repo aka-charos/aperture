@@ -64,7 +64,7 @@ A pie chart splitting your watch time between movies and TV. TV time is estimate
 
 How the crowd rates what you watch:
 
-- **Avg community rating** — the average score critics/community give to the movies you watch
+- **Avg rating** — the average rating of the movies you watch (IMDb with critic scores, the number title pages show)
 - **Rating distribution** — a histogram of those ratings, bucketed by half-point ("Rated 7.5")
 - **Guilty pleasures** — genres you watch a lot that critics rate below your average
 

@@ -11,6 +11,7 @@ import type { FastifyInstance } from 'fastify'
 import {
   batchGetSeerrMediaStatus,
   classifyCollectionPart,
+  displayRatingSql,
   getCollectionDataCached,
   getImageUrl,
   isSeerrConfigured,
@@ -98,7 +99,7 @@ export function registerFranchiseDetailHandler(fastify: FastifyInstance) {
       const libraryParams: unknown[] = [user.id, partTmdbIds, String(collectionId)]
       const inScope = scopeClause(await viewerScope(request), 'm', libraryParams)
       const libraryResult = await query<LibraryRow>(
-        `SELECT m.id, m.tmdb_id, m.title, m.year, m.poster_url, m.community_rating,
+        `SELECT m.id, m.tmdb_id, m.title, m.year, m.poster_url, ${displayRatingSql('m')} AS community_rating,
                 m.collection_name, (wh.id IS NOT NULL) AS watched
          FROM movies m
          LEFT JOIN watch_history wh

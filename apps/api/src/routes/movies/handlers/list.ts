@@ -4,7 +4,7 @@
  * GET /api/movies - List all movies with pagination, filtering, and sorting
  */
 import type { FastifyInstance } from 'fastify'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, displayRatingSql } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
@@ -129,7 +129,7 @@ export function registerListHandler(fastify: FastifyInstance) {
         const rating = parseFloat(minCommunityRating)
         if (!isNaN(rating)) {
           whereClause += whereClause ? ' AND ' : ' WHERE '
-          whereClause += `community_rating >= $${paramIndex++}`
+          whereClause += `${displayRatingSql()} >= $${paramIndex++}`
           params.push(rating)
         }
       }
@@ -246,7 +246,7 @@ export function registerListHandler(fastify: FastifyInstance) {
           orderClause = `premiere_date ${order} ${nullsPosition}, title ASC`
           break
         case 'rating':
-          orderClause = `community_rating ${order} ${nullsPosition}, title ASC`
+          orderClause = `${displayRatingSql()} ${order} ${nullsPosition}, title ASC`
           break
         case 'rtScore':
           orderClause = `rt_critic_score ${order} ${nullsPosition}, title ASC`
@@ -268,7 +268,7 @@ export function registerListHandler(fastify: FastifyInstance) {
       params.push(pageSize, offset)
       const result = await query<MovieRow>(
         `SELECT id, provider_item_id, title, original_title, year, genres, overview,
-                community_rating, runtime_minutes, poster_url, backdrop_url, created_at, updated_at,
+                ${displayRatingSql()} AS community_rating, runtime_minutes, poster_url, backdrop_url, created_at, updated_at,
                 rt_critic_score, awards_summary
          FROM movies${whereClause}
          ORDER BY ${orderClause}

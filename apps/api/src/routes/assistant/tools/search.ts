@@ -4,7 +4,13 @@
 import { tool } from 'ai'
 import { nullSafe } from './utils.js'
 import { z } from 'zod'
-import { getActiveEmbeddingTableName, binderFor, libraryScopeSql, scopedAnnQuery } from '@aperture/core'
+import {
+  getActiveEmbeddingTableName,
+  binderFor,
+  displayRatingSql,
+  libraryScopeSql,
+  scopedAnnQuery,
+} from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import { annotateWatchedItems } from '../helpers/unwatched.js'
@@ -249,7 +255,7 @@ export async function findSimilarItems(
       : [movie.id, modelId, embeddingStr, limit]
 
     const similar = await scopedAnnQuery<MovieResult & { provider_item_id?: string }>(
-      `SELECT m.id, m.title, m.year, m.genres, m.overview, m.community_rating, m.poster_url, m.provider_item_id, m.directors
+      `SELECT m.id, m.title, m.year, m.genres, m.overview, ${displayRatingSql('m')} AS community_rating, m.poster_url, m.provider_item_id, m.directors
        FROM ${movieEmbeddingTable} e JOIN movies m ON m.id = e.movie_id
        WHERE e.movie_id != $1 AND e.model = $2 ${watchedFilter}
          AND ${libraryScopeSql(ctx.scope, 'm', binderFor(params))}
@@ -283,7 +289,7 @@ export async function findSimilarItems(
       : [series.id, modelId, embeddingStr, limit]
 
     const similar = await scopedAnnQuery<SeriesResult & { provider_item_id?: string }>(
-      `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, s.community_rating, s.poster_url, s.provider_item_id, s.directors
+      `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, ${displayRatingSql('s')} AS community_rating, s.poster_url, s.provider_item_id, s.directors
        FROM ${seriesEmbeddingTable} se
        JOIN series s ON s.id = se.series_id
        WHERE se.series_id != $1
@@ -470,12 +476,12 @@ export function createSearchTools(ctx: ToolContext) {
             idx++
           }
           if (minRating) {
-            conditions.push(`community_rating >= $${idx}`)
+            conditions.push(`${displayRatingSql()} >= $${idx}`)
             values.push(minRating)
             idx++
           }
           if (maxRating) {
-            conditions.push(`community_rating <= $${idx}`)
+            conditions.push(`${displayRatingSql()} <= $${idx}`)
             values.push(maxRating)
             idx++
           }
@@ -568,19 +574,19 @@ export function createSearchTools(ctx: ToolContext) {
         // Sort column mapping
         const sortColumn =
           {
-            rating: 'community_rating',
+            rating: displayRatingSql(),
             year: 'year',
             title: 'title',
             runtime: 'runtime_minutes',
             critic_rating: 'critic_rating',
-          }[sortBy] || 'community_rating'
+          }[sortBy] || displayRatingSql()
         const order = sortOrder === 'asc' ? 'ASC' : 'DESC'
         const nullsOrder = sortOrder === 'asc' ? 'NULLS FIRST' : 'NULLS LAST'
 
         if (type === 'movies' || type === 'both') {
           const { whereClause, values, limitIdx } = buildWhere(true)
           const movieResult = await query<MovieResult & { provider_item_id?: string }>(
-            `SELECT id, title, year, genres, overview, community_rating, poster_url, provider_item_id, directors
+            `SELECT id, title, year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url, provider_item_id, directors
              FROM movies ${whereClause}
              ORDER BY ${sortColumn} ${order} ${nullsOrder} LIMIT $${limitIdx}`,
             values
@@ -600,9 +606,9 @@ export function createSearchTools(ctx: ToolContext) {
         if (type === 'series' || type === 'both') {
           const { whereClause, values, limitIdx } = buildWhere(false)
           const seriesResult = await query<SeriesResult & { provider_item_id?: string }>(
-            `SELECT id, title, year, genres, network, overview, community_rating, poster_url, provider_item_id, directors
+            `SELECT id, title, year, genres, network, overview, ${displayRatingSql()} AS community_rating, poster_url, provider_item_id, directors
              FROM series ${whereClause}
-             ORDER BY ${sortColumn !== 'runtime_minutes' ? sortColumn : 'community_rating'} ${order} ${nullsOrder} LIMIT $${limitIdx}`,
+             ORDER BY ${sortColumn !== 'runtime_minutes' ? sortColumn : displayRatingSql()} ${order} ${nullsOrder} LIMIT $${limitIdx}`,
             values
           )
 
@@ -767,7 +773,7 @@ export function createSearchTools(ctx: ToolContext) {
             const movieResults = await scopedAnnQuery<
               MovieResult & { provider_item_id?: string; similarity: number }
             >(
-              `SELECT m.id, m.title, m.year, m.genres, m.overview, m.community_rating, m.poster_url, m.provider_item_id, m.directors,
+              `SELECT m.id, m.title, m.year, m.genres, m.overview, ${displayRatingSql('m')} AS community_rating, m.poster_url, m.provider_item_id, m.directors,
                       1 - (e.embedding <=> $1::halfvec) as similarity
                FROM ${movieTableName} e
                JOIN movies m ON m.id = e.movie_id
@@ -796,7 +802,7 @@ export function createSearchTools(ctx: ToolContext) {
             const seriesResults = await scopedAnnQuery<
               SeriesResult & { provider_item_id?: string; similarity: number }
             >(
-              `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, s.community_rating, s.poster_url, s.provider_item_id, s.directors,
+              `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, ${displayRatingSql('s')} AS community_rating, s.poster_url, s.provider_item_id, s.directors,
                       1 - (se.embedding <=> $1::halfvec) as similarity
                FROM ${seriesTableName} se
                JOIN series s ON s.id = se.series_id

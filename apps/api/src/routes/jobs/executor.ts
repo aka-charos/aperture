@@ -886,7 +886,9 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
             moviesEnriched: result.moviesEnriched,
             seriesEnriched: result.seriesEnriched,
           },
-          `✅ MDBList enrichment complete`
+          // Not "complete": a run MDBList stopped answering fails its own job
+          // and still returns, so what it wrote is rated below (F-171).
+          `MDBList enrichment finished`
         )
         // MDBList writes RT and Metacritic (F-167).
         await refreshQualityRatingsSafely('movie')

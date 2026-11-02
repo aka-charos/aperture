@@ -20,6 +20,8 @@
  * tie-break among titles that contain all of it.
  */
 
+import { displayRatingSql } from '@aperture/core'
+
 /**
  * A long paste should not become a long AND chain: every extra term is another
  * condition a title must satisfy, and past a dozen words the full-text half has
@@ -90,6 +92,15 @@ export const SEMANTIC_BLEND = { lexical: 0.6, semantic: 0.4 } as const
  */
 export function semanticPoolSize(limit: number): number {
   return Math.min(Math.max(limit * 4, 100), 400)
+}
+
+/**
+ * A column of the search row as selected. The rating is the one a title SHOWS
+ * (core displayRatingSql, F-167), kept under its old name so the response
+ * shape is unchanged.
+ */
+function projectColumn(col: string): string {
+  return col === 'community_rating' ? `${displayRatingSql('t')} AS community_rating` : `t.${col}`
 }
 
 /** Columns every search row returns, beyond the per-table extra. */
@@ -253,7 +264,7 @@ export function buildLexicalSearchSql(input: TitleSearchSqlInput): string {
             + ${w.prefix}::float8 * s.prefix
             + ${w.exact}::float8 * s.exact)::float8 AS lexical_score
     FROM (
-      SELECT ${columns.map((col) => `t.${col}`).join(', ')},
+      SELECT ${columns.map(projectColumn).join(', ')},
              COALESCE(ts_rank(t.search_vector, to_tsquery('english', ${tsq})), 0)::float8 AS text_rank,
              ${best((k) => `word_similarity(${key}, ${k})`)}::float8 AS coverage,
              ${best((k) => `similarity(${key}, ${k})`)}::float8 AS closeness,
