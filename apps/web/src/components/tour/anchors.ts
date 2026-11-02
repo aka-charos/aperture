@@ -16,6 +16,15 @@ export function findTourAnchor(anchor: string): HTMLElement | null {
   return null
 }
 
+/**
+ * Some element carries the anchor, showing or not: a sidebar item inside the
+ * phone's closed menu. Tells "there but hidden" (point somewhere else now)
+ * from "not mounted yet" (wait for it).
+ */
+export function tourAnchorMounted(anchor: string): boolean {
+  return document.querySelector(`[data-tour="${CSS.escape(anchor)}"]`) !== null
+}
+
 function isShowing(node: HTMLElement): boolean {
   const box = node.getBoundingClientRect()
   if (box.width <= 0 || box.height <= 0) return false

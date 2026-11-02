@@ -57,7 +57,8 @@
     "sharedWithMeBadge_few": "{{count}} ترشيحات جديدة",
     "sharedWithMeBadge_many": "{{count}} ترشيحًا جديدًا",
     "userMenu": "Account menu",
-    "nextFromHere": "Next from here"
+    "nextFromHere": "Next from here",
+    "openMenu": "Open menu"
   },
   "admin": {
     "title": "الإدارة",
@@ -6538,7 +6539,8 @@
       "howPicksAreMade": "How picks are made",
       "showMeAround": "Show me around",
       "keysMove": "to move",
-      "keysClose": "to close"
+      "keysClose": "to close",
+      "inMenu": "You will find it in the menu: tap ☰ at the top."
     },
     "tours": {
       "welcome": {

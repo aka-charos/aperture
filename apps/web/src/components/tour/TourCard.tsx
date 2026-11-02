@@ -29,6 +29,7 @@ import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded'
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded'
 import { stepItemKey, stepKey, type TourIcon, type TourId, type TourStep } from './tours'
 import { IconTile } from './IconTile'
+import { DOCK_EDGE_GAP, DOCK_FREE_SHARE } from './tourLayout'
 
 const ICONS: Record<TourIcon, typeof AutoAwesomeIcon> = {
   sparkle: AutoAwesomeIcon,
@@ -73,6 +74,27 @@ interface CardProps {
   onExplainer?: () => void
   /** The pointer toward the element, when the card sits beside one. */
   arrow?: ReactElement
+  /**
+   * Docked to an edge of a phone's screen (`tourLayout.ts`): as wide as the
+   * screen allows and never taller than half of it, scrolling inside, so the
+   * element it describes keeps the other half.
+   */
+  docked?: boolean
+  /**
+   * The step points at the menu button because its element is inside the
+   * closed menu: the card says where to find it.
+   */
+  inMenu?: boolean
+}
+
+/**
+ * A docked card's height cap: the share of the screen the element does not
+ * get (tourLayout.ts), less the gap and the safe areas, so the card ends where
+ * the element's half begins. dvh where the browser has it: on a phone vh is
+ * the height with the toolbars hidden, taller than what is showing.
+ */
+function dockedMaxHeight(unit: 'vh' | 'dvh'): string {
+  return `calc(${(1 - DOCK_FREE_SHARE) * 100}${unit} - ${DOCK_EDGE_GAP}px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))`
 }
 
 /** Forward arrows point the reading direction. */
@@ -132,9 +154,14 @@ export const StepCard = forwardRef<HTMLDivElement, CardProps>(function StepCard(
       onKeyDown={props.onKeyDown}
       sx={{
         ...cardSx,
-        width: 'min(392px, calc(100vw - 32px))',
+        width: props.docked ? '100%' : 'min(392px, calc(100vw - 32px))',
+        ...(props.docked && {
+          maxHeight: dockedMaxHeight('vh'),
+          '@supports (height: 1dvh)': { maxHeight: dockedMaxHeight('dvh') },
+          overflowY: 'auto',
+        }),
         borderRadius: 4,
-        p: 2.75,
+        p: props.docked ? 2.25 : 2.75,
         pb: 2,
         display: 'flex',
         flexDirection: 'column',
@@ -165,6 +192,11 @@ export const StepCard = forwardRef<HTMLDivElement, CardProps>(function StepCard(
         <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
           {t(stepKey(tour, step.id, 'body'))}
         </Typography>
+        {props.inMenu && (
+          <Typography variant="body2" sx={{ lineHeight: 1.6, color: 'primary.light', fontWeight: 500 }}>
+            {t('onboarding.tour.inMenu')}
+          </Typography>
+        )}
         {step.items && (
           <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
             {step.items.map((item) => (

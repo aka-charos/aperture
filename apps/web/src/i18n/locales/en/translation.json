@@ -53,6 +53,7 @@
     "sharedWithMeBadge_one": "{{count}} new recommendation",
     "sharedWithMeBadge_other": "{{count}} new recommendations",
     "userMenu": "Account menu",
+    "openMenu": "Open menu",
     "nextFromHere": "Next from here"
   },
   "admin": {
@@ -6469,6 +6470,7 @@
       "back": "Back",
       "readMore": "Read more",
       "howPicksAreMade": "How picks are made",
+      "inMenu": "You will find it in the menu: tap ☰ at the top.",
       "showMeAround": "Show me around",
       "keysMove": "to move",
       "keysClose": "to close"

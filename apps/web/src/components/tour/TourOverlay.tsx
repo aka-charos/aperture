@@ -12,9 +12,10 @@ import {
 import { useUserHelp } from '@/hooks/useUserHelp'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import { useTour } from '@/hooks/useTour'
-import { type TourPlacement } from './tours'
+import { type TourPlacement, type TourStep } from './tours'
 import { CARD_SURFACE, StepCard, WelcomeCard } from './TourCard'
-import { findTourAnchor } from './anchors'
+import { findTourAnchor, tourAnchorMounted } from './anchors'
+import { DOCK_EDGE_GAP, DOCK_SCROLL_GAP, dockEdge, dockLanding, dockScrollOffset, type DockEdge } from './tourLayout'
 
 /** Space between the element and the edge of the light around it. */
 const SPOTLIGHT_PADDING = 6
@@ -30,6 +31,32 @@ interface Rect {
   left: number
   width: number
   height: number
+}
+
+/**
+ * Where the fixed app bar (and the "viewing as" banner) ends, as Layout
+ * publishes it: an element scrolled up stops below it. Read off the element,
+ * because the property is set on the layout and inherited; something drawn
+ * outside it (a dialog) has no app bar over it and reads 0.
+ */
+function chromeBottom(element: HTMLElement): number {
+  const value = parseFloat(getComputedStyle(element).getPropertyValue('--aperture-chrome-top'))
+  return Number.isFinite(value) ? value : 0
+}
+
+/** How far the page itself can still scroll up and down. */
+function scrollRoom() {
+  const page = document.scrollingElement ?? document.documentElement
+  return { up: page.scrollTop, down: Math.max(0, page.scrollHeight - page.clientHeight - page.scrollTop) }
+}
+
+/** The element, or something holding it, stays put while the page scrolls. */
+function isFixed(element: HTMLElement): boolean {
+  for (let node: HTMLElement | null = element; node && node !== document.body; node = node.parentElement) {
+    const position = getComputedStyle(node).position
+    if (position === 'fixed' || position === 'sticky') return true
+  }
+  return false
 }
 
 function sameRect(a: Rect | null, b: Rect | null): boolean {
@@ -80,6 +107,18 @@ export function TourOverlay() {
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
   // Keyboard hints only where there is likely a keyboard.
   const finePointer = useMediaQuery('(hover: hover) and (pointer: fine)')
+  // A phone has no room beside anything: the card docks to an edge instead
+  // (tourLayout.ts).
+  const docked = useMediaQuery(theme.breakpoints.down('sm'))
+  const [edge, setEdge] = useState<DockEdge>('bottom')
+  /** The step is pointing at its fallback (the menu button), not its own element. */
+  const [viaFallback, setViaFallback] = useState(false)
+  /**
+   * The step whose element has been scrolled to. Once per step: finding the
+   * element again (the help drawer closed, the phone turned and crossed the
+   * breakpoint) must not scroll the page out from under the reader.
+   */
+  const scrolledStep = useRef<TourStep | null>(null)
   const [arrowEl, setArrowEl] = useState<HTMLElement | null>(null)
   const rtl = theme.direction === 'rtl'
   const titleId = useId()
@@ -100,6 +139,7 @@ export function TourOverlay() {
   useEffect(() => {
     if (!active) {
       startPath.current = null
+      scrolledStep.current = null
       return
     }
     if (startPath.current === null) startPath.current = location.pathname
@@ -116,8 +156,10 @@ export function TourOverlay() {
   useEffect(() => {
     setRect(null)
     setSettled(false)
+    setViaFallback(false)
     if (!step || hidden) return
     const anchor = step.anchor
+    const fallbackAnchor = step.fallbackAnchor
     if (!anchor) {
       setSettled(true)
       return
@@ -125,7 +167,6 @@ export function TourOverlay() {
     let frame = 0
     let element: HTMLElement | null = null
     let observer: ResizeObserver | null = null
-    let scrolled = false
     let last: Rect | null = null
 
     function clearRect() {
@@ -164,14 +205,29 @@ export function TourOverlay() {
       frame = requestAnimationFrame(measure)
     }
 
-    function attach(found: HTMLElement) {
+    function attach(found: HTMLElement, fallback: boolean) {
       element = found
-      if (!scrolled) {
-        scrolled = true
-        const box = found.getBoundingClientRect()
-        if (box.top < 0 || box.bottom > window.innerHeight) {
-          found.scrollIntoView({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' })
+      setViaFallback(fallback)
+      const box = found.getBoundingClientRect()
+      const scroll = scrolledStep.current !== step
+      scrolledStep.current = step
+      const behavior = reducedMotion ? 'auto' : 'smooth'
+      if (docked) {
+        // Into the half the docked card leaves free, just under the app bar,
+        // with the card on the edge decided by where the element lands
+        // (dockEdge), which is only as far as the page can actually scroll.
+        const chrome = chromeBottom(found)
+        const offset = scroll ? dockScrollOffset(box, window.innerHeight, chrome, isFixed(found)) : null
+        const landing = dockLanding(box, offset, scrollRoom())
+        if (offset != null) {
+          const margin = found.style.scrollMarginTop
+          found.style.scrollMarginTop = `${chrome + DOCK_SCROLL_GAP}px`
+          found.scrollIntoView({ block: 'start', behavior })
+          found.style.scrollMarginTop = margin
         }
+        setEdge(dockEdge(landing, window.innerHeight, chrome))
+      } else if (scroll && (box.top < 0 || box.bottom > window.innerHeight)) {
+        found.scrollIntoView({ block: 'center', behavior })
       }
       observer = new ResizeObserver(onMove)
       observer.observe(found)
@@ -187,11 +243,22 @@ export function TourOverlay() {
       const tick = () => {
         const found = findTourAnchor(anchor!)
         if (found) {
-          attach(found)
+          attach(found, false)
           return
         }
+        const waited = performance.now() - started > ANCHOR_WAIT_MS
+        // The fallback only once the element is known to be hidden (mounted
+        // in the closed menu) or never came: an element that is merely late
+        // (a lazy section) still wins.
+        if (fallbackAnchor && (waited || tourAnchorMounted(anchor!))) {
+          const instead = findTourAnchor(fallbackAnchor)
+          if (instead) {
+            attach(instead, true)
+            return
+          }
+        }
         // Gave up: the step shows centred, with the same words.
-        if (performance.now() - started > ANCHOR_WAIT_MS) {
+        if (waited) {
           setSettled(true)
           return
         }
@@ -205,7 +272,7 @@ export function TourOverlay() {
       cancelAnimationFrame(frame)
       detach()
     }
-  }, [step, hidden, reducedMotion])
+  }, [step, hidden, reducedMotion, docked])
 
   // The card takes focus on every step, so a screen reader reads the step and
   // the keyboard is already inside it.
@@ -309,8 +376,9 @@ export function TourOverlay() {
   }
 
   // The pointer sits on the card's edge facing the element: the arrow
-  // modifier places it along that edge, the placement says which edge.
-  const arrow = spotlight ? (
+  // modifier places it along that edge, the placement says which edge. A
+  // docked card is not beside the element, so it has none.
+  const arrow = spotlight && !docked ? (
     <Box
       ref={setArrowEl}
       className="tour-arrow"
@@ -334,7 +402,13 @@ export function TourOverlay() {
     </FocusTrap>
   ) : (
     <FocusTrap open isEnabled={() => true}>
-      <StepCard ref={cardRef} {...common} arrow={arrow} />
+      <StepCard
+        ref={cardRef}
+        {...common}
+        arrow={arrow}
+        docked={docked && Boolean(spotlight)}
+        inMenu={viaFallback && Boolean(spotlight)}
+      />
     </FocusTrap>
   )
 
@@ -381,7 +455,21 @@ export function TourOverlay() {
         )}
       </Box>
 
-      {spotlight ? (
+      {spotlight && docked ? (
+        <Box
+          sx={{
+            position: 'fixed',
+            left: DOCK_EDGE_GAP,
+            right: DOCK_EDGE_GAP,
+            zIndex: zIndex + 1,
+            ...(edge === 'bottom'
+              ? { bottom: `calc(${DOCK_EDGE_GAP}px + env(safe-area-inset-bottom, 0px))` }
+              : { top: `calc(${DOCK_EDGE_GAP}px + env(safe-area-inset-top, 0px))` }),
+          }}
+        >
+          {card}
+        </Box>
+      ) : spotlight ? (
         <Popper
           open
           anchorEl={virtualAnchor}
