@@ -18,6 +18,20 @@ const CORE_SRC = join(fileURLToPath(new URL('.', import.meta.url)), '..')
 /** Where the function is defined, not called. */
 const DEFINITION = ['recommender', 'shared', 'scoring.ts'].join(sep)
 
+/**
+ * Whether a call's argument is the unified rating: scoringRating(...) itself,
+ * or a name (`scoredRating`, `candidate.scoredRating`) the same file assigns
+ * straight from scoringRating(. The scorers keep the rating as well as the
+ * score (recommendation_candidates.scored_rating, 0216), so they hold it in a
+ * name first; anything else assigned to that name is still an offender.
+ */
+function fedByScoringRating(source: string, argument: string | undefined): boolean {
+  if (argument === 'scoringRating') return true
+  if (!argument) return false
+  const name = argument.replace(/[.$]/g, '\\$&')
+  return new RegExp(`(?:^|[^\\w$.])${name}\\s*=\\s*scoringRating\\(`).test(source)
+}
+
 test('every calculateRatingScore call scores the unified rating', () => {
   const offenders: string[] = []
   let calls = 0
@@ -25,9 +39,9 @@ test('every calculateRatingScore call scores the unified rating', () => {
     const rel = relative(CORE_SRC, file)
     if (rel.endsWith('.test.ts') || rel === DEFINITION) continue
     const source = stripComments(readFileSync(file, 'utf8'))
-    for (const match of source.matchAll(/calculateRatingScore\(\s*([A-Za-z_$][\w$]*)?/g)) {
+    for (const match of source.matchAll(/calculateRatingScore\(\s*([A-Za-z_$][\w$.]*)?/g)) {
       calls++
-      if (match[1] !== 'scoringRating') offenders.push(`${rel}: calculateRatingScore(${match[1] ?? '...'}`)
+      if (!fedByScoringRating(source, match[1])) offenders.push(`${rel}: calculateRatingScore(${match[1] ?? '...'}`)
     }
   }
   assert.deepEqual(offenders, [])

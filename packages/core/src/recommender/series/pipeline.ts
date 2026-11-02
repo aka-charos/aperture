@@ -150,6 +150,12 @@ export interface SeriesCandidate {
   normalizedSimilarity: number
   novelty: number
   ratingScore: number
+  /**
+   * The rating ratingScore was computed from (scoringRating); null when the
+   * title had none and scored the neutral default. Stored (0216) so the
+   * insights panel can name it after the title's rating moves.
+   */
+  scoredRating?: number | null
   /** Raw rating, kept beside ratingScore for the acclaimed-slot gate. */
   communityRating?: number | null
   /**
@@ -558,24 +564,23 @@ async function scoreSeriesCandidates(
   // novelty gain is a property of the pool -- it needs every candidate's
   // novelty before any candidate's final score can be computed. Mirrors
   // movies/scoring.ts.
-  const scored = candidates.map((candidate) => ({
-    ...candidate,
-    ratingScore: calculateRatingScore(
-      scoringRating(
-        rowsById.get(candidate.seriesId)?.quality_rating,
-        rowsById.get(candidate.seriesId)?.quality_rating_sources,
-        rowsById.get(candidate.seriesId)?.community_rating
-      )
-    ),
-    communityRating: ratingsMap.get(candidate.seriesId) ?? null,
-    voteCount: votesMap.get(candidate.seriesId) ?? null,
-    // Use shared novelty score calculation (handles missing genres). The genre
-    // baseline now comes from the user's whole history rather than the
-    // recentWatchLimit slice this used to query for itself.
-    novelty: calculateGenreNoveltyScore(candidate.genres, genreFamiliarity),
-    // Raw similarity stays untouched for evidence, explanations and storage.
-    normalizedSimilarity: normalizeSimilarity(candidate.similarity, similarityScale),
-  }))
+  const scored = candidates.map((candidate) => {
+    const row = rowsById.get(candidate.seriesId)
+    const scoredRating = scoringRating(row?.quality_rating, row?.quality_rating_sources, row?.community_rating)
+    return {
+      ...candidate,
+      scoredRating,
+      ratingScore: calculateRatingScore(scoredRating),
+      communityRating: ratingsMap.get(candidate.seriesId) ?? null,
+      voteCount: votesMap.get(candidate.seriesId) ?? null,
+      // Use shared novelty score calculation (handles missing genres). The genre
+      // baseline now comes from the user's whole history rather than the
+      // recentWatchLimit slice this used to query for itself.
+      novelty: calculateGenreNoveltyScore(candidate.genres, genreFamiliarity),
+      // Raw similarity stays untouched for evidence, explanations and storage.
+      normalizedSimilarity: normalizeSimilarity(candidate.similarity, similarityScale),
+    }
+  })
 
   const weights = effectiveBlendWeights(config, spreadOf(scored.map((c) => c.novelty)))
 
@@ -692,6 +697,8 @@ async function storeSeriesCandidates(
       normalizedSimilarity: candidate.normalizedSimilarity,
       novelty: candidate.novelty,
       ratingScore: candidate.ratingScore,
+      // The rating that score was computed from (0216); see storage.ts.
+      scoredRating: candidate.scoredRating ?? null,
       // null when the selector never ranked this row, so a slot filler and a
       // scored-but-unpicked title stop reporting a measured-looking 0% variety.
       // See measuredDiversity in ../storage.ts for the full reasoning.
@@ -751,18 +758,19 @@ async function storeSeriesCandidates(
   await query(
     `INSERT INTO recommendation_candidates (
        run_id, series_id, rank, similarity_score, normalized_similarity, novelty_score, rating_score,
-       diversity_score, final_score, base_score, is_selected, selected_rank, score_breakdown
+       scored_rating, diversity_score, final_score, base_score, is_selected, selected_rank, score_breakdown
      )
      SELECT $1, series_id, rank, similarity_score, normalized_similarity, novelty_score, rating_score,
-            diversity_score, final_score, base_score, is_selected, selected_rank,
+            scored_rating, diversity_score, final_score, base_score, is_selected, selected_rank,
             -- qualified: score_breakdown is also the name of the target
             -- column, and t. leaves nothing resting on scoping rules
             COALESCE(t.score_breakdown, '{}'::jsonb)
      FROM unnest(
        $2::uuid[], $3::int[], $4::real[], $5::real[], $6::real[], $7::real[],
-       $8::real[], $9::real[], $10::real[], $11::boolean[], $12::int[], $13::jsonb[]
+       $8::real[], $9::real[], $10::real[], $11::boolean[], $12::int[], $13::jsonb[], $14::float8[]
      ) AS t(series_id, rank, similarity_score, normalized_similarity, novelty_score, rating_score,
-            diversity_score, final_score, base_score, is_selected, selected_rank, score_breakdown)`,
+            diversity_score, final_score, base_score, is_selected, selected_rank, score_breakdown,
+            scored_rating)`,
     [
       runId,
       data.map((d) => d.seriesId),
@@ -777,6 +785,7 @@ async function storeSeriesCandidates(
       data.map((d) => d.isSelected),
       data.map((d) => d.selectedRank),
       data.map((d) => d.scoreBreakdown),
+      data.map((d) => d.scoredRating),
     ]
   )
 }

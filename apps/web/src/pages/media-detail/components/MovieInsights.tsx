@@ -31,6 +31,7 @@ import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 import { insightsHaveDetail } from '../helpers'
 import { buildClosestRow, twinMarking } from '../closestRow'
 import { readInterestPick } from '../interestPick'
+import { formatRating, qualityCaption } from '../qualityCaption'
 import type { RecommendationInsights, MediaType } from '../types'
 import { HelpHint } from '@/components/HelpHint'
 
@@ -395,27 +396,14 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
   // Quality says which rating it is: the stored score is what the title's
   // rating gave when the run scored it, which is not always the headline at
   // the top of the page. The server decides which (qualityBasis); the panel
-  // only words it. One decimal, as the headline prints it.
-  const basis = insights.qualityBasis
-  const ratingText = (value: number) => value.toFixed(1)
-  const qualityFrom = !basis?.current
-    ? null
-    : basis.rating != null
-      ? t('mediaDetail.insights.qualityFrom', { rating: ratingText(basis.rating) })
-      : t('mediaDetail.insights.qualityUnrated')
-  const qualityNote =
-    !basis || basis.current
-      ? undefined
-      : basis.rating == null
-        ? basis.scoredRating != null
-          ? t('mediaDetail.insights.qualityScoredOnOnly', { scored: ratingText(basis.scoredRating) })
-          : undefined
-        : basis.scoredRating != null
-          ? t('mediaDetail.insights.qualityScoredOn', {
-              scored: ratingText(basis.scoredRating),
-              rating: ratingText(basis.rating),
-            })
-          : t('mediaDetail.insights.qualityScoredOnUnknown', { rating: ratingText(basis.rating) })
+  // only words it (qualityCaption.ts).
+  const qualityText = qualityCaption(insights.qualityBasis)
+  const qualityFrom = qualityText.from
+    ? t(`mediaDetail.insights.${qualityText.from.key}`, qualityText.from.values)
+    : null
+  const qualityNote = qualityText.note
+    ? t(`mediaDetail.insights.${qualityText.note.key}`, qualityText.note.values)
+    : undefined
   // The curve's worked examples come from the server; an older API sends
   // none, and the tooltip then says what Quality is without them.
   const ratingExamples = insights.scoreScales?.rating ?? []
@@ -425,7 +413,10 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
       ? t('mediaDetail.insights.tooltipQualityScale', {
           examples: ratingExamples
             .map(({ rating, score }) =>
-              t('mediaDetail.insights.ratingScoreExample', { rating, pct: Math.round(score * 100) })
+              t('mediaDetail.insights.ratingScoreExample', {
+                rating: formatRating(rating),
+                pct: Math.round(score * 100),
+              })
             )
             .join(', '),
         })

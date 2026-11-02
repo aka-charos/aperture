@@ -288,6 +288,7 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         normalized_similarity: number | null
         novelty_score: number | null
         rating_score: number | null
+        scored_rating: number | string | null
         diversity_score: number | null
         base_score: number | null
         score_breakdown: Record<string, unknown>
@@ -295,7 +296,7 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
       }>(
         `SELECT rc.id, rc.rank, rc.is_selected, rc.final_score,
                 rc.similarity_score, rc.normalized_similarity, rc.novelty_score,
-                rc.rating_score, rc.diversity_score, rc.base_score,
+                rc.rating_score, rc.scored_rating, rc.diversity_score, rc.base_score,
                 rc.score_breakdown, rc.ai_explanation
          FROM recommendation_candidates rc
          WHERE rc.run_id = $1 AND rc.movie_id = $2`,
@@ -443,7 +444,7 @@ export async function registerMovieHandlers(fastify: FastifyInstance) {
         // Which rating the Quality score was computed from, and whether that is
         // still the title's rating (lib/qualityRating.ts). Absent when there is
         // no score or no title row.
-        ...qualityBasisField(candidate.rating_score, movie),
+        ...qualityBasisField(candidate, movie),
         // How much of the match each component carried. Null for runs written
         // before 0147, which is what the panel branches on to decide whether it
         // can state the arithmetic — the same rule it applies to base.

@@ -1376,7 +1376,7 @@
       "varietyExplainer": "How much this pick differs from the others chosen with it. This shapes the order of your list, not the match above.",
       "tooltipDiscovery": "How different this is from what you usually watch - helps you discover new things",
       "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%.",
-      "tooltipQuality": "This title's rating, the number at the top of the page, turned into a score: the better it is rated, the higher the score. The share under the bar is how much it counted toward this match.",
+      "tooltipQuality": "The rating this title had when your recommendations were made, turned into a score: the better it is rated, the higher the score. The line under the bar names that rating, and the share is how much it counted toward this match.",
       "tooltipQualityScale": "For example: {{examples}}.",
       "ratingScoreExample": "{{rating}} → {{pct}}%",
       "qualityFrom": "From rating {{rating}}",

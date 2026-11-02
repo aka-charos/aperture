@@ -205,6 +205,7 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         normalized_similarity: number | null
         novelty_score: number | null
         rating_score: number | null
+        scored_rating: number | string | null
         diversity_score: number | null
         base_score: number | null
         score_breakdown: Record<string, unknown>
@@ -212,7 +213,7 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
       }>(
         `SELECT rc.id, rc.rank, rc.is_selected, rc.final_score,
                 rc.similarity_score, rc.normalized_similarity, rc.novelty_score,
-                rc.rating_score, rc.diversity_score, rc.base_score,
+                rc.rating_score, rc.scored_rating, rc.diversity_score, rc.base_score,
                 rc.score_breakdown, rc.ai_explanation
          FROM recommendation_candidates rc
          WHERE rc.run_id = $1 AND rc.series_id = $2`,
@@ -341,7 +342,7 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
           rating: RATING_SCALE_EXAMPLES,
         },
         // See the movie handler.
-        ...qualityBasisField(candidate.rating_score, targetSeries),
+        ...qualityBasisField(candidate, targetSeries),
         // How much of the match each component carried. Null for runs written
         // before 0147, which is what the panel branches on to decide whether it
         // can state the arithmetic — the same rule it applies to base.

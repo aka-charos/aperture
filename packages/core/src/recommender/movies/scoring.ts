@@ -49,9 +49,12 @@ export function scoreCandidates(
   for (const candidate of candidates) {
     // The stored unified rating (refreshed IMDb plus critics, F-167); the
     // media server's own rating only for a film not computed yet.
-    candidate.ratingScore = calculateRatingScore(
-      scoringRating(candidate.qualityRating, candidate.qualityRatingSources, candidate.communityRating)
+    candidate.scoredRating = scoringRating(
+      candidate.qualityRating,
+      candidate.qualityRatingSources,
+      candidate.communityRating
     )
+    candidate.ratingScore = calculateRatingScore(candidate.scoredRating)
 
     // Use shared novelty score calculation (handles missing genres)
     candidate.novelty = calculateGenreNoveltyScore(candidate.genres, genreFamiliarity)
