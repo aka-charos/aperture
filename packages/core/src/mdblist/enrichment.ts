@@ -10,7 +10,7 @@
  * - Keywords
  *
  * PERFORMANCE:
- * - Uses batch API (up to 200 items per request)
+ * - Uses batch API (up to 100 items per request)
  * - Respects rate limits (free: ~1k/day, supporter: higher)
  */
 
@@ -25,7 +25,14 @@ import {
   isJobCancelled,
   addLog,
 } from '../jobs/progress.js'
-import { getMDBListConfig, getMediaInfoByTmdbBatch, getMediaInfoByImdb, extractEnrichmentData } from './provider.js'
+import {
+  getMDBListConfig,
+  getMediaInfoByTmdbBatchOrThrow,
+  getMediaInfoByImdb,
+  getMediaInfoByImdbOrThrow,
+  extractEnrichmentData,
+} from './provider.js'
+import { MDBLIST_PENDING_SQL } from './rules.js'
 import type { MDBListEnrichmentData } from './types.js'
 
 const logger = createChildLogger('mdblist:enrichment')
@@ -34,11 +41,14 @@ const logger = createChildLogger('mdblist:enrichment')
 // Constants
 // ============================================================================
 
-/** Batch size for MDBList API (max 200) */
+/** Batch size for MDBList API (max 100) */
 const BATCH_SIZE = 100
 
 /** Number of items to fetch per database query */
 const DB_BATCH_SIZE = 500
+
+/** Requests MDBList may fail in a row before a run stops. */
+const MAX_FAILED_BATCHES_IN_ROW = 3
 
 // ============================================================================
 // Types
@@ -65,46 +75,36 @@ interface ItemToEnrich {
 // ============================================================================
 
 /**
- * Get movies that need MDBList enrichment
- * Prefers items with TMDB IDs, falls back to IMDB
+ * Titles due for MDBList (MDBLIST_PENDING_SQL): never asked first, then the
+ * oldest answers; TMDB ids before IMDB-only. `skipIds` are titles a batch
+ * left unstamped this run (a failed request or write), so they cannot be
+ * selected again and spin the loop; they are retried next run.
  */
-async function getMoviesNeedingMDBListEnrichment(limit: number = 500): Promise<ItemToEnrich[]> {
+async function getItemsNeedingMDBListEnrichment(
+  table: 'movies' | 'series',
+  skipIds: string[],
+  limit: number = 500
+): Promise<ItemToEnrich[]> {
   const result = await query<ItemToEnrich>(
     `SELECT id, title, tmdb_id, imdb_id
-     FROM movies
-     WHERE mdblist_enriched_at IS NULL
-       AND (tmdb_id IS NOT NULL OR imdb_id IS NOT NULL)
-     ORDER BY 
+     FROM ${table}
+     WHERE ${MDBLIST_PENDING_SQL}
+       AND NOT (id = ANY($2::uuid[]))
+     ORDER BY
+       mdblist_enriched_at ASC NULLS FIRST,
        CASE WHEN tmdb_id IS NOT NULL THEN 0 ELSE 1 END,
        created_at DESC
      LIMIT $1`,
-    [limit]
+    [limit, skipIds]
   )
   return result.rows
 }
 
-
-// ============================================================================
-// Series Enrichment
-// ============================================================================
-
-/**
- * Get series that need MDBList enrichment
- * Prefers items with TMDB IDs, falls back to IMDB
- */
-async function getSeriesNeedingMDBListEnrichment(limit: number = 500): Promise<ItemToEnrich[]> {
-  const result = await query<ItemToEnrich>(
-    `SELECT id, title, tmdb_id, imdb_id
-     FROM series
-     WHERE mdblist_enriched_at IS NULL
-       AND (tmdb_id IS NOT NULL OR imdb_id IS NOT NULL)
-     ORDER BY 
-       CASE WHEN tmdb_id IS NOT NULL THEN 0 ELSE 1 END,
-       created_at DESC
-     LIMIT $1`,
-    [limit]
+async function countItemsNeedingMDBListEnrichment(table: 'movies' | 'series'): Promise<number> {
+  const row = await queryOne<{ count: string }>(
+    `SELECT COUNT(*) AS count FROM ${table} WHERE ${MDBLIST_PENDING_SQL}`
   )
-  return result.rows
+  return parseInt(row?.count || '0', 10)
 }
 
 
@@ -224,10 +224,11 @@ async function bulkUpdateSeries(updates: EnrichmentUpdate[]): Promise<number> {
 }
 
 /**
- * Mark items as processed (no data found) in bulk
+ * Mark items as processed (no data found) in bulk. False when the write
+ * failed, so the caller knows these titles are still unstamped.
  */
-async function markAsProcessed(ids: string[], table: 'movies' | 'series'): Promise<void> {
-  if (ids.length === 0) return
+async function markAsProcessed(ids: string[], table: 'movies' | 'series'): Promise<boolean> {
+  if (ids.length === 0) return true
 
   try {
     const result = await query(
@@ -235,24 +236,39 @@ async function markAsProcessed(ids: string[], table: 'movies' | 'series'): Promi
       [ids]
     )
     logger.debug({ table, ids: ids.length, updated: result.rowCount }, 'Marked items as processed')
+    return true
   } catch (err) {
     logger.error({ err, table, ids }, 'Failed to mark items as processed')
+    return false
   }
+}
+
+interface BatchResult {
+  enriched: number
+  /** Titles MDBList answered without an entry for. */
+  notFound: number
+  /** The batch request itself went unanswered. */
+  requestFailed: boolean
+  /**
+   * Titles this batch left unstamped (a request or a write failed). They are
+   * still due, so the run must skip them or select them again forever; every
+   * other title in the batch was stamped and is no longer due.
+   */
+  unstampedIds: string[]
 }
 
 /**
  * Process a batch of items (movies or series) with MDBList data
  * Uses TMDB IDs when available, falls back to IMDB
- * 
+ *
  * OPTIMIZED: Uses bulk UPDATE with unnest() instead of individual queries
  */
 async function processBatch(
   items: ItemToEnrich[],
   mediaType: 'movie' | 'show',
-  table: 'movies' | 'series',
-  _jobId: string
-): Promise<{ enriched: number; failed: number }> {
-  const result = { enriched: 0, failed: 0 }
+  table: 'movies' | 'series'
+): Promise<BatchResult> {
+  const result: BatchResult = { enriched: 0, notFound: 0, requestFailed: false, unstampedIds: [] }
 
   // Separate items by ID type
   const tmdbItems = items.filter((item) => item.tmdb_id !== null)
@@ -260,12 +276,16 @@ async function processBatch(
 
   // Create maps for quick lookup by item ID
   const infoByItemId = new Map<string, MDBListEnrichmentData>()
+  // IMDB-only titles whose own request went unanswered: neither found nor
+  // "not found", so never stamped.
+  const unansweredIds = new Set<string>()
 
   try {
-    // Fetch TMDB items (most items should have TMDB IDs)
+    // Fetch TMDB items (most items should have TMDB IDs). A request MDBList
+    // did not answer throws here, before anything is stamped.
     if (tmdbItems.length > 0) {
       const tmdbIds = tmdbItems.map((item) => item.tmdb_id!)
-      const mediaInfoList = await getMediaInfoByTmdbBatch(tmdbIds, mediaType)
+      const mediaInfoList = await getMediaInfoByTmdbBatchOrThrow(tmdbIds, mediaType)
 
       // Map results back by TMDB ID
       const tmdbIdToInfo = new Map<number, MDBListEnrichmentData>()
@@ -283,77 +303,70 @@ async function processBatch(
         }
       }
     }
-
-    // For items without TMDB, try IMDB (less common case)
-    for (const item of imdbOnlyItems) {
-      if (item.imdb_id) {
-        try {
-          const info = await getMediaInfoByImdb(item.imdb_id)
-          if (info) {
-            infoByItemId.set(item.id, extractEnrichmentData(info))
-          }
-        } catch {
-          // Skip failed lookups
-        }
-      }
-    }
-
-    // Prepare bulk update data
-    const updates: EnrichmentUpdate[] = []
-    const notFoundIds: string[] = []
-
-    for (const item of items) {
-      const data = infoByItemId.get(item.id)
-      if (data) {
-        updates.push({
-          id: item.id,
-          letterboxdScore: data.letterboxdScore,
-          mdblistScore: data.mdblistScore,
-          rtCriticScore: data.rtCriticScore,
-          rtAudienceScore: data.rtAudienceScore,
-          metacriticScore: data.metacriticScore,
-          streamingProviders: JSON.stringify(data.streamingProviders),
-          keywords: data.keywords.length > 0 ? data.keywords : null,
-        })
-      } else {
-        notFoundIds.push(item.id)
-      }
-    }
-
-    // Bulk update items with data (single query!)
-    if (updates.length > 0) {
-      const updated = table === 'movies'
-        ? await bulkUpdateMovies(updates)
-        : await bulkUpdateSeries(updates)
-      result.enriched = updated
-      logger.debug({ table, updates: updates.length, updated }, 'Bulk update completed')
-    }
-
-    // Mark items without data as processed (single query!)
-    if (notFoundIds.length > 0) {
-      logger.debug({ table, notFoundIds: notFoundIds.length }, 'Marking items without MDBList data as processed')
-      await markAsProcessed(notFoundIds, table)
-    }
-    result.failed = notFoundIds.length
-
-    // Safety: if somehow items weren't updated, mark ALL as processed to prevent infinite loop
-    const allIds = items.map(i => i.id)
-    const processedCount = result.enriched + notFoundIds.length
-    if (processedCount < items.length) {
-      const missingIds = allIds.filter(id => !updates.find(u => u.id === id) && !notFoundIds.includes(id))
-      if (missingIds.length > 0) {
-        logger.warn({ table, missingIds: missingIds.length }, 'Found items that slipped through - marking as processed')
-        await markAsProcessed(missingIds, table)
-      }
-    }
-
   } catch (err) {
-    logger.error({ err }, 'Batch MDBList fetch failed')
-    // Mark ALL items as processed to prevent infinite retry loop
-    const allIds = items.map(i => i.id)
-    await markAsProcessed(allIds, table)
-    result.failed = items.length
+    // A failed request is not an answer: nothing is stamped, so these titles
+    // are retried next run. Stamping them here is what left most of a
+    // library without scores or providers.
+    logger.error({ err, table, items: items.length }, 'Batch MDBList fetch failed')
+    return { ...result, requestFailed: true, unstampedIds: items.map((item) => item.id) }
   }
+
+  // For items without TMDB, try IMDB (less common case). Null is "no entry";
+  // anything else that went wrong throws and leaves the title unstamped.
+  for (const item of imdbOnlyItems) {
+    try {
+      const info = await getMediaInfoByImdbOrThrow(item.imdb_id!)
+      if (info) {
+        infoByItemId.set(item.id, extractEnrichmentData(info))
+      }
+    } catch (err) {
+      logger.warn({ err, table, imdbId: item.imdb_id }, 'MDBList IMDB lookup failed')
+      unansweredIds.add(item.id)
+    }
+  }
+
+  // Prepare bulk update data
+  const updates: EnrichmentUpdate[] = []
+  const notFoundIds: string[] = []
+
+  for (const item of items) {
+    if (unansweredIds.has(item.id)) continue
+    const data = infoByItemId.get(item.id)
+    if (data) {
+      updates.push({
+        id: item.id,
+        letterboxdScore: data.letterboxdScore,
+        mdblistScore: data.mdblistScore,
+        rtCriticScore: data.rtCriticScore,
+        rtAudienceScore: data.rtAudienceScore,
+        metacriticScore: data.metacriticScore,
+        streamingProviders: JSON.stringify(data.streamingProviders),
+        keywords: data.keywords.length > 0 ? data.keywords : null,
+      })
+    } else {
+      notFoundIds.push(item.id)
+    }
+  }
+  result.unstampedIds.push(...unansweredIds)
+
+  // Bulk update items with data (single query!). A failed write answers 0
+  // and stamps nothing.
+  if (updates.length > 0) {
+    const updated = table === 'movies'
+      ? await bulkUpdateMovies(updates)
+      : await bulkUpdateSeries(updates)
+    result.enriched = updated
+    if (updated === 0) result.unstampedIds.push(...updates.map((u) => u.id))
+    logger.debug({ table, updates: updates.length, updated }, 'Bulk update completed')
+  }
+
+  // Mark items MDBList answered without as processed (single query!):
+  // "no entry" is an answer, and is asked again after the refresh window.
+  if (notFoundIds.length > 0) {
+    logger.debug({ table, notFoundIds: notFoundIds.length }, 'Marking items without MDBList data as processed')
+    if (!(await markAsProcessed(notFoundIds, table))) result.unstampedIds.push(...notFoundIds)
+  }
+  result.notFound = notFoundIds.length
 
   return result
 }
@@ -361,6 +374,19 @@ async function processBatch(
 // ============================================================================
 // Main Enrichment Job
 // ============================================================================
+
+/** One table's pass over MDBList, and where its counts go in the progress. */
+interface TablePass {
+  table: 'movies' | 'series'
+  mediaType: 'movie' | 'show'
+  step: number
+  stepLabel: string
+  logLabel: string
+  total: number
+  processed: 'moviesProcessed' | 'seriesProcessed'
+  enriched: 'moviesEnriched' | 'seriesEnriched'
+  failed: 'moviesFailed' | 'seriesFailed'
+}
 
 /**
  * Run MDBList metadata enrichment for movies and series
@@ -385,16 +411,9 @@ export async function enrichMDBListMetadata(jobId: string): Promise<MDBListEnric
   createJobProgress(jobId, 'enrich-mdblist', 2) // 2 steps: movies, series
 
   try {
-    // Get counts (items with TMDB or IMDB IDs)
-    const movieCount = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM movies WHERE mdblist_enriched_at IS NULL AND (tmdb_id IS NOT NULL OR imdb_id IS NOT NULL)`
-    )
-    const seriesCount = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM series WHERE mdblist_enriched_at IS NULL AND (tmdb_id IS NOT NULL OR imdb_id IS NOT NULL)`
-    )
-
-    const totalMovies = parseInt(movieCount?.count || '0', 10)
-    const totalSeries = parseInt(seriesCount?.count || '0', 10)
+    // Get counts (the same rule the selections use)
+    const totalMovies = await countItemsNeedingMDBListEnrichment('movies')
+    const totalSeries = await countItemsNeedingMDBListEnrichment('series')
     const totalItems = totalMovies + totalSeries
 
     if (totalItems === 0) {
@@ -413,70 +432,88 @@ export async function enrichMDBListMetadata(jobId: string): Promise<MDBListEnric
     addLog(jobId, 'info', `MDBList tier: ${tierLabel}`)
     addLog(jobId, 'info', `Found ${totalMovies} movies and ${totalSeries} series to enrich`)
 
-    // Process movies
-    if (totalMovies > 0) {
-      setJobStep(jobId, 0, 'Enriching movies from MDBList', totalItems)
+    // Titles a batch left unstamped this run. Stamped titles stop being due
+    // on their own; these are still due and would be selected again forever.
+    const skipIds: string[] = []
+    // Consecutive batches MDBList did not answer. An outage or a spent daily
+    // quota fails every request after it, so the run stops rather than
+    // spending the rest of the library on refusals.
+    let failedBatchesInRow = 0
+    let stoppedReason: string | null = null
 
-      while (!isJobCancelled(jobId)) {
-        const movies = await getMoviesNeedingMDBListEnrichment(DB_BATCH_SIZE)
-        if (movies.length === 0) break
+    const passes: TablePass[] = [
+      {
+        table: 'movies',
+        mediaType: 'movie',
+        step: 0,
+        stepLabel: 'Enriching movies from MDBList',
+        logLabel: '📽 Movies',
+        total: totalMovies,
+        processed: 'moviesProcessed',
+        enriched: 'moviesEnriched',
+        failed: 'moviesFailed',
+      },
+      {
+        table: 'series',
+        mediaType: 'show',
+        step: 1,
+        stepLabel: 'Enriching series from MDBList',
+        logLabel: '📺 Series',
+        total: totalSeries,
+        processed: 'seriesProcessed',
+        enriched: 'seriesEnriched',
+        failed: 'seriesFailed',
+      },
+    ]
+
+    for (const pass of passes) {
+      if (pass.total === 0 || stoppedReason || isJobCancelled(jobId)) continue
+      setJobStep(jobId, pass.step, pass.stepLabel, totalItems)
+
+      while (!stoppedReason && !isJobCancelled(jobId)) {
+        const items = await getItemsNeedingMDBListEnrichment(pass.table, skipIds, DB_BATCH_SIZE)
+        if (items.length === 0) break
 
         // Process in batches for the API
-        for (let i = 0; i < movies.length && !isJobCancelled(jobId); i += BATCH_SIZE) {
-          const batch = movies.slice(i, i + BATCH_SIZE)
-          const batchResult = await processBatch(batch, 'movie', 'movies', jobId)
+        for (let i = 0; i < items.length && !stoppedReason && !isJobCancelled(jobId); i += BATCH_SIZE) {
+          const batch = items.slice(i, i + BATCH_SIZE)
+          const batchResult = await processBatch(batch, pass.mediaType, pass.table)
+          skipIds.push(...batchResult.unstampedIds)
 
-          progress.moviesProcessed += batch.length
-          progress.moviesEnriched += batchResult.enriched
-          progress.moviesFailed += batchResult.failed
+          failedBatchesInRow = batchResult.requestFailed ? failedBatchesInRow + 1 : 0
+          if (failedBatchesInRow >= MAX_FAILED_BATCHES_IN_ROW) {
+            stoppedReason = `MDBList failed ${failedBatchesInRow} requests in a row; stopped. The titles not reached are retried next run.`
+          }
 
-          updateJobProgress(jobId, progress.moviesProcessed, totalItems)
+          progress[pass.processed] += batch.length
+          progress[pass.enriched] += batchResult.enriched
+          progress[pass.failed] += batchResult.notFound + batchResult.unstampedIds.length
 
-          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-          addLog(
-            jobId,
-            'info',
-            `📽 Movies: ${progress.moviesProcessed}/${totalMovies} (${progress.moviesEnriched} enriched, ${elapsed}s elapsed)`
-          )
-        }
-      }
-    }
-
-    // Process series
-    if (totalSeries > 0 && !isJobCancelled(jobId)) {
-      setJobStep(jobId, 1, 'Enriching series from MDBList', totalItems)
-
-      while (!isJobCancelled(jobId)) {
-        const seriesList = await getSeriesNeedingMDBListEnrichment(DB_BATCH_SIZE)
-        if (seriesList.length === 0) break
-
-        for (let i = 0; i < seriesList.length && !isJobCancelled(jobId); i += BATCH_SIZE) {
-          const batch = seriesList.slice(i, i + BATCH_SIZE)
-          const batchResult = await processBatch(batch, 'show', 'series', jobId)
-
-          progress.seriesProcessed += batch.length
-          progress.seriesEnriched += batchResult.enriched
-          progress.seriesFailed += batchResult.failed
-
-          updateJobProgress(
-            jobId,
-            progress.moviesProcessed + progress.seriesProcessed,
-            totalItems
-          )
+          updateJobProgress(jobId, progress.moviesProcessed + progress.seriesProcessed, totalItems)
 
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
           addLog(
             jobId,
             'info',
-            `📺 Series: ${progress.seriesProcessed}/${totalSeries} (${progress.seriesEnriched} enriched, ${elapsed}s elapsed)`
+            `${pass.logLabel}: ${progress[pass.processed]}/${pass.total} (${progress[pass.enriched]} enriched, ${elapsed}s elapsed)`
           )
         }
       }
     }
 
-    // Complete
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1)
     const summary = `Enriched ${progress.moviesEnriched} movies and ${progress.seriesEnriched} series from MDBList in ${totalDuration}s`
+
+    // A run MDBList stopped answering is a failed run, not a quiet success:
+    // "completed" every week is how ten months of empty stamps went unseen.
+    // What was written stays written; the rest is retried next run.
+    if (stoppedReason) {
+      addLog(jobId, 'warn', `${stoppedReason} ${summary} before stopping.`)
+      logger.warn(progress, 'MDBList metadata enrichment stopped: MDBList is not answering')
+      failJob(jobId, stoppedReason)
+      return progress
+    }
+
     addLog(jobId, 'info', `🎉 ${summary}`)
     completeJob(jobId, { progress })
 
@@ -497,39 +534,28 @@ export async function getMDBListEnrichmentStats(): Promise<{
   movies: { total: number; enriched: number; pending: number }
   series: { total: number; enriched: number; pending: number }
 }> {
-  const movieStats = await queryOne<{ total: string; enriched: string }>(
-    `SELECT 
-       COUNT(*) as total,
-       COUNT(*) FILTER (WHERE mdblist_enriched_at IS NOT NULL) as enriched
-     FROM movies
-     WHERE tmdb_id IS NOT NULL OR imdb_id IS NOT NULL`
-  )
-
-  const seriesStats = await queryOne<{ total: string; enriched: string }>(
-    `SELECT 
-       COUNT(*) as total,
-       COUNT(*) FILTER (WHERE mdblist_enriched_at IS NOT NULL) as enriched
-     FROM series
-     WHERE tmdb_id IS NOT NULL OR imdb_id IS NOT NULL`
-  )
-
-  const totalMovies = parseInt(movieStats?.total || '0', 10)
-  const enrichedMovies = parseInt(movieStats?.enriched || '0', 10)
-  const totalSeries = parseInt(seriesStats?.total || '0', 10)
-  const enrichedSeries = parseInt(seriesStats?.enriched || '0', 10)
-
-  return {
-    movies: {
-      total: totalMovies,
-      enriched: enrichedMovies,
-      pending: totalMovies - enrichedMovies,
-    },
-    series: {
-      total: totalSeries,
-      enriched: enrichedSeries,
-      pending: totalSeries - enrichedSeries,
-    },
+  // `enriched` is "MDBList has been asked at least once"; `pending` is what the
+  // job will ask next (MDBLIST_PENDING_SQL), which includes titles whose
+  // answer is older than the refresh window. So the two need not add up to
+  // the total, and enriched never falls as answers age.
+  const stats = async (table: 'movies' | 'series') => {
+    const row = await queryOne<{ total: string; enriched: string; pending: string }>(
+      `SELECT
+         COUNT(*) as total,
+         COUNT(*) FILTER (WHERE mdblist_enriched_at IS NOT NULL) as enriched,
+         COUNT(*) FILTER (WHERE ${MDBLIST_PENDING_SQL}) as pending
+       FROM ${table}
+       WHERE tmdb_id IS NOT NULL OR imdb_id IS NOT NULL`
+    )
+    return {
+      total: parseInt(row?.total || '0', 10),
+      enriched: parseInt(row?.enriched || '0', 10),
+      pending: parseInt(row?.pending || '0', 10),
+    }
   }
+
+  const [movies, series] = await Promise.all([stats('movies'), stats('series')])
+  return { movies, series }
 }
 
 /**

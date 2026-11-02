@@ -92,11 +92,10 @@ test('every element a tour points at exists', () => {
   const anchors = anchorsInSource()
   for (const tour of Object.values(TOURS)) {
     for (const step of tour.steps) {
-      if (!step.anchor) continue
-      assert.ok(
-        anchors.has(step.anchor),
-        `${tour.id}/${step.id} points at data-tour="${step.anchor}", which no element carries`
-      )
+      for (const anchor of [step.anchor, step.fallbackAnchor]) {
+        if (!anchor) continue
+        assert.ok(anchors.has(anchor), `${tour.id}/${step.id} points at data-tour="${anchor}", which no element carries`)
+      }
     }
   }
 })

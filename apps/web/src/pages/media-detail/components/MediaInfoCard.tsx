@@ -218,8 +218,14 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
   //
   // Community watch counts left for the same reason — they are a line in the
   // hero now. See CommunityStrip.
-  const hasStreamingProviders =
-    media.streaming_providers && media.streaming_providers.length > 0
+  //
+  // MDBList lists a provider once per way of watching (rent, buy, plan), so a
+  // row stored before enrichment deduplicated reads "Apple TV Store" twice.
+  // One chip per provider, and duplicate React keys with it gone.
+  const streamingProviders = (media.streaming_providers ?? []).filter(
+    (p, i, all) => all.findIndex((q) => q.id === p.id) === i
+  )
+  const hasStreamingProviders = streamingProviders.length > 0
   // OMDb writes the literal string "None" into the Language field when it
   // holds no language for a title — 48 of them in this library. It is a
   // placeholder, not a language, and a chip reading "None" tells a reader
@@ -545,7 +551,7 @@ export function MediaInfoCard({ media }: MediaInfoCardProps) {
         {hasStreamingProviders && (
           <FactRow icon={<StreamIcon />} label={t('mediaDetail.infoCard.alsoAvailableOn')}>
             <Stack direction="row" flexWrap="wrap" gap={0.5}>
-              {media.streaming_providers!.map((provider) => (
+              {streamingProviders.map((provider) => (
                 <Chip
                   key={provider.id}
                   label={provider.name}
