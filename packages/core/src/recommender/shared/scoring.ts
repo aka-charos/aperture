@@ -39,6 +39,26 @@ export function calculateRatingScore(rating: number | null | undefined): number 
 }
 
 /**
+ * The rating a stored rating score was computed from: calculateRatingScore run
+ * backwards. A run stores the score and not the rating, so this is how the
+ * insights panel can say what an older pick was scored on after the title's
+ * rating has moved. Every band is a straight line, so the inverse is exact up
+ * to the 4 decimals the score is stored at (a few thousandths of a point).
+ *
+ * The neutral default makes one score ambiguous: 0.4 is both a 6.0 and a title
+ * with no rating, and this answers 6. Callers that can tell the two apart (a
+ * title with no rating now) decide that themselves.
+ */
+export function ratingFromScore(score: number): number {
+  const clamped = Math.min(Math.max(score, 0), 1)
+  if (clamped >= 0.8) return 8 + (clamped - 0.8) / 0.1
+  if (clamped >= 0.6) return 7 + (clamped - 0.6) / 0.2
+  if (clamped >= 0.4) return 6 + (clamped - 0.4) / 0.2
+  if (clamped >= 0.2) return 5 + (clamped - 0.2) / 0.2
+  return clamped * 25
+}
+
+/**
  * Where on the 0-1 novelty axis the response peaks. Half the item's genre mass
  * being unfamiliar is the "familiar anchor plus something new" case the score
  * is meant to reward.

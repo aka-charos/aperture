@@ -1607,11 +1607,15 @@ export {
 // them drift the moment the curve is retuned.
 // blendWeightShares rides along for the same reason: the panel has to state
 // the multipliers it used, and the equal-thirds fallback for a zero total is a
-// branch of calculateBaseScore, not a UI decision.
+// branch of calculateBaseScore, not a UI decision. The rating score curve and
+// its inverse ride along so the panel can say which rating a stored Quality
+// score was computed from (apps/api lib/qualityBasis.ts).
 export {
   NOVELTY_ALIEN_FLOOR,
   NOVELTY_PEAK,
   blendWeightShares,
+  calculateRatingScore,
+  ratingFromScore,
 } from './recommender/shared/scoring.js'
 
 // Same reasoning one more time: storeEvidence keeps the three nearest watched

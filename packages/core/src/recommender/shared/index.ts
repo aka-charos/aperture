@@ -7,6 +7,7 @@
 
 export {
   calculateRatingScore,
+  ratingFromScore,
   buildGenreFamiliarity,
   calculateGenreNoveltyScore,
   buildSimilarityScale,

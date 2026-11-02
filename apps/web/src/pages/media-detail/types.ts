@@ -243,6 +243,22 @@ export interface RecommendationInsights {
    */
   scoreScales?: {
     novelty: { min: number; max: number }
+    /**
+     * Points on the Quality curve (a rating and the score it gives), for the
+     * tooltip. Absent from an older API.
+     */
+    rating?: Array<{ rating: number; score: number }>
+  }
+  /**
+   * Which rating the Quality score was computed from, decided by the server.
+   * `current` when the stored score is what the title's rating now gives;
+   * otherwise `scoredRating` is the rating it was scored on (null when that
+   * cannot be known). Absent from an older API or with no score.
+   */
+  qualityBasis?: {
+    current: boolean
+    rating: number | null
+    scoredRating: number | null
   }
   /**
    * The share of the match each component carried, summing to 1, as the run
