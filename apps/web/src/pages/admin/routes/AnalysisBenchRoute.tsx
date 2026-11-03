@@ -23,6 +23,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { withServerMessageDetail } from '../../../lib/withServerMessageDetail'
 import {
   Alert,
   Box,
@@ -62,6 +63,8 @@ interface ProviderGroup {
   configured: boolean
   /** False only for a LOCAL provider whose configured server did not answer. */
   reachable: boolean
+  /** Why, in the server's own terms, when its reader could say. */
+  error?: string
   models: { id: string; name: string }[]
 }
 
@@ -564,7 +567,11 @@ export default function AnalysisBenchRoute() {
               </Typography>
             ) : !group.reachable ? (
               <Typography variant="caption" color="warning.main">
-                {t('adminAnalysisBench.unreachable')}
+                {/* A reason means the server DID answer (a key refused, a web
+                    page at the API path), so "did not answer" would be false. */}
+                {group.error
+                  ? withServerMessageDetail(t, group.error)
+                  : t('adminAnalysisBench.unreachable')}
               </Typography>
             ) : group.models.length === 0 ? (
               <Typography variant="caption" color="text.secondary">

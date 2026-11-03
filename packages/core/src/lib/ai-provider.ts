@@ -90,6 +90,7 @@ import {
   lmStudioInferenceBaseUrl,
 } from './local-model-capabilities.js'
 import { unslothInferenceBaseUrl } from './unslothServer.js'
+import { benchEndpointFrom, type BenchEndpoint } from './benchEndpoint.js'
 import { describeAiError } from './aiErrors.js'
 import {
   isCustomModelProvider,
@@ -2090,9 +2091,8 @@ export async function getTitleAnalysisModelAttempts(): Promise<ModelAttempt[]> {
  * healthy LM Studio on the host reports as unreachable. That shipped.
  *
  * Exported because the two resolvers below it are private and there must not be
- * a second copy of this rule: `buildTitleAnalysisAttemptFor` needs the same
- * answer to construct a model, and the bench's model picker needs it to probe
- * one, and those two disagreeing is how a model that lists cannot be run.
+ * a second copy of this rule. It never lends a grounding role's key; the bench,
+ * which runs Title Analysis's own work, goes through `resolveBenchEndpoint`.
  */
 export async function resolveProviderEndpoint(
   provider: ProviderType
@@ -2101,6 +2101,18 @@ export async function resolveProviderEndpoint(
     baseUrl: await resolveBaseUrlForProvider(provider),
     apiKey: await resolveApiKeyForProvider(provider),
   }
+}
+
+/**
+ * Where the analysis bench reaches a provider, for both listing its models and
+ * running one. The rule is `benchEndpointFrom`; this only loads what it reads.
+ */
+export async function resolveBenchEndpoint(
+  provider: ProviderType,
+  roleConfig?: ProviderConfig | null
+): Promise<BenchEndpoint> {
+  const role = roleConfig === undefined ? await getFunctionConfig('titleAnalysis') : roleConfig
+  return benchEndpointFrom(provider, role, await resolveProviderEndpoint(provider))
 }
 
 /**
@@ -2125,15 +2137,13 @@ export async function buildTitleAnalysisAttemptFor(
   model: string
 ): Promise<ModelAttempt> {
   const roleConfig = await getFunctionConfig('titleAnalysis')
-  const sameProvider = roleConfig?.provider === provider
+  const endpoint = await resolveBenchEndpoint(provider, roleConfig)
 
   const resolved: ProviderConfig = {
     provider,
     model,
-    apiKey: sameProvider
-      ? (roleConfig?.apiKey ?? (await resolveApiKeyForProvider(provider)))
-      : await resolveApiKeyForProvider(provider),
-    baseUrl: sameProvider ? roleConfig?.baseUrl : await resolveBaseUrlForProvider(provider),
+    apiKey: endpoint.apiKey,
+    baseUrl: endpoint.baseUrl,
   }
 
   const instance = createProviderInstance(resolved, 'titleAnalysis')

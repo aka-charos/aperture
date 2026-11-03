@@ -35,7 +35,7 @@ import {
   getModelsForFunctionWithCustom,
   discoverLocalModels,
   isDiscoverableProvider,
-  resolveProviderEndpoint,
+  resolveBenchEndpoint,
   createChildLogger,
   type ComparisonModelRequest,
 } from '@aperture/core'
@@ -78,7 +78,8 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
    * probe can say what is actually installed on the server at the other end of
    * a base URL.
    *
-   * THE PROBE MUST BE GIVEN THE OPERATOR'S ADDRESS. `discoverLocalModels` takes
+   * THE PROBE MUST BE GIVEN THE OPERATOR'S ADDRESS AND KEY, the same ones a
+   * bench run uses (`resolveBenchEndpoint`). `discoverLocalModels` takes
    * a base URL and a key precisely because a local server is only reachable
    * where it was configured; called without them it falls back to
    * `localhost:1234`, which inside the API container is the container itself.
@@ -111,8 +112,13 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
             const providerId = provider.id
             const discoverable = isDiscoverableProvider(providerId)
             const endpoint = discoverable
-              ? await resolveProviderEndpoint(providerId)
+              ? await resolveBenchEndpoint(providerId)
               : { baseUrl: undefined, apiKey: undefined }
+            // Why the list could not be read, in the server's terms, where its
+            // reader says (Unsloth's: a key needed or refused, a web page
+            // answering the API path). "Did not answer" alone sends the
+            // operator to an address that is fine.
+            let unreachableReason: string | undefined
             // null means two different things from discoverLocalModels — this
             // provider has no local catalogue to read, or the server did not
             // answer — and only the first is normal. Asking which provider it
@@ -124,7 +130,12 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
                     provider.id,
                     'titleAnalysis',
                     endpoint.baseUrl,
-                    endpoint.apiKey
+                    endpoint.apiKey,
+                    {
+                      onUnreachable: (why) => {
+                        unreachableReason = why
+                      },
+                    }
                   )
                 : null
 
@@ -143,6 +154,7 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
               // cloud one is neither for having no server of its own.
               configured: discoverable ? Boolean(endpoint.baseUrl) : true,
               reachable: discoverable ? endpoint.baseUrl != null && discovered !== null : true,
+              ...(discovered === null && unreachableReason && { error: unreachableReason }),
               models: [
                 ...models.map((model) => ({ id: model.id, name: model.name })),
                 ...extra,
