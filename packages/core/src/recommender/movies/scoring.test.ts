@@ -35,6 +35,8 @@ test('the rating scored is the stored unified one, not the media server copy', (
   // Media server says 9.3 (stale), the unified rating says 7.5 (F-167).
   const { candidates } = scoreCandidates([candidate('a', 9.3, 7.5, ['imdb'])], new Map(), FALLBACK_CONFIG)
   assert.equal(candidates[0].ratingScore, calculateRatingScore(7.5))
+  // And keeps the rating it scored, for the insights panel (0216).
+  assert.equal(candidates[0].scoredRating, 7.5)
   // The media server's number stays on the candidate for the acclaimed gate.
   assert.equal(candidates[0].communityRating, 9.3)
 })

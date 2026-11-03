@@ -53,6 +53,7 @@
     "sharedWithMeBadge_one": "{{count}} new recommendation",
     "sharedWithMeBadge_other": "{{count}} new recommendations",
     "userMenu": "Account menu",
+    "openMenu": "Open menu",
     "nextFromHere": "Next from here"
   },
   "admin": {
@@ -1376,7 +1377,14 @@
       "varietyExplainer": "How much this pick differs from the others chosen with it. This shapes the order of your list, not the match above.",
       "tooltipDiscovery": "How different this is from what you usually watch - helps you discover new things",
       "tooltipDiscoveryRanged": "How different this is from what you usually watch. Peaks when a pick mixes the familiar with something new, so this score always sits between {{min}}% and {{max}}%.",
-      "tooltipQuality": "Community and critic rating quality",
+      "tooltipQuality": "The rating this title had when your recommendations were made, turned into a score: the better it is rated, the higher the score. The line under the bar names that rating, and the share is how much it counted toward this match.",
+      "tooltipQualityScale": "For example: {{examples}}.",
+      "ratingScoreExample": "{{rating}} → {{pct}}%",
+      "qualityFrom": "From rating {{rating}}",
+      "qualityUnrated": "No rating: given the default score",
+      "qualityScoredOn": "Scored on {{scored}}; the rating is now {{rating}}. Updates when your recommendations are regenerated.",
+      "qualityScoredOnUnknown": "Scored on an older rating; it is now {{rating}}. Updates when your recommendations are regenerated.",
+      "qualityScoredOnOnly": "Scored on {{scored}}",
       "genreAnalysis": "Genre Analysis",
       "genresEnjoy_one": "{{count}} genre you enjoy",
       "genresEnjoy_other": "{{count}} genres you enjoy",
@@ -6479,6 +6487,7 @@
       "back": "Back",
       "readMore": "Read more",
       "howPicksAreMade": "How picks are made",
+      "inMenu": "You will find it in the menu: tap ☰ at the top.",
       "showMeAround": "Show me around",
       "keysMove": "to move",
       "keysClose": "to close"

@@ -2120,3 +2120,11 @@ It is not disobedience. `TRADITION_QUESTION` said the tradition is one **"a docu
 5. **Providers are one entry per provider.** MDBList lists a provider once per way of watching (rent, buy, plan), so "Apple TV Store" was drawn twice. Enrichment deduplicates by id, and the info card also deduplicates rows stored before.
 
 **Not verified yet:** the repair run itself. After deploying, `enrich-mdblist` should re-ask about 13,400 titles; the per-month query above is the check.
+
+## F-172
+
+**The insights panel's Quality bar disagreed with the headline.** The bar is the score the run stored, so it lags whenever the rating moved after that run, and every run made before `0213` had scored the media server's rating. Reading the number back through the curve (`ratingFromScore`) is only right while the curve is unchanged, and the neutral 0.4 is also a 6.0, so it can name no number there. Hence each candidate now stores the rating it was scored on (`recommendation_candidates.scored_rating`, `0216`), left unconstrained so a bad 101 cannot fail a run's insert. Comparing unrounded values printed "scored on 6.9; the rating is now 6.9" for 6.9437 against 6.9, so two ratings that print the same to one decimal count as the same (`printsSameRating`).
+
+## F-173
+
+**On a phone the tour card covered what it described.** Below `sm` there is no room beside anything, so Popper pushed the card back over its element, and most anchors (rows, the hero, the results grid) are taller than the screen. The card now docks to an edge as a sheet capped at the half the element does not get (in dvh, so the cap and the "fits above" test measure the same screen), the element is scrolled to just under the app bar (never under a fixed element), and the edge is decided from where the element really lands, since a short page cannot scroll past its end. Scrolling again whenever the element was found again (the guide drawer closing, the phone turning) made the page jump, so it scrolls once per step.

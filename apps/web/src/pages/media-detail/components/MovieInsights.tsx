@@ -31,6 +31,7 @@ import { getProxiedImageUrl, FALLBACK_POSTER_URL } from '@aperture/ui'
 import { insightsHaveDetail } from '../helpers'
 import { buildClosestRow, twinMarking } from '../closestRow'
 import { readInterestPick } from '../interestPick'
+import { formatRating, qualityCaption } from '../qualityCaption'
 import type { RecommendationInsights, MediaType } from '../types'
 import { HelpHint } from '@/components/HelpHint'
 
@@ -64,6 +65,11 @@ interface ScoreMeter {
    * missing weight is "not stated", never a default — see blendWeightShares.
    */
   caption?: string
+  /**
+   * A line under the caption that needs attention: Quality uses it when the
+   * stored score was computed from a rating the title no longer has.
+   */
+  note?: string
 }
 
 /**
@@ -90,7 +96,7 @@ function ScoreMeters({
         rowGap: 1.25,
       }}
     >
-      {meters.map(({ id, icon, label, tooltip, value, fill, color, caption }) => (
+      {meters.map(({ id, icon, label, tooltip, value, fill, color, caption, note }) => (
         <Tooltip key={id} title={tooltip} arrow>
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
@@ -127,6 +133,16 @@ function ScoreMeters({
                 sx={{ mt: 0.25, fontSize: '0.65rem', lineHeight: 1.4 }}
               >
                 {caption}
+              </Typography>
+            )}
+            {note && (
+              <Typography
+                variant="caption"
+                color="warning.main"
+                display="block"
+                sx={{ mt: 0.25, fontSize: '0.65rem', lineHeight: 1.4 }}
+              >
+                {note}
               </Typography>
             )}
           </Box>
@@ -377,6 +393,38 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
   const noveltyBand =
     noveltyScale && (noveltyScale.min > 0.001 || noveltyScale.max < 0.999) ? noveltyScale : null
 
+  // Quality says which rating it is: the stored score is what the title's
+  // rating gave when the run scored it, which is not always the headline at
+  // the top of the page. The server decides which (qualityBasis); the panel
+  // only words it (qualityCaption.ts).
+  const qualityText = qualityCaption(insights.qualityBasis)
+  const qualityFrom = qualityText.from
+    ? t(`mediaDetail.insights.${qualityText.from.key}`, qualityText.from.values)
+    : null
+  const qualityNote = qualityText.note
+    ? t(`mediaDetail.insights.${qualityText.note.key}`, qualityText.note.values)
+    : undefined
+  // The curve's worked examples come from the server; an older API sends
+  // none, and the tooltip then says what Quality is without them.
+  const ratingExamples = insights.scoreScales?.rating ?? []
+  const qualityTooltip = [
+    t('mediaDetail.insights.tooltipQuality'),
+    ratingExamples.length > 0
+      ? t('mediaDetail.insights.tooltipQualityScale', {
+          examples: ratingExamples
+            .map(({ rating, score }) =>
+              t('mediaDetail.insights.ratingScoreExample', {
+                rating: formatRating(rating),
+                pct: Math.round(score * 100),
+              })
+            )
+            .join(', '),
+        })
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   const discoveryTooltip = noveltyBand
     ? t('mediaDetail.insights.tooltipDiscoveryRanged', {
         min: Math.round(noveltyBand.min * 100),
@@ -542,13 +590,15 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
       id: 'quality',
       icon: <ThumbUpIcon sx={{ fontSize: 16 }} />,
       label: t('mediaDetail.insights.quality'),
-      tooltip: t('mediaDetail.insights.tooltipQuality'),
+      tooltip: qualityTooltip,
       value: insights.scores?.rating ?? null,
       fill: (insights.scores?.rating ?? 0) * 100,
       color: 'warning',
-      caption: weightPct
-        ? t('mediaDetail.insights.weightShare', { pct: weightPct.rating })
-        : undefined,
+      caption:
+        [qualityFrom, weightPct ? t('mediaDetail.insights.weightShare', { pct: weightPct.rating }) : null]
+          .filter(Boolean)
+          .join(' · ') || undefined,
+      note: qualityNote,
     },
   ]
 

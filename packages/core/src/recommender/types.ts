@@ -45,6 +45,12 @@ export interface Candidate {
   normalizedSimilarity: number
   novelty: number
   ratingScore: number
+  /**
+   * The rating ratingScore was computed from (scoringRating); null when the
+   * title had none and scored the neutral default. Stored (0216) so the
+   * insights panel can name it after the title's rating moves.
+   */
+  scoredRating?: number | null
   diversityScore: number
   diversityBoost: number // Used by shared selection algorithm
   /** Quality match, comparable across every candidate in a run. See BaseCandidate. */

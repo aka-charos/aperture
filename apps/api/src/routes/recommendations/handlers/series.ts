@@ -17,6 +17,7 @@ import { recommendationSchemas } from '../schemas.js'
 import { resolveTwinDonor, resolveTwinShared, twinCameClose } from '../../../lib/twinShared.js'
 import { publicScoreBreakdown } from '../../../lib/scoreBreakdown.js'
 import { withInterestEvidenceOnRead } from '../../../lib/interestEvidenceOnRead.js'
+import { RATING_SCALE_EXAMPLES, qualityBasisField } from '../../../lib/qualityRating.js'
 import type { SeriesRecommendationCandidate, RecommendationRun } from '../types.js'
 import {
   WATCH_HISTORY_TASTE_SQL,
@@ -204,6 +205,7 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         normalized_similarity: number | null
         novelty_score: number | null
         rating_score: number | null
+        scored_rating: number | string | null
         diversity_score: number | null
         base_score: number | null
         score_breakdown: Record<string, unknown>
@@ -211,7 +213,7 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
       }>(
         `SELECT rc.id, rc.rank, rc.is_selected, rc.final_score,
                 rc.similarity_score, rc.normalized_similarity, rc.novelty_score,
-                rc.rating_score, rc.diversity_score, rc.base_score,
+                rc.rating_score, rc.scored_rating, rc.diversity_score, rc.base_score,
                 rc.score_breakdown, rc.ai_explanation
          FROM recommendation_candidates rc
          WHERE rc.run_id = $1 AND rc.series_id = $2`,
@@ -283,8 +285,19 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
       ])
 
       // keywords too: an older interest pick has its evidence checked on read.
-      const targetSeries = await queryOne<{ genres: string[]; keywords: string[] | null }>(
-        `SELECT genres, keywords FROM series WHERE id = $1`,
+      // The rating columns feed qualityBasis. Read as the title page reads them:
+      // the shown rating aliased as community_rating (displayRatingSql) beside
+      // the stored pair, which storedQualityRating resolves the same way.
+      const targetSeries = await queryOne<{
+        genres: string[]
+        keywords: string[] | null
+        quality_rating: string | null
+        quality_rating_sources: string[] | null
+        community_rating: string | null
+      }>(
+        `SELECT s.genres, s.keywords, s.quality_rating, s.quality_rating_sources,
+                ${displayRatingSql('s')} AS community_rating
+           FROM series s WHERE s.id = $1`,
         [seriesId]
       )
 
@@ -325,7 +338,11 @@ export async function registerSeriesHandlers(fastify: FastifyInstance) {
         },
         scoreScales: {
           novelty: { min: NOVELTY_ALIEN_FLOOR, max: NOVELTY_PEAK },
+          // Worked examples of the Quality curve for the tooltip.
+          rating: RATING_SCALE_EXAMPLES,
         },
+        // See the movie handler.
+        ...qualityBasisField(candidate, targetSeries),
         // How much of the match each component carried. Null for runs written
         // before 0147, which is what the panel branches on to decide whether it
         // can state the arithmetic — the same rule it applies to base.

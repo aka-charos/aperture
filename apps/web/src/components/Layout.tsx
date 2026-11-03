@@ -656,6 +656,8 @@ function AppShell() {
             color="inherit"
             edge="start"
             onClick={handleDrawerToggle}
+            data-tour="app-menu"
+            aria-label={t('nav.openMenu')}
             sx={{ display: { md: 'none' } }}
           >
             <MenuIcon />
