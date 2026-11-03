@@ -66,9 +66,9 @@ test("the browser chrome is told each mode's own page colour", () => {
  * The light mode's two promises, read off the built theme rather than the
  * scheme object, so an override that bypasses the scheme is caught too.
  *
- * No surface is white: the operator's rule after paper-white sheets were tried
- * and rejected. The ceiling sits just above the lightest base step (#dedcdc,
- * luminance 0.719), so any background drifting toward white fails here.
+ * Nothing is lighter than the page: the operator's rule, after paper-white
+ * sheets and then a run of pale palettes were rejected. So the canvas itself is
+ * the ceiling, and any surface drawn lighter than it fails here.
  *
  * Every colour that carries text reaches 4.5:1 (WCAG AA for normal text) on
  * every surface it sits on, and every label reaches it on its own fill. The
@@ -76,10 +76,9 @@ test("the browser chrome is told each mode's own page colour", () => {
  * beige, which is how a version shipped unreadable button labels and tab names.
  */
 const { getLuminance, getContrastRatio } = require('@mui/material/styles') as typeof import('@mui/material/styles')
-const LIGHT_SURFACE_CEILING = 0.75
 const AA_TEXT = 4.5
 
-test('no light-mode surface is white', () => {
+test('no light-mode surface is lighter than the page', () => {
   const t = createAppTheme('ltr', 'light')
   const surfaces: Record<string, string> = {
     'background.default': t.palette.background.default,
@@ -96,7 +95,7 @@ test('no light-mode surface is white', () => {
     'nav.selectedBg': t.palette.nav.selectedBg,
   }
   for (const [name, colour] of Object.entries(surfaces)) {
-    assert.ok(getLuminance(colour) <= LIGHT_SURFACE_CEILING, `${name} ${colour} is too close to white`)
+    assert.ok(getLuminance(colour) <= getLuminance(t.palette.background.default), `${name} ${colour} is lighter than the page`)
   }
 })
 
@@ -123,7 +122,7 @@ test('every light-mode text colour reaches 4.5:1 on every surface', () => {
       assert.ok(ratio >= AA_TEXT, `${name} ${colour} on ${surface} is ${ratio.toFixed(2)}:1`)
     }
   }
-  for (const key of ['primary', 'secondary'] as const) {
+  for (const key of ['primary', 'secondary', 'error', 'warning', 'success', 'info'] as const) {
     const ratio = getContrastRatio(p[key].contrastText, p[key].main)
     assert.ok(ratio >= AA_TEXT, `${key} label on its fill is ${ratio.toFixed(2)}:1`)
   }
