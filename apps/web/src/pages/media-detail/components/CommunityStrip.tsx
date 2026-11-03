@@ -9,6 +9,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import type { Media, MovieWatchStats, SeriesWatchStats, Watcher } from '../types'
 import { isMovie } from '../types'
+import { decorativeColor } from '@/theme'
 import { WatcherListDialog } from './WatcherListDialog'
 import { useAuth } from '@/hooks/useAuth'
 import { unnamedCount, watcherLabel } from '../watcherNames'
@@ -93,7 +94,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
 
     stats.push({
       id: 'watched',
-      icon: <VisibilityIcon sx={{ ...ICON_SX, color: 'info.main' }} />,
+      icon: <VisibilityIcon sx={{ ...ICON_SX, color: decorativeColor('info') }} />,
       value: String(s.totalWatchers),
       label: t('mediaDetail.infoCard.watched'),
       tooltip: t('mediaDetail.infoCard.movieWatchersTooltip', {
@@ -107,7 +108,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
     if (s.totalPlays > 0) {
       stats.push({
         id: 'plays',
-        icon: <PlayArrowIcon sx={{ ...ICON_SX, color: 'success.main' }} />,
+        icon: <PlayArrowIcon sx={{ ...ICON_SX, color: decorativeColor('success') }} />,
         value: String(s.totalPlays),
         label: t('mediaDetail.infoCard.plays'),
       })
@@ -115,7 +116,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
     if (s.favoritesCount > 0) {
       stats.push({
         id: 'favorited',
-        icon: <FavoriteIcon sx={{ ...ICON_SX, color: 'error.main' }} />,
+        icon: <FavoriteIcon sx={{ ...ICON_SX, color: decorativeColor('error') }} />,
         value: String(s.favoritesCount),
         label: t('mediaDetail.infoCard.favorited'),
         watchers: s.watchers?.filter((w) => w.favorite),
@@ -129,7 +130,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
     if (s.averageUserRating != null) {
       stats.push({
         id: 'rating',
-        icon: <StarIcon sx={{ ...ICON_SX, color: 'warning.main' }} />,
+        icon: <StarIcon sx={{ ...ICON_SX, color: decorativeColor('warning') }} />,
         value: s.averageUserRating.toFixed(1),
         label: t('mediaDetail.infoCard.avgRatingCount', { count: s.totalRatings }),
       })
@@ -149,7 +150,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
     if (s.currentlyWatching > 0) {
       stats.push({
         id: 'watchingNow',
-        icon: <TrendingUpIcon sx={{ ...ICON_SX, color: 'success.main' }} />,
+        icon: <TrendingUpIcon sx={{ ...ICON_SX, color: decorativeColor('success') }} />,
         value: String(s.currentlyWatching),
         label: t('mediaDetail.infoCard.watchingNow'),
       })
@@ -157,7 +158,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
     if (s.totalViewers > 0) {
       stats.push({
         id: 'viewers',
-        icon: <VisibilityIcon sx={{ ...ICON_SX, color: 'info.main' }} />,
+        icon: <VisibilityIcon sx={{ ...ICON_SX, color: decorativeColor('info') }} />,
         value: String(s.totalViewers),
         label: t('mediaDetail.infoCard.viewers'),
         watchers: s.watchers,
@@ -168,7 +169,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
     if (s.completedViewers > 0) {
       stats.push({
         id: 'completed',
-        icon: <CheckCircleIcon sx={{ ...ICON_SX, color: 'warning.main' }} />,
+        icon: <CheckCircleIcon sx={{ ...ICON_SX, color: decorativeColor('warning') }} />,
         value: String(s.completedViewers),
         label: t('mediaDetail.infoCard.completed'),
       })
@@ -176,7 +177,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
     if (s.totalEpisodePlays > 0) {
       stats.push({
         id: 'episodePlays',
-        icon: <PlayArrowIcon sx={{ ...ICON_SX, color: 'secondary.main' }} />,
+        icon: <PlayArrowIcon sx={{ ...ICON_SX, color: decorativeColor('secondary') }} />,
         value: String(s.totalEpisodePlays),
         label: t('mediaDetail.infoCard.episodePlays'),
       })
@@ -184,7 +185,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
     if (s.averageUserRating != null) {
       stats.push({
         id: 'rating',
-        icon: <StarIcon sx={{ ...ICON_SX, color: 'warning.main' }} />,
+        icon: <StarIcon sx={{ ...ICON_SX, color: decorativeColor('warning') }} />,
         value: s.averageUserRating.toFixed(1),
         label: t('mediaDetail.infoCard.avgRatingCount', { count: s.totalRatings }),
       })

@@ -537,11 +537,25 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
           },
         },
       },
+      // A button that names no colour is neutral: outlined and text buttons
+      // take the ink around them, so a row of actions reads black and white.
+      // A colour a call site ASKS for (primary for a live or active state,
+      // success, warning, error) is kept, because there the colour says
+      // something. Contained buttons that name none stay the accent, as before.
       MuiButton: {
+        defaultProps: { color: 'inherit' },
         styleOverrides: {
           root: { borderRadius: 6 },
           ...BUTTON_SIZES,
-          contained: { boxShadow: 'none', '&:hover': { boxShadow: 'none' } },
+          contained: ({ ownerState }) => ({
+            boxShadow: 'none',
+            '&:hover': { boxShadow: 'none' },
+            ...(ownerState.color === 'inherit' && {
+              backgroundColor: brand.primary.main,
+              color: brand.primary.contrastText,
+              '&:hover': { boxShadow: 'none', backgroundColor: brand.primary.dark },
+            }),
+          }),
           outlined: ({ ownerState }) =>
             ownerState.color === 'inherit' ? { borderColor: s.borderStrong } : {},
         },
@@ -821,6 +835,25 @@ export function backdropFullFade(theme: Theme): string {
   return theme.palette.mode === 'light'
     ? `linear-gradient(to bottom, ${alpha(fade, 0.2)} 0%, ${alpha(fade, 0.75)} 60%, ${fade} 100%)`
     : `linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 70%, ${fade} 100%)`
+}
+
+/** The palette colours a component may borrow for decoration. */
+export type DecorativeTone = 'primary' | 'secondary' | 'info' | 'success' | 'warning' | 'error'
+
+/**
+ * A palette colour used as DECORATION (the eye beside a watch count, the star
+ * beside a rating, a red heart), not to say something. The dark mode keeps the
+ * colour; the light mode draws it in the secondary text colour, so its icons and
+ * actions read black and white. A colour that carries meaning (a failed job, a
+ * live state) is asked for directly and kept in both modes. For an sx `color`.
+ */
+export function decorativeColor(tone: DecorativeTone): (theme: Theme) => string {
+  return (theme) => (theme.palette.mode === 'light' ? theme.palette.text.secondary : theme.palette[tone].main)
+}
+
+/** The same rule for a Button's `color` prop: neutral in the light mode. */
+export function decorativeButtonColor(theme: Theme, tone: DecorativeTone): DecorativeTone | 'inherit' {
+  return theme.palette.mode === 'light' ? 'inherit' : tone
 }
 
 /** Shown where a hero has no image at all. */
