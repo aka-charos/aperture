@@ -5186,7 +5186,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own slate teal and deep mauve. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "The light appearance answers the default pair with its own near-black and charcoal. Save any other pair and both appearances use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -6943,7 +6943,7 @@
     "switchToLight": "Αλλαγή σε φωτεινή εμφάνιση",
     "switchToDark": "Αλλαγή σε σκοτεινή εμφάνιση",
     "cardTitle": "Εμφάνιση",
-    "cardDescription": "Η φωτεινή είναι ένας απαλός γκρι καμβάς με τόνους σχιστόλιθου και μοβ· η σκοτεινή ξεκουράζει τα μάτια σε χαμηλό φωτισμό. Αποθηκεύεται σε αυτόν τον browser."
+    "cardDescription": "Η φωτεινή είναι μια επίπεδη γκρι σελίδα με σχεδόν μαύρα γράμματα και κουμπιά· η σκοτεινή ξεκουράζει τα μάτια σε χαμηλό φωτισμό. Αποθηκεύεται σε αυτόν τον browser."
   },
   "newsletters": {
     "status": {
