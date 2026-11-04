@@ -122,8 +122,6 @@ docker-compose -f docker-compose.[your-platform].yml up -d
 - **Restore During Setup** — Restore from backup when setting up a new instance
 - **Admin Panel Restore** — Restore from the Admin → Settings → System tab
 - **Configurable Retention** — Set how many backups to keep
-- **Restore Progress** — Live step and elapsed-time reporting for the whole restore, with an optional pre-restore safety backup
-- **Backward-Compatible Restores** — Bundled PostgreSQL 17 client tools restore every backup Aperture has ever written; the bundled database stays on PostgreSQL 16 (no migration required — see [PostgreSQL 16 and 17](docs/admin/postgres-17-migration.md))
 
 ### Admin Features
 
@@ -146,11 +144,8 @@ All schedules are configurable in **Admin → Jobs**.
 | Embeddings          | Daily at 3 AM            |
 | AI Recommendations  | Weekly on Sunday at 4 AM |
 | Top Picks           | Daily at 5 AM            |
-| Library Build       | Weekly on Sunday at 5 AM |
 | Watch History       | Every 2 hours            |
 | Metadata Enrichment | Every 6 hours            |
-| Discovery           | Daily at 6 AM            |
-| User Sync           | Every 30 minutes         |
 
 ---
 
@@ -164,15 +159,12 @@ All schedules are configurable in **Admin → Jobs**.
 | [API Reference](docs/api-reference.md) | Complete API endpoint documentation                          |
 | [Architecture](docs/architecture.md)   | Technical overview, recommendation pipeline, database schema |
 | [Development](docs/development.md)     | Local dev setup, scripts, contribution guidelines            |
-| [Backup & Restore](docs/admin/backup-restore.md) | Backups, restores, and backup file format          |
-| [PostgreSQL 16 and 17](docs/admin/postgres-17-migration.md) | Bundled database/client versions and optional migration |
-| [Release Notes](docs/release-notes/)   | Per-version changes (latest: v0.7.10)                        |
 
 ---
 
 ## Tech Stack
 
-- **Backend**: Fastify, TypeScript, PostgreSQL 16 (pgvector), PostgreSQL 17 client tools for backup/restore
+- **Backend**: Fastify, TypeScript, PostgreSQL, pgvector
 - **Frontend**: React, Vite, MUI, React Router
 - **AI**: OpenAI Embeddings & GPT models
 - **Infrastructure**: Docker, pnpm workspaces
