@@ -52,6 +52,8 @@ import { query, queryOne } from '../lib/db.js'
 import { describeAiError } from '../lib/aiErrors.js'
 import { streamLmStudioChat } from '../lib/lmstudioChat.js'
 import { waitForCallSlot } from '../lib/callPacing.js'
+import { titleAnalysisUpsertSql } from './storeSql.js'
+import { phaseMs, withAnalysisTiming, type AnalysisTiming } from './timing.js'
 import { createChildLogger } from '../lib/logger.js'
 import { startStreamStallGuard, type StreamAbortReason } from '../lib/streamStall.js'
 import { recordWebSearchCall } from '../lib/webSearchUsage.js'
@@ -157,7 +159,25 @@ export interface StoredAnalysis {
   promptVersion: number
   /** The variant that wrote it, or null for the version's own prompt (0180). */
   promptVariant: string | null
+  /** How long fetching took (0217). See ./timing.ts for what null means. */
+  retrievalMs: number | null
+  /** How long the model took, pacing waits excluded (0217). */
+  writeMs: number | null
   analyzedAt: string
+}
+
+let warnedNoTimingColumns = false
+
+/** A database behind the image (0217 not applied) loses the figures, nothing else. */
+function withTimingColumns<T>(run: (withTiming: boolean) => Promise<T>): Promise<T> {
+  return withAnalysisTiming(run, (err) => {
+    if (warnedNoTimingColumns) return
+    warnedNoTimingColumns = true
+    logger.warn(
+      { err },
+      'title_analysis has no retrieval_ms/write_ms column (migration 0217 not applied); analyses are read and stored without their timing until it is applied'
+    )
+  })
 }
 
 /** The stored analysis for a title, or null when it has never been attempted. */
@@ -165,26 +185,30 @@ export async function getStoredAnalysis(
   mediaType: 'movie' | 'series',
   mediaId: string
 ): Promise<StoredAnalysis | null> {
-  const row = await queryOne<{
-    analysis: string | null
-    decline_reason: string | null
-    sources: AnalysisSourceRef[] | null
-    source_grade: string | null
-    source_count: number | null
-    retrieved_chars: number | null
-    model: string | null
-    retrieval_mode: RetrievalMode | null
-    paragraph_map: ParagraphMap | null
-    prompt_version: number
-    prompt_variant: string | null
-    analyzed_at: Date
-  }>(
-    `SELECT analysis, decline_reason, sources, source_grade, source_count,
-            retrieved_chars, model, retrieval_mode, paragraph_map,
-            prompt_version, prompt_variant, analyzed_at
-       FROM title_analysis
-      WHERE media_type = $1 AND media_id = $2`,
-    [mediaType, mediaId]
+  const row = await withTimingColumns((withTiming) =>
+    queryOne<{
+      analysis: string | null
+      decline_reason: string | null
+      sources: AnalysisSourceRef[] | null
+      source_grade: string | null
+      source_count: number | null
+      retrieved_chars: number | null
+      model: string | null
+      retrieval_mode: RetrievalMode | null
+      paragraph_map: ParagraphMap | null
+      prompt_version: number
+      prompt_variant: string | null
+      retrieval_ms?: number | null
+      write_ms?: number | null
+      analyzed_at: Date
+    }>(
+      `SELECT analysis, decline_reason, sources, source_grade, source_count,
+              retrieved_chars, model, retrieval_mode, paragraph_map,
+              prompt_version, prompt_variant, ${withTiming ? 'retrieval_ms, write_ms,' : ''} analyzed_at
+         FROM title_analysis
+        WHERE media_type = $1 AND media_id = $2`,
+      [mediaType, mediaId]
+    )
   )
   if (!row) return null
 
@@ -202,6 +226,8 @@ export async function getStoredAnalysis(
     paragraphMap: row.paragraph_map,
     promptVersion: row.prompt_version,
     promptVariant: row.prompt_variant,
+    retrievalMs: row.retrieval_ms ?? null,
+    writeMs: row.write_ms ?? null,
     analyzedAt: row.analyzed_at.toISOString(),
   }
 }
@@ -847,6 +873,8 @@ export interface WriteOptions {
   shouldCancel?: () => Promise<boolean> | boolean
   /** Told when a pacing cool-off begins, so a job console can say why it is idle. */
   onWait?: (seconds: number) => void
+  /** Told how long each cool-off lasted, so it can be left out of the writing time. */
+  onPaced?: (waitedMs: number) => void
   /**
    * The title being written, for the log lines on this path and nothing else.
    *
@@ -1055,6 +1083,7 @@ export async function runWriteAttempt(
     // belongs to the account rather than to this role.
     const paced = await waitForCallSlot('provider:' + attempt.provider, attempt.spacingMs, options)
     if (paced.cancelled) return { kind: 'cancelled' }
+    options.onPaced?.(paced.waitedMs)
 
     let response
     // The one genuinely unobservable stretch in this file, and the reason the
@@ -1545,6 +1574,7 @@ async function writeWithGrounding(
       // differently. Cancellation lands inside the wait rather than after it.
       const paced = await waitForCallSlot('provider:' + keyAttempt.provider, spacingMs, options)
       if (paced.cancelled) throw new AnalysisCancelledError()
+      options.onPaced?.(paced.waitedMs)
 
       const reasoning = await getReasoningProviderOptionsFor(
         keyAttempt.provider,
@@ -1759,6 +1789,15 @@ export async function analyseTitle(
   // are one decision about one context window.
   const crwConfig = await getCrwConfig()
 
+  // Pacing waits come out of the writing time: they measure the provider's rate
+  // limit, and left in they would read as a slow model.
+  let pacedMs = 0
+  const onPaced = (waitedMs: number) => {
+    pacedMs += waitedMs
+  }
+  let retrievalMs: number | null = null
+  let writeStartedAt = performance.now()
+
   let text: string
   let mapText: string | null
   let grade: SourceGrade | null
@@ -1783,6 +1822,7 @@ export async function analyseTitle(
         mediaType,
         shouldCancel: options.shouldCancel,
         onWait: options.onWait,
+        onPaced,
         title: subject.title,
       }
     )
@@ -1818,9 +1858,11 @@ export async function analyseTitle(
     // to record. NULL means "not measurable in this mode", not zero.
     retrievedChars = null
   } else {
+    const retrievalStartedAt = performance.now()
     const retrieval = await retrieveSources(subject, {
       shouldCancel: options.shouldCancel,
     })
+    retrievalMs = phaseMs(retrievalStartedAt, performance.now())
 
     // The seam. Retrieval is the long half and the model call is about to be
     // the other one, so a Stop pressed during the fetch takes effect here
@@ -1829,6 +1871,7 @@ export async function analyseTitle(
       throw new AnalysisCancelledError()
     }
 
+    writeStartedAt = performance.now()
     const result = await writeFromSources(
       buildAnalysisPrompt(subject, { mode, sources: retrieval.sources, variant: promptVariant }),
       crwConfig.analysisMaxOutputTokens,
@@ -1836,6 +1879,7 @@ export async function analyseTitle(
         mediaType,
         shouldCancel: options.shouldCancel,
         onWait: options.onWait,
+        onPaced,
         title: subject.title,
       }
     )
@@ -1856,6 +1900,8 @@ export async function analyseTitle(
     sourceCount = retrieval.sources.length
     retrievedChars = retrieval.retrievedChars
   }
+
+  const writeMs = phaseMs(writeStartedAt, performance.now(), pacedMs)
 
   // A response that cannot be read as an answer THROWS rather than declining,
   // which leaves the row unwritten and the title pending. That asymmetry is the
@@ -1906,6 +1952,7 @@ export async function analyseTitle(
     retrievedChars,
     promptVersion: ANALYSIS_PROMPT_VERSION,
     promptVariant,
+    timing: { retrievalMs, writeMs },
   })
 }
 
@@ -1933,6 +1980,8 @@ export interface AnalysisOutcomeToStore {
    */
   promptVersion: number
   promptVariant: string | null
+  /** Required so a new writer has to decide what it measured. */
+  timing: AnalysisTiming
 }
 
 /**
@@ -2008,49 +2057,33 @@ export async function storeAnalysisOutcome(o: AnalysisOutcomeToStore): Promise<S
     )
   }
 
-  await query(
-    `INSERT INTO title_analysis
-       (media_type, media_id, analysis, decline_reason, sources, source_grade,
-        source_count, retrieved_chars, model, retrieval_mode, paragraph_map,
-        prompt_version, prompt_variant, analyzed_at)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11::jsonb, $12, $13, NOW())
-     ON CONFLICT (media_type, media_id) DO UPDATE SET
-       analysis = EXCLUDED.analysis,
-       decline_reason = EXCLUDED.decline_reason,
-       sources = EXCLUDED.sources,
-       source_grade = EXCLUDED.source_grade,
-       source_count = EXCLUDED.source_count,
-       retrieved_chars = EXCLUDED.retrieved_chars,
-       model = EXCLUDED.model,
-       retrieval_mode = EXCLUDED.retrieval_mode,
-       paragraph_map = EXCLUDED.paragraph_map,
-       prompt_version = EXCLUDED.prompt_version,
-       prompt_variant = EXCLUDED.prompt_variant,
-       analyzed_at = NOW(),
-       -- A fresh analysis invalidates tags extracted from the previous prose.
-       tags_prompt_version = NULL`,
-    [
-      mediaType,
-      mediaId,
-      analysis,
-      declineReason,
-      JSON.stringify(storedSources),
-      grade,
-      o.sourceCount,
-      o.retrievedChars,
-      modelId,
-      mode,
-      // NULL, not '[]'. "The model wrote no usable map" and "the map says this
-      // analysis answers nothing" are different claims, and only the first is
-      // true here -- an empty array would tell a later reader the questions
-      // were checked and found unanswered.
-      paragraphMap ? JSON.stringify(paragraphMap) : null,
-      o.promptVersion,
-      // What actually wrote it, never what was configured: a stored id this
-      // build cannot use resolved to null above, and the version's own prompt
-      // wrote the row.
-      o.promptVariant,
-    ]
+  const params = [
+    mediaType,
+    mediaId,
+    analysis,
+    declineReason,
+    JSON.stringify(storedSources),
+    grade,
+    o.sourceCount,
+    o.retrievedChars,
+    modelId,
+    mode,
+    // NULL, not '[]'. "The model wrote no usable map" and "the map says this
+    // analysis answers nothing" are different claims, and only the first is
+    // true here -- an empty array would tell a later reader the questions
+    // were checked and found unanswered.
+    paragraphMap ? JSON.stringify(paragraphMap) : null,
+    o.promptVersion,
+    // What actually wrote it, never what was configured: a stored id this
+    // build cannot use resolved to null above, and the version's own prompt
+    // wrote the row.
+    o.promptVariant,
+  ]
+  await withTimingColumns((withTiming) =>
+    query(
+      titleAnalysisUpsertSql(withTiming),
+      withTiming ? [...params, o.timing.retrievalMs, o.timing.writeMs] : params
+    )
   )
 
   // THE LINE THAT SAYS A ROW NOW EXISTS, and its absence is what made a live
@@ -2078,6 +2111,8 @@ export async function storeAnalysisOutcome(o: AnalysisOutcomeToStore): Promise<S
       sourceCount: o.sourceCount,
       promptVersion: o.promptVersion,
       promptVariant: o.promptVariant,
+      retrievalMs: o.timing.retrievalMs,
+      writeMs: o.timing.writeMs,
     },
     'Title analysis stored'
   )
@@ -2096,6 +2131,8 @@ export async function storeAnalysisOutcome(o: AnalysisOutcomeToStore): Promise<S
     paragraphMap,
     promptVersion: o.promptVersion,
     promptVariant: o.promptVariant,
+    retrievalMs: o.timing.retrievalMs,
+    writeMs: o.timing.writeMs,
     analyzedAt: new Date().toISOString(),
   }
 }

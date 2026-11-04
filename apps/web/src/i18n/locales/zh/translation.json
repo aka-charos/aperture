@@ -1,5 +1,11 @@
 {
   "common": {
+    "duration": {
+      "ms": "{{ms}}ms",
+      "sec": "{{sec}} 秒",
+      "minSec": "{{min}} 分 {{sec}} 秒",
+      "hrMin": "{{hr}} 小时 {{min}} 分"
+    },
     "appName": "{{appName}}",
     "save": "保存",
     "saving": "正在保存…",
@@ -457,10 +463,6 @@
         "nextInDaysHours": "{{days}} 天 {{hours}} 小时后",
         "nextInHoursMinutes": "{{hours}} 小时 {{minutes}} 分钟后",
         "nextInMinutes": "{{minutes}} 分钟后",
-        "durationMs": "{{ms}}ms",
-        "durationSec": "{{sec}} 秒",
-        "durationMinSec": "{{min}} 分 {{sec}} 秒",
-        "durationHrMin": "{{hr}} 小时 {{min}} 分",
         "elapsedMinSec": "{{min}} 分 {{sec}} 秒",
         "elapsedSec": "{{sec}} 秒",
         "dash": "—",
@@ -1678,6 +1680,8 @@
         "sourceCount_other": "{{count}} sources",
         "retrievedChars": "{{chars}} chars read",
         "promptVersion": "prompt v{{version}}",
+        "timeTaken": "took {{total}} (writing {{writing}})",
+        "writingTime": "writing {{writing}}",
         "mode": {
           "crw": "Self-hosted search",
           "grounding": "Google grounding"

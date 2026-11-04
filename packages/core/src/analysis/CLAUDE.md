@@ -13,6 +13,7 @@ Loaded when working in `analysis/`. Terse rules; evidence in [F-064](../../../..
 - A question's answer must be one findable CONTIGUOUS run: the panel heads each run, `grounding.ts` selects by label, the assistant gates by label.
 - `analysisMaxOutputTokens` default 8000, 0 = no ceiling. Length is shaped in the prompt; `max_tokens` is never the lever (`findResponseProblem` rejects a truncated answer and throws).
 - `POST …?force=true` (route) is admin-only and the only way to rewrite a declined row.
+- Timing has two columns (`0217`, rules in `timing.ts`, pure): `retrieval_ms` = the fetching; `write_ms` = the model, retries and fallback models included, pacing waits excluded (`WriteOptions.onPaced`). Never one mixed total: only writing compares models, and an offsite import has only writing (the runner's `elapsed_ms`; retrieval NULL, as in grounding mode). NULL = not measured. A database behind the image loses the figures, not the row (`withAnalysisTiming`). The one write statement is `titleAnalysisUpsertSql` (`storeSql.ts`, pure, pinned).
 
 ## Retrieval (`retrieveSources` in `generate.ts`)
 

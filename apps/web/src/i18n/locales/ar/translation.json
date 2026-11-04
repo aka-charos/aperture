@@ -1,5 +1,11 @@
 {
   "common": {
+    "duration": {
+      "ms": "{{ms}} مللي ث",
+      "sec": "{{sec}} ث",
+      "minSec": "{{min}}د {{sec}}ث",
+      "hrMin": "{{hr}}س {{min}}د"
+    },
     "appName": "{{appName}}",
     "save": "حفظ",
     "saving": "جارٍ الحفظ…",
@@ -568,10 +574,6 @@
         "nextInDaysHours": "خلال {{days}}ي {{hours}}س",
         "nextInHoursMinutes": "خلال {{hours}}س {{minutes}}د",
         "nextInMinutes": "خلال {{minutes}}د",
-        "durationMs": "{{ms}} مللي ث",
-        "durationSec": "{{sec}} ث",
-        "durationMinSec": "{{min}}د {{sec}}ث",
-        "durationHrMin": "{{hr}}س {{min}}د",
         "elapsedMinSec": "{{min}}د {{sec}}ث",
         "elapsedSec": "{{sec}}ث",
         "dash": "—",
@@ -1073,6 +1075,8 @@
         "sourceCount_other": "{{count}} sources",
         "retrievedChars": "{{chars}} chars read",
         "promptVersion": "prompt v{{version}}",
+        "timeTaken": "took {{total}} (writing {{writing}})",
+        "writingTime": "writing {{writing}}",
         "mode": {
           "crw": "Self-hosted search",
           "grounding": "Google grounding"

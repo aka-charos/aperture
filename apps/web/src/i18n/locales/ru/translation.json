@@ -1,5 +1,11 @@
 {
   "common": {
+    "duration": {
+      "ms": "{{мс}}мс",
+      "sec": "{{сек}} с.",
+      "minSec": "{{min}} м {{sec}} с",
+      "hrMin": "{{hr}} ч {{min}} м"
+    },
     "appName": "{{appName}}",
     "save": "Сохранять",
     "saving": "Сохранение…",
@@ -566,10 +572,6 @@
         "nextInDaysHours": "через {{days}} д {{hours}} ч",
         "nextInHoursMinutes": "через {{часы}}ч {{минуты}}м",
         "nextInMinutes": "через {{минуты}} м",
-        "durationMs": "{{мс}}мс",
-        "durationSec": "{{сек}} с.",
-        "durationMinSec": "{{min}} м {{sec}} с",
-        "durationHrMin": "{{hr}} ч {{min}} м",
         "elapsedMinSec": "{{min}} м {{sec}} с",
         "elapsedSec": "{{сек}} с.",
         "dash": "—",
@@ -1165,6 +1167,8 @@
         "sourceCount_other": "{{count}} sources",
         "retrievedChars": "{{chars}} chars read",
         "promptVersion": "prompt v{{version}}",
+        "timeTaken": "took {{total}} (writing {{writing}})",
+        "writingTime": "writing {{writing}}",
         "mode": {
           "crw": "Self-hosted search",
           "grounding": "Google grounding"

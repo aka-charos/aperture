@@ -1,5 +1,11 @@
 {
   "common": {
+    "duration": {
+      "ms": "{{ms}} मिलीसेकंड",
+      "sec": "{{sec}} सेकंड",
+      "minSec": "{{min}} मि {{sec}} सेकंड",
+      "hrMin": "{{hr}} घं {{min}} मि"
+    },
     "appName": "{{appName}}",
     "save": "सहेजें",
     "saving": "सहेजा जा रहा है…",
@@ -564,10 +570,6 @@
         "nextInDaysHours": "{{days}}दि {{hours}}घं में",
         "nextInHoursMinutes": "{{hours}}घं {{minutes}}मि में",
         "nextInMinutes": "{{minutes}}मि में",
-        "durationMs": "{{ms}} मिलीसेकंड",
-        "durationSec": "{{sec}} सेकंड",
-        "durationMinSec": "{{min}} मि {{sec}} सेकंड",
-        "durationHrMin": "{{hr}} घं {{min}} मि",
         "elapsedMinSec": "{{min}} मि {{sec}} सेकंड",
         "elapsedSec": "{{sec}} सेकंड",
         "dash": "—",
@@ -1061,6 +1063,8 @@
         "sourceCount_other": "{{count}} sources",
         "retrievedChars": "{{chars}} chars read",
         "promptVersion": "prompt v{{version}}",
+        "timeTaken": "took {{total}} (writing {{writing}})",
+        "writingTime": "writing {{writing}}",
         "mode": {
           "crw": "Self-hosted search",
           "grounding": "Google grounding"

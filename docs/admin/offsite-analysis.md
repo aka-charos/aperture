@@ -101,4 +101,4 @@ A normal run retries a model that breaks the format and then falls back to the n
 {"custom_id":"…","attempt":0,"model":"qwen3-30b-a3b","text":"…the model's raw reply…","finish_reason":"stop","usage":{"completion_tokens":1290},"elapsed_ms":84210}
 ```
 
-or `{"custom_id":"…","attempt":0,"error":"…"}` when no answer came back. `attempt` is copied from the batch line: it counts how many answers for that title were rejected, and a runner resumes by id and attempt, so a rejected title runs again. `text` is the raw reply, reasoning blocks included: Aperture strips them on import. Any tool can write this file; the runner is just the easy way.
+or `{"custom_id":"…","attempt":0,"error":"…"}` when no answer came back. `attempt` is copied from the batch line: it counts how many answers for that title were rejected, and a runner resumes by id and attempt, so a rejected title runs again. `text` is the raw reply, reasoning blocks included: Aperture strips them on import. Any tool can write this file; the runner is just the easy way. `elapsed_ms` is optional: when present, it shows as the writing time on the title's admin line.

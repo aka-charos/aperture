@@ -1,5 +1,11 @@
 {
   "common": {
+    "duration": {
+      "ms": "{{ms}} ms",
+      "sec": "{{sec}} s",
+      "minSec": "{{min}} min {{sec}} s",
+      "hrMin": "{{hr}} h {{min}} min"
+    },
     "appName": "{{appName}}",
     "save": "Enregistrer",
     "saving": "Enregistrement…",
@@ -565,10 +571,6 @@
         "nextInDaysHours": "dans {{days}} j {{hours}} h",
         "nextInHoursMinutes": "dans {{hours}} h {{minutes}} min",
         "nextInMinutes": "dans {{minutes}} min",
-        "durationMs": "{{ms}} ms",
-        "durationSec": "{{sec}} s",
-        "durationMinSec": "{{min}} min {{sec}} s",
-        "durationHrMin": "{{hr}} h {{min}} min",
         "elapsedMinSec": "{{min}} min {{sec}} s",
         "elapsedSec": "{{sec}} s",
         "dash": "—",
@@ -1064,6 +1066,8 @@
         "sourceCount_other": "{{count}} sources",
         "retrievedChars": "{{chars}} chars read",
         "promptVersion": "prompt v{{version}}",
+        "timeTaken": "took {{total}} (writing {{writing}})",
+        "writingTime": "writing {{writing}}",
         "mode": {
           "crw": "Self-hosted search",
           "grounding": "Google grounding"

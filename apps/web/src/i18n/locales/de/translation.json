@@ -1,5 +1,11 @@
 {
   "common": {
+    "duration": {
+      "ms": "{{ms}} ms",
+      "sec": "{{sec}} s",
+      "minSec": "{{min}} m {{sec}} s",
+      "hrMin": "{{hr}} Std. {{min}} Min."
+    },
     "appName": "{{appName}}",
     "save": "Speichern",
     "saving": "Speichert…",
@@ -564,10 +570,6 @@
         "nextInDaysHours": "in {{days}} Tg. {{hours}} Std.",
         "nextInHoursMinutes": "in {{hours}} Std. {{minutes}} Min.",
         "nextInMinutes": "in {{minutes}} Min.",
-        "durationMs": "{{ms}} ms",
-        "durationSec": "{{sec}} s",
-        "durationMinSec": "{{min}} m {{sec}} s",
-        "durationHrMin": "{{hr}} Std. {{min}} Min.",
         "elapsedMinSec": "{{min}} m {{sec}} s",
         "elapsedSec": "{{sec}} s",
         "dash": "—",
@@ -1061,6 +1063,8 @@
         "sourceCount_other": "{{count}} sources",
         "retrievedChars": "{{chars}} chars read",
         "promptVersion": "prompt v{{version}}",
+        "timeTaken": "took {{total}} (writing {{writing}})",
+        "writingTime": "writing {{writing}}",
         "mode": {
           "crw": "Self-hosted search",
           "grounding": "Google grounding"

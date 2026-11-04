@@ -727,6 +727,9 @@ export async function importOffsiteResults(jsonl: string): Promise<OffsiteImport
         retrievedChars: item.retrieved_chars,
         promptVersion: item.prompt_version,
         promptVariant: item.prompt_variant,
+        // The model's time, as the runner measured it. Retrieval ran here when
+        // the batch was built, and nothing timed it.
+        timing: { retrievalMs: null, writeMs: result.elapsedMs },
       })
       const outcome: OffsiteImportOutcome = stored.analysis ? 'stored' : 'declined'
       // The prompt is cleared: the row is written and nothing will send it again.

@@ -30,6 +30,7 @@ import { createChildLogger } from '../lib/logger.js'
 import { AnalysisCancelledError, analyseTitle } from './generate.js'
 import { checkModeReadiness } from './mode.js'
 import { countPendingAnalysis, selectPendingTitles } from './titles.js'
+import { totalAnalysisMs } from './timing.js'
 
 const logger = createChildLogger('title-analysis-job')
 
@@ -216,7 +217,6 @@ export async function generateTitleAnalyses(
         report(title.subject.title)
         say('info', `🔎 [${result.processed + 1}/${capped}] ${describe(title.subject)}`)
         result.processed++
-        const startedAt = Date.now()
 
         try {
           const stored = await analyseTitle(title.mediaType, title.mediaId, title.subject, {
@@ -229,7 +229,8 @@ export async function generateTitleAnalyses(
             onWait: (seconds) =>
               say('info', `⏸️ Free-tier pacing — waiting ${seconds}s before the next model call`),
           })
-          const secs = ((Date.now() - startedAt) / 1000).toFixed(0)
+          // The panel's own figure, so the console and the title can't disagree.
+          const secs = ((totalAnalysisMs(stored) ?? 0) / 1000).toFixed(0)
           const found = `${stored.sourceCount ?? 0} source(s)${
             stored.retrievedChars != null ? `, ${stored.retrievedChars.toLocaleString()} chars` : ''
           }`

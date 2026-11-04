@@ -68,6 +68,7 @@ import {
 import type { TFunction } from 'i18next'
 import { useAuth } from '../../../hooks/useAuth'
 import { pollOutcome } from '../analysisPoll'
+import { describeProvenance, type AnalysisProvenance } from '../analysisProvenance'
 import { readMinutes, sectionHeading } from '../analysisText'
 import type { MediaType } from '../types'
 
@@ -80,19 +81,6 @@ interface AnalysisSource {
    * written before the field existed. A source without one is normal.
    */
   url?: string
-}
-
-/**
- * What produced the stored row: which model wrote it, which retrieval mode fed
- * it, how much text that came to. Sent to admins only, so the panel renders it
- * whenever it is present rather than re-deciding who may see it.
- */
-interface AnalysisProvenance {
-  model: string | null
-  retrievalMode: 'crw' | 'grounding' | null
-  sourceCount: number | null
-  retrievedChars: number | null
-  promptVersion: number
 }
 
 /**
@@ -1048,30 +1036,6 @@ function splitSentences(text: string): string[] {
     }
   }
   return merged.filter(Boolean)
-}
-
-/**
- * One line saying what wrote this row. Every part is optional: rows written
- * before a column existed carry nulls, and a gap has to read as "not recorded"
- * rather than as a broken panel.
- */
-function describeProvenance(data: AnalysisResponse, t: TFunction): string | null {
-  const p = data.provenance
-  if (!p) return null
-  const parts: string[] = []
-  if (p.model) parts.push(p.model)
-  if (p.retrievalMode) parts.push(t(`mediaDetail.analysis.admin.mode.${p.retrievalMode}`))
-  if (p.sourceCount != null) {
-    parts.push(t('mediaDetail.analysis.admin.sourceCount', { count: p.sourceCount }))
-  }
-  if (p.retrievedChars != null) {
-    parts.push(
-      t('mediaDetail.analysis.admin.retrievedChars', { chars: p.retrievedChars.toLocaleString() })
-    )
-  }
-  parts.push(t('mediaDetail.analysis.admin.promptVersion', { version: p.promptVersion }))
-  if (data.analyzedAt) parts.push(new Date(data.analyzedAt).toLocaleString())
-  return parts.length > 0 ? parts.join(' · ') : null
 }
 
 /**
