@@ -10,6 +10,10 @@ you are about to change, revert or argue with that rule.
 **When to write one.** A new trap gets its rule in CLAUDE.md and its evidence here, under the
 next free number.
 
+**The long-form rules.** On 2026-11-02 CLAUDE.md was compressed to rules only, written for an LLM
+reader. The wording it was compressed from, which sometimes carries detail no entry here repeats, is
+`git show 65962deb:CLAUDE.md`.
+
 **What never goes in here.** This repository is public. Record mechanisms, not the deployment
 they were measured on: no usernames, account or viewer counts, per-person watch histories or
 picks, library sizes, hostnames, addresses, database row or run ids, or anything that
@@ -1115,6 +1119,10 @@ The general form is sharper than the first statement of it: **a permission and a
 
 **The word tolerance is working**: 628 words against a loose 600 prints clean where it would have printed `628!` a bench earlier, and version 17's 627 against a hard 650 prints clean too — so the two editions are being judged by their own rules.
 
+### The CLAUDE.md entry before the split (2026-11-02)
+
+The rules moved to `packages/core/src/analysis/CLAUDE.md`, slimmed. The full entry the root CLAUDE.md carried until then is line 211 of `git show 65962deb:CLAUDE.md`.
+
 ## F-125
 
 **A collection name on the detail page opens the franchise, with what is missing and a way to request it.** "Part of Collection — X" was plain text. Already present and unconnected: `movies.collection_id` was returned by the detail route; `tmdb_collection_cache` held part lists but only gap analysis wrote it; enrichment fetched every collection's parts and kept only name and poster. The person page's "not in your library → request" flow is reused.
@@ -2082,6 +2090,10 @@ It is not disobedience. `TRADITION_QUESTION` said the tradition is one **"a docu
 
 **A second review found three claims the first version made on too little.** (1) A 401 always said a key was needed, including when one had been sent: an operator whose saved key was revoked was told to create one, and the saved key, which is the thing to remove or replace, went unmentioned. A 401 now reads differently by whether a key went with the request (`unslothAuthFailure`, pinned against the stand-in server). (2) "A decision-only server ignores the parameter" was measured on Unsloth alone. A server that validates its query string answers 400 or 422 to `output_modalities`, and the card would have called a working server unreachable, so the bare list is asked for after exactly those two answers (`retryCatalogUnfiltered`) and never after a 401, 404 or 5xx, which would answer the bare list the same way. (3) The cards on one provider heard of a removed key but not of a saved one, so after a removal on one card and a save on another, a third showed no key while requests sent the new one. A save now tells the others to ask the server again (`providerKeyEvents.ts`, `saved`); a removal still tells them their own copy is gone, which a later save on another card does not undo. The setup hints moved onto `PROVIDER_INFO.setupHint` for LM Studio and Unsloth alike, and the probe list behind `probesLocalServer` became the table `liveModelCapabilities` probes from, so the two cannot disagree about which servers need an address.
 
+**Live, the bench's picker called a working Unsloth unreachable, and the cause is narrowed to two, not confirmed.** With Unsloth on the Title Analysis role and writing analyses (the log shows `Writing analysis` on `provider: unsloth`), `/api/analysis-compare/models` reported "That server did not answer at its configured address". The picker read only `resolveProviderEndpoint`, which differs from what the writer uses in two ways, and either alone produces that sentence: the key (a key saved on that card never reaches the shared store and is never lent, so the list would ask with none and be refused), and the address (the shared one can be an older address than the role's, and this operator had used one unreachable from the API's network). Neither could be observed: the reason was logged at debug level only, and `system_settings` is not readable from the read-only link. The fix covers both, since the picker now reads `benchEndpointFrom`, the writer's own answer, and the `error` beside the group names the reason, which is what will settle it. Running a bench model already took the role's key, which is the disagreement `resolveProviderEndpoint`'s comment said must not happen, while the function that needed the rule did not use it.
+
+**Reviewing that fix corrected three more things and refused one.** The reason replaces "did not answer" rather than following it, since a refused key or a web page means the server did answer. A first version also let a same-provider bench run fall back to the shared address, which the writer does not do, so the bench could have measured another server than the library; `benchEndpointFrom` gives the role's address and nothing else, and a role with none reads as "no server address set", which is true of what the writer would do too. The decision model had the same blind spot on OpenRouter and told an operator whose only OpenRouter role was Title Analysis to add a key to a role that had one; `decisionOpenRouterKey` takes the shared key first, so a key kept separate is not spent while another exists. The review's claim that pairing a role's address with a shared key breaks `storedKeyMayGoTo` was wrong: that rule's allowed list holds every address stored for the provider, the role's included, because it guards against an address a REQUEST names and these are all the operator's own settings. Withholding the key would have made the picker disagree with the writer again.
+
 ## F-170
 
 **Notifications reach a person by email or by a phone app, chosen per event, and the app half is invisible until a phone exists.** Four events — a Watch This recommendation, a request approved, declined or made available, a reply on or resolution of an issue the person reported, and refreshed recommendations — are read from where each already lives (`social_recommendations` through `listInbox`, `discovery_requests`, Seerr's issue threads, `recommendation_runs`) by one function, `collectNotifications`, so an email and a phone cannot disagree about what counts as news. Text is written on the server in the recipient's language (`notifications/strings.ts`, English and Greek), so the app carries no copy of the wording.
@@ -2112,3 +2124,11 @@ It is not disobedience. `TRADITION_QUESTION` said the tradition is one **"a docu
 5. **Providers are one entry per provider.** MDBList lists a provider once per way of watching (rent, buy, plan), so "Apple TV Store" was drawn twice. Enrichment deduplicates by id, and the info card also deduplicates rows stored before.
 
 **Not verified yet:** the repair run itself. After deploying, `enrich-mdblist` should re-ask about 13,400 titles; the per-month query above is the check.
+
+## F-172
+
+**The insights panel's Quality bar disagreed with the headline.** The bar is the score the run stored, so it lags whenever the rating moved after that run, and every run made before `0213` had scored the media server's rating. Reading the number back through the curve (`ratingFromScore`) is only right while the curve is unchanged, and the neutral 0.4 is also a 6.0, so it can name no number there. Hence each candidate now stores the rating it was scored on (`recommendation_candidates.scored_rating`, `0216`), left unconstrained so a bad 101 cannot fail a run's insert. Comparing unrounded values printed "scored on 6.9; the rating is now 6.9" for 6.9437 against 6.9, so two ratings that print the same to one decimal count as the same (`printsSameRating`).
+
+## F-173
+
+**On a phone the tour card covered what it described.** Below `sm` there is no room beside anything, so Popper pushed the card back over its element, and most anchors (rows, the hero, the results grid) are taller than the screen. The card now docks to an edge as a sheet capped at the half the element does not get (in dvh, so the cap and the "fits above" test measure the same screen), the element is scrolled to just under the app bar (never under a fixed element), and the edge is decided from where the element really lands, since a short page cannot scroll past its end. Scrolling again whenever the element was found again (the guide drawer closing, the phone turning) made the page jump, so it scrolls once per step.

@@ -1,5 +1,11 @@
 {
   "common": {
+    "duration": {
+      "ms": "{{мс}}мс",
+      "sec": "{{сек}} с.",
+      "minSec": "{{min}} м {{sec}} с",
+      "hrMin": "{{hr}} ч {{min}} м"
+    },
     "appName": "{{appName}}",
     "save": "Сохранять",
     "saving": "Сохранение…",
@@ -566,10 +572,6 @@
         "nextInDaysHours": "через {{days}} д {{hours}} ч",
         "nextInHoursMinutes": "через {{часы}}ч {{минуты}}м",
         "nextInMinutes": "через {{минуты}} м",
-        "durationMs": "{{мс}}мс",
-        "durationSec": "{{сек}} с.",
-        "durationMinSec": "{{min}} м {{sec}} с",
-        "durationHrMin": "{{hr}} ч {{min}} м",
         "elapsedMinSec": "{{min}} м {{sec}} с",
         "elapsedSec": "{{сек}} с.",
         "dash": "—",
@@ -1165,6 +1167,8 @@
         "sourceCount_other": "{{count}} sources",
         "retrievedChars": "{{chars}} chars read",
         "promptVersion": "prompt v{{version}}",
+        "timeTaken": "took {{total}} (writing {{writing}})",
+        "writingTime": "writing {{writing}}",
         "mode": {
           "crw": "Self-hosted search",
           "grounding": "Google grounding"
@@ -5153,7 +5157,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own slate teal and deep mauve. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "The light appearance answers the default pair with its own near-black and charcoal. Save any other pair and both appearances use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -6939,7 +6943,7 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is a soft gray canvas with slate and mauve accents; dark is easier on the eyes in a dim room. Remembered in this browser."
+    "cardDescription": "Light is a flat gray page with near-black type and buttons; dark is easier on the eyes in a dim room. Remembered in this browser."
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",

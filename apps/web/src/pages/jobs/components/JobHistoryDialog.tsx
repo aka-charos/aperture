@@ -27,7 +27,8 @@ import CancelIcon from '@mui/icons-material/Cancel'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
-import { formatJobName, formatJobDurationMs } from '../constants'
+import { formatDurationMs } from '@/lib/formatDuration'
+import { formatJobName } from '../constants'
 import type { JobRunRecord, LogEntry } from '../types'
 
 interface JobHistoryDialogProps {
@@ -192,7 +193,7 @@ export function JobHistoryDialog({ open, jobName, onClose }: JobHistoryDialogPro
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {formatJobDurationMs(run.duration_ms, t)}
+                            {formatDurationMs(run.duration_ms, t)}
                           </Typography>
                         </TableCell>
                         <TableCell>

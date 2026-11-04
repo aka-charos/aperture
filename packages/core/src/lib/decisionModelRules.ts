@@ -195,6 +195,24 @@ export function retryCatalogUnfiltered(status: number): boolean {
   return status === 400 || status === 422
 }
 
+/**
+ * The OpenRouter key the decision model calls with: the shared one, else the
+ * one saved on the Title Analysis card when that role is on OpenRouter.
+ *
+ * That card's key never reaches the shared lookup, which is right for a Google
+ * key holding grounding quota and has no such reason on OpenRouter. Without
+ * this, an operator whose only OpenRouter role is Title Analysis is told to add
+ * a key to a role that has one. Shared first, so a key the operator kept separate
+ * for Title Analysis is not spent here while another is available.
+ */
+export function decisionOpenRouterKey(
+  sharedKey: string | undefined,
+  titleAnalysisRole: { provider: string; apiKey?: string } | null | undefined
+): string | undefined {
+  if (sharedKey) return sharedKey
+  return titleAnalysisRole?.provider === 'openrouter' ? titleAnalysisRole.apiKey || undefined : undefined
+}
+
 /** One entry of a decision catalog, as the card offers it. */
 export interface DecisionModelOption {
   id: string

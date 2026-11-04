@@ -164,12 +164,12 @@ export const palette = {
 
 /**
  * The light mode, laid out the way a light palette guide lays out a site: two
- * ACCENT colours for calls to action (slate teal, and deep mauve as the second
+ * ACCENT colours for calls to action (near-black, and charcoal as the second
  * accent), the CONTRAST colours from dark to pale for text and state
- * (blue-black ink, a slate grey for secondary text, green, pale mauve),
- * three BASE colours for the surfaces, all soft neutral grey and none of them
- * white, and the status colours. The accent is the primary colour; the
- * selected page and a selected toggle sit on pale mauve; depth comes from the base steps and
+ * (near-black ink, a dark grey for secondary text, green, a deeper grey),
+ * three BASE colours for the surfaces, all flat neutral grey and none of them
+ * lighter than the canvas, and the status colours. The accent is the primary
+ * colour; the selected page and a selected toggle sit on the deeper grey; depth comes from the base steps and
  * borders rather than from shadows. An admin's own brand pair replaces both
  * accents when one is set.
  *
@@ -182,7 +182,9 @@ export const palette = {
 interface LightScheme {
   /** Accent 1: the primary colour (contained buttons, tabs, switches, progress). */
   accent: string
-  /** Accent 2: the secondary colour, a deep mauve beside the slate teal. */
+  /** The accent under the pointer: darkening near-black would not show. */
+  accentHover: string
+  /** Accent 2: the secondary colour, a charcoal beside the near-black. */
   accentDeep: string
   /** Text and icons set ON an accent or a status colour (button labels). */
   onAccent: string
@@ -228,45 +230,46 @@ interface LightScheme {
 }
 
 /**
- * Dusk: a six-step palette, read from dark to light as #191d23 (ink), #57707a
- * (slate teal), #7e919f (blue-grey), #979dab (grey-lavender), #c5bac4 (mauve)
- * and #dedcdc (the lightest, a soft neutral grey, never white). The slate teal is
- * the accent and a deep mauve the second accent; the selected page sits on a
- * pale tint of the mauve. The bases step down from #dedcdc so cards stand off
- * the canvas. Every text-bearing colour is the palette's hue taken deep enough
- * to reach 4.5:1 on every base and on the highlight.
+ * Graphite: a flat mid grey (#b4b4b4) and a near-black, nothing else. The grey is
+ * the page AND the lightest thing on it: nothing is drawn lighter than the canvas
+ * (a button's label included), so cards are the same grey with a hairline, and
+ * inputs and the selected page step DOWN from it. Near-black is the accent, so
+ * buttons and progress are black on grey. Colour is left to status alone, each
+ * one taken deep enough to reach 4.5:1 on the darkest step.
  */
 const LIGHT_SCHEME: LightScheme = {
-  accent: '#40565f',
-  accentDeep: '#5c4a5b',
-  onAccent: '#dedcdc',
-  ink: '#191d23',
-  muted: '#454b57',
-  sage: '#30533f',
-  highlight: '#d4cad3',
-  highlightHover: '#cbbfca',
-  onHighlight: '#191d23',
-  info: '#284a72',
-  error: '#8c2432',
-  warning: '#66410f',
-  canvas: '#d2d0d4',
-  sheet: '#d9d7d9',
-  raised: '#dedcdc',
-  raisedHover: '#d3d1d4',
-  border: '#c6c3c8',
-  borderStrong: '#a9acb7',
-  borderHover: '#7e919f',
-  tableHead: '#d0ced2',
-  fill: '#c8c5ca',
-  fillDeep: '#cdcace',
-  scrollbar: '#979dab',
-  placeholder: ['#c5bac4', '#7e919f'],
+  accent: '#141517',
+  accentHover: '#2e2f32',
+  accentDeep: '#2e2f32',
+  onAccent: '#b4b4b4',
+  ink: '#141517',
+  muted: '#3a3b3e',
+  sage: '#15402a',
+  highlight: '#a7a7a7',
+  highlightHover: '#9d9d9d',
+  onHighlight: '#141517',
+  info: '#143a66',
+  error: '#6b1420',
+  warning: '#4a2f06',
+  canvas: '#b4b4b4',
+  sheet: '#b4b4b4',
+  raised: '#adadad',
+  raisedHover: '#a5a5a5',
+  border: '#9c9c9c',
+  borderStrong: '#858585',
+  borderHover: '#4a4a4a',
+  tableHead: '#ababab',
+  fill: '#9d9d9d',
+  fillDeep: '#a3a3a3',
+  scrollbar: '#858585',
+  placeholder: ['#a3a3a3', '#7f7f7f'],
 }
 
 /**
- * The light palette. Status and information colours give only their main
- * value: MUI derives the light, dark and label shades the same way it does
- * for every other palette colour.
+ * The light palette. Status and information colours give their main value and
+ * the label set on it (MUI's own choice would be white, lighter than the page);
+ * MUI derives the light and dark shades the same way it does for every other
+ * palette colour.
  */
 function lightPaletteFor(s: LightScheme) {
   return {
@@ -281,10 +284,10 @@ function lightPaletteFor(s: LightScheme) {
       disabled: alpha(s.ink, 0.32),
       disabledBackground: alpha(s.ink, 0.08),
     },
-    error: { main: s.error },
-    warning: { main: s.warning },
-    success: { main: s.sage },
-    info: { main: s.info },
+    error: { main: s.error, contrastText: s.onAccent },
+    warning: { main: s.warning, contrastText: s.onAccent },
+    success: { main: s.sage, contrastText: s.onAccent },
+    info: { main: s.info, contrastText: s.onAccent },
   }
 }
 
@@ -307,7 +310,7 @@ function brandPairIsDefault(): boolean {
 function lightBrand(s: LightScheme) {
   if (!brandPairIsDefault()) return { primary: { ...palette.primary }, secondary: { ...palette.secondary } }
   const shades = (main: string) => ({ ...deriveShades(main), contrastText: s.onAccent })
-  return { primary: shades(s.accent), secondary: shades(s.accentDeep) }
+  return { primary: { ...shades(s.accent), dark: s.accentHover }, secondary: shades(s.accentDeep) }
 }
 
 /** The brand gradients for one mode's primary and secondary. */
@@ -355,7 +358,7 @@ function lightSurfaces(s: LightScheme): SurfaceTokens {
   }
 }
 
-/** The light mode's selected page: a pale mauve pill, the palest contrast colour. */
+/** The light mode's selected page: a deeper grey pill. */
 function lightNav(s: LightScheme): NavTokens {
   return { selectedBg: s.highlight, selectedHoverBg: s.highlightHover, selectedText: s.onHighlight, selectedIcon: s.onHighlight }
 }
@@ -492,9 +495,9 @@ const BUTTON_SIZES = { sizeSmall: { fontSize: '0.75rem' }, sizeLarge: { fontSize
 const TAB_TYPE = { fontFamily: SANS_FONT, fontSize: '0.875rem', letterSpacing: '0.02857em' }
 
 /**
- * The light mode's look: crisper 6px corners, every working surface a soft grey
- * sheet with a 1px border on a slightly deeper grey canvas, slate teal as the
- * primary colour, a pale mauve pill for the selected page, tinted table headers, and
+ * The light mode's look: crisper 6px corners, every working surface the canvas's
+ * own grey with a 1px border, near-black as the primary colour, a deeper grey
+ * pill for the selected page, tinted table headers, and
  * transitions on colour only. Every colour here comes from the scheme (`lightColourCallSites`
  * in themeColorCallSites.test.ts holds it to that).
  */
@@ -537,11 +540,25 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
           },
         },
       },
+      // A button that names no colour is neutral: outlined and text buttons
+      // take the ink around them, so a row of actions reads black and white.
+      // A colour a call site ASKS for (primary for a live or active state,
+      // success, warning, error) is kept, because there the colour says
+      // something. Contained buttons that name none stay the accent, as before.
       MuiButton: {
+        defaultProps: { color: 'inherit' },
         styleOverrides: {
           root: { borderRadius: 6 },
           ...BUTTON_SIZES,
-          contained: { boxShadow: 'none', '&:hover': { boxShadow: 'none' } },
+          contained: ({ ownerState }) => ({
+            boxShadow: 'none',
+            '&:hover': { boxShadow: 'none' },
+            ...(ownerState.color === 'inherit' && {
+              backgroundColor: brand.primary.main,
+              color: brand.primary.contrastText,
+              '&:hover': { boxShadow: 'none', backgroundColor: brand.primary.dark },
+            }),
+          }),
           outlined: ({ ownerState }) =>
             ownerState.color === 'inherit' ? { borderColor: s.borderStrong } : {},
         },
@@ -644,6 +661,12 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
           },
         },
       },
+      // MUI draws an unticked switch's thumb white, the one thing it would paint
+      // lighter than the canvas; the canvas's own grey would vanish, so a mid
+      // grey. Ticked takes the primary colour as usual.
+      MuiSwitch: {
+        styleOverrides: { switchBase: { '&:not(.Mui-checked)': { color: s.borderHover } } },
+      },
       MuiTooltip: {
         styleOverrides: {
           tooltip: { backgroundColor: alpha(s.ink, 0.94), fontSize: '0.75rem' },
@@ -662,7 +685,7 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
       MuiTab: {
         styleOverrides: { root: { ...TAB_TYPE, '&.Mui-selected': { fontWeight: 600 } } },
       },
-      // The active side of a segmented control is filled with the same pale mauve
+      // The active side of a segmented control is filled with the same deeper grey
       // as the selected page in the sidebar.
       MuiToggleButton: {
         styleOverrides: {
@@ -821,6 +844,25 @@ export function backdropFullFade(theme: Theme): string {
   return theme.palette.mode === 'light'
     ? `linear-gradient(to bottom, ${alpha(fade, 0.2)} 0%, ${alpha(fade, 0.75)} 60%, ${fade} 100%)`
     : `linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 70%, ${fade} 100%)`
+}
+
+/** The palette colours a component may borrow for decoration. */
+export type DecorativeTone = 'primary' | 'secondary' | 'info' | 'success' | 'warning' | 'error'
+
+/**
+ * A palette colour used as DECORATION (the eye beside a watch count, the star
+ * beside a rating, a red heart), not to say something. The dark mode keeps the
+ * colour; the light mode draws it in the secondary text colour, so its icons and
+ * actions read black and white. A colour that carries meaning (a failed job, a
+ * live state) is asked for directly and kept in both modes. For an sx `color`.
+ */
+export function decorativeColor(tone: DecorativeTone): (theme: Theme) => string {
+  return (theme) => (theme.palette.mode === 'light' ? theme.palette.text.secondary : theme.palette[tone].main)
+}
+
+/** The same rule for a Button's `color` prop: neutral in the light mode. */
+export function decorativeButtonColor(theme: Theme, tone: DecorativeTone): DecorativeTone | 'inherit' {
+  return theme.palette.mode === 'light' ? 'inherit' : tone
 }
 
 /** Shown where a hero has no image at all. */

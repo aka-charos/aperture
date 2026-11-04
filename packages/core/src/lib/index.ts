@@ -140,6 +140,7 @@ export {
   getModelsForFunction,
   getModelsForFunctionWithCustom,
   resolveProviderEndpoint,
+  resolveBenchEndpoint,
   forgetProviderApiKey,
   getPricingForModel,
   getPricingForModelAsync,

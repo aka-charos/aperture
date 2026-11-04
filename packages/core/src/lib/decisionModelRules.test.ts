@@ -5,6 +5,7 @@ import {
   DEFAULT_DECISION_MODEL_CONFIG,
   DECISION_CONCURRENCY_MAX,
   DECISION_TIMEOUT_MIN_MS,
+  decisionOpenRouterKey,
   isRetryableDecisionFailure,
   isSystemicDecisionFailure,
   modelsUrlFor,
@@ -60,6 +61,15 @@ test('a self-hosted URL is accepted as root, /v1 or the full endpoint', () => {
     'http://localhost:8009/v1/models?output_modalities=decisions'
   )
   assert.equal(unfilteredModelsUrlFor('http://localhost:8009'), 'http://localhost:8009/v1/models')
+})
+
+test('the OpenRouter key: shared first, then the Title Analysis card, never another provider', () => {
+  const role = { provider: 'openrouter', apiKey: 'role-key' }
+  assert.equal(decisionOpenRouterKey('shared-key', role), 'shared-key')
+  assert.equal(decisionOpenRouterKey(undefined, role), 'role-key')
+  assert.equal(decisionOpenRouterKey(undefined, { provider: 'google', apiKey: 'grounding-key' }), undefined)
+  assert.equal(decisionOpenRouterKey(undefined, { provider: 'openrouter', apiKey: '' }), undefined)
+  assert.equal(decisionOpenRouterKey(undefined, null), undefined)
 })
 
 test('only a refusal of the request is asked again without the modality filter', () => {

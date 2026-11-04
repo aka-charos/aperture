@@ -77,7 +77,7 @@ test('results: answers and errors are read, blank and broken lines are reported,
   const parsed = parseOffsiteResults(file)
   assert.deepEqual(parsed.badLines, [4, 5, 6])
   assert.deepEqual(parsed.results, [
-    { kind: 'answer', customId: 'a', attempt: 0, model: 'qwen', text: 'ANSWER', finishReason: 'stop', outputTokens: 12 },
+    { kind: 'answer', customId: 'a', attempt: 0, model: 'qwen', text: 'ANSWER', finishReason: 'stop', outputTokens: 12, elapsedMs: null },
     { kind: 'error', customId: 'b', attempt: 0, error: 'HTTP 500: boom' },
   ])
 })
@@ -204,4 +204,18 @@ test('precheck: an answer to an attempt the import already rejected is not judge
   assert.deepEqual(importPrecheck({ ...base, itemStatus: 'rejected', resultAttempt: 1, itemAttempt: 1 }), {
     action: 'read',
   })
+})
+
+test('the runner\'s elapsed_ms is read off an answer, and optional', () => {
+  const answers = parseOffsiteResults(
+    [
+      JSON.stringify({ custom_id: 'timed', text: 'prose', elapsed_ms: 84210 }),
+      JSON.stringify({ custom_id: 'hand-made', text: 'prose' }),
+      JSON.stringify({ custom_id: 'junk', text: 'prose', elapsed_ms: 'soon' }),
+    ].join('\n')
+  )
+  const elapsed = Object.fromEntries(
+    answers.results.map((r) => [r.customId, r.kind === 'answer' ? r.elapsedMs : undefined])
+  )
+  assert.deepEqual(elapsed, { timed: 84210, 'hand-made': null, junk: null })
 })

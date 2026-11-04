@@ -15,6 +15,7 @@
 
 import type { FastifyPluginAsync } from 'fastify'
 import { requireAuth } from '../../plugins/auth.js'
+import { analysisProvenance } from './provenance.js'
 import {
   analyseTitle,
   getStoredAnalysis,
@@ -66,15 +67,7 @@ function analysisPayload(stored: StoredAnalysis, generated: boolean, admin: bool
     // model otherwise has no way to see what the text already on screen was
     // written by, which makes a before/after meaningless. Withheld from
     // everyone else because it describes our infrastructure, not the film.
-    provenance: admin
-      ? {
-          model: stored.model,
-          retrievalMode: stored.retrievalMode,
-          sourceCount: stored.sourceCount,
-          retrievedChars: stored.retrievedChars,
-          promptVersion: stored.promptVersion,
-        }
-      : undefined,
+    provenance: admin ? analysisProvenance(stored) : undefined,
   }
 }
 

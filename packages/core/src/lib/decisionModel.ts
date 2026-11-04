@@ -15,11 +15,12 @@
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import { createChildLogger } from './logger.js'
 import { createMeteredFetch } from './usageFetch.js'
-import { resolveProviderEndpoint } from './ai-provider.js'
+import { getFunctionConfig, resolveProviderEndpoint } from './ai-provider.js'
 import {
   DEFAULT_DECISION_MODEL_CONFIG,
   OPENROUTER_DECISION_MODELS_URL,
   OPENROUTER_SYSTEMONE_URL,
+  decisionOpenRouterKey,
   isRetryableDecisionFailure,
   modelsUrlFor,
   parseDecisionCatalog,
@@ -85,7 +86,8 @@ export async function resolveDecisionEndpoint(
   config: DecisionModelConfig
 ): Promise<DecisionEndpointResolution> {
   if (config.source === 'openrouter') {
-    const { apiKey } = await resolveProviderEndpoint('openrouter')
+    const { apiKey: sharedKey } = await resolveProviderEndpoint('openrouter')
+    const apiKey = decisionOpenRouterKey(sharedKey, await getFunctionConfig('titleAnalysis'))
     if (!apiKey) {
       return {
         ok: false,

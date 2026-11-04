@@ -9,7 +9,8 @@ import HistoryIcon from '@mui/icons-material/History'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ErrorIcon from '@mui/icons-material/Error'
 import CancelIcon from '@mui/icons-material/Cancel'
-import { JOB_ICONS, JOB_COLORS, formatJobName, formatJobDurationMs, formatRelativePastTime } from '../constants'
+import { formatDurationMs } from '@/lib/formatDuration'
+import { JOB_ICONS, JOB_COLORS, formatJobName, formatRelativePastTime } from '../constants'
 import { jobAnchor } from '../registry'
 import { JobProgressSection } from './JobProgressSection'
 import { JobResult } from './JobResult'
@@ -74,7 +75,7 @@ export function JobCard({
     return {
       status,
       time: formatRelativePastTime(startedAt, t),
-      duration: formatJobDurationMs(durationMs, t),
+      duration: formatDurationMs(durationMs, t),
       items,
       error: errorMessage,
       icon: status === 'completed' ? <CheckCircleIcon sx={{ fontSize: 14 }} /> :

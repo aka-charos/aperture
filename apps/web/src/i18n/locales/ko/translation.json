@@ -1,5 +1,11 @@
 {
   "common": {
+    "duration": {
+      "ms": "{{ms}}ms",
+      "sec": "{{sec}}초",
+      "minSec": "{{min}}분 {{sec}}초",
+      "hrMin": "{{hr}}시간 {{min}}분"
+    },
     "appName": "{{appName}}",
     "save": "저장",
     "saving": "저장 중…",
@@ -564,10 +570,6 @@
         "nextInDaysHours": "{{days}}일 {{hours}}시간 후",
         "nextInHoursMinutes": "{{hours}}시간 {{minutes}}분 후",
         "nextInMinutes": "{{minutes}}분 후",
-        "durationMs": "{{ms}}ms",
-        "durationSec": "{{sec}}초",
-        "durationMinSec": "{{min}}분 {{sec}}초",
-        "durationHrMin": "{{hr}}시간 {{min}}분",
         "elapsedMinSec": "{{min}}분 {{sec}}초",
         "elapsedSec": "{{sec}}초",
         "dash": "—",
@@ -1061,6 +1063,8 @@
         "sourceCount_other": "{{count}} sources",
         "retrievedChars": "{{chars}} chars read",
         "promptVersion": "prompt v{{version}}",
+        "timeTaken": "took {{total}} (writing {{writing}})",
+        "writingTime": "writing {{writing}}",
         "mode": {
           "crw": "Self-hosted search",
           "grounding": "Google grounding"
@@ -5145,7 +5149,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own slate teal and deep mauve. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "The light appearance answers the default pair with its own near-black and charcoal. Save any other pair and both appearances use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -6927,7 +6931,7 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is a soft gray canvas with slate and mauve accents; dark is easier on the eyes in a dim room. Remembered in this browser."
+    "cardDescription": "Light is a flat gray page with near-black type and buttons; dark is easier on the eyes in a dim room. Remembered in this browser."
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",

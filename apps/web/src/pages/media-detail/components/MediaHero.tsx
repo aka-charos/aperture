@@ -66,6 +66,7 @@ import {
   EpisodeProgressBadge,
 } from '@aperture/ui'
 import { genreLabel } from '@/lib/genreLabel'
+import { decorativeButtonColor, decorativeColor } from '@/theme'
 
 // The "open in <server>" CTA is branded like the app it opens, not the instance's own
 // theme — these are the media servers' own colors, not admin-configurable.
@@ -963,7 +964,7 @@ export function MediaHero({
                 <span>
                   <Button
                     variant={isFavorite ? 'contained' : 'outlined'}
-                    color="error"
+                    color={decorativeButtonColor(theme, 'error')}
                     startIcon={
                       favoriteLoading ? (
                         <CircularProgress size={18} color="inherit" />
@@ -1026,7 +1027,7 @@ export function MediaHero({
                 <span>
                   <Button
                     variant="outlined"
-                    color="success"
+                    color={decorativeButtonColor(theme, 'success')}
                     startIcon={
                       markingWatched ? (
                         <CircularProgress size={18} color="inherit" />
@@ -1048,7 +1049,7 @@ export function MediaHero({
               <Tooltip title={t('mediaDetail.hero.markUnwatchedTooltip')}>
                 <Button
                   variant="outlined"
-                  color="warning"
+                  color={decorativeButtonColor(theme, 'warning')}
                   startIcon={<VisibilityOffIcon />}
                   onClick={() => setConfirmOpen(true)}
                   sx={actionBtnSx}
@@ -1089,7 +1090,7 @@ export function MediaHero({
                     aria-label={`${headline.value.toFixed(1)} ${t('mediaDetail.hero.outOfTen')}. ${headlineExplain}`}
                     sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 0.5, cursor: 'help' }}
                   >
-                    <StarIcon sx={{ color: 'warning.main' }} />
+                    <StarIcon sx={{ color: decorativeColor('warning') }} />
                     <Typography variant="h6" fontWeight={600}>
                       {headline.value.toFixed(1)}
                     </Typography>
@@ -1142,7 +1143,7 @@ export function MediaHero({
             <Box
               sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, maxWidth: 600 }}
             >
-              <EmojiEventsIcon sx={{ color: 'warning.main', fontSize: 20, flexShrink: 0 }} />
+              <EmojiEventsIcon sx={{ color: decorativeColor('warning'), fontSize: 20, flexShrink: 0 }} />
               <Typography variant="body2" color="text.secondary">
                 {awardsLine}
               </Typography>

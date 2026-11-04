@@ -1,5 +1,6 @@
 import React from 'react'
 import type { TFunction } from 'i18next'
+import { formatDurationMs } from '@/lib/formatDuration'
 import MovieIcon from '@mui/icons-material/Movie'
 import TvIcon from '@mui/icons-material/Tv'
 import PsychologyIcon from '@mui/icons-material/Psychology'
@@ -167,19 +168,7 @@ export function formatRelativePastTime(dateString: string, t: TFunction): string
 
 export function formatJobDurationMsOrDash(ms: number | null | undefined, t: TFunction): string {
   if (ms == null || ms <= 0) return t('admin.jobsPage.ui.dash')
-  return formatJobDurationMs(ms, t)
-}
-
-export function formatJobDurationMs(ms: number, t: TFunction): string {
-  if (ms < 1000) return t('admin.jobsPage.ui.durationMs', { ms })
-  const sec = Math.floor(ms / 1000)
-  if (sec < 60) return t('admin.jobsPage.ui.durationSec', { sec })
-  const min = Math.floor(sec / 60)
-  const remainingSec = sec % 60
-  if (min < 60) return t('admin.jobsPage.ui.durationMinSec', { min, sec: remainingSec })
-  const hr = Math.floor(min / 60)
-  const remainingMin = min % 60
-  return t('admin.jobsPage.ui.durationHrMin', { hr, min: remainingMin })
+  return formatDurationMs(ms, t)
 }
 
 export function formatCron(cron: string | null): string {

@@ -1068,6 +1068,12 @@
     "statusAvailable": "Διαθέσιμη"
   },
   "common": {
+    "duration": {
+      "ms": "{{ms}}ms",
+      "sec": "{{sec}}δ",
+      "minSec": "{{min}}λ {{sec}}δ",
+      "hrMin": "{{hr}}ώ {{min}}λ"
+    },
     "appName": "{{appName}}",
     "save": "Αποθήκευση",
     "saving": "Αποθήκευση…",
@@ -3512,6 +3518,8 @@
         "sourceCount_other": "{{count}} πηγές",
         "retrievedChars": "{{chars}} χαρακτήρες",
         "promptVersion": "οδηγίες v{{version}}",
+        "timeTaken": "διάρκεια {{total}} (συγγραφή {{writing}})",
+        "writingTime": "συγγραφή {{writing}}",
         "mode": {
           "crw": "Δική μας αναζήτηση",
           "grounding": "Τεκμηρίωση Google"
@@ -4731,10 +4739,6 @@
         "nextInDaysHours": "σε {{days}}η {{hours}}ώ",
         "nextInHoursMinutes": "σε {{hours}}ώ {{minutes}}λ",
         "nextInMinutes": "σε {{minutes}}λ",
-        "durationMs": "{{ms}}ms",
-        "durationSec": "{{sec}}δ",
-        "durationMinSec": "{{min}}λ {{sec}}δ",
-        "durationHrMin": "{{hr}}ώ {{min}}λ",
         "elapsedMinSec": "{{min}}λ {{sec}}δ",
         "elapsedSec": "{{sec}}δ",
         "dash": "—",
@@ -5186,7 +5190,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own slate teal and deep mauve. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "The light appearance answers the default pair with its own near-black and charcoal. Save any other pair and both appearances use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -6943,7 +6947,7 @@
     "switchToLight": "Αλλαγή σε φωτεινή εμφάνιση",
     "switchToDark": "Αλλαγή σε σκοτεινή εμφάνιση",
     "cardTitle": "Εμφάνιση",
-    "cardDescription": "Η φωτεινή είναι ένας απαλός γκρι καμβάς με τόνους σχιστόλιθου και μοβ· η σκοτεινή ξεκουράζει τα μάτια σε χαμηλό φωτισμό. Αποθηκεύεται σε αυτόν τον browser."
+    "cardDescription": "Η φωτεινή είναι μια επίπεδη γκρι σελίδα με σχεδόν μαύρα γράμματα και κουμπιά· η σκοτεινή ξεκουράζει τα μάτια σε χαμηλό φωτισμό. Αποθηκεύεται σε αυτόν τον browser."
   },
   "newsletters": {
     "status": {

@@ -20,6 +20,8 @@
  * contract.
  */
 
+import { readElapsedMs } from './timing.js'
+
 /** Written into every exported line, so a file from a future format is recognisable. */
 export const OFFSITE_FORMAT = 'aperture-analysis-offsite/1'
 
@@ -88,6 +90,8 @@ export type OffsiteResult =
       /** Normalised to the OpenAI spelling, which the response checks read. */
       finishReason: string | null
       outputTokens: number | null
+      /** The runner's `elapsed_ms`: how long the model took. Null when a line doesn't say. */
+      elapsedMs: number | null
     }
   | { kind: 'error'; customId: string; attempt: number; error: string }
 
@@ -166,6 +170,7 @@ export function parseOffsiteResults(jsonl: string): ParsedOffsiteResults {
         text: r.text,
         finishReason: normaliseFinishReason(r.finish_reason),
         outputTokens: readTokens(r.usage),
+        elapsedMs: readElapsedMs(r.elapsed_ms),
       }
     } else if (typeof r.error === 'string' && r.error.trim()) {
       result = { kind: 'error', customId, attempt, error: r.error.trim() }
