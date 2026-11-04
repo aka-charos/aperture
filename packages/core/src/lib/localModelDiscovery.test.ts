@@ -1,6 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { lmStudioModelsForRole, isDiscoverableProvider } from './localModelDiscovery.js'
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import {
+  lmStudioModelsForRole,
+  isDiscoverableProvider,
+  discoverLocalModels,
+  openAiModelsUrl,
+  parseOpenAiModelList,
+  describeOpenAiListFailure,
+  openAiCompatibleModelsForRole,
+} from './localModelDiscovery.js'
 import {
   enrichFromV0,
   lmStudioInferenceBaseUrl,
@@ -324,4 +334,121 @@ test('a remote LM Studio behind a path prefix keeps its prefix', () => {
 test('nothing configured falls back to the documented default', () => {
   assert.equal(lmStudioInferenceBaseUrl(undefined), 'http://localhost:1234/v1')
   assert.equal(lmStudioInferenceBaseUrl(''), 'http://localhost:1234/v1')
+})
+
+// ---------------------------------------------------------------------------
+// A generic OpenAI-compatible server: only the standard /v1/models listing
+// ---------------------------------------------------------------------------
+
+test('the /v1/models address is the same whether or not the base ends in /v1', () => {
+  assert.equal(openAiModelsUrl('http://host:8000'), 'http://host:8000/v1/models')
+  assert.equal(openAiModelsUrl('http://host:8000/'), 'http://host:8000/v1/models')
+  assert.equal(openAiModelsUrl('http://host:8000/v1'), 'http://host:8000/v1/models')
+  assert.equal(openAiModelsUrl('http://host:8000/V1/'), 'http://host:8000/V1/models')
+  assert.equal(openAiModelsUrl('https://gw/openai/v1'), 'https://gw/openai/v1/models')
+})
+
+test('an OpenAI listing yields each id once, in order; anything else is unreadable', () => {
+  assert.deepEqual(
+    parseOpenAiModelList({ data: [{ id: 'a' }, { id: 'b' }, { id: 'a' }, { id: '' }, { id: 3 }, null] }),
+    ['a', 'b']
+  )
+  assert.deepEqual(parseOpenAiModelList({ data: [] }), [])
+  assert.equal(parseOpenAiModelList({ models: [] }), null)
+  assert.equal(parseOpenAiModelList(null), null)
+  assert.equal(parseOpenAiModelList('<html>'), null)
+})
+
+test('a refused listing says whether the key is missing or wrong', () => {
+  assert.match(describeOpenAiListFailure(401, false), /needs an API key/)
+  assert.match(describeOpenAiListFailure(401, true), /refused the saved API key/)
+  assert.match(describeOpenAiListFailure(403, true), /refused/)
+  assert.match(describeOpenAiListFailure(404, false), /base URL/)
+  assert.match(describeOpenAiListFailure(500, false), /HTTP 500/)
+})
+
+test('a bare listing offers every id to every role but Web Search', () => {
+  const ids = ['qwen3', 'bge-m3']
+  for (const fn of ['chat', 'textGeneration', 'titleAnalysis', 'embeddings'] as const) {
+    assert.deepEqual(
+      openAiCompatibleModelsForRole(ids, fn).models.map((m) => m.id),
+      ids,
+      `${fn} should be offered every id`
+    )
+  }
+  const embed = openAiCompatibleModelsForRole(ids, 'embeddings').models[0]
+  assert.equal(embed.capabilities.supportsEmbeddings, true)
+  assert.equal(openAiCompatibleModelsForRole(ids, 'chat').models[0].capabilities.supportsToolCalling, true)
+  assert.deepEqual(openAiCompatibleModelsForRole(ids, 'webSearch'), { models: [], skipped: [] })
+})
+
+/** A stand-in server answering only what `answer` says, LM Studio paths 404. */
+async function withServer(
+  answer: (url: string, auth: string | undefined) => { status: number; body: unknown },
+  run: (base: string) => Promise<void>
+): Promise<void> {
+  const server: Server = createServer((req, res) => {
+    const { status, body } = answer(req.url ?? '', req.headers.authorization)
+    res.writeHead(status, { 'content-type': 'application/json' })
+    res.end(JSON.stringify(body))
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  try {
+    await run(`http://127.0.0.1:${(server.address() as AddressInfo).port}`)
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+}
+
+test('a generic OpenAI-compatible server is discovered through /v1/models', { timeout: 15_000 }, async () => {
+  await withServer(
+    (url) =>
+      url === '/v1/models'
+        ? { status: 200, body: { object: 'list', data: [{ id: 'llama-3.1-8b' }, { id: 'llama-3.1-8b' }] } }
+        : { status: 404, body: { error: 'not found' } },
+    async (base) => {
+      for (const configured of [base, `${base}/v1`]) {
+        const result = await discoverLocalModels('openai-compatible', 'titleAnalysis', configured)
+        assert.deepEqual(result?.models.map((m) => m.id), ['llama-3.1-8b'], configured)
+      }
+    }
+  )
+})
+
+test('a server refusing the key reports why instead of "did not answer"', { timeout: 15_000 }, async () => {
+  await withServer(
+    (_url, auth) =>
+      auth === 'Bearer good'
+        ? { status: 200, body: { data: [{ id: 'm' }] } }
+        : { status: 401, body: { error: 'unauthorized' } },
+    async (base) => {
+      let reason: string | undefined
+      const refused = await discoverLocalModels('openai-compatible', 'chat', base, 'bad', {
+        onUnreachable: (why) => {
+          reason = why
+        },
+      })
+      assert.equal(refused, null)
+      assert.match(reason ?? '', /refused the saved API key/)
+
+      const ok = await discoverLocalModels('openai-compatible', 'chat', base, 'good')
+      assert.deepEqual(ok?.models.map((m) => m.id), ['m'])
+    }
+  )
+})
+
+test('the standard listing is not tried for LM Studio, nor without an address', { timeout: 15_000 }, async () => {
+  let hits = 0
+  await withServer(
+    (url) => {
+      if (url === '/v1/models') hits++
+      return url === '/v1/models'
+        ? { status: 200, body: { data: [{ id: 'm' }] } }
+        : { status: 404, body: {} }
+    },
+    async (base) => {
+      assert.equal(await discoverLocalModels('lmstudio', 'chat', base), null)
+      assert.equal(hits, 0)
+    }
+  )
 })
