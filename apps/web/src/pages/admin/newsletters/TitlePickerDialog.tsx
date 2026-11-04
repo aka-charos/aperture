@@ -57,7 +57,7 @@ export function TitlePickerDialog({
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t('newsletters.picker.title')}</DialogTitle>
+      <DialogTitle>{t('admin.newsletters.picker.title')}</DialogTitle>
       <DialogContent dividers>
         <TextField
           autoFocus
@@ -68,7 +68,7 @@ export function TitlePickerDialog({
             setTerm(event.target.value)
             setPicked(null)
           }}
-          placeholder={t('newsletters.picker.search')}
+          placeholder={t('admin.newsletters.picker.search')}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -98,13 +98,13 @@ export function TitlePickerDialog({
                 </ListItemAvatar>
                 <ListItemText
                   primary={`${hit.title}${hit.year ? ` (${hit.year})` : ''}`}
-                  secondary={t(hit.type === 'series' ? 'newsletters.editor.series' : 'newsletters.editor.movie')}
+                  secondary={t(hit.type === 'series' ? 'admin.newsletters.editor.series' : 'admin.newsletters.editor.movie')}
                 />
               </ListItemButton>
             ))}
             {!tooShort && !loading && hits.length === 0 && (
               <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>
-                {t('newsletters.picker.noResults')}
+                {t('admin.newsletters.picker.noResults')}
               </Typography>
             )}
           </List>
@@ -116,7 +116,7 @@ export function TitlePickerDialog({
               {picked.year ? ` (${picked.year})` : ''}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {t('newsletters.picker.chooseFields')}
+              {t('admin.newsletters.picker.chooseFields')}
             </Typography>
             <TitleFieldPicker
               fields={fields}
@@ -129,14 +129,14 @@ export function TitlePickerDialog({
             />
             {fields.includes('fullPlot') && (
               <Typography variant="caption" color="warning.main" component="p" sx={{ mt: 1 }}>
-                {t('newsletters.editor.fullPlotWarning')}
+                {t('admin.newsletters.editor.fullPlotWarning')}
               </Typography>
             )}
           </Box>
         )}
       </DialogContent>
       <DialogActions>
-        {picked && <Button onClick={() => setPicked(null)}>{t('newsletters.picker.back')}</Button>}
+        {picked && <Button onClick={() => setPicked(null)}>{t('admin.newsletters.picker.back')}</Button>}
         <Button onClick={onClose}>{t('common.cancel')}</Button>
         <Button
           variant="contained"
@@ -154,7 +154,7 @@ export function TitlePickerDialog({
             })
           }
         >
-          {t('newsletters.picker.insert')}
+          {t('admin.newsletters.picker.insert')}
         </Button>
       </DialogActions>
     </Dialog>

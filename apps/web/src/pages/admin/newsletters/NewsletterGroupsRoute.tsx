@@ -78,20 +78,20 @@ function GroupDialog({
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{group === 'new' ? t('newsletters.groups.newTitle') : t('newsletters.groups.editTitle')}</DialogTitle>
+      <DialogTitle>{group === 'new' ? t('admin.newsletters.groups.newTitle') : t('admin.newsletters.groups.editTitle')}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
             autoFocus
-            label={t('newsletters.groups.name')}
+            label={t('admin.newsletters.groups.name')}
             value={name}
             onChange={(event) => setName(event.target.value)}
             inputProps={{ maxLength: 80 }}
-            placeholder={t('newsletters.groups.namePlaceholder')}
+            placeholder={t('admin.newsletters.groups.namePlaceholder')}
           />
           <TextField
-            label={t('newsletters.groups.descriptionLabel')}
+            label={t('admin.newsletters.groups.descriptionLabel')}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             inputProps={{ maxLength: 500 }}
@@ -107,8 +107,8 @@ function GroupDialog({
               control={<Radio size="small" />}
               label={
                 <ListItemText
-                  primary={t('newsletters.groups.matchRules')}
-                  secondary={t('newsletters.groups.matchRulesHelp')}
+                  primary={t('admin.newsletters.groups.matchRules')}
+                  secondary={t('admin.newsletters.groups.matchRulesHelp')}
                 />
               }
             />
@@ -116,14 +116,14 @@ function GroupDialog({
               value="none"
               control={<Radio size="small" />}
               label={
-                <ListItemText primary={t('newsletters.groups.matchNone')} secondary={t('newsletters.groups.matchNoneHelp')} />
+                <ListItemText primary={t('admin.newsletters.groups.matchNone')} secondary={t('admin.newsletters.groups.matchNoneHelp')} />
               }
             />
           </RadioGroup>
           {rules.match === 'rules' && (
             <>
               <FormControl fullWidth>
-                <InputLabel id="group-languages-label">{t('newsletters.groups.languages')}</InputLabel>
+                <InputLabel id="group-languages-label">{t('admin.newsletters.groups.languages')}</InputLabel>
                 <Select
                   labelId="group-languages-label"
                   multiple
@@ -132,10 +132,10 @@ function GroupDialog({
                     const value = event.target.value
                     setRules({ ...rules, languages: typeof value === 'string' ? value.split(',') : value })
                   }}
-                  input={<OutlinedInput label={t('newsletters.groups.languages')} />}
+                  input={<OutlinedInput label={t('admin.newsletters.groups.languages')} />}
                   renderValue={(selected) =>
                     selected.length === 0 ? (
-                      t('newsletters.groups.anyLanguage')
+                      t('admin.newsletters.groups.anyLanguage')
                     ) : (
                       <Stack direction="row" gap={0.5} flexWrap="wrap">
                         {selected.map((code) => (
@@ -156,18 +156,18 @@ function GroupDialog({
               </FormControl>
               <TextField
                 select
-                label={t('newsletters.groups.role')}
+                label={t('admin.newsletters.groups.role')}
                 value={rules.role}
                 onChange={(event) => setRules({ ...rules, role: event.target.value as GroupRules['role'] })}
               >
-                <MenuItem value="any">{t('newsletters.groups.roleAny')}</MenuItem>
-                <MenuItem value="viewers">{t('newsletters.groups.roleViewers')}</MenuItem>
-                <MenuItem value="admins">{t('newsletters.groups.roleAdmins')}</MenuItem>
+                <MenuItem value="any">{t('admin.newsletters.groups.roleAny')}</MenuItem>
+                <MenuItem value="viewers">{t('admin.newsletters.groups.roleViewers')}</MenuItem>
+                <MenuItem value="admins">{t('admin.newsletters.groups.roleAdmins')}</MenuItem>
               </TextField>
             </>
           )}
           <Typography variant="caption" color="text.secondary">
-            {t('newsletters.groups.optInNote')}
+            {t('admin.newsletters.groups.optInNote')}
           </Typography>
         </Stack>
       </DialogContent>
@@ -235,9 +235,9 @@ function MembersDialog({
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>
-        {t('newsletters.groups.membersTitle', { name: group.name })}
+        {t('admin.newsletters.groups.membersTitle', { name: group.name })}
         <Typography variant="body2" color="text.secondary">
-          {t('newsletters.groups.counts', { members: members.length, recipients: receiving.length })}
+          {t('admin.newsletters.groups.counts', { members: members.length, recipients: receiving.length })}
         </Typography>
       </DialogTitle>
       <DialogContent dividers>
@@ -249,7 +249,7 @@ function MembersDialog({
         <TextField
           size="small"
           fullWidth
-          placeholder={t('newsletters.groups.filter')}
+          placeholder={t('admin.newsletters.groups.filter')}
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
           sx={{ mb: 1 }}
@@ -260,11 +260,11 @@ function MembersDialog({
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>{t('newsletters.groups.person')}</TableCell>
-                <TableCell>{t('newsletters.editor.language')}</TableCell>
-                <TableCell>{t('newsletters.groups.inGroup')}</TableCell>
-                <TableCell>{t('newsletters.groups.receives')}</TableCell>
-                <TableCell align="right">{t('newsletters.groups.override')}</TableCell>
+                <TableCell>{t('admin.newsletters.groups.person')}</TableCell>
+                <TableCell>{t('admin.newsletters.editor.language')}</TableCell>
+                <TableCell>{t('admin.newsletters.groups.inGroup')}</TableCell>
+                <TableCell>{t('admin.newsletters.groups.receives')}</TableCell>
+                <TableCell align="right">{t('admin.newsletters.groups.override')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -274,11 +274,11 @@ function MembersDialog({
                     <Typography variant="body2">
                       {row.displayName || row.username}
                       {row.isAdmin && (
-                        <Chip size="small" variant="outlined" label={t('newsletters.groups.admin')} sx={{ ml: 1 }} />
+                        <Chip size="small" variant="outlined" label={t('admin.newsletters.groups.admin')} sx={{ ml: 1 }} />
                       )}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {row.email || t('newsletters.groups.noEmail')}
+                      {row.email || t('admin.newsletters.groups.noEmail')}
                     </Typography>
                   </TableCell>
                   <TableCell>{languageLabel(row.language)}</TableCell>
@@ -287,18 +287,18 @@ function MembersDialog({
                       size="small"
                       color={row.member ? 'primary' : 'default'}
                       variant={row.member ? 'filled' : 'outlined'}
-                      label={t(`newsletters.groups.reason.${row.reason}`)}
+                      label={t(`admin.newsletters.groups.reason.${row.reason}`)}
                     />
                   </TableCell>
                   <TableCell>
                     {row.member ? (
                       row.ineligible === null ? (
                         <Typography variant="body2" color="success.main">
-                          {t('newsletters.groups.yes')}
+                          {t('admin.newsletters.groups.yes')}
                         </Typography>
                       ) : (
                         <Typography variant="body2" color="text.secondary">
-                          {t(`newsletters.groups.ineligible.${row.ineligible}`)}
+                          {t(`admin.newsletters.groups.ineligible.${row.ineligible}`)}
                         </Typography>
                       )
                     ) : (
@@ -315,9 +315,9 @@ function MembersDialog({
                         void setMode(row, value === 'auto' ? null : value)
                       }}
                     >
-                      <ToggleButton value="auto">{t('newsletters.groups.modeAuto')}</ToggleButton>
-                      <ToggleButton value="include">{t('newsletters.groups.modeInclude')}</ToggleButton>
-                      <ToggleButton value="exclude">{t('newsletters.groups.modeExclude')}</ToggleButton>
+                      <ToggleButton value="auto">{t('admin.newsletters.groups.modeAuto')}</ToggleButton>
+                      <ToggleButton value="include">{t('admin.newsletters.groups.modeInclude')}</ToggleButton>
+                      <ToggleButton value="exclude">{t('admin.newsletters.groups.modeExclude')}</ToggleButton>
                     </ToggleButtonGroup>
                   </TableCell>
                 </TableRow>
@@ -359,7 +359,7 @@ export default function NewsletterGroupsRoute() {
   }, [load])
 
   const remove = async (group: NewsletterGroup) => {
-    if (!window.confirm(t('newsletters.groups.confirmDelete', { name: group.name }))) return
+    if (!window.confirm(t('admin.newsletters.groups.confirmDelete', { name: group.name }))) return
     try {
       await api(`/api/newsletter-groups/${group.id}`, { method: 'DELETE' })
       await load()
@@ -370,12 +370,12 @@ export default function NewsletterGroupsRoute() {
 
   const languages = options?.languages ?? []
   const describe = (group: NewsletterGroup) => {
-    if (group.rules.match === 'none') return t('newsletters.groups.summaryManual')
+    if (group.rules.match === 'none') return t('admin.newsletters.groups.summaryManual')
     const langs =
       group.rules.languages.length === 0
-        ? t('newsletters.groups.anyLanguage')
+        ? t('admin.newsletters.groups.anyLanguage')
         : group.rules.languages.map((code) => languages.find((l) => l.code === code)?.label ?? code).join(', ')
-    return t(`newsletters.groups.summary.${group.rules.role}`, { languages: langs })
+    return t(`admin.newsletters.groups.summary.${group.rules.role}`, { languages: langs })
   }
 
   return (
@@ -390,29 +390,29 @@ export default function NewsletterGroupsRoute() {
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
             <Box sx={{ flex: 1 }}>
               <Typography variant="subtitle1" fontWeight={600}>
-                {t('newsletters.groups.title')}
+                {t('admin.newsletters.groups.title')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {t('newsletters.groups.description')}
+                {t('admin.newsletters.groups.description')}
               </Typography>
             </Box>
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing('new')}>
-              {t('newsletters.groups.new')}
+              {t('admin.newsletters.groups.new')}
             </Button>
           </Stack>
           {!groups ? (
             <LinearProgress />
           ) : groups.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              {t('newsletters.groups.empty')}
+              {t('admin.newsletters.groups.empty')}
             </Typography>
           ) : (
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>{t('newsletters.groups.name')}</TableCell>
-                  <TableCell>{t('newsletters.groups.who')}</TableCell>
-                  <TableCell>{t('newsletters.groups.size')}</TableCell>
+                  <TableCell>{t('admin.newsletters.groups.name')}</TableCell>
+                  <TableCell>{t('admin.newsletters.groups.who')}</TableCell>
+                  <TableCell>{t('admin.newsletters.groups.size')}</TableCell>
                   <TableCell />
                 </TableRow>
               </TableHead>
@@ -431,18 +431,18 @@ export default function NewsletterGroupsRoute() {
                     </TableCell>
                     <TableCell>{describe(group)}</TableCell>
                     <TableCell>
-                      {t('newsletters.groups.counts', {
+                      {t('admin.newsletters.groups.counts', {
                         members: group.memberCount ?? 0,
                         recipients: group.recipientCount ?? 0,
                       })}
                     </TableCell>
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                      <Tooltip title={t('newsletters.groups.members')}>
+                      <Tooltip title={t('admin.newsletters.groups.members')}>
                         <IconButton size="small" onClick={() => setMembers(group)}>
                           <PeopleOutlineIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title={t('newsletters.groups.edit')}>
+                      <Tooltip title={t('admin.newsletters.groups.edit')}>
                         <IconButton size="small" onClick={() => setEditing(group)}>
                           <EditOutlinedIcon fontSize="small" />
                         </IconButton>
