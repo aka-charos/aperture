@@ -14,6 +14,10 @@ Admin console → **Operations** → **Logs** (`/admin/ops/logs`).
 
 Both apply **immediately** — no restart; each key saves independently, so an old client can't blank the other.
 
+## The Container's Health Check
+
+The image checks itself every 30 seconds, and that check stays out of the access log whatever the switches say. Only three of its answers are logged: the first after the server starts, the first after a failure, and every failure. So one `/health` line near the top of the log means the checks are arriving. Anything else calling `/health`, such as a browser or an outside monitor, is logged like any other request.
+
 ## Where Logs Actually Are
 
 - **Job runs** — per-run logs in each job's history dialog ([Jobs](jobs-overview.md))

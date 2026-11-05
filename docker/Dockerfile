@@ -123,9 +123,12 @@ ENV APP_BUILD=${APP_BUILD}
 # Expose port
 EXPOSE 3456
 
-# Health check
+# Health check. A Node script rather than wget http://localhost: Alpine's BusyBox
+# wget uses only the first address it resolves, which is ::1 wherever the container
+# has an IPv6 loopback, and the server listens on IPv4 by default. The script works
+# the address out from the same HOST and PORT the server uses, and is tested.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget -qO- http://localhost:3456/health || exit 1
+    CMD ["node", "/app/apps/api/dist/healthcheck.js"]
 
 # Start the server
 CMD ["node", "apps/api/dist/index.js"]

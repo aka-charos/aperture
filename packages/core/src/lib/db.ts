@@ -1,10 +1,14 @@
 import pg from 'pg'
 import { createChildLogger } from './logger.js'
 import { getDatabaseUrl } from '../config/env.js'
+import { probeDatabase } from './databaseHealth.js'
 
 const { Pool } = pg
 
 const logger = createChildLogger('db')
+
+const POOL_MAX = 20
+const CONNECTION_TIMEOUT_MS = 5000
 
 let pool: pg.Pool | null = null
 
@@ -19,9 +23,9 @@ export function getPool(): pg.Pool {
 
     pool = new Pool({
       connectionString: databaseUrl,
-      max: 20,
+      max: POOL_MAX,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
     })
 
     pool.on('error', (err) => {
@@ -86,13 +90,30 @@ export async function closePool(): Promise<void> {
   }
 }
 
-export async function healthCheck(): Promise<boolean> {
+/** A connection that belongs to one health check, for when the pool has none to spare. */
+async function askOnOwnConnection(): Promise<void> {
+  const client = new pg.Client({
+    connectionString: getDatabaseUrl(),
+    connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
+    query_timeout: CONNECTION_TIMEOUT_MS,
+  })
+  // A client with no 'error' listener takes the process down with it.
+  client.on('error', () => {})
   try {
-    await query('SELECT 1')
-    return true
-  } catch {
-    return false
+    await client.connect()
+    await client.query('SELECT 1')
+  } finally {
+    client.end().catch(() => {})
   }
+}
+
+export async function healthCheck(): Promise<boolean> {
+  const { totalCount, idleCount, waitingCount } = getPool()
+  return probeDatabase(
+    { totalCount, idleCount, waitingCount, max: POOL_MAX },
+    () => query('SELECT 1'),
+    askOnOwnConnection
+  )
 }
 
 export type { Pool, PoolClient } from 'pg'

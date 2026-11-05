@@ -17,21 +17,47 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
+import { spawn } from 'node:child_process'
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
 
 // An address nothing listens on, so any query fails at once instead of hanging.
 process.env.DATABASE_URL ??= 'postgres://boot:test@127.0.0.1:1/boot_test'
 // The OpenAPI document is only registered when docs are on, and the API
 // reference test below reads it.
 process.env.API_DOCS = 'public'
+// Gives the log tests below a silenced route.
+process.env.QUIET_POLL_LOGS = 'true'
 
 const REPO_ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', '..')
+
+interface LogFields {
+  url?: string
+  req?: { url?: string }
+  res?: { statusCode?: number }
+}
+
+/** The lines the server wrote through its own logger at info level. */
+const logged: { msg: string; fields: LogFields }[] = []
+const ignore = () => {}
+const captureLogger = {
+  level: 'info',
+  info: (fields: LogFields, msg: string) => void logged.push({ msg, fields }),
+  warn: ignore,
+  error: ignore,
+  debug: ignore,
+  trace: ignore,
+  fatal: ignore,
+  silent: ignore,
+  child: () => captureLogger,
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let app: any
 
 before(async () => {
   const { buildServer } = await import('./server.js')
-  app = await buildServer({ logger: false })
+  app = await buildServer({ loggerInstance: captureLogger as never })
 })
 
 after(async () => {
@@ -90,4 +116,179 @@ test('an admin newsletter route refuses a form body', async () => {
     payload: 'subject=x',
   })
   assert.equal(res.statusCode, 415)
+})
+
+test('the health check dials what the server binds', async () => {
+  const { listenHost, probeUrl } = await import('./config/healthProbe.js')
+  assert.equal(listenHost({}), '0.0.0.0')
+  assert.equal(listenHost({ HOST: '  ' }), '0.0.0.0')
+  assert.equal(probeUrl({}), 'http://127.0.0.1:3456/health')
+  assert.equal(probeUrl({ PORT: '8080' }), 'http://127.0.0.1:8080/health')
+  assert.equal(probeUrl({ HOST: '0.0.0.0' }), 'http://127.0.0.1:3456/health')
+  assert.equal(probeUrl({ HOST: '127.0.0.1' }), 'http://127.0.0.1:3456/health')
+  assert.equal(probeUrl({ HOST: '::' }), 'http://[::1]:3456/health')
+  assert.equal(probeUrl({ HOST: '::1' }), 'http://[::1]:3456/health')
+  assert.equal(probeUrl({ HOST: 'fd00::5' }), 'http://[fd00::5]:3456/health')
+  assert.equal(probeUrl({ HOST: '192.168.1.5' }), 'http://192.168.1.5:3456/health')
+})
+
+test('the container probe is a probe route from loopback, not forwarded', async () => {
+  const { isContainerProbe } = await import('./config/healthProbe.js')
+  for (const url of ['/health', '/ready', '/live', '/live?x=1']) {
+    assert.equal(isContainerProbe(url, '127.0.0.1', false), true, url)
+  }
+  assert.equal(isContainerProbe('/health', '::1', false), true)
+  assert.equal(isContainerProbe('/health', '::ffff:127.0.0.1', false), true)
+  assert.equal(isContainerProbe('/health', '127.0.0.1', true), false, 'through a proxy')
+  assert.equal(isContainerProbe('/health', '192.168.1.20', false), false, 'a browser on the LAN')
+  assert.equal(isContainerProbe('/health', undefined, false), false)
+  assert.equal(isContainerProbe('/api/branding', '127.0.0.1', false), false)
+})
+
+/** The access-log lines written for a url since `logged` was last emptied. */
+function linesFor(url: string): { msg: string; fields: LogFields }[] {
+  return logged.filter(({ fields }) => (fields.url ?? fields.req?.url) === url)
+}
+
+test("the container's own check stays out of the sample and the log, but not entirely", async () => {
+  await app.ready()
+  const { getObservation, resetObservation } = await import('./config/deploymentPosture.js')
+  const { resetContainerProbeLog } = await import('./config/healthProbe.js')
+  resetObservation()
+  resetContainerProbeLog()
+  logged.length = 0
+
+  // The first answer is logged, so a reader can see probes arrive; the rest are not.
+  for (let i = 0; i < 3; i++) await app.inject({ url: '/live' })
+  assert.deepEqual(
+    linesFor('/live').map(({ msg, fields }) => [msg, fields.res?.statusCode]),
+    [['request completed', 200]]
+  )
+
+  // /health answers 503 here (no database). Every failure is logged, by name.
+  logged.length = 0
+  for (let i = 0; i < 2; i++) await app.inject({ url: '/health' })
+  assert.deepEqual(
+    linesFor('/health').map(({ msg, fields }) => [msg, fields.res?.statusCode]),
+    [
+      ['request completed', 503],
+      ['request completed', 503],
+    ]
+  )
+
+  // The recovery is logged once.
+  logged.length = 0
+  for (let i = 0; i < 2; i++) await app.inject({ url: '/live' })
+  assert.equal(linesFor('/live').length, 1)
+
+  assert.equal(getObservation().requestsSeen, 0)
+  assert.equal(getObservation().distinctClientIps, 0)
+})
+
+test('anyone else calling a probe route is a visitor', async () => {
+  await app.ready()
+  const { getObservation, resetObservation } = await import('./config/deploymentPosture.js')
+  resetObservation()
+  logged.length = 0
+
+  await app.inject({ url: '/live', headers: { 'x-forwarded-for': '203.0.113.9' } })
+  assert.equal(getObservation().requestsSeen, 1)
+  assert.equal(getObservation().forwardedForSeen, 1, 'forwarded evidence must reach the posture')
+  assert.deepEqual(
+    linesFor('/live').map(({ msg }) => msg),
+    ['incoming request']
+  )
+
+  logged.length = 0
+  await app.inject({ url: '/live', remoteAddress: '192.168.1.20' })
+  assert.equal(getObservation().requestsSeen, 2)
+  assert.deepEqual(
+    linesFor('/live').map(({ msg }) => msg),
+    ['incoming request']
+  )
+  resetObservation()
+})
+
+test('a completed line names the url only when no incoming line did', async () => {
+  await app.ready()
+  logged.length = 0
+  await app.inject({ url: '/api/branding' })
+  const branding = logged.filter(({ msg }) => msg === 'request completed')
+  assert.equal(branding.length, 1)
+  assert.equal(branding[0].fields.url, undefined)
+  assert.equal(linesFor('/api/branding').length, 1, 'the incoming line names it')
+
+  // Quiet route (QUIET_POLL_LOGS above): no incoming line, and refused here.
+  logged.length = 0
+  const refused = await app.inject({ url: '/api/jobs/active' })
+  assert.ok(refused.statusCode >= 400)
+  assert.deepEqual(
+    linesFor('/api/jobs/active').map(({ msg }) => msg),
+    ['request completed']
+  )
+})
+
+/** Runs the health check script itself, as the image does. */
+function runHealthCheck(port: number): Promise<{ code: number | null; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const env: NodeJS.ProcessEnv = { ...process.env, PORT: String(port) }
+    delete env.HOST
+    const child = spawn(process.execPath, ['--import', 'tsx', 'src/healthcheck.ts'], {
+      cwd: join(REPO_ROOT, 'apps', 'api'),
+      env,
+    })
+    let stderr = ''
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk
+    })
+    child.on('error', reject)
+    child.on('close', (code) => resolve({ code, stderr }))
+  })
+}
+
+/** A server bound where the real one binds by default: IPv4 only. */
+async function listenOnDefaultHost(status: number): Promise<Server> {
+  const { listenHost } = await import('./config/healthProbe.js')
+  const server = createServer((request, response) => {
+    response.statusCode = request.url === '/health' ? status : 404
+    response.end()
+  })
+  await new Promise<void>((resolve) => server.listen(0, listenHost({}), resolve))
+  return server
+}
+
+test('the health check script reaches a server on the default bind and reports its answer', async () => {
+  const healthy = await listenOnDefaultHost(200)
+  const failing = await listenOnDefaultHost(503)
+  const closed = await listenOnDefaultHost(200)
+  const closedPort = (closed.address() as AddressInfo).port
+  await new Promise((resolve) => closed.close(resolve))
+
+  try {
+    const ok = await runHealthCheck((healthy.address() as AddressInfo).port)
+    assert.equal(ok.code, 0, ok.stderr)
+
+    const refused = await runHealthCheck((failing.address() as AddressInfo).port)
+    assert.equal(refused.code, 1)
+    assert.match(refused.stderr, /answered 503/)
+
+    const nobody = await runHealthCheck(closedPort)
+    assert.equal(nobody.code, 1)
+    assert.notEqual(nobody.stderr, '', 'the runtime health log should say why')
+  } finally {
+    await new Promise((resolve) => healthy.close(resolve))
+    await new Promise((resolve) => failing.close(resolve))
+  }
+})
+
+test("the image's health check runs that script against a route that exists", async () => {
+  const dockerfile = await readFile(join(REPO_ROOT, 'docker', 'Dockerfile'), 'utf8')
+  const lines = dockerfile.split('\n').map((line) => line.trimEnd())
+  const check = lines[lines.findIndex((line) => line.startsWith('HEALTHCHECK ')) + 1]
+  assert.equal(check?.trim(), 'CMD ["node", "/app/apps/api/dist/healthcheck.js"]')
+  // The runner stage's WORKDIR is what makes that absolute path right.
+  assert.ok(lines.includes('WORKDIR /app'))
+
+  await app.ready()
+  assert.ok(app.hasRoute({ method: 'GET', url: '/health' }))
 })

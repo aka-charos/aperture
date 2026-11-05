@@ -1,5 +1,6 @@
 import { buildServer } from './server.js'
 import { validateEnv, getDatabaseUrl } from './config/env.js'
+import { listenHost } from './config/healthProbe.js'
 import {
   runMigrations,
   getMigrationStatus,
@@ -139,7 +140,7 @@ async function main() {
   try {
     const address = await server.listen({
       port: env.PORT,
-      host: process.env.HOST?.trim() || '0.0.0.0',
+      host: listenHost(),
     })
     console.log(`🚀 Aperture API server running at ${address}`)
 

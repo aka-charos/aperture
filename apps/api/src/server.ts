@@ -1,4 +1,4 @@
-import Fastify from 'fastify'
+import Fastify, { type FastifyBaseLogger, type FastifyRequest } from 'fastify'
 import cors from '@fastify/cors'
 import cookie from '@fastify/cookie'
 import multipart from '@fastify/multipart'
@@ -8,6 +8,7 @@ import swagger from '@fastify/swagger'
 import swaggerUI from '@fastify/swagger-ui'
 import { createLogger } from './lib/logger.js'
 import { refreshQuietPollState, shouldLogIncoming, shouldLogCompleted } from './config/logging.js'
+import { isContainerProbe, shouldLogContainerProbe } from './config/healthProbe.js'
 import { refreshLogMaskingState, maskHost, maskAddress, maskUrl } from './config/logMasking.js'
 import requestIdPlugin from './plugins/requestId.js'
 import authPlugin, { requireAdmin } from './plugins/auth.js'
@@ -21,17 +22,27 @@ import { warnOnWeakSecurityPosture, noteRequest } from './config/deploymentPostu
 
 export interface ServerOptions {
   logger?: boolean
+  /** Replaces the app's logger, so a test can read the lines it writes. */
+  loggerInstance?: FastifyBaseLogger
 }
 
 /** Ceiling for any multipart upload; individual routes may cap lower. */
 const MAX_UPLOAD_FILE_SIZE = 10 * 1024 * 1024
+
+function fromContainerProbe(request: FastifyRequest): boolean {
+  return isContainerProbe(
+    request.url,
+    request.socket.remoteAddress,
+    request.headers['x-forwarded-for'] !== undefined
+  )
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function buildServer(options: ServerOptions = {}): Promise<any> {
   const logger = createLogger('api')
 
   const fastify = Fastify({
-    loggerInstance: options.logger !== false ? logger : undefined,
+    loggerInstance: options.loggerInstance ?? (options.logger !== false ? logger : undefined),
     // Default per-request logging is disabled so we can suppress noisy
     // high-frequency poll routes at runtime (see the onRequest/onResponse hooks
     // below and the Settings > System "Quiet poll-route logs" toggle).
@@ -65,6 +76,14 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
   // can skip the silenced poll routes (failures are always logged). This is the
   // documented way to customise request logging alongside disableRequestLogging.
   fastify.addHook('onRequest', (request, _reply, done) => {
+    // The container's own health check says nothing about who reaches this
+    // server: it would raise "all traffic from one address" on an idle instance
+    // and hide it on one where it is true, and its lines would swamp the log.
+    if (fromContainerProbe(request)) {
+      done()
+      return
+    }
+
     // Cheap sample of what the traffic looks like, so Settings > Deployment can
     // tell a correctly-configured instance from one whose proxy headers are
     // being ignored. Config alone cannot distinguish those two.
@@ -95,9 +114,18 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
   })
 
   fastify.addHook('onResponse', (request, reply, done) => {
-    if (shouldLogCompleted(request.url, reply.statusCode)) {
+    const probe = fromContainerProbe(request)
+    const logIt = probe
+      ? shouldLogContainerProbe(reply.statusCode)
+      : shouldLogCompleted(request.url, reply.statusCode)
+    if (logIt) {
       request.log.info(
-        { res: { statusCode: reply.statusCode }, responseTime: reply.elapsedTime },
+        {
+          res: { statusCode: reply.statusCode },
+          responseTime: reply.elapsedTime,
+          // A silenced request has no "incoming request" line naming it.
+          ...(probe || !shouldLogIncoming(request.url) ? { url: request.url } : {}),
+        },
         'request completed'
       )
     }
