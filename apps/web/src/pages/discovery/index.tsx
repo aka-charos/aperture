@@ -33,8 +33,8 @@ import {
   useDiscoveryData,
   useSeerrRequest,
   useDiscoveryJobStatus,
-  invalidateDiscoveryCache,
   useDiscoveryGenres,
+  useSeerrStatuses,
 } from './hooks'
 import {
   DiscoveryCard,
@@ -45,11 +45,20 @@ import {
 } from './components'
 import { useServerDisplayName } from '../../hooks/useServerDisplayName'
 import { useViewMode } from '../../hooks/useViewMode'
-import type { DiscoveryCandidate, DiscoveryFilterOptions, MediaType } from './types'
+import { mediaKey } from './hooks/statusBatches'
+import type { DiscoveryCandidate, DiscoveryFilterOptions, MediaType, SeerrMediaStatus } from './types'
 
 type DiscoveryTab = 'movie' | 'series' | 'streaming'
 import type { SeerrRequestOptions } from '../../types/seerrRequest'
 import { PageHeading } from '@/components/PageHeading'
+
+const NO_CANDIDATES: DiscoveryCandidate[] = []
+const REQUESTED_HERE: SeerrMediaStatus = {
+  exists: false,
+  status: 'pending',
+  requested: true,
+  requestStatus: 'pending',
+}
 
 // Local storage key for persisting filter preferences
 const FILTERS_STORAGE_KEY = 'aperture_discovery_filters'
@@ -117,13 +126,11 @@ export function DiscoveryPage() {
     seriesCandidates,
     movieRun,
     seriesRun,
-    seerrStatus,
     loading,
     refreshing,
     expanding,
     error,
     refresh,
-    markAsRequested,
     refetchCandidates,
   } = useDiscoveryData(filters)
 
@@ -132,8 +139,6 @@ export function DiscoveryPage() {
   // Subscribe to discovery job status for real-time updates
   const { isRunning: isJobRunning, progress: jobProgress } = useDiscoveryJobStatus({
     onComplete: () => {
-      // Invalidate cache and refetch when job completes
-      invalidateDiscoveryCache()
       refetchCandidates()
       setSnackbar({
         open: true,
@@ -151,6 +156,18 @@ export function DiscoveryPage() {
   const browseSubTab: BrowseSubTab =
     discoveryTab === 'series' ? browseSubSeries : discoveryTab === 'movie' ? browseSubMovie : 'popular'
   const genreMediaType: MediaType = discoveryTab === 'series' ? 'series' : 'movie'
+  const listShown =
+    discoveryTab === 'streaming' || browseSubTab !== 'popular'
+      ? NO_CANDIDATES
+      : discoveryTab === 'movie'
+        ? movieCandidates
+        : seriesCandidates
+  const seerrStatuses = useSeerrStatuses(listShown)
+  const [requestedHere, setRequestedHere] = useState<Record<string, SeerrMediaStatus>>({})
+  const statusOf = (candidate: DiscoveryCandidate) => {
+    const key = mediaKey(candidate.mediaType, candidate.tmdbId)
+    return requestedHere[key] ?? seerrStatuses[key]
+  }
   const { genres: genreOptions, loading: genresLoading, resolveGenreName } =
     useDiscoveryGenres(genreMediaType)
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
@@ -207,7 +224,10 @@ export function DiscoveryPage() {
       seerrOptions
     )
     if (result.success) {
-      markAsRequested(candidate.tmdbId)
+      setRequestedHere((prev) => ({
+        ...prev,
+        [mediaKey(candidate.mediaType, candidate.tmdbId)]: REQUESTED_HERE,
+      }))
       setSnackbar({
         open: true,
         message: t('discovery.snackbarRequestSubmitted', { title: candidate.title }),
@@ -216,7 +236,7 @@ export function DiscoveryPage() {
     } else {
       setSnackbar({ open: true, message: result.error || t('discovery.snackbarRequestFailed'), severity: 'error' })
     }
-  }, [submitRequest, markAsRequested, t])
+  }, [submitRequest, t])
 
   // Not enabled state
   if (!loading && status && !status.enabled) {
@@ -507,7 +527,7 @@ export function DiscoveryPage() {
                 canRequest={status?.requestEnabled ?? false}
                 onRequest={handleRequest}
                 isRequesting={isRequesting(candidate.tmdbId)}
-                cachedStatus={seerrStatus[candidate.tmdbId]}
+                cachedStatus={statusOf(candidate)}
                 fetchTVDetails={fetchTVDetails}
                 resolveGenreName={resolveGenreName}
               />
@@ -523,7 +543,7 @@ export function DiscoveryPage() {
               canRequest={status?.requestEnabled ?? false}
               onRequest={handleRequest}
               isRequesting={isRequesting(candidate.tmdbId)}
-              cachedStatus={seerrStatus[candidate.tmdbId]}
+              cachedStatus={statusOf(candidate)}
               fetchTVDetails={fetchTVDetails}
               resolveGenreName={resolveGenreName}
             />

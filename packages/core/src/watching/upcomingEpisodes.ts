@@ -8,11 +8,27 @@
 
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne } from '../lib/db.js'
-import { tmdbRequest } from '../tmdb/client.js'
+import { AsyncCache, concurrencyLimit } from '../lib/asyncCache.js'
+import { getTMDbApiKey } from '../settings/systemSettings.js'
+import { tmdbLookup } from '../tmdb/client.js'
 import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
 import { pickLatestAired, type AiredEpisode, type SeasonProgress } from './episodeWindows.js'
 
 const logger = createChildLogger('upcoming-episodes')
+
+/** How long TMDb's answer about one show is reused, an absent next episode included. */
+export const FORECAST_TTL_MS = 30 * 60_000
+const FORECAST_MAX_ENTRIES = 2000
+/** Across every viewer in this process, not per request. */
+export const FORECAST_CONCURRENCY = 4
+/** One attempt: a person is waiting, and a miss costs only this page load. */
+export const FORECAST_TIMEOUT_MS = 5_000
+/**
+ * The longest a request waits for all its lookups. Without it a TMDb outage costs
+ * (lookups / concurrency) x timeout. Lookups past it still finish and fill the
+ * cache; their shows are simply without a TMDb episode for this one response.
+ */
+export const FORECAST_BATCH_BUDGET_MS = 15_000
 
 export interface UpcomingEpisode {
   seriesId: string
@@ -56,14 +72,25 @@ interface TMDbTVDetailsWithNextEpisode {
  * caching here costs one UPDATE and keeps the watching page's "N aired" and
  * missing-season info fresh.
  */
-export async function persistTmdbTotals(
-  seriesId: string,
-  tmdbData:
-    | (Pick<
-        TMDbTVDetailsWithNextEpisode,
-        'number_of_episodes' | 'number_of_seasons' | 'seasons' | 'status'
-      > & { last_episode_to_air?: TMDbNextEpisode | null })
-    | null
+export function persistTmdbTotals(seriesId: string, tmdbData: TmdbTotalsInput): Promise<void> {
+  return writeTmdbTotals('id', seriesId, tmdbData)
+}
+
+type TmdbTotalsInput =
+  | (Pick<
+      TMDbTVDetailsWithNextEpisode,
+      'number_of_episodes' | 'number_of_seasons' | 'seasons' | 'status'
+    > & { last_episode_to_air?: TMDbNextEpisode | null })
+  | null
+
+/**
+ * `tmdb_id` writes every row of a show: one TMDb answer is cached per TMDb id, so
+ * a show held in two libraries gets both rows written the one time it arrives.
+ */
+async function writeTmdbTotals(
+  column: 'id' | 'tmdb_id',
+  value: string,
+  tmdbData: TmdbTotalsInput
 ): Promise<void> {
   try {
     if (tmdbData && typeof tmdbData.number_of_episodes === 'number' && tmdbData.number_of_episodes > 0) {
@@ -90,9 +117,9 @@ export async function persistTmdbTotals(
         `UPDATE series
          SET tmdb_total_episodes = $2, tmdb_total_seasons = $3, tmdb_seasons = $4,
              tmdb_status = $5, tmdb_last_episode = $6, tmdb_totals_synced_at = NOW()
-         WHERE id = $1`,
+         WHERE ${column} = $1`,
         [
-          seriesId,
+          value,
           tmdbData.number_of_episodes,
           tmdbData.number_of_seasons,
           seasons ? JSON.stringify(seasons) : null,
@@ -111,13 +138,96 @@ export async function persistTmdbTotals(
         `UPDATE series
          SET tmdb_totals_synced_at = NOW(),
              tmdb_last_episode = COALESCE(tmdb_last_episode, '{}'::jsonb)
-         WHERE id = $1`,
-        [seriesId]
+         WHERE ${column} = $1`,
+        [value]
       )
     }
   } catch (err) {
-    logger.debug({ err, seriesId }, 'Failed to persist TMDB totals')
+    logger.debug({ err, [column]: value }, 'Failed to persist TMDB totals')
   }
+}
+
+/** TMDb's answer about one show. Public data: it holds nothing about a viewer. */
+interface Forecast {
+  next: TMDbNextEpisode | null
+}
+
+const forecasts = new AsyncCache<Forecast>({
+  ttlMs: FORECAST_TTL_MS,
+  maxEntries: FORECAST_MAX_ENTRIES,
+})
+const limitForecasts = concurrencyLimit(FORECAST_CONCURRENCY)
+
+/**
+ * What TMDb says comes next for a show; null when it could not be asked. Shared
+ * by concurrent requests, and a null is not kept, so a failure is retried by the
+ * next load rather than read as "no upcoming episode". The totals are written
+ * only for a real answer, so a failure does not mark the row as freshly synced
+ * either (`refreshStaleTmdbTotals` keeps its own rule for that).
+ */
+async function getForecast(tmdbId: string, apiKey: string): Promise<Forecast | null> {
+  try {
+    const forecast = await forecasts.get(tmdbId, () =>
+      limitForecasts(async () => {
+        const lookup = await tmdbLookup<TMDbTVDetailsWithNextEpisode>(`/tv/${tmdbId}`, {
+          apiKey,
+          timeoutMs: FORECAST_TIMEOUT_MS,
+          maxAttempts: 1,
+        })
+        if (lookup.status === 'failed') return null
+        const details = lookup.status === 'ok' ? lookup.data : null
+        await writeTmdbTotals('tmdb_id', tmdbId, details)
+        return { next: details?.next_episode_to_air ?? null }
+      })
+    )
+    return forecast ?? null
+  } catch (err) {
+    logger.debug({ err, tmdbId }, 'Failed to fetch TMDB data for upcoming episode')
+    return null
+  }
+}
+
+function tmdbUpcomingEpisode(seriesId: string, next: TMDbNextEpisode): UpcomingEpisode {
+  return {
+    seriesId,
+    seasonNumber: next.season_number,
+    episodeNumber: next.episode_number,
+    title: next.name,
+    overview: next.overview,
+    airDate: next.air_date as string,
+    source: 'tmdb',
+  }
+}
+
+/** The forecasts for many shows, within a time budget. */
+async function lookUpForecasts(
+  rows: ReadonlyArray<{ id: string; tmdb_id: string }>,
+  apiKey: string,
+  budgetMs: number
+): Promise<Map<string, UpcomingEpisode>> {
+  const found = new Map<string, UpcomingEpisode>()
+  const all = Promise.all(
+    rows.map(async (row) => {
+      const forecast = await getForecast(row.tmdb_id, apiKey)
+      if (forecast?.next?.air_date) found.set(row.id, tmdbUpcomingEpisode(row.id, forecast.next))
+    })
+  )
+
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const budget = new Promise<'budget'>((resolve) => {
+    timer = setTimeout(() => resolve('budget'), budgetMs)
+  })
+  const finished = await Promise.race([all, budget])
+  clearTimeout(timer)
+
+  if (finished === 'budget') {
+    logger.warn(
+      { lookups: rows.length, answered: found.size },
+      'TMDb upcoming episode lookups ran past the request budget'
+    )
+  }
+  // A copy: lookups still running must not change a map the caller is reading.
+  return new Map(found)
 }
 
 /**
@@ -161,24 +271,10 @@ export async function getUpcomingEpisodeForSeries(
 
   // Fallback to TMDB if we have a tmdb_id
   if (tmdbId) {
-    try {
-      const tmdbData = await tmdbRequest<TMDbTVDetailsWithNextEpisode>(`/tv/${tmdbId}`)
-
-      await persistTmdbTotals(seriesId, tmdbData ?? null)
-
-      if (tmdbData?.next_episode_to_air && tmdbData.next_episode_to_air.air_date) {
-        return {
-          seriesId,
-          seasonNumber: tmdbData.next_episode_to_air.season_number,
-          episodeNumber: tmdbData.next_episode_to_air.episode_number,
-          title: tmdbData.next_episode_to_air.name,
-          overview: tmdbData.next_episode_to_air.overview,
-          airDate: tmdbData.next_episode_to_air.air_date,
-          source: 'tmdb',
-        }
-      }
-    } catch (err) {
-      logger.debug({ err, tmdbId, seriesId }, 'Failed to fetch TMDB data for upcoming episode')
+    const apiKey = await getTMDbApiKey()
+    if (apiKey) {
+      const forecast = await getForecast(tmdbId, apiKey)
+      if (forecast?.next?.air_date) return tmdbUpcomingEpisode(seriesId, forecast.next)
     }
   }
 
@@ -191,11 +287,12 @@ export async function getUpcomingEpisodeForSeries(
  *
  * options.tmdbFallbackIds bounds the live TMDB fallback: only series in the
  * set are fetched from TMDB when the episodes table has no future episode.
- * The batch Emby query always covers every id (single cheap query).
+ * The batch Emby query always covers every id (single cheap query), and runs on
+ * every call: only TMDb's answer is cached.
  */
 export async function getUpcomingEpisodes(
   seriesIds: string[],
-  options?: { tmdbFallbackIds?: Set<string> }
+  options?: { tmdbFallbackIds?: Set<string>; forecastBudgetMs?: number }
 ): Promise<Map<string, UpcomingEpisode>> {
   const result = new Map<string, UpcomingEpisode>()
   
@@ -249,26 +346,14 @@ export async function getUpcomingEpisodes(
       [seriesNeedingTmdb]
     )
 
-    // Fetch from TMDB (with rate limiting consideration)
-    for (const row of tmdbIds.rows) {
-      try {
-        const tmdbData = await tmdbRequest<TMDbTVDetailsWithNextEpisode>(`/tv/${row.tmdb_id}`)
-
-        await persistTmdbTotals(row.id, tmdbData ?? null)
-
-        if (tmdbData?.next_episode_to_air && tmdbData.next_episode_to_air.air_date) {
-          result.set(row.id, {
-            seriesId: row.id,
-            seasonNumber: tmdbData.next_episode_to_air.season_number,
-            episodeNumber: tmdbData.next_episode_to_air.episode_number,
-            title: tmdbData.next_episode_to_air.name,
-            overview: tmdbData.next_episode_to_air.overview,
-            airDate: tmdbData.next_episode_to_air.air_date,
-            source: 'tmdb',
-          })
-        }
-      } catch (err) {
-        logger.debug({ err, tmdbId: row.tmdb_id, seriesId: row.id }, 'Failed to fetch TMDB data')
+    const apiKey = tmdbIds.rows.length > 0 ? await getTMDbApiKey() : null
+    if (apiKey) {
+      for (const [seriesId, episode] of await lookUpForecasts(
+        tmdbIds.rows,
+        apiKey,
+        options?.forecastBudgetMs ?? FORECAST_BATCH_BUDGET_MS
+      )) {
+        result.set(seriesId, episode)
       }
     }
   }

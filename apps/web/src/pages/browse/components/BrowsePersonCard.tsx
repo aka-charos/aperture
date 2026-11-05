@@ -55,6 +55,8 @@ export function BrowsePersonCard({ person, onNavigate }: BrowsePersonCardProps) 
             component="img"
             src={displaySrc}
             alt=""
+            loading="lazy"
+            decoding="async"
             onLoad={() => setCardImgShown(true)}
             onError={onImageError}
             sx={{

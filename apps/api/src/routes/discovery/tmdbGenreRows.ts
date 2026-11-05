@@ -6,7 +6,6 @@ import { requireAuth, type SessionUser } from '../../plugins/auth.js'
 import { requireCapability } from '../../lib/permissions.js'
 import {
   fetchGenreStripDiscoverCandidates,
-  batchGetSeerrMediaStatus,
   getGenreStripMovieRows,
   getGenreStripSeriesRows,
   GENRE_STRIP_DEFAULT_ROW_LIMIT,
@@ -245,25 +244,11 @@ export function registerTmdbGenreRowsRoutes(fastify: FastifyInstance) {
       yearEndCurrent: ye.current === true ? true : undefined,
     })
 
-    const items = sliced.map((c) => ({
-      tmdbId: c.tmdbId,
-      mediaType: coreMediaType === 'movie' ? ('movie' as const) : ('tv' as const),
-    }))
-    const seerrMap = items.length > 0 ? await batchGetSeerrMediaStatus(items) : new Map()
-    const seerrStatuses: Record<
-      number,
-      { exists: boolean; status: string; requested: boolean; requestStatus?: string }
-    > = {}
-    for (const [tmdbId, st] of seerrMap) {
-      seerrStatuses[tmdbId] = {
-        exists: st.exists,
-        status: st.status,
-        requested: st.requested,
-      }
-    }
+    // No `error` text: the page shows its own translated sentence for a row that failed.
+    if (sliced === null) return reply.status(502).send({})
 
     const candidates = sliced.map((c, i) => rawToCandidateJson(c, i + 1, currentUser.id, coreMediaType))
 
-    return reply.send({ candidates, seerrStatuses })
+    return reply.send({ candidates })
   })
 }

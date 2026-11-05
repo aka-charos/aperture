@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
-import { parsePopularEdges, parseProvidersResponse } from './normalize.js'
+import { justWatchPosterAddress, parsePopularEdges, parseProvidersResponse } from './normalize.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const sample = JSON.parse(readFileSync(join(__dirname, '__fixtures__/popular-sample.json'), 'utf8'))
@@ -17,6 +17,16 @@ test('parsePopularEdges maps tmdb, chart, poster', () => {
   assert.equal(rows[0].chartTrend, 'UP')
   assert.equal(rows[0].daysInTop10, 5)
   assert.ok(rows[0].posterPath?.startsWith('http'))
+})
+
+test("JustWatch's poster becomes a whole address, so the card never asks TMDb for it", () => {
+  assert.equal(
+    justWatchPosterAddress('/poster/305/s718/title.jpg'),
+    'https://images.justwatch.com/poster/305/s718/title.jpg'
+  )
+  assert.equal(justWatchPosterAddress('https://example.invalid/p.jpg'), 'https://example.invalid/p.jpg')
+  assert.equal(justWatchPosterAddress(null), null)
+  assert.equal(justWatchPosterAddress(''), null)
 })
 
 test('parseProvidersResponse maps packages', () => {

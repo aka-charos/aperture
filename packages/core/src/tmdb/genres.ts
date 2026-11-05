@@ -2,15 +2,21 @@
  * TMDb genre lists (localized via `language` on the client).
  */
 
+import { AsyncCache } from '../lib/asyncCache.js'
 import { tmdbRequest, type ApiLogCallback } from './client.js'
 import type { TMDbGenre } from './types.js'
 import { pairGenreNames } from './genreNames.js'
+
+/** TMDb's lists practically never change. A failed read answers null and is not kept. */
+const genreLists = new AsyncCache<{ genres: TMDbGenre[] }>({ ttlMs: 60 * 60_000, maxEntries: 100 })
 
 export async function getMovieGenresList(options: {
   language?: string
   onLog?: ApiLogCallback
 } = {}): Promise<TMDbGenre[]> {
-  const data = await tmdbRequest<{ genres: TMDbGenre[] }>(`/genre/movie/list`, options)
+  const data = await genreLists.get(`movie:${options.language ?? ''}`, () =>
+    tmdbRequest<{ genres: TMDbGenre[] }>(`/genre/movie/list`, options)
+  )
   return data?.genres ?? []
 }
 
@@ -18,7 +24,9 @@ export async function getTVGenresList(options: {
   language?: string
   onLog?: ApiLogCallback
 } = {}): Promise<TMDbGenre[]> {
-  const data = await tmdbRequest<{ genres: TMDbGenre[] }>(`/genre/tv/list`, options)
+  const data = await genreLists.get(`tv:${options.language ?? ''}`, () =>
+    tmdbRequest<{ genres: TMDbGenre[] }>(`/genre/tv/list`, options)
+  )
   return data?.genres ?? []
 }
 

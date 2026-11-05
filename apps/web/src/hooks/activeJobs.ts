@@ -42,6 +42,8 @@ let timer: ReturnType<typeof setInterval> | null = null
 let latest: JobProgress[] = []
 
 async function poll(): Promise<void> {
+  // Nobody is looking. Returning to the tab asks at once (below).
+  if (document.hidden) return
   try {
     const response = await fetch('/api/jobs/active', { credentials: 'include' })
     if (!response.ok) return
@@ -58,6 +60,10 @@ async function poll(): Promise<void> {
   }
 }
 
+function onVisibilityChange(): void {
+  if (!document.hidden) void poll()
+}
+
 function subscribe(listener: Listener): () => void {
   listeners.add(listener)
   // Hand the newcomer what we already know, so a second consumer mounting
@@ -67,6 +73,7 @@ function subscribe(listener: Listener): () => void {
   if (timer === null) {
     void poll()
     timer = setInterval(() => void poll(), POLL_MS)
+    document.addEventListener('visibilitychange', onVisibilityChange)
   }
 
   return () => {
@@ -74,6 +81,7 @@ function subscribe(listener: Listener): () => void {
     if (listeners.size === 0 && timer !== null) {
       clearInterval(timer)
       timer = null
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       // Dropped too: a list from before the last unmount is stale by the time
       // anything subscribes again.
       latest = []

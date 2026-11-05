@@ -80,3 +80,13 @@ test('only a released part nobody has or has asked for is requestable', () => {
     requestable: true,
   })
 })
+
+test('a part Seerr did not answer for is missing, but not requestable', () => {
+  const part = classifyCollectionPart({
+    releaseDate: '1980-12-19',
+    inLibrary: false,
+    seerrAnswered: false,
+    now: NOW,
+  })
+  assert.deepEqual(part, { status: 'missing', seerrStatus: 'none', requestable: false })
+})

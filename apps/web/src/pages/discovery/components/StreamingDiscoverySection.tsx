@@ -26,11 +26,17 @@ import type { DiscoveryCandidate, MediaType, SeerrMediaStatus, StreamingChartRow
 import type { SeerrRequestOptions } from '../../../types/seerrRequest'
 import type { ResolveDiscoveryGenreName } from '../hooks/useDiscoveryGenres'
 import { useStripLoadQueue } from '../hooks/useStripLoadQueue'
+import { useSeerrStatuses } from '../hooks/useSeerrStatuses'
+import { mediaKey } from '../hooks/statusBatches'
 
 const PLACEHOLDER_RUN_ID = '00000000-0000-0000-0000-000000000000'
 
+function rowMediaType(row: StreamingChartRow): MediaType {
+  return row.objectType === 'MOVIE' ? 'movie' : 'series'
+}
+
 function rowToCandidate(row: StreamingChartRow, index: number): DiscoveryCandidate {
-  const mediaType: MediaType = row.objectType === 'MOVIE' ? 'movie' : 'series'
+  const mediaType = rowMediaType(row)
   return {
     id: `jw-${row.jwNodeId}`,
     runId: PLACEHOLDER_RUN_ID,
@@ -116,7 +122,6 @@ function ChartTrendBadge({ trend }: { trend: string }) {
 interface StripState {
   title: string
   rows: StreamingChartRow[]
-  seerrStatuses: Record<number, SeerrMediaStatus>
   error: string | null
   stale?: boolean
 }
@@ -231,7 +236,7 @@ export function StreamingDiscoverySection({ requestEnabled }: { requestEnabled: 
   const [loadingLabels, setLoadingLabels] = useState(true)
   const [searchStrip, setSearchStrip] = useState<StripState | null>(null)
   const [searchLoading, setSearchLoading] = useState(false)
-  const [seerrLocal, setSeerrLocal] = useState<Record<number, Partial<SeerrMediaStatus>>>({})
+  const [seerrLocal, setSeerrLocal] = useState<Record<string, Partial<SeerrMediaStatus>>>({})
 
   const stripEntriesRef = useRef(stripEntries)
   stripEntriesRef.current = stripEntries
@@ -268,7 +273,10 @@ export function StreamingDiscoverySection({ requestEnabled }: { requestEnabled: 
   }, [])
 
   const fetchOneStrip = useCallback(
-    async (opts: { title: string; provider?: string; q?: string }): Promise<StripState> => {
+    async (
+      opts: { title: string; provider?: string; q?: string },
+      signal?: AbortSignal
+    ): Promise<StripState> => {
       const base = {
         country: country.toUpperCase(),
         language,
@@ -280,25 +288,22 @@ export function StreamingDiscoverySection({ requestEnabled }: { requestEnabled: 
           ? buildStreamingQuery({ ...base, q: opts.q })
           : buildStreamingQuery({ ...base, provider: opts.provider })
       const path = opts.q !== undefined ? '/api/discovery/streaming/search' : '/api/discovery/streaming/popular'
-      const res = await fetch(`${path}${qs}`, { credentials: 'include' })
+      const res = await fetch(`${path}${qs}`, { credentials: 'include', signal })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         return {
           title: opts.title,
           rows: [],
-          seerrStatuses: {},
           error: typeof err.error === 'string' ? err.error : t('discoveryStreaming.loadError'),
         }
       }
       const data = (await res.json()) as {
         rows: StreamingChartRow[]
         stale?: boolean
-        seerrStatuses?: Record<number, SeerrMediaStatus>
       }
       return {
         title: opts.title,
         rows: data.rows || [],
-        seerrStatuses: (data.seerrStatuses || {}) as Record<number, SeerrMediaStatus>,
         error: null,
         stale: data.stale,
       }
@@ -307,16 +312,18 @@ export function StreamingDiscoverySection({ requestEnabled }: { requestEnabled: 
   )
 
   const processStripItem = useCallback(
-    async (code: string) => {
+    async (code: string, signal: AbortSignal) => {
       const title = stripEntriesRef.current.find((e) => e.code === code)?.title ?? code
       setStripEntries((prev) => prev.map((e) => (e.code === code ? { ...e, state: 'loading' } : e)))
 
       try {
-        const strip = await fetchOneStrip({ title, provider: code })
+        const strip = await fetchOneStrip({ title, provider: code }, signal)
+        if (signal.aborted) return
         setStripEntries((prev) =>
           prev.map((e) => (e.code === code ? { ...e, state: 'loaded', strip } : e))
         )
       } catch {
+        if (signal.aborted) return
         setStripEntries((prev) =>
           prev.map((e) =>
             e.code === code
@@ -326,7 +333,6 @@ export function StreamingDiscoverySection({ requestEnabled }: { requestEnabled: 
                   strip: {
                     title,
                     rows: [],
-                    seerrStatuses: {},
                     error: t('discoveryStreaming.loadError'),
                   },
                 }
@@ -435,7 +441,7 @@ export function StreamingDiscoverySection({ requestEnabled }: { requestEnabled: 
       if (result.success && candidate.tmdbId) {
         setSeerrLocal((prev) => ({
           ...prev,
-          [candidate.tmdbId]: {
+          [mediaKey(candidate.mediaType, candidate.tmdbId)]: {
             exists: false,
             status: 'pending',
             requested: true,
@@ -447,10 +453,23 @@ export function StreamingDiscoverySection({ requestEnabled }: { requestEnabled: 
     [submitRequest]
   )
 
-  const mergeSeerr = (tmdbId: number | null, strip: StripState): SeerrMediaStatus | undefined => {
-    if (tmdbId == null) return undefined
-    const base = strip.seerrStatuses[tmdbId]
-    const loc = seerrLocal[tmdbId]
+  const shownRows = useMemo(
+    () =>
+      [...stripEntries.map((entry) => entry.strip), searchStrip].flatMap((strip) =>
+        (strip?.rows ?? []).map((row) => ({
+          tmdbId: row.tmdbId ?? 0,
+          mediaType: rowMediaType(row),
+        }))
+      ),
+    [stripEntries, searchStrip]
+  )
+  const seerrStatuses = useSeerrStatuses(shownRows)
+
+  const mergeSeerr = (row: StreamingChartRow): SeerrMediaStatus | undefined => {
+    if (row.tmdbId == null) return undefined
+    const key = mediaKey(rowMediaType(row), row.tmdbId)
+    const base = seerrStatuses[key]
+    const loc = seerrLocal[key]
     if (!base && !loc) return undefined
     const merged: SeerrMediaStatus = {
       exists: loc?.exists ?? base?.exists ?? false,
@@ -490,7 +509,7 @@ export function StreamingDiscoverySection({ requestEnabled }: { requestEnabled: 
       >
         {strip.rows.map((row, idx) => {
           const candidate = rowToCandidate(row, idx)
-          const status = mergeSeerr(row.tmdbId, strip)
+          const status = mergeSeerr(row)
           return (
             <Box
               key={row.jwNodeId}

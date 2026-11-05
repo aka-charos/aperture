@@ -1,6 +1,6 @@
+import { concurrencyLimit } from '../lib/asyncCache.js'
 import { getTMDbConfig } from '../settings/systemSettings.js'
-import { getMovieDetails } from '../tmdb/movies.js'
-import { getTVDetails } from '../tmdb/series.js'
+import { tmdbLookup } from '../tmdb/client.js'
 import type { JustWatchStreamingRow } from './types.js'
 import {
   getCachedTmdbPostersBatch,
@@ -14,6 +14,10 @@ import {
  * so the web client can build `image.tmdb.org` URLs consistently with Discovery cards.
  *
  * Uses DB-backed cache + in-flight dedupe to limit TMDb API usage (see tmdb_poster_cache migration).
+ *
+ * Answers from what is saved and never waits for TMDb: a saved poster past its time
+ * still answers, a title with none keeps JustWatch's own, and anything due is
+ * looked up behind the answer for the next visit.
  */
 export async function attachTmdbPosterPaths(
   rows: JustWatchStreamingRow[],
@@ -47,25 +51,25 @@ export async function attachTmdbPosterPaths(
   const tvPoster = new Map<number, string | null>()
   const now = Date.now()
 
-  for (const id of movieIds) {
-    const row = movieCached.get(id)
-    if (row && now - row.fetchedAtMs <= ttl) {
-      moviePoster.set(id, row.posterPath)
+  const savedAndDue = (
+    ids: Set<number>,
+    saved: typeof movieCached,
+    posters: Map<number, string | null>
+  ): number[] => {
+    const due: number[] = []
+    for (const id of ids) {
+      const row = saved.get(id)
+      if (row) posters.set(id, row.posterPath)
+      if (!row || now - row.fetchedAtMs > ttl) due.push(id)
     }
+    return due
   }
-  for (const id of tvIds) {
-    const row = tvCached.get(id)
-    if (row && now - row.fetchedAtMs <= ttl) {
-      tvPoster.set(id, row.posterPath)
-    }
-  }
+  const dueMovies = savedAndDue(movieIds, movieCached, moviePoster)
+  const dueShows = savedAndDue(tvIds, tvCached, tvPoster)
 
-  const fetchMovieIds = [...movieIds].filter((id) => !moviePoster.has(id))
-  const fetchTvIds = [...tvIds].filter((id) => !tvPoster.has(id))
-
-  await Promise.all([
-    ...fetchMovieIds.map((id) => fetchMoviePoster(id, lang, moviePoster)),
-    ...fetchTvIds.map((id) => fetchTvPoster(id, lang, tvPoster)),
+  void Promise.allSettled([
+    ...dueMovies.map((id) => limitBackgroundFill(() => fetchPoster('movie', id, lang))),
+    ...dueShows.map((id) => limitBackgroundFill(() => fetchPoster('tv', id, lang))),
   ])
 
   return rows.map((r) => {
@@ -86,45 +90,29 @@ function inflightKey(media: 'movie' | 'tv', id: number, lang: string): string {
   return `${media}:${id}:${normalizePosterCacheLanguage(lang)}`
 }
 
-async function fetchMoviePoster(
-  id: number,
-  lang: string,
-  out: Map<number, string | null>
-): Promise<void> {
-  const key = inflightKey('movie', id, lang)
-  let p = inflight.get(key)
-  if (!p) {
-    p = (async () => {
-      const d = await getMovieDetails(id, { language: lang })
-      const path = d?.poster_path ?? null
-      await upsertTmdbPosterCache('movie', id, lang, path)
-      return path
-    })()
-    inflight.set(key, p)
-  }
-  try {
-    const path = await p
-    out.set(id, path)
-  } finally {
-    inflight.delete(key)
-  }
-}
+const limitBackgroundFill = concurrencyLimit(4)
 
-async function fetchTvPoster(id: number, lang: string, out: Map<number, string | null>): Promise<void> {
-  const key = inflightKey('tv', id, lang)
+/**
+ * TMDb saying it has no such title is kept; a failed lookup keeps nothing, so a
+ * TMDb outage cannot fill the cache with titles marked as having no poster.
+ */
+async function fetchPoster(media: 'movie' | 'tv', id: number, lang: string): Promise<void> {
+  const key = inflightKey(media, id, lang)
   let p = inflight.get(key)
   if (!p) {
     p = (async () => {
-      const d = await getTVDetails(id, { language: lang })
-      const path = d?.poster_path ?? null
-      await upsertTmdbPosterCache('tv', id, lang, path)
+      const answer = await tmdbLookup<{ poster_path?: string | null }>(`/${media}/${id}`, {
+        language: lang,
+      })
+      if (answer.status === 'failed') return null
+      const path = answer.status === 'ok' ? (answer.data.poster_path ?? null) : null
+      await upsertTmdbPosterCache(media, id, lang, path)
       return path
     })()
     inflight.set(key, p)
   }
   try {
-    const path = await p
-    out.set(id, path)
+    await p
   } finally {
     inflight.delete(key)
   }

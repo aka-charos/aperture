@@ -1,43 +1,15 @@
-import { useCallback, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createStripQueue } from './stripQueue'
 
-export function useStripLoadQueue(processItem: (key: string) => Promise<void>) {
-  const queueRef = useRef<string[]>([])
-  const processingRef = useRef(false)
-  const queuedRef = useRef<Set<string>>(new Set())
+export function useStripLoadQueue(processItem: (key: string, signal: AbortSignal) => Promise<void>) {
   const processItemRef = useRef(processItem)
   processItemRef.current = processItem
 
-  const processQueue = useCallback(async () => {
-    if (processingRef.current) return
-    const key = queueRef.current.shift()
-    if (!key) return
-    processingRef.current = true
-    queuedRef.current.delete(key)
-
-    try {
-      await processItemRef.current(key)
-    } finally {
-      processingRef.current = false
-      void processQueue()
-    }
-  }, [])
-
-  const enqueue = useCallback(
-    (key: string, canEnqueue: () => boolean) => {
-      if (!canEnqueue()) return
-      if (queuedRef.current.has(key)) return
-      queuedRef.current.add(key)
-      queueRef.current.push(key)
-      void processQueue()
-    },
-    [processQueue]
+  const [queue] = useState(() =>
+    createStripQueue((key, signal) => processItemRef.current(key, signal))
   )
 
-  const reset = useCallback(() => {
-    queueRef.current = []
-    queuedRef.current = new Set()
-    processingRef.current = false
-  }, [])
+  useEffect(() => queue.reset, [queue])
 
-  return { enqueue, reset }
+  return queue
 }
