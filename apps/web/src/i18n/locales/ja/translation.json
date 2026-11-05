@@ -2335,8 +2335,8 @@
     "dislikedHandlingSubtitle": "ハート 1 ～ 3 個の評価を付けたコンテンツは、おすすめにどのような影響を与えますか?",
     "excludeOptionTitle": "完全に除外 (推奨)",
     "excludeOptionDesc": "嫌いなコンテンツはおすすめに表示されません",
-    "penalizeOptionTitle": "罰則を与えるが許可する",
-    "penalizeOptionDesc": "他の設定と強く一致する場合は引き続き表示される可能性があります",
+    "penalizeOptionTitle": "他のタイトルと同様に許可",
+    "penalizeOptionDesc": "他のタイトルと同様におすすめされることがあり、スコアは下がりません。視聴済みのものは、視聴済みタイトルを許可しない限り除外されます。",
     "noDislikedItems": "嫌いなコンテンツはありません。 ここにアイテムを追加するには、コンテンツを 1 ～ 3 個のハートで評価してください。",
     "clearRatingTooltip": "明確な評価",
     "dislikedTipFooter": "ヒント: ハートを調整して評価を変更します。 ✕ をクリックして評価を完全にクリアします (項目を未評価プールに戻します)。"

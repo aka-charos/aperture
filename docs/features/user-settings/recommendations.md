@@ -52,7 +52,7 @@ What is allowed onto your list, and what comes with it.
 | Setting | What it does |
 |---------|--------------|
 | **Suggest titles I have already watched** | Off (the default): you are only offered titles you haven't watched or started (5% progress counts as started). On: titles you've seen may come back, for example to rewatch |
-| **Titles you rated low** | What happens to titles you rated 1–3: **Exclude Completely** (recommended) keeps them off your list, **Penalize But Allow** lets them through when they strongly match everything else. **Review** lists those titles so you can change a rating or clear it |
+| **Titles you rated low** | What happens to titles you rated 1–3: **Exclude Completely** (recommended) keeps them off your list, **Allow Like Any Other Title** lets them be recommended with no lower score (ones you've already watched still need **Suggest titles I have already watched**). **Review** lists those titles so you can change a rating or clear it |
 | **Explain each pick** | Whether each recommendation carries a *"Why Aperture picked this for you"* note. Your admin may decide this for you, in which case the card shows the setting in force with a reset option. Turning it on doesn't add notes to recommendations already made |
 
 ---

@@ -2339,8 +2339,8 @@
     "dislikedHandlingSubtitle": "Comment le contenu auquel vous avez attribué une note de 1 à 3 cœurs devrait-il affecter vos recommandations ?",
     "excludeOptionTitle": "Exclure complètement (recommandé)",
     "excludeOptionDesc": "Le contenu que vous n'aimez pas n'apparaîtra jamais dans les recommandations",
-    "penalizeOptionTitle": "Pénaliser mais autoriser",
-    "penalizeOptionDesc": "Peut toujours apparaître s'il correspond fortement à d'autres préférences",
+    "penalizeOptionTitle": "Autoriser comme tout autre titre",
+    "penalizeOptionDesc": "Peuvent être recommandés comme tout autre titre, sans score réduit. Ceux que vous avez déjà vus restent exclus, sauf si vous autorisez les titres vus.",
     "noDislikedItems": "Aucun contenu détesté. Évaluez le contenu avec 1 à 3 cœurs pour ajouter des éléments ici.",
     "clearRatingTooltip": "Effacer la note",
     "dislikedTipFooter": "Astuce : Ajustez les cœurs pour modifier la note. Cliquez sur ✕ pour effacer complètement la note (renvoie l'élément au pool non noté)."

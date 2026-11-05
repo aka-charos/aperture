@@ -2335,8 +2335,8 @@
     "dislikedHandlingSubtitle": "您评价为 1-3 颗心的内容会对您的推荐产生什么影响？",
     "excludeOptionTitle": "完全排除（推荐）",
     "excludeOptionDesc": "您不喜欢的内容永远不会出现在推荐中",
-    "penalizeOptionTitle": "惩罚但允许",
-    "penalizeOptionDesc": "如果强烈匹配其他偏好，可能仍然会出现",
+    "penalizeOptionTitle": "与其他作品一样允许",
+    "penalizeOptionDesc": "可以像其他作品一样被推荐，评分不会降低。已看过的作品不会出现，除非您允许推荐已看过的作品。",
     "noDislikedItems": "没有不喜欢的内容。 为内容评分 1-3 颗心，以便在此处添加项目。",
     "clearRatingTooltip": "明确评级",
     "dislikedTipFooter": "提示：调整红心来改变评级。 单击 ✕ 完全清除评级（将项目返回到未评级池）。"

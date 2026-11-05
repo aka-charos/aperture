@@ -2339,8 +2339,8 @@
     "dislikedHandlingSubtitle": "Como o conteúdo que você avaliou de 1 a 3 corações deve afetar suas recomendações?",
     "excludeOptionTitle": "Excluir completamente (recomendado)",
     "excludeOptionDesc": "O conteúdo que você não gosta nunca aparecerá nas recomendações",
-    "penalizeOptionTitle": "Penalizar, mas permitir",
-    "penalizeOptionDesc": "Ainda pode aparecer se corresponder fortemente a outras preferências",
+    "penalizeOptionTitle": "Permitir como qualquer outro título",
+    "penalizeOptionDesc": "Podem ser recomendados como qualquer outro título, sem pontuação menor. Os que você já assistiu ficam de fora, a menos que você permita títulos assistidos.",
     "noDislikedItems": "Nenhum conteúdo não apreciado. Avalie o conteúdo com 1 a 3 corações para adicionar itens aqui.",
     "clearRatingTooltip": "Classificação clara",
     "dislikedTipFooter": "Dica: ajuste os corações para alterar a classificação. Clique em ✕ para limpar totalmente a classificação (retorna o item para o conjunto sem classificação)."

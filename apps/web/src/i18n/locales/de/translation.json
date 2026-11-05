@@ -2335,8 +2335,8 @@
     "dislikedHandlingSubtitle": "Wie sollen Inhalte, die du mit 1-3 Herzen bewertet hast, deine Empfehlungen beeinflussen?",
     "excludeOptionTitle": "Vollständig ausschließen (empfohlen)",
     "excludeOptionDesc": "Inhalte, die du nicht magst, erscheinen nie in Empfehlungen",
-    "penalizeOptionTitle": "Bestrafen, aber zulassen",
-    "penalizeOptionDesc": "Kann trotzdem erscheinen, wenn andere Präferenzen stark übereinstimmen",
+    "penalizeOptionTitle": "Wie jeden anderen Titel zulassen",
+    "penalizeOptionDesc": "Können wie jeder andere Titel empfohlen werden, ohne Abzug bei der Bewertung. Bereits gesehene bleiben außen vor, solange du gesehene Titel nicht zulässt.",
     "noDislikedItems": "Keine unerwünschten Inhalte. Bewerte Inhalte mit 1-3 Herzen, um hier Elemente hinzuzufügen.",
     "clearRatingTooltip": "Bewertung löschen",
     "dislikedTipFooter": "Tipp: Passe die Herzen an, um die Bewertung zu ändern. Klicke ✕, um die Bewertung komplett zu löschen (Element wird wieder als unbewertet behandelt)."

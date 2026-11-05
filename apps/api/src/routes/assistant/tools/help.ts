@@ -45,8 +45,8 @@ export function createHelpTools(ctx: ToolContext) {
             ],
             impact: [
               'High ratings (7+) boost similar content in recommendations',
-              'Low ratings (3 or below) exclude similar content by default',
-              'You can change "exclude" to "penalize" in settings',
+              'Titles you rate 3 or below stay out of your recommendations by default',
+              'Under "Titles you rated low" in settings you can allow them like any other title, with no lower score',
             ],
           },
           recommendations: {

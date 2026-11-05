@@ -2335,8 +2335,8 @@
     "dislikedHandlingSubtitle": "하트 1~3개를 평가한 콘텐츠가 맞춤 동영상에 어떤 영향을 미치나요?",
     "excludeOptionTitle": "완전히 제외(권장)",
     "excludeOptionDesc": "싫어하는 콘텐츠는 추천 항목에 표시되지 않습니다.",
-    "penalizeOptionTitle": "처벌하되 허용하라",
-    "penalizeOptionDesc": "다른 기본 설정과 강력하게 일치하는 경우 계속 나타날 수 있습니다.",
+    "penalizeOptionTitle": "다른 타이틀처럼 허용",
+    "penalizeOptionDesc": "다른 타이틀과 똑같이 추천될 수 있으며 점수가 낮아지지 않습니다. 이미 시청한 타이틀은 시청한 타이틀을 허용하지 않는 한 제외됩니다.",
     "noDislikedItems": "싫어하는 콘텐츠가 없습니다. 여기에 항목을 추가하려면 하트 1~3개로 콘텐츠를 평가하세요.",
     "clearRatingTooltip": "평점 지우기",
     "dislikedTipFooter": "팁: 하트를 조정하여 등급을 변경하세요. 평가를 완전히 지우려면 ✕를 클릭하세요(항목을 평가되지 않은 풀로 되돌림)."

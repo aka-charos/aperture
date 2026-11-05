@@ -63,7 +63,7 @@ How dislikes are treated is your choice under **Titles you rated low** in [Recom
 | Mode | Effect |
 |------|--------|
 | **Exclude Completely** (recommended) | Disliked titles never appear in recommendations |
-| **Penalize But Allow** | They're scored down but can still appear if something else fits strongly |
+| **Allow Like Any Other Title** | They can be recommended with no lower score. Ones you've already watched stay out unless **Suggest titles I have already watched** is on |
 
 Either way the model learns from what you don't like. **Review** on the same card lists them, so you can re-rate or clear any of them.
 

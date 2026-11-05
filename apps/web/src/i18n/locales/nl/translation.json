@@ -2105,8 +2105,8 @@
     "dislikedHandlingSubtitle": "Hoe moet inhoud die u met 1 tot 3 harten heeft beoordeeld, van invloed zijn op uw aanbevelingen?",
     "excludeOptionTitle": "Volledig uitsluiten (aanbevolen)",
     "excludeOptionDesc": "Inhoud die u niet leuk vindt, zal nooit in aanbevelingen verschijnen",
-    "penalizeOptionTitle": "Straffen maar toestaan",
-    "penalizeOptionDesc": "Kan nog steeds verschijnen als deze sterk overeenkomt met andere voorkeuren",
+    "penalizeOptionTitle": "Toestaan zoals elke andere titel",
+    "penalizeOptionDesc": "Kunnen worden aanbevolen zoals elke andere titel, zonder lagere score. Titels die u al hebt gezien blijven buiten beeld, tenzij u bekeken titels toestaat.",
     "noDislikedItems": "Geen afgekeurde inhoud. Beoordeel inhoud met 1-3 harten om hier items toe te voegen.",
     "clearRatingTooltip": "Duidelijke beoordeling",
     "dislikedTipFooter": "Tip: Pas harten aan om de beoordeling te wijzigen. Klik op ✕ om de beoordeling volledig te wissen (het item wordt teruggezet in de groep zonder beoordeling)."

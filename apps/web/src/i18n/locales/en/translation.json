@@ -2429,8 +2429,8 @@
     "dislikedHandlingSubtitle": "How should content you've rated 1-3 hearts affect your recommendations?",
     "excludeOptionTitle": "Exclude Completely (Recommended)",
     "excludeOptionDesc": "Content you dislike will never appear in recommendations",
-    "penalizeOptionTitle": "Penalize But Allow",
-    "penalizeOptionDesc": "May still appear if strongly matching other preferences",
+    "penalizeOptionTitle": "Allow Like Any Other Title",
+    "penalizeOptionDesc": "Can be recommended like any other title, with no lower score. Ones you've already watched stay out unless you allow watched titles.",
     "noDislikedItems": "No disliked content. Rate content with 1-3 hearts to add items here.",
     "clearRatingTooltip": "Clear rating",
     "dislikedTipFooter": "Tip: Adjust hearts to change rating. Click ✕ to clear rating entirely (returns item to unrated pool)."

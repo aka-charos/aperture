@@ -2339,8 +2339,8 @@
     "dislikedHandlingSubtitle": "¿Cómo debería afectar a tus recomendaciones el contenido que has clasificado entre 1 y 3 corazones?",
     "excludeOptionTitle": "Excluir completamente (recomendado)",
     "excludeOptionDesc": "El contenido que no te gusta nunca aparecerá en las recomendaciones.",
-    "penalizeOptionTitle": "Penalizar pero permitir",
-    "penalizeOptionDesc": "Todavía puede aparecer si coincide fuertemente con otras preferencias",
+    "penalizeOptionTitle": "Permitir como cualquier otro título",
+    "penalizeOptionDesc": "Pueden recomendarse como cualquier otro título, sin una puntuación más baja. Los que ya viste quedan fuera, salvo que permitas títulos vistos.",
     "noDislikedItems": "No hay contenido que no me guste. Califica el contenido con 1 a 3 corazones para agregar elementos aquí.",
     "clearRatingTooltip": "Borrar calificación",
     "dislikedTipFooter": "Consejo: ajuste los corazones para cambiar la calificación. Haga clic en ✕ para borrar la calificación por completo (devuelve el artículo al grupo sin calificación)."

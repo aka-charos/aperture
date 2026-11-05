@@ -2339,8 +2339,8 @@
     "dislikedHandlingSubtitle": "In che modo i contenuti che hai valutato con 1-3 cuori dovrebbero influenzare i tuoi consigli?",
     "excludeOptionTitle": "Escludi completamente (consigliato)",
     "excludeOptionDesc": "I contenuti che non ti piacciono non verranno mai visualizzati nei consigli",
-    "penalizeOptionTitle": "Penalizzare ma consentire",
-    "penalizeOptionDesc": "Può ancora apparire se corrisponde fortemente ad altre preferenze",
+    "penalizeOptionTitle": "Consenti come qualsiasi altro titolo",
+    "penalizeOptionDesc": "Possono essere consigliati come qualsiasi altro titolo, senza un punteggio più basso. Quelli già visti restano esclusi, a meno che tu non consenta i titoli visti.",
     "noDislikedItems": "Nessun contenuto non gradito. Valuta il contenuto con 1-3 cuori per aggiungere elementi qui.",
     "clearRatingTooltip": "Valutazione chiara",
     "dislikedTipFooter": "Suggerimento: modifica i cuori per modificare la valutazione. Fare clic su ✕ per cancellare completamente la valutazione (restituisce l'elemento al pool senza classificazione)."
