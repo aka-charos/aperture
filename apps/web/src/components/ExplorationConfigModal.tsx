@@ -192,7 +192,7 @@ export function ExplorationConfigModal({ open: controlledOpen, onClose }: Explor
           }
           label={
             <Typography variant="body2" color="text.secondary">
-              {t('common.dontShowAgain')}
+              {t('admin.common.dontShowAgain')}
             </Typography>
           }
         />
@@ -200,7 +200,7 @@ export function ExplorationConfigModal({ open: controlledOpen, onClose }: Explor
 
       <DialogActions sx={{ p: 3, pt: 0, gap: 1 }}>
         <Button variant="outlined" onClick={handleClose}>
-          {t('common.later')}
+          {t('admin.common.later')}
         </Button>
         <Button
           variant="contained"

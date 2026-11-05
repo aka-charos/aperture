@@ -6,9 +6,11 @@
 #   - Emby or Jellyfin is running directly on Windows (NOT in Docker)
 #   - Your media is on network shares (NAS) or local drives
 #
-# This configuration uses STRM mode - symlinks are NOT supported because
-# Aperture runs in a Linux container while your media server runs on Windows.
-# STRM files contain Windows paths that Emby reads and resolves directly.
+# Recommendations reach viewers in the app and, on Emby, as home screen rows,
+# which need no shared folder. The STRM / symlink libraries are a legacy option,
+# off on a new install (Admin -> Recommendations -> Output format). If you switch
+# them on here, use STRM: symlinks do not work because Aperture runs in a Linux
+# container while your media server runs on Windows.
 #
 # Quick start:
 #   1. Edit the REQUIRED settings below
@@ -39,14 +41,13 @@
 # │  │  C:\Media\Movies\                                         │  │
 # │  │  D:\TV Shows\                                             │  │
 # │  │  \\NAS\Media\Movies\                                      │  │
-# │  │  M:\ApertureLibraries\  ← Aperture writes here            │  │
+# │  │  M:\ApertureLibraries\  ← legacy STRM output, if enabled  │  │
 # │  └───────────────────────────────────────────────────────────┘  │
 # └─────────────────────────────────────────────────────────────────┘
 #
-# KEY CONCEPT: Aperture only needs write access to ONE location for output.
-# It reads all media information from Emby's API - it doesn't need direct
-# access to your movies or TV shows. The STRM files it creates contain the
-# Windows paths that Emby already knows.
+# KEY CONCEPT: Aperture reads all media information from Emby's API - it
+# doesn't need access to your movies or TV shows. The only folder it writes
+# to besides its backups is the legacy STRM output, and only when that is on.
 #
 # =============================================================================
 
@@ -96,9 +97,10 @@ services:
         condition: service_healthy
     volumes:
       # ─────────────────────────────────────────────────────────────────────────
-      # VOLUME 1: Aperture Libraries Output
+      # VOLUME 1: Aperture Libraries Output (legacy, off on a new install)
       # ─────────────────────────────────────────────────────────────────────────
-      # This is where Aperture writes STRM files. You have two options:
+      # Only used if you switch on the legacy STRM libraries. Keep the mount
+      # either way; the folder simply stays empty. You have two options:
       #
       # OPTION A: Local folder on Windows (simplest)
       #   - C:\ApertureLibraries:/aperture-libraries
@@ -124,9 +126,13 @@ services:
       # ─────────────────────────────────────────────────────────────────────────
       # NO MEDIA MOUNT NEEDED!
       # ─────────────────────────────────────────────────────────────────────────
-      # In STRM mode, Aperture gets all media information from Emby's API.
-      # The STRM files contain Windows paths (like D:\Movies\Film.mkv) that
-      # Emby reads and resolves directly. Aperture never touches your media.
+      # Aperture gets all media information from Emby's API and never touches
+      # your media. Legacy STRM files, if you enable them, contain Windows paths
+      # (like D:\Movies\Film.mkv) that Emby reads and resolves directly.
+      #
+      # Optional: your own logo/favicon and UI string overrides, e.g.
+      #   - C:/ApertureConfig/branding:/config/branding:ro
+      #   - C:/ApertureConfig/i18n:/config/i18n:ro
       #
     restart: unless-stopped
 
@@ -147,6 +153,10 @@ volumes:
 #   │              Docker containers reach the Windows host                   │
 #   └─────────────────────────────────────────────────────────────────────────┘
 #
+#   That is the only path the wizard asks for. The settings below apply only
+#   if you later switch on the legacy STRM libraries in the admin console
+#   (Admin -> Recommendations -> Output format, then Library -> File locations):
+#
 #   FILE LOCATIONS:
 #   ┌─────────────────────────────────────────────────────────────────────────┐
 #   │ Where does your media server see Aperture's libraries?                  │
@@ -161,8 +171,8 @@ volumes:
 #   │ Movies Use Symlinks:  OFF (use STRM)                                    │
 #   │ Series Use Symlinks:  OFF (use STRM)                                    │
 #   │                                                                         │
-#   │ ⚠️  STRM mode is REQUIRED for Windows Docker Desktop!                   │
-#   │     Symlinks won't work across Linux container → Windows host           │
+#   │ ⚠️  Use STRM on Windows Docker Desktop: symlinks won't work across      │
+#   │     a Linux container → Windows host                                    │
 #   └─────────────────────────────────────────────────────────────────────────┘
 #
 # =============================================================================

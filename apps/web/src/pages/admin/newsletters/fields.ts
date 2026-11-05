@@ -18,5 +18,5 @@ export interface TitleCardAttrs {
 
 /** The translation key for a field's label; a show's director is its creator. */
 export function fieldLabelKey(field: string, mediaType: 'movie' | 'series'): string {
-  return `newsletters.fields.${field}${field === 'director' && mediaType === 'series' ? 'Series' : ''}`
+  return `admin.newsletters.fields.${field}${field === 'director' && mediaType === 'series' ? 'Series' : ''}`
 }

@@ -210,7 +210,7 @@ export function NewsletterEditor({
         method: 'POST',
         json: { subject, preheader, content, groupIds, language: previewLanguage },
       })
-      setNotice(t('newsletters.editor.testSent', { to: result.to }))
+      setNotice(t('admin.newsletters.editor.testSent', { to: result.to }))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -258,7 +258,7 @@ export function NewsletterEditor({
     <Stack spacing={2}>
       <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
         <Button startIcon={<ArrowBackIcon />} onClick={onBack}>
-          {t('newsletters.editor.back')}
+          {t('admin.newsletters.editor.back')}
         </Button>
         <StatusChip status={newsletter.status} />
         <Box sx={{ flex: 1 }} />
@@ -269,7 +269,7 @@ export function NewsletterEditor({
               disabled={busy !== null}
               onClick={() => void sendTest()}
             >
-              {t('newsletters.editor.sendTest')}
+              {t('admin.newsletters.editor.sendTest')}
             </Button>
             <Button
               variant="outlined"
@@ -277,13 +277,13 @@ export function NewsletterEditor({
               disabled={saving || !dirty}
               onClick={() => void save()}
             >
-              {dirty ? t('newsletters.editor.save') : t('newsletters.editor.saved')}
+              {dirty ? t('admin.newsletters.editor.save') : t('admin.newsletters.editor.saved')}
             </Button>
           </>
         )}
         {!editable && (
           <Button startIcon={<ContentCopyIcon />} onClick={() => void duplicate()}>
-            {t('newsletters.editor.duplicate')}
+            {t('admin.newsletters.editor.duplicate')}
           </Button>
         )}
         {canSend && (
@@ -298,20 +298,20 @@ export function NewsletterEditor({
             }
             onClick={() => setConfirmSend(true)}
           >
-            {newsletter.status === 'failed' ? t('newsletters.editor.retry') : t('newsletters.editor.send')}
+            {newsletter.status === 'failed' ? t('admin.newsletters.editor.retry') : t('admin.newsletters.editor.send')}
           </Button>
         )}
       </Stack>
 
       {options.sendingProblemText && canSend && (
-        <Alert severity="warning">{t('newsletters.editor.cannotSend', { reason: options.sendingProblemText })}</Alert>
+        <Alert severity="warning">{t('admin.newsletters.editor.cannotSend', { reason: options.sendingProblemText })}</Alert>
       )}
       {newsletter.status === 'failed' && newsletter.lastError && (
-        <Alert severity="error">{t('newsletters.editor.lastError', { error: newsletter.lastError })}</Alert>
+        <Alert severity="error">{t('admin.newsletters.editor.lastError', { error: newsletter.lastError })}</Alert>
       )}
       {newsletter.status === 'sending' && (
         <Alert severity="info" icon={<CircularProgress size={18} />}>
-          {t('newsletters.editor.sendingProgress', {
+          {t('admin.newsletters.editor.sendingProgress', {
             sent: newsletter.sentCount,
             total: newsletter.recipientCount ?? 0,
           })}
@@ -319,7 +319,7 @@ export function NewsletterEditor({
       )}
       {newsletter.status === 'sent' && (
         <Alert severity="success">
-          {t('newsletters.editor.sentSummary', {
+          {t('admin.newsletters.editor.sentSummary', {
             sent: newsletter.sentCount,
             date: newsletter.sentAt ? new Date(newsletter.sentAt).toLocaleString() : '',
           })}
@@ -346,7 +346,7 @@ export function NewsletterEditor({
       >
         <Stack spacing={2}>
           <TextField
-            label={t('newsletters.editor.subject')}
+            label={t('admin.newsletters.editor.subject')}
             value={subject}
             disabled={!editable}
             onChange={(event) => {
@@ -357,8 +357,8 @@ export function NewsletterEditor({
             fullWidth
           />
           <TextField
-            label={t('newsletters.editor.preheader')}
-            helperText={t('newsletters.editor.preheaderHelp')}
+            label={t('admin.newsletters.editor.preheader')}
+            helperText={t('admin.newsletters.editor.preheaderHelp')}
             value={preheader}
             disabled={!editable}
             onChange={(event) => {
@@ -369,7 +369,7 @@ export function NewsletterEditor({
             fullWidth
           />
           <FormControl fullWidth disabled={!editable}>
-            <InputLabel id="newsletter-groups-label">{t('newsletters.editor.groups')}</InputLabel>
+            <InputLabel id="newsletter-groups-label">{t('admin.newsletters.editor.groups')}</InputLabel>
             <Select
               labelId="newsletter-groups-label"
               multiple
@@ -379,7 +379,7 @@ export function NewsletterEditor({
                 setGroupIds(typeof value === 'string' ? value.split(',') : value)
                 setDirty(true)
               }}
-              input={<OutlinedInput label={t('newsletters.editor.groups')} />}
+              input={<OutlinedInput label={t('admin.newsletters.editor.groups')} />}
               renderValue={(selected) => (
                 <Stack direction="row" gap={0.5} flexWrap="wrap">
                   {selected.map((groupId) => (
@@ -390,7 +390,7 @@ export function NewsletterEditor({
             >
               {groups.length === 0 && (
                 <MenuItem disabled>
-                  <ListItemText primary={t('newsletters.editor.noGroups')} />
+                  <ListItemText primary={t('admin.newsletters.editor.noGroups')} />
                 </MenuItem>
               )}
               {groups.map((group) => (
@@ -398,7 +398,7 @@ export function NewsletterEditor({
                   <Checkbox size="small" checked={groupIds.includes(group.id)} />
                   <ListItemText
                     primary={group.name}
-                    secondary={t('newsletters.groups.counts', {
+                    secondary={t('admin.newsletters.groups.counts', {
                       members: group.memberCount ?? 0,
                       recipients: group.recipientCount ?? 0,
                     })}
@@ -410,8 +410,8 @@ export function NewsletterEditor({
           {audience && (
             <Typography variant="body2" color={recipientCount === 0 ? 'warning.main' : 'text.secondary'}>
               {recipientCount === 0
-                ? t('newsletters.editor.noRecipients')
-                : t('newsletters.editor.audience', {
+                ? t('admin.newsletters.editor.noRecipients')
+                : t('admin.newsletters.editor.audience', {
                     count: recipientCount,
                     languages: Object.entries(audience.byLanguage)
                       .map(([code, n]) => `${languageLabel(code)} ${n}`)
@@ -437,14 +437,14 @@ export function NewsletterEditor({
               <Card variant="outlined">
                 <CardContent>
                   <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
-                    {t('newsletters.editor.deliveries', { count: deliveries.length })}
+                    {t('admin.newsletters.editor.deliveries', { count: deliveries.length })}
                   </Typography>
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>{t('newsletters.editor.recipient')}</TableCell>
-                        <TableCell>{t('newsletters.editor.language')}</TableCell>
-                        <TableCell>{t('newsletters.editor.result')}</TableCell>
+                        <TableCell>{t('admin.newsletters.editor.recipient')}</TableCell>
+                        <TableCell>{t('admin.newsletters.editor.language')}</TableCell>
+                        <TableCell>{t('admin.newsletters.editor.result')}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -459,7 +459,7 @@ export function NewsletterEditor({
                           <TableCell>{languageLabel(delivery.language)}</TableCell>
                           <TableCell>
                             {delivery.status === 'sent' ? (
-                              <Chip size="small" color="success" label={t('newsletters.editor.delivered')} />
+                              <Chip size="small" color="success" label={t('admin.newsletters.editor.delivered')} />
                             ) : (
                               <Typography variant="body2" color="error">
                                 {delivery.error}
@@ -480,12 +480,12 @@ export function NewsletterEditor({
           <CardContent>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
               <Typography variant="subtitle1" fontWeight={600} sx={{ flex: 1 }}>
-                {t('newsletters.editor.preview')}
+                {t('admin.newsletters.editor.preview')}
               </Typography>
               <TextField
                 select
                 size="small"
-                label={t('newsletters.editor.previewLanguage')}
+                label={t('admin.newsletters.editor.previewLanguage')}
                 value={previewLanguage}
                 onChange={(event) => setPreviewLanguage(event.target.value)}
                 sx={{ minWidth: 150 }}
@@ -497,21 +497,21 @@ export function NewsletterEditor({
                 ))}
               </TextField>
               <Button size="small" startIcon={<RefreshIcon />} onClick={() => void refreshPreview()} disabled={previewing}>
-                {t('newsletters.editor.refresh')}
+                {t('admin.newsletters.editor.refresh')}
               </Button>
             </Stack>
             <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
-              {t('newsletters.editor.previewHelp')}
+              {t('admin.newsletters.editor.previewHelp')}
             </Typography>
             {preview ? (
               <>
                 <Typography variant="body2" sx={{ mb: 1 }}>
-                  <strong>{t('newsletters.editor.subject')}:</strong> {preview.subject || '—'}
+                  <strong>{t('admin.newsletters.editor.subject')}:</strong> {preview.subject || '—'}
                 </Typography>
                 {/* An empty sandbox: the email's HTML runs no script and reaches nothing of this page. */}
                 <Box
                   component="iframe"
-                  title={t('newsletters.editor.preview')}
+                  title={t('admin.newsletters.editor.preview')}
                   sandbox=""
                   srcDoc={preview.html}
                   sx={{
@@ -532,18 +532,18 @@ export function NewsletterEditor({
       </Box>
 
       <Dialog open={confirmSend} onClose={() => setConfirmSend(false)}>
-        <DialogTitle>{t('newsletters.editor.confirmTitle')}</DialogTitle>
+        <DialogTitle>{t('admin.newsletters.editor.confirmTitle')}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             {editable
-              ? t('newsletters.editor.confirmBody', { count: recipientCount, subject: subject.trim() })
-              : t('newsletters.editor.confirmRetry', { subject: subject.trim() })}
+              ? t('admin.newsletters.editor.confirmBody', { count: recipientCount, subject: subject.trim() })
+              : t('admin.newsletters.editor.confirmRetry', { subject: subject.trim() })}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmSend(false)}>{t('common.cancel')}</Button>
           <Button variant="contained" startIcon={<SendIcon />} onClick={() => void send()}>
-            {t('newsletters.editor.sendNow')}
+            {t('admin.newsletters.editor.sendNow')}
           </Button>
         </DialogActions>
       </Dialog>

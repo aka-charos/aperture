@@ -22,7 +22,7 @@ export function AnalysisPartsPicker({
   return (
     <Box sx={{ mt: 1, pl: 1.5, borderInlineStart: 2, borderColor: 'divider' }}>
       <Typography variant="caption" color="text.secondary">
-        {t('newsletters.analysisParts.title')}
+        {t('admin.newsletters.analysisParts.title')}
       </Typography>
       <RadioGroup
         row
@@ -32,12 +32,12 @@ export function AnalysisPartsPicker({
         <FormControlLabel
           value="all"
           control={<Radio size="small" />}
-          label={<Typography variant="body2">{t('newsletters.analysisParts.all')}</Typography>}
+          label={<Typography variant="body2">{t('admin.newsletters.analysisParts.all')}</Typography>}
         />
         <FormControlLabel
           value="some"
           control={<Radio size="small" />}
-          label={<Typography variant="body2">{t('newsletters.analysisParts.some')}</Typography>}
+          label={<Typography variant="body2">{t('admin.newsletters.analysisParts.some')}</Typography>}
         />
       </RadioGroup>
       {some && (
@@ -69,7 +69,7 @@ export function AnalysisPartsPicker({
       )}
       {some && (
         <Typography variant="caption" color="text.secondary" component="p">
-          {t('newsletters.analysisParts.unlabelledNote')}
+          {t('admin.newsletters.analysisParts.unlabelledNote')}
         </Typography>
       )}
     </Box>

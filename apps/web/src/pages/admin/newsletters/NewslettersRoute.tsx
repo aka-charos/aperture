@@ -85,7 +85,7 @@ export default function NewslettersRoute() {
   }
 
   const remove = async (newsletter: Newsletter) => {
-    if (!window.confirm(t('newsletters.list.confirmDelete', { subject: newsletter.subject || t('newsletters.list.untitled') }))) {
+    if (!window.confirm(t('admin.newsletters.list.confirmDelete', { subject: newsletter.subject || t('admin.newsletters.list.untitled') }))) {
       return
     }
     try {
@@ -102,7 +102,7 @@ export default function NewslettersRoute() {
     return <NewsletterEditor id={editing} options={options} onBack={() => open(null)} onOpen={(id) => open(id)} />
   }
 
-  const groupName = (id: string) => groups.find((g) => g.id === id)?.name ?? t('newsletters.list.deletedGroup')
+  const groupName = (id: string) => groups.find((g) => g.id === id)?.name ?? t('admin.newsletters.list.deletedGroup')
 
   return (
     <Stack spacing={2}>
@@ -112,40 +112,40 @@ export default function NewslettersRoute() {
         </Alert>
       )}
       {options?.sendingProblemText && (
-        <Alert severity="warning">{t('newsletters.editor.cannotSend', { reason: options.sendingProblemText })}</Alert>
+        <Alert severity="warning">{t('admin.newsletters.editor.cannotSend', { reason: options.sendingProblemText })}</Alert>
       )}
       <Card variant="outlined">
         <CardContent>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
             <Box sx={{ flex: 1, minWidth: 220 }}>
               <Typography variant="subtitle1" fontWeight={600}>
-                {t('newsletters.list.title')}
+                {t('admin.newsletters.list.title')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {t('newsletters.list.description')}
+                {t('admin.newsletters.list.description')}
               </Typography>
             </Box>
             <Button component={RouterLink} to="/admin/communication/groups" startIcon={<GroupsIcon />}>
-              {t('newsletters.list.manageGroups')}
+              {t('admin.newsletters.list.manageGroups')}
             </Button>
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => void create()}>
-              {t('newsletters.list.new')}
+              {t('admin.newsletters.list.new')}
             </Button>
           </Stack>
           {!newsletters ? (
             <LinearProgress />
           ) : newsletters.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              {t('newsletters.list.empty')}
+              {t('admin.newsletters.list.empty')}
             </Typography>
           ) : (
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>{t('newsletters.editor.subject')}</TableCell>
-                  <TableCell>{t('newsletters.editor.groups')}</TableCell>
-                  <TableCell>{t('newsletters.list.status')}</TableCell>
-                  <TableCell>{t('newsletters.list.updated')}</TableCell>
+                  <TableCell>{t('admin.newsletters.editor.subject')}</TableCell>
+                  <TableCell>{t('admin.newsletters.editor.groups')}</TableCell>
+                  <TableCell>{t('admin.newsletters.list.status')}</TableCell>
+                  <TableCell>{t('admin.newsletters.list.updated')}</TableCell>
                   <TableCell />
                 </TableRow>
               </TableHead>
@@ -154,7 +154,7 @@ export default function NewslettersRoute() {
                   <TableRow key={newsletter.id} hover sx={{ cursor: 'pointer' }} onClick={() => open(newsletter.id)}>
                     <TableCell>
                       <Typography variant="body2" fontWeight={600}>
-                        {newsletter.subject || t('newsletters.list.untitled')}
+                        {newsletter.subject || t('admin.newsletters.list.untitled')}
                       </Typography>
                       {newsletter.createdByName && (
                         <Typography variant="caption" color="text.secondary">
@@ -168,7 +168,7 @@ export default function NewslettersRoute() {
                         <StatusChip status={newsletter.status} />
                         {newsletter.status !== 'draft' && (
                           <Typography variant="caption" color="text.secondary">
-                            {t('newsletters.list.sentCount', {
+                            {t('admin.newsletters.list.sentCount', {
                               sent: newsletter.sentCount,
                               total: newsletter.recipientCount ?? 0,
                             })}
@@ -179,7 +179,7 @@ export default function NewslettersRoute() {
                     <TableCell>{new Date(newsletter.updatedAt).toLocaleString()}</TableCell>
                     <TableCell align="right" onClick={(event) => event.stopPropagation()}>
                       {newsletter.status !== 'sending' && (
-                        <Tooltip title={t('common.delete')}>
+                        <Tooltip title={t('admin.common.delete')}>
                           <IconButton size="small" onClick={() => void remove(newsletter)}>
                             <DeleteOutlineIcon fontSize="small" />
                           </IconButton>
