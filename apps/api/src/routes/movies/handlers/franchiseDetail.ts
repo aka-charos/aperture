@@ -138,7 +138,7 @@ export function registerFranchiseDetailHandler(fastify: FastifyInstance) {
         .map((part) => ({ tmdbId: part.tmdbId, mediaType: 'movie' as const }))
       if (seerrConfigured && toAsk.length > 0) {
         try {
-          statuses = await batchGetSeerrMediaStatus(toAsk)
+          statuses = await batchGetSeerrMediaStatus(toAsk, { interactive: true })
         } catch (err) {
           request.log.warn(
             { err, collectionId },
@@ -173,6 +173,7 @@ export function registerFranchiseDetailHandler(fastify: FastifyInstance) {
             releaseDate: part.releaseDate,
             inLibrary: lib != null,
             seerr: statuses.get(part.tmdbId),
+            seerrAnswered: !seerrConfigured || statuses.has(part.tmdbId),
           }),
         })
       }

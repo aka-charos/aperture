@@ -7,7 +7,7 @@
  * - General discovery with filters
  */
 
-import { tmdbRequest, type ApiLogCallback } from './client.js'
+import { tmdbRequest, type ApiLogCallback, type TmdbRequestOptions } from './client.js'
 import type {
   TMDbMovieRecommendationsResponse,
   TMDbMovieSimilarResponse,
@@ -300,7 +300,7 @@ export async function getSimilarMovies(
  */
 export async function discoverMovies(
   filters: DiscoverMovieFilters = {},
-  options: { onLog?: ApiLogCallback } = {}
+  options: TmdbRequestOptions = {}
 ): Promise<TMDbMovieDiscoverResponse | null> {
   const params = new URLSearchParams({
     language: 'en-US',
@@ -416,7 +416,7 @@ export async function getSimilarTV(
  */
 export async function discoverTV(
   filters: DiscoverTVFilters = {},
-  options: { onLog?: ApiLogCallback } = {}
+  options: TmdbRequestOptions = {}
 ): Promise<TMDbTVDiscoverResponse | null> {
   const params = new URLSearchParams({
     language: 'en-US',

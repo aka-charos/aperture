@@ -34,6 +34,7 @@ import {
 } from '../trakt/index.js'
 import type { TMDbMovieResult, TMDbTVResult } from '../tmdb/types.js'
 import { GENRE_STRIP_MAX_ROW_LIMIT, getTMDbApiKey } from '../settings/systemSettings.js'
+import { AsyncCache, concurrencyLimit } from '../lib/asyncCache.js'
 import { getCandidateExclusionTmdbIds } from './filter.js'
 import { DEFAULT_DISCOVERY_CONFIG } from './types.js'
 import type {
@@ -55,6 +56,17 @@ const PAGE_DELAY_MS = 50              // 50ms delay between page fetches for rat
 
 /** TMDb allows up to ~500 discover pages. */
 const GENRE_STRIP_MAX_DISCOVER_PAGE = 500
+
+type GenrePage = Awaited<ReturnType<typeof discoverMovies>> | Awaited<ReturnType<typeof discoverTV>>
+
+/**
+ * TMDb's pages only, which are the same for everyone: what a viewer has seen or
+ * requested is taken out per viewer afterwards, and never kept here. A failed read
+ * answers null and is not kept. Keyed by API key, so a changed key reuses nothing.
+ */
+const genrePages = new AsyncCache<NonNullable<GenrePage>>({ ttlMs: 5 * 60_000, maxEntries: 500 })
+const limitGenrePage = concurrencyLimit(4)
+const GENRE_PAGE_TIMEOUT_MS = 5000
 
 function rawFromMovieResult(movie: TMDbMovieResult): RawCandidate {
   const normalized = normalizeMovieResult(movie)
@@ -116,10 +128,15 @@ export interface GenreStripDiscoverFilters {
   userId: string
 }
 
+/**
+ * One genre row after the viewer's exclusions. An empty list means nothing matches;
+ * null means the row could not be read, which the page must not show as "nothing".
+ * A later page failing only shortens the row.
+ */
 export async function fetchGenreStripDiscoverCandidates(
   mediaType: MediaType,
   filters: GenreStripDiscoverFilters
-): Promise<RawCandidate[]> {
+): Promise<RawCandidate[] | null> {
   const targetCount = Math.max(1, Math.min(GENRE_STRIP_MAX_ROW_LIMIT, filters.targetCount))
   const sortBy = 'vote_count.desc' as const
   const withoutGenres = filters.withoutGenreIds?.length ? filters.withoutGenreIds : undefined
@@ -150,6 +167,8 @@ export async function fetchGenreStripDiscoverCandidates(
   }
 
   try {
+    const apiKey = await getTMDbApiKey()
+    if (!apiKey) return []
     const excludeIds = await getCandidateExclusionTmdbIds(filters.userId, mediaType)
     const pool: RawCandidate[] = []
     const seenTmdb = new Set<number>()
@@ -157,15 +176,16 @@ export async function fetchGenreStripDiscoverCandidates(
     let totalCatalog = 0
 
     for (let page = 1; page <= totalPagesCap; page++) {
-      const res =
-        mediaType === 'movie'
-          ? await discoverMovies({ ...base, page })
-          : await discoverTV({ ...base, page })
+      const res = await genrePages.get(JSON.stringify([apiKey, mediaType, base, page]), () =>
+        limitGenrePage<GenrePage>(() => {
+          const options = { apiKey, timeoutMs: GENRE_PAGE_TIMEOUT_MS, maxAttempts: 1 }
+          return mediaType === 'movie'
+            ? discoverMovies({ ...base, page }, options)
+            : discoverTV({ ...base, page }, options)
+        })
+      )
 
-      if (page > 1) {
-        await new Promise((r) => setTimeout(r, PAGE_DELAY_MS))
-      }
-
+      if (!res && page === 1) return null
       if (!res || !res.results.length) {
         if (page === 1) return []
         break
@@ -216,7 +236,7 @@ export async function fetchGenreStripDiscoverCandidates(
     return enriched
   } catch (err) {
     logger.error({ err, mediaType, filters }, 'Failed to fetch genre strip discover candidates')
-    return []
+    return null
   }
 }
 

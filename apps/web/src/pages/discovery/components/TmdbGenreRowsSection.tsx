@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Skeleton, Typography } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -9,10 +9,11 @@ import type { DiscoveryCandidate, MediaType, SeerrMediaStatus } from '../types'
 import type { SeerrRequestOptions } from '../../../types/seerrRequest'
 import type { ResolveDiscoveryGenreName } from '../hooks/useDiscoveryGenres'
 import { useStripLoadQueue } from '../hooks/useStripLoadQueue'
+import { useSeerrStatuses } from '../hooks/useSeerrStatuses'
+import { mediaKey } from '../hooks/statusBatches'
 
 interface StripState {
   candidates: DiscoveryCandidate[]
-  seerrStatuses: Record<number, SeerrMediaStatus>
   error: string | null
 }
 
@@ -203,7 +204,7 @@ export function TmdbGenreRowsSection({
   const { t } = useTranslation()
   const [stripEntries, setStripEntries] = useState<StripEntry[]>([])
   const [loadingConfig, setLoadingConfig] = useState(true)
-  const [seerrLocal, setSeerrLocal] = useState<Record<number, Partial<SeerrMediaStatus>>>({})
+  const [seerrLocal, setSeerrLocal] = useState<Record<string, Partial<SeerrMediaStatus>>>({})
 
   const stripEntriesRef = useRef(stripEntries)
   stripEntriesRef.current = stripEntries
@@ -211,15 +212,18 @@ export function TmdbGenreRowsSection({
   const { submitRequest, isRequesting, fetchTVDetails } = useSeerrRequest()
 
   const fetchOneStrip = useCallback(
-    async (params: {
-      genreIds: number[]
-      limit: number
-      originCountry?: string
-      excludeGenreIds?: number[]
-      yearStart?: number
-      yearEnd?: number
-      yearEndCurrent?: boolean
-    }): Promise<StripState> => {
+    async (
+      params: {
+        genreIds: number[]
+        limit: number
+        originCountry?: string
+        excludeGenreIds?: number[]
+        yearStart?: number
+        yearEnd?: number
+        yearEndCurrent?: boolean
+      },
+      signal: AbortSignal
+    ): Promise<StripState> => {
       const { genreIds, limit, originCountry, excludeGenreIds, yearStart, yearEnd, yearEndCurrent } =
         params
       const qs = buildQuery({
@@ -236,22 +240,17 @@ export function TmdbGenreRowsSection({
               ? String(yearEnd)
               : undefined,
       })
-      const res = await fetch(`/api/discovery/tmdb-genre-row${qs}`, { credentials: 'include' })
+      const res = await fetch(`/api/discovery/tmdb-genre-row${qs}`, { credentials: 'include', signal })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         return {
           candidates: [],
-          seerrStatuses: {},
           error: typeof err.error === 'string' ? err.error : t('discoveryGenreRows.loadError'),
         }
       }
-      const data = (await res.json()) as {
-        candidates: DiscoveryCandidate[]
-        seerrStatuses?: Record<number, SeerrMediaStatus>
-      }
+      const data = (await res.json()) as { candidates: DiscoveryCandidate[] }
       return {
         candidates: data.candidates || [],
-        seerrStatuses: (data.seerrStatuses || {}) as Record<number, SeerrMediaStatus>,
         error: null,
       }
     },
@@ -259,7 +258,7 @@ export function TmdbGenreRowsSection({
   )
 
   const processStripItem = useCallback(
-    async (key: string) => {
+    async (key: string, signal: AbortSignal) => {
       const parsed = parseQueueKey(key)
       if (!parsed) return
       const { genreIds, limit, originCountry, excludeGenreIds, yearStart, yearEnd, yearEndCurrent } =
@@ -270,19 +269,24 @@ export function TmdbGenreRowsSection({
       )
 
       try {
-        const strip = await fetchOneStrip({
-          genreIds,
-          limit,
-          originCountry,
-          excludeGenreIds,
-          yearStart,
-          yearEnd,
-          yearEndCurrent,
-        })
+        const strip = await fetchOneStrip(
+          {
+            genreIds,
+            limit,
+            originCountry,
+            excludeGenreIds,
+            yearStart,
+            yearEnd,
+            yearEndCurrent,
+          },
+          signal
+        )
+        if (signal.aborted) return
         setStripEntries((prev) =>
           prev.map((e) => (stripRowKey(e) === key ? { ...e, state: 'loaded', strip } : e))
         )
       } catch {
+        if (signal.aborted) return
         setStripEntries((prev) =>
           prev.map((e) =>
             stripRowKey(e) === key
@@ -291,7 +295,6 @@ export function TmdbGenreRowsSection({
                   state: 'loaded',
                   strip: {
                     candidates: [],
-                    seerrStatuses: {},
                     error: t('discoveryGenreRows.loadError'),
                   },
                 }
@@ -428,7 +431,7 @@ export function TmdbGenreRowsSection({
       if (result.success && candidate.tmdbId) {
         setSeerrLocal((prev) => ({
           ...prev,
-          [candidate.tmdbId]: {
+          [mediaKey(candidate.mediaType, candidate.tmdbId)]: {
             exists: false,
             status: 'pending',
             requested: true,
@@ -440,9 +443,16 @@ export function TmdbGenreRowsSection({
     [submitRequest]
   )
 
-  const mergeSeerr = (tmdbId: number, strip: StripState): SeerrMediaStatus | undefined => {
-    const base = strip.seerrStatuses[tmdbId]
-    const loc = seerrLocal[tmdbId]
+  const shownCandidates = useMemo(
+    () => stripEntries.flatMap((entry) => entry.strip?.candidates ?? []),
+    [stripEntries]
+  )
+  const seerrStatuses = useSeerrStatuses(shownCandidates)
+
+  const mergeSeerr = (tmdbId: number): SeerrMediaStatus | undefined => {
+    const key = mediaKey(mediaType, tmdbId)
+    const base = seerrStatuses[key]
+    const loc = seerrLocal[key]
     if (!base && !loc) return undefined
     return {
       exists: loc?.exists ?? base?.exists ?? false,
@@ -480,7 +490,7 @@ export function TmdbGenreRowsSection({
         }}
       >
         {strip.candidates.map((candidate) => {
-          const status = mergeSeerr(candidate.tmdbId, strip)
+          const status = mergeSeerr(candidate.tmdbId)
           return (
             <Box
               key={candidate.id}

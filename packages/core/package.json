@@ -63,7 +63,7 @@
     "test:exclusion": "node --import tsx --test src/recommender/watchedExclusion.test.ts src/recommender/watchHistoryCallSites.test.ts",
     "test:countries": "node --import tsx --test src/countries/canonical.test.ts src/tmdb/originCountries.test.ts",
     "test:engagement": "node --import tsx --test src/taste-profile/engagement.test.ts src/taste-profile/ratingWeight.test.ts src/recommender/series/libraryEpisodes.test.ts",
-    "test:activity-gate": "node --import tsx --test src/recommender/activityGate.test.ts src/recommender/gateCounts.test.ts src/recommender/watchHistorySyncRows.test.ts",
+    "test:activity-gate": "node --import tsx --test src/recommender/activityGate.test.ts src/recommender/gateCounts.test.ts src/recommender/watchHistorySyncRows.test.ts src/recommender/watchHistoryCatalog.test.ts src/recommender/watchHistorySharedCatalog.test.ts",
     "test:storage": "node --import tsx --test src/recommender/storage.test.ts",
     "test:canonical": "node --import tsx --test src/recommender/movies/canonicalText.test.ts",
     "test:twins": "node --import tsx --test src/recommender/shared/twinSlots.test.ts src/recommender/shared/acclaimedSlots.test.ts src/recommender/twinNearShared.test.ts",
@@ -71,7 +71,7 @@
     "test:decisions": "node --import tsx --test src/lib/decisionModelRules.test.ts src/recommender/evidenceJudgment.test.ts src/recommender/evidenceBenchmarkPairs.test.ts src/recommender/evidenceLabelling.test.ts src/recommender/explanationCheck.test.ts",
     "test:migrations": "node --import tsx --test src/migrations.test.ts",
     "test:schedule": "node --import tsx --test src/jobs/schedule.test.ts src/jobs/logWindow.test.ts",
-    "test:discovery": "node --import tsx --test src/discover/scorer.test.ts src/discover/reconcile.test.ts src/discover/embeddings.test.ts src/discover/config.test.ts src/discover/merge.test.ts src/discover/blendDiagnostics.test.ts src/discover/genreStripOrder.test.ts",
+    "test:discovery": "node --import tsx --test src/discover/scorer.test.ts src/discover/reconcile.test.ts src/discover/embeddings.test.ts src/discover/config.test.ts src/discover/merge.test.ts src/discover/blendDiagnostics.test.ts src/discover/genreStripOrder.test.ts src/discover/peopleBrowse.test.ts src/discover/genreStripPages.test.ts src/lib/asyncCache.test.ts src/seerr/batchStatus.test.ts src/justwatch/cache.test.ts src/justwatch/tmdbPosters.test.ts",
     "test:enrichment": "node --import tsx --test src/mdblist/rules.test.ts src/enrichment/needsEnrichment.test.ts src/enrichment/studioLogoMatch.test.ts src/media/studioImages.test.ts src/omdb/failures.test.ts src/omdb/ratings.test.ts",
     "test:analysis": "node --import tsx --test src/analysis/prompt.test.ts src/analysis/paragraphMap.test.ts src/analysis/segments.test.ts src/analysis/grounding.test.ts src/analysis/comparisonReport.test.ts src/analysis/compareManual.test.ts src/analysis/proseSignals.test.ts src/analysis/blockedPage.test.ts src/analysis/structure.test.ts src/analysis/sourceQuality.test.ts src/analysis/curatedSearch.test.ts src/analysis/duplicateSources.test.ts src/analysis/sourceCleanup.test.ts src/analysis/sourceFloor.test.ts src/analysis/sourceJudgment.test.ts src/analysis/pending.test.ts src/analysis/budget.test.ts src/analysis/response.test.ts src/analysis/offsiteFormat.test.ts src/analysis/offsiteRunner.test.ts src/lib/crw.test.ts src/lib/crwChatSearch.test.ts src/lib/crwEngines.test.ts src/lib/streamStall.test.ts src/analysis/timing.test.ts src/analysis/storeSql.test.ts",
     "test:api-keys": "node --import tsx --test src/apiKeyScopes.test.ts src/permissionAudit.test.ts src/permissionAuditCallSites.test.ts src/settings/settingLog.test.ts",
@@ -103,7 +103,7 @@
     "test:onboarding": "node --import tsx --test src/onboarding/rules.test.ts",
     "test:trails": "node --import tsx --test src/trails/trails.test.ts",
     "test:next-from-here": "node --import tsx --test src/nextFromHere/nextFromHere.test.ts",
-    "test:watching": "node --import tsx --test src/watching/episodeWindows.test.ts",
+    "test:watching": "node --import tsx --test src/watching/episodeWindows.test.ts src/watching/upcomingEpisodes.test.ts src/tmdb/client.test.ts src/lib/asyncCache.test.ts",
     "test:home-sections": "node --import tsx --test src/homeSections/version.test.ts src/homeSections/settings.test.ts src/homeSections/plan.test.ts src/homeSections/placement.test.ts src/homeSections/rowStates.test.ts src/homeSections/preview.test.ts src/media/managedTags.test.ts"
   },
   "dependencies": {

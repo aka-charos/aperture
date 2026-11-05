@@ -212,6 +212,8 @@ export function MediaPosterCard({
           component="img"
           image={finalPosterUrl}
           alt={title}
+          loading="lazy"
+          decoding="async"
           onError={() => setImageError(true)}
           sx={{
             width: '100%',

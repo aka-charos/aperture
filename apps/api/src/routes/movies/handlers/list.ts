@@ -9,6 +9,7 @@ import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../../lib/viewerScope.js'
 import { countryFilterSql, parseCountryQuery } from '../../../lib/countryFilter.js'
+import { watcherCountFilter } from '../../../lib/watcherFilter.js'
 import { listMoviesSchema } from '../schemas.js'
 import type { MovieRow, MoviesListResponse, MoviesListQuerystring } from '../types.js'
 
@@ -177,27 +178,6 @@ export function registerListHandler(fastify: FastifyInstance) {
         params.push(userId)
       }
 
-      // "Distinct users on this server" is what the helper text promises, and a
-      // watcher is someone who played it.
-      if (minWatchers) {
-        const n = parseInt(minWatchers, 10)
-        if (!isNaN(n) && n > 0) {
-          whereClause += whereClause ? ' AND ' : ' WHERE '
-          whereClause += `(SELECT COUNT(DISTINCT wh.user_id)::int FROM watch_history wh
-            WHERE wh.movie_id = movies.id AND ${WATCH_HISTORY_PLAYED_SQL}) >= $${paramIndex++}`
-          params.push(n)
-        }
-      }
-      if (maxWatchers) {
-        const n = parseInt(maxWatchers, 10)
-        if (!isNaN(n) && n >= 0) {
-          whereClause += whereClause ? ' AND ' : ' WHERE '
-          whereClause += `(SELECT COUNT(DISTINCT wh.user_id)::int FROM watch_history wh
-            WHERE wh.movie_id = movies.id AND ${WATCH_HISTORY_PLAYED_SQL}) <= $${paramIndex++}`
-          params.push(n)
-        }
-      }
-
       // Resolution filter (4K, 1080p, 720p, SD)
       if (resolution) {
         const resolutions = Array.isArray(resolution) ? resolution : [resolution]
@@ -226,9 +206,17 @@ export function registerListHandler(fastify: FastifyInstance) {
         }
       }
 
+      // Last, because it adds to the WHERE and its join goes in both queries below.
+      const watchers = watcherCountFilter('movies', minWatchers, maxWatchers, params)
+      paramIndex = params.length + 1
+      if (watchers.where) {
+        whereClause += whereClause ? ' AND ' : ' WHERE '
+        whereClause += watchers.where
+      }
+
       // Get total count
       const countResult = await queryOne<{ count: string }>(
-        `SELECT COUNT(*) as count FROM movies${whereClause}`,
+        `SELECT COUNT(*) as count FROM movies${watchers.join}${whereClause}`,
         params
       )
       const total = parseInt(countResult?.count || '0', 10)
@@ -270,7 +258,7 @@ export function registerListHandler(fastify: FastifyInstance) {
         `SELECT id, provider_item_id, title, original_title, year, genres, overview,
                 ${displayRatingSql()} AS community_rating, runtime_minutes, poster_url, backdrop_url, created_at, updated_at,
                 rt_critic_score, awards_summary
-         FROM movies${whereClause}
+         FROM movies${watchers.join}${whereClause}
          ORDER BY ${orderClause}
          LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
         params

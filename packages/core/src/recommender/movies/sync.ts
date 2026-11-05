@@ -1,6 +1,12 @@
 import { createChildLogger } from '../../lib/logger.js'
 import { mergeWatchHistorySyncRow, watchHistorySyncUpdateSql } from '../watchHistorySyncRows.js'
 import { partitionHistorySyncUsers } from '../historySyncUsers.js'
+import {
+  historyIdsToRemove,
+  loadMovieWatchHistoryCatalog,
+  runtimeTicksOf,
+  type MovieWatchHistoryCatalog,
+} from '../watchHistoryCatalog.js'
 import { query, queryOne } from '../../lib/db.js'
 import { getEnabledLibraryIds } from '../../lib/libraryConfig.js'
 import { getMediaServerProvider } from '../../media/index.js'
@@ -805,7 +811,8 @@ export async function syncMovies(existingJobId?: string): Promise<SyncMoviesResu
 export async function syncWatchHistoryForUser(
   userId: string,
   providerUserId: string,
-  fullSync: boolean = false
+  fullSync: boolean = false,
+  sharedCatalog?: MovieWatchHistoryCatalog
 ): Promise<{ synced: number; removed: number }> {
   const provider = await getMediaServerProvider()
   const apiKey = await getMediaServerApiKey()
@@ -831,48 +838,9 @@ export async function syncWatchHistoryForUser(
   const excludedLibraryIds = await getUserExcludedLibraries(userId)
   const excludedSet = new Set(excludedLibraryIds)
 
-  // Get all movies we have in our database with their provider IDs and library IDs
-  const allMovies = await query<{
-    id: string
-    provider_item_id: string
-    provider_library_id: string | null
-    tmdb_id: string | null
-    imdb_id: string | null
-    runtime_minutes: number | null
-  }>(
-    'SELECT id, provider_item_id, provider_library_id, tmdb_id, imdb_id, runtime_minutes FROM movies WHERE provider_item_id IS NOT NULL'
-  )
-
-  const providerIdToMovieId = new Map<string, string>()
-  const providerIdToLibraryId = new Map<string, string | null>()
-  const movieIdToLibraryId = new Map<string, string | null>()
-  const movieIdToRuntimeTicks = new Map<string, number>()
-  const tmdbIdToMovieId = new Map<string, string>()
-  const imdbIdToMovieId = new Map<string, string>()
-  for (const movie of allMovies.rows) {
-    providerIdToMovieId.set(movie.provider_item_id, movie.id)
-    providerIdToLibraryId.set(movie.provider_item_id, movie.provider_library_id)
-    movieIdToLibraryId.set(movie.id, movie.provider_library_id)
-    if (movie.runtime_minutes) {
-      movieIdToRuntimeTicks.set(movie.id, movie.runtime_minutes * 600000000)
-    }
-    if (movie.tmdb_id) tmdbIdToMovieId.set(movie.tmdb_id, movie.id)
-    if (movie.imdb_id) imdbIdToMovieId.set(movie.imdb_id, movie.id)
-  }
-
-  const resolveMovieId = (item: (typeof watchedItems)[number]): string | undefined => {
-    const byProviderId = providerIdToMovieId.get(item.movieId)
-    if (byProviderId) return byProviderId
-    if (item.tmdbId) {
-      const byTmdb = tmdbIdToMovieId.get(item.tmdbId)
-      if (byTmdb) return byTmdb
-    }
-    if (item.imdbId) {
-      const byImdb = imdbIdToMovieId.get(item.imdbId)
-      if (byImdb) return byImdb
-    }
-    return undefined
-  }
+  // One catalog per all-user job; a single-user sync reads its own.
+  const catalog = sharedCatalog ?? (await loadMovieWatchHistoryCatalog())
+  if (sharedCatalog) await sharedCatalog.refreshMissing(watchedItems)
 
   // Get current movie watch history for this user. Movie rows only: episode
   // rows share the table with movie_id NULL, and a NULL in this set made the
@@ -900,13 +868,14 @@ export async function syncWatchHistoryForUser(
   let excludedCount = 0
   let fallbackMappedCount = 0
   for (const item of watchedItems) {
-    const movieId = resolveMovieId(item)
-    if (movieId) {
-      if (!providerIdToMovieId.has(item.movieId)) {
+    const movieId = catalog.resolve(item)
+    const identity = movieId ? catalog.identity(movieId) : undefined
+    if (movieId && identity) {
+      if (!catalog.isProviderMatch(item)) {
         fallbackMappedCount++
       }
       // Check if movie's library is excluded
-      const libraryId = movieIdToLibraryId.get(movieId)
+      const libraryId = identity.provider_library_id
       if (libraryId && excludedSet.has(libraryId)) {
         excludedCount++
         continue // Skip movies from excluded libraries
@@ -919,7 +888,7 @@ export async function syncWatchHistoryForUser(
         isFavorite: item.isFavorite,
         played: item.played ?? false,
         playbackPositionTicks: item.playbackPositionTicks ?? null,
-        runtimeTicks: item.runtimeTicks ?? movieIdToRuntimeTicks.get(movieId) ?? null,
+        runtimeTicks: item.runtimeTicks ?? runtimeTicksOf(identity),
       }
       const existing = toSyncMap.get(movieId)
       toSyncMap.set(
@@ -949,6 +918,7 @@ export async function syncWatchHistoryForUser(
        SELECT $1, movie_id, play_count, last_played_at, is_favorite, 'movie', played, playback_position_ticks, runtime_ticks
        FROM unnest($2::uuid[], $3::int[], $4::timestamptz[], $5::boolean[], $6::boolean[], $7::bigint[], $8::bigint[])
          AS t(movie_id, play_count, last_played_at, is_favorite, played, playback_position_ticks, runtime_ticks)
+       WHERE EXISTS (SELECT 1 FROM movies m WHERE m.id = t.movie_id)
        ON CONFLICT (user_id, movie_id) WHERE movie_id IS NOT NULL DO UPDATE SET
          ${watchHistorySyncUpdateSql()}`,
       [
@@ -999,7 +969,7 @@ export async function syncWatchHistoryForUser(
   // Only do this on full sync (delta sync only adds/updates)
   let removed = 0
   if (fullSync && existingMovieIds.size > 0) {
-    const toRemove = [...existingMovieIds].filter((id) => !syncedMovieIds.has(id))
+    const toRemove = historyIdsToRemove(existingMovieIds, syncedMovieIds, catalog)
     if (toRemove.length > 0) {
       const deleteResult = await query(
         `DELETE FROM watch_history WHERE user_id = $1 AND movie_id = ANY($2::uuid[])`,
@@ -1130,6 +1100,9 @@ export async function syncWatchHistoryForAllUsers(
     const syncMode = fullSync ? 'full' : 'delta'
     addLog(jobId, 'info', `🔄 Sync mode: ${syncMode}`)
 
+    const catalog = await loadMovieWatchHistoryCatalog()
+    addLog(jobId, 'info', `📚 Catalog loaded: ${catalog.size} movies, shared by every user this run`)
+
     // Step 3: Sync each user
     setJobStep(jobId, 2, 'Syncing watch history', users.length)
 
@@ -1143,7 +1116,7 @@ export async function syncWatchHistoryForAllUsers(
 
       try {
         addLog(jobId, 'info', `🔄 Syncing watch history for ${user.username}...`)
-        const syncResult = await syncWatchHistoryForUser(user.id, user.provider_user_id, fullSync)
+        const syncResult = await syncWatchHistoryForUser(user.id, user.provider_user_id, fullSync, catalog)
         totalItems += syncResult.synced
         success++
         const removedMsg = syncResult.removed > 0 ? `, ${syncResult.removed} removed` : ''

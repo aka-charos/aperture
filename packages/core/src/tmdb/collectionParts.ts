@@ -83,12 +83,15 @@ export function deriveSeerrStatus(st: SeerrMediaStatusLike | undefined): SeerrSt
  *    for a title the server already holds is a request that does nothing. It
  *    appears here after the next sync.
  * 4. Already in Seerr's pipeline: that status, not requestable.
- * 5. Otherwise it is missing, and it is the only case that can be requested.
+ * 5. Otherwise it is missing, and it is the only case that can be requested, unless
+ *    Seerr was asked and did not answer: then nothing says it has not been requested
+ *    already, so no button until a reload gets an answer. Absent = answered.
  */
 export function classifyCollectionPart(input: {
   releaseDate: string | null | undefined
   inLibrary: boolean
   seerr?: SeerrMediaStatusLike
+  seerrAnswered?: boolean
   now?: Date
 }): ClassifiedCollectionPart {
   const seerrStatus = input.inLibrary ? 'available' : deriveSeerrStatus(input.seerr)
@@ -100,7 +103,7 @@ export function classifyCollectionPart(input: {
     return { status: 'upcoming', seerrStatus, requestable: false }
   }
   if (seerrStatus === 'none') {
-    return { status: 'missing', seerrStatus, requestable: true }
+    return { status: 'missing', seerrStatus, requestable: input.seerrAnswered !== false }
   }
   return { status: seerrStatus, seerrStatus, requestable: false }
 }

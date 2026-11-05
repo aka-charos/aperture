@@ -31,26 +31,47 @@ export type ApiLogCallback = (
 
 async function rateLimit(): Promise<void> {
   const now = Date.now()
-  const timeSinceLastRequest = now - lastRequestTime
-  if (timeSinceLastRequest < RATE_LIMIT_DELAY_MS) {
-    await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_DELAY_MS - timeSinceLastRequest))
+  // Reserve a start slot before yielding: parallel callers would otherwise all
+  // read the same last time, wake together and exceed the shared rate.
+  const startAt = Math.max(now, lastRequestTime + RATE_LIMIT_DELAY_MS)
+  lastRequestTime = startAt
+  if (startAt > now) {
+    await new Promise((resolve) => setTimeout(resolve, startAt - now))
   }
-  lastRequestTime = Date.now()
+}
+
+export interface TmdbRequestOptions {
+  apiKey?: string
+  onLog?: ApiLogCallback
+  language?: string
+  /** Per attempt. Default REQUEST_TIMEOUT_MS. */
+  timeoutMs?: number
+  /** Default MAX_RETRIES. 1 = one attempt, for a caller a person is waiting on. */
+  maxAttempts?: number
 }
 
 /**
- * Make a rate-limited request to the TMDb API
+ * What TMDb answered. `failed` is every way of not getting an answer: no key, a
+ * timeout, a dropped connection, an error status, a persistent 429. It says
+ * nothing about the title, so it must never be remembered as "has none";
+ * `not_found` (404) is the answer that the title does not exist.
  */
-export async function tmdbRequest<T>(
+export type TmdbLookup<T> =
+  | { status: 'ok'; data: T }
+  | { status: 'not_found' }
+  | { status: 'failed' }
+
+/** A rate-limited request to the TMDb API that tells absence from failure. */
+export async function tmdbLookup<T>(
   endpoint: string,
-  options: { apiKey?: string; onLog?: ApiLogCallback; language?: string } = {}
-): Promise<T | null> {
+  options: TmdbRequestOptions = {}
+): Promise<TmdbLookup<T>> {
   const apiKey = options.apiKey || (await getTMDbApiKey())
   const { onLog, language } = options
 
   if (!apiKey) {
     logger.warn('TMDb API key not configured')
-    return null
+    return { status: 'failed' }
   }
 
   let url = `${TMDB_API_BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}api_key=${apiKey}`
@@ -58,7 +79,8 @@ export async function tmdbRequest<T>(
     url += `&language=${encodeURIComponent(language)}`
   }
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  const maxAttempts = options.maxAttempts ?? MAX_RETRIES
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     await rateLimit()
 
     try {
@@ -66,10 +88,12 @@ export async function tmdbRequest<T>(
         headers: {
           Accept: 'application/json',
         },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(options.timeoutMs ?? REQUEST_TIMEOUT_MS),
       })
 
       if (response.status === 429) {
+        // No attempt left: waiting out Retry-After would only delay the failure.
+        if (attempt === maxAttempts) break
         // Rate limited - wait and retry
         const retryAfter = parseInt(response.headers.get('Retry-After') || '1', 10)
         logger.warn({ retryAfter, attempt }, 'TMDb rate limit hit, waiting...')
@@ -78,9 +102,9 @@ export async function tmdbRequest<T>(
       }
 
       if (response.status === 404) {
-        // Not found is not an error, just return null
+        // Not found is not an error
         onLog?.('tmdb', endpoint, 'not_found')
-        return null
+        return { status: 'not_found' }
       }
 
       if (!response.ok) {
@@ -90,23 +114,23 @@ export async function tmdbRequest<T>(
           'TMDb API request failed'
         )
         onLog?.('tmdb', endpoint, 'error', `HTTP ${response.status}`)
-        return null
+        return { status: 'failed' }
       }
 
       const data = (await response.json()) as T
       onLog?.('tmdb', endpoint, 'success')
-      return data
+      return { status: 'ok', data }
     } catch (err) {
       // Don't retry timeout errors
       if (err instanceof Error && err.name === 'TimeoutError') {
         logger.error({ endpoint }, 'TMDb API request timed out')
         onLog?.('tmdb', endpoint, 'error', 'Request timed out')
-        return null
+        return { status: 'failed' }
       }
-      if (attempt === MAX_RETRIES) {
+      if (attempt === maxAttempts) {
         logger.error({ err, endpoint }, 'TMDb API request failed after retries')
         onLog?.('tmdb', endpoint, 'error', err instanceof Error ? err.message : 'Unknown error')
-        return null
+        return { status: 'failed' }
       }
       logger.warn({ err, attempt, endpoint }, 'TMDb API request failed, retrying...')
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt))
@@ -117,7 +141,16 @@ export async function tmdbRequest<T>(
   // or a caller reads a rate-limited lookup as "TMDb has no such thing".
   logger.error({ endpoint }, 'TMDb API rate limit persisted after retries')
   onLog?.('tmdb', endpoint, 'error', 'Rate limited (429) after retries')
-  return null
+  return { status: 'failed' }
+}
+
+/** `tmdbLookup` for callers that treat every non-answer alike: null. */
+export async function tmdbRequest<T>(
+  endpoint: string,
+  options: TmdbRequestOptions = {}
+): Promise<T | null> {
+  const lookup = await tmdbLookup<T>(endpoint, options)
+  return lookup.status === 'ok' ? lookup.data : null
 }
 
 /**

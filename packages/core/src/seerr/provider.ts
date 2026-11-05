@@ -5,6 +5,7 @@
  * Uses API Key authentication (admin-configured)
  */
 
+import { AsyncCache, concurrencyLimit } from '../lib/asyncCache.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import type {
@@ -138,6 +139,8 @@ interface SeerrCallOptions {
    * auto-approve setting decides whether the request goes straight through.
    */
   actAsUserId?: number
+  /** Gives up after this long and reports it like any other failed call. */
+  timeoutMs?: number
 }
 
 /**
@@ -169,6 +172,7 @@ async function seerrCall<T>(
       method: options.method || 'GET',
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: options.timeoutMs != null ? AbortSignal.timeout(options.timeoutMs) : undefined,
     })
 
     if (!response.ok) {
@@ -180,6 +184,9 @@ async function seerrCall<T>(
       )
       return { ok: false, status: response.status, data: null, message }
     }
+
+    // Any write can change what a title's status says, whoever it was made as.
+    if ((options.method || 'GET') !== 'GET') statusCache.clear()
 
     // 204 No Content (DELETE) has no body to parse.
     if (response.status === 204) {
@@ -274,15 +281,21 @@ export async function searchContent(
 /**
  * Get movie details by TMDb ID
  */
-export async function getMovieDetails(tmdbId: number): Promise<SeerrMovieDetails | null> {
-  return seerrRequest<SeerrMovieDetails>(`/movie/${tmdbId}`)
+export async function getMovieDetails(
+  tmdbId: number,
+  options: SeerrCallOptions = {}
+): Promise<SeerrMovieDetails | null> {
+  return seerrRequest<SeerrMovieDetails>(`/movie/${tmdbId}`, options)
 }
 
 /**
  * Get TV show details by TMDb ID
  */
-export async function getTVDetails(tmdbId: number): Promise<SeerrTVDetails | null> {
-  return seerrRequest<SeerrTVDetails>(`/tv/${tmdbId}`)
+export async function getTVDetails(
+  tmdbId: number,
+  options: SeerrCallOptions = {}
+): Promise<SeerrTVDetails | null> {
+  return seerrRequest<SeerrTVDetails>(`/tv/${tmdbId}`, options)
 }
 
 /** Jellyseerr / JSON may surface status as number or string; normalize for comparisons. */
@@ -297,7 +310,8 @@ function mediaStatusCode(s: unknown): number | undefined {
  */
 export async function getMediaStatus(
   tmdbId: number,
-  mediaType: 'movie' | 'tv'
+  mediaType: 'movie' | 'tv',
+  options: SeerrCallOptions = {}
 ): Promise<{
   exists: boolean
   status: 'unknown' | 'pending' | 'processing' | 'partially_available' | 'available'
@@ -313,8 +327,8 @@ export async function getMediaStatus(
   seerrMediaId?: number
 } | null> {
   const details = mediaType === 'movie' 
-    ? await getMovieDetails(tmdbId)
-    : await getTVDetails(tmdbId)
+    ? await getMovieDetails(tmdbId, options)
+    : await getTVDetails(tmdbId, options)
 
   if (!details) {
     return null
@@ -623,47 +637,94 @@ export async function deleteRequest(requestId: number): Promise<boolean> {
 // Batch Operations
 // ============================================================================
 
+type MediaStatus = NonNullable<Awaited<ReturnType<typeof getMediaStatus>>>
+
+/** External changes made directly in Seerr can take this long to show on a badge. */
+const STATUS_CACHE_TTL_MS = 30_000
+const STATUS_CACHE_MAX_ENTRIES = 5000
 /**
- * Check media status for multiple TMDb IDs
+ * Process-wide, so several rows loading at once cannot multiply the load on Seerr.
+ * Per kind of caller: people never wait behind a job's long list.
+ */
+const STATUS_CONCURRENCY = 5
+const STATUS_CALL_TIMEOUT_MS = 5000
+const BACKGROUND_STATUS_CALL_TIMEOUT_MS = 30_000
+/** Covers a page of 100 titles at this library's usual Seerr speed. */
+const STATUS_BATCH_BUDGET_MS = 12_000
+
+/**
+ * For someone waiting; a job neither reads nor fills it, because a load shared with
+ * a job could hand it the null of someone's spent budget.
+ *
+ * Successful answers only (`AsyncCache` keeps no null), so an unreachable Seerr is
+ * asked again rather than remembered. Keyed by address and key, so changing either
+ * reuses nothing, and by media type, because a movie and a show can share a TMDb id.
+ */
+const statusCache = new AsyncCache<MediaStatus>({
+  ttlMs: STATUS_CACHE_TTL_MS,
+  maxEntries: STATUS_CACHE_MAX_ENTRIES,
+})
+const limitStatusCall = concurrencyLimit(STATUS_CONCURRENCY)
+const limitJobStatusCall = concurrencyLimit(STATUS_CONCURRENCY)
+
+/**
+ * Check media status for multiple TMDb IDs.
+ *
+ * `interactive` is for someone waiting on a page: answers kept briefly, a shorter
+ * limit per call, and no new call once the batch's budget is spent, so a hung Seerr
+ * costs seconds rather than minutes. A title that ran out of budget has no entry,
+ * like any other unanswered one. A job leaves it off, because it needs every answer:
+ * it asks Seerr itself for each title, in its own queue.
  */
 export async function batchGetMediaStatus(
-  items: { tmdbId: number; mediaType: 'movie' | 'tv' }[]
+  items: { tmdbId: number; mediaType: 'movie' | 'tv' }[],
+  options: { interactive?: boolean; budgetMs?: number } = {}
 ): Promise<Map<number, {
   exists: boolean
   status: string
   requested: boolean
 }>> {
   const results = new Map<number, { exists: boolean; status: string; requested: boolean }>()
+  const config = await getSeerrConfig()
+  if (!config) return results
 
-  // Process in parallel with rate limiting
-  const batchSize = 5
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize)
-    
-    const batchResults = await Promise.all(
-      batch.map(async (item) => {
-        const id = Number(item.tmdbId)
-        if (!Number.isFinite(id)) {
-          return { tmdbId: id, status: null }
-        }
-        const status = await getMediaStatus(id, item.mediaType)
+  const interactive = options.interactive === true
+  const deadline = interactive
+    ? Date.now() + (options.budgetMs ?? STATUS_BATCH_BUDGET_MS)
+    : Infinity
+
+  const answers = await Promise.all(
+    items.map(async (item) => {
+      const id = Number(item.tmdbId)
+      if (!Number.isFinite(id)) return { tmdbId: id, status: null }
+      if (!interactive) {
+        const status = await limitJobStatusCall(() =>
+          getMediaStatus(id, item.mediaType, {
+            config,
+            timeoutMs: BACKGROUND_STATUS_CALL_TIMEOUT_MS,
+          })
+        )
         return { tmdbId: id, status }
-      })
-    )
-
-    for (const { tmdbId, status } of batchResults) {
-      if (status && Number.isFinite(tmdbId)) {
-        results.set(tmdbId, {
-          exists: status.exists,
-          status: status.status,
-          requested: status.requested,
-        })
       }
-    }
+      const key = JSON.stringify([config.url, config.apiKey, item.mediaType, id])
+      const status = await statusCache.get(key, () =>
+        limitStatusCall(async () =>
+          Date.now() >= deadline
+            ? null
+            : getMediaStatus(id, item.mediaType, { config, timeoutMs: STATUS_CALL_TIMEOUT_MS })
+        )
+      )
+      return { tmdbId: id, status }
+    })
+  )
 
-    // Small delay between batches
-    if (i + batchSize < items.length) {
-      await new Promise(resolve => setTimeout(resolve, 100))
+  for (const { tmdbId, status } of answers) {
+    if (status && Number.isFinite(tmdbId)) {
+      results.set(tmdbId, {
+        exists: status.exists,
+        status: status.status,
+        requested: status.requested,
+      })
     }
   }
 

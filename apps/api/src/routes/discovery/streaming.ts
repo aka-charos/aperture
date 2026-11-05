@@ -7,7 +7,6 @@ import { can, refusalFor } from '../../lib/permissions.js'
 import {
   attachLibraryMatch,
   attachTmdbPosterPaths,
-  batchGetSeerrMediaStatus,
   buildCacheKey,
   fetchPopularTitles,
   fetchProviders,
@@ -15,7 +14,6 @@ import {
   loadCachedOrFetch,
   getStreamingDiscoveryEnabled,
   getStreamingDiscoveryProviderStrips,
-  isSeerrConfigured,
   parsePopularEdges,
   parseProvidersResponse,
   sortStreamingRowsForDiscovery,
@@ -56,35 +54,6 @@ async function assertStreamingDiscoveryAllowed(
     }
   }
   return { ok: true }
-}
-
-function rowToSeerrItem(row: JustWatchStreamingRow): { tmdbId: number; mediaType: 'movie' | 'tv' } | null {
-  if (!row.tmdbId) return null
-  if (row.objectType === 'MOVIE') return { tmdbId: row.tmdbId, mediaType: 'movie' }
-  if (row.objectType === 'SHOW') return { tmdbId: row.tmdbId, mediaType: 'tv' }
-  return null
-}
-
-async function attachSeerrStatuses(
-  rows: JustWatchStreamingRow[]
-): Promise<Record<number, { exists: boolean; status: string; requested: boolean }>> {
-  const seerrOk = await isSeerrConfigured()
-  if (!seerrOk || rows.length === 0) return {}
-
-  const items: { tmdbId: number; mediaType: 'movie' | 'tv' }[] = []
-  for (const r of rows) {
-    const it = rowToSeerrItem(r)
-    if (it) items.push(it)
-    if (items.length >= 80) break
-  }
-  if (items.length === 0) return {}
-
-  const map = await batchGetSeerrMediaStatus(items)
-  const out: Record<number, { exists: boolean; status: string; requested: boolean }> = {}
-  for (const [tmdbId, st] of map) {
-    out[tmdbId] = st
-  }
-  return out
 }
 
 export function registerStreamingDiscoveryRoutes(fastify: FastifyInstance) {
@@ -148,8 +117,7 @@ export function registerStreamingDiscoveryRoutes(fastify: FastifyInstance) {
       if (missingOnly) {
         rows = rows.filter((r: JustWatchStreamingRow) => !r.inLibrary && r.tmdbId != null)
       }
-      const seerrStatuses = await attachSeerrStatuses(rows)
-      return reply.send({ rows, stale, seerrStatuses })
+      return reply.send({ rows, stale })
     } catch (e) {
       if (e instanceof Error && e.message === 'JUSTWATCH_UNAVAILABLE') {
         fastify.log.warn({ country }, 'JustWatch popular fetch failed with no cache')
@@ -219,8 +187,7 @@ export function registerStreamingDiscoveryRoutes(fastify: FastifyInstance) {
       if (missingOnly) {
         rows = rows.filter((r: JustWatchStreamingRow) => !r.inLibrary && r.tmdbId != null)
       }
-      const seerrStatuses = await attachSeerrStatuses(rows)
-      return reply.send({ rows, stale, seerrStatuses })
+      return reply.send({ rows, stale })
     } catch (e) {
       if (e instanceof Error && e.message === 'JUSTWATCH_UNAVAILABLE') {
         return reply.status(502).send({ error: 'Streaming data temporarily unavailable', rows: [], stale: false, seerrStatuses: {} })

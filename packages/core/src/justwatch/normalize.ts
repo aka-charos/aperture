@@ -1,5 +1,17 @@
 import type { JustWatchProviderOption, JustWatchStreamingRow } from './types.js'
 
+const JUSTWATCH_IMAGE_HOST = 'https://images.justwatch.com'
+
+/**
+ * A row's `posterPath` is either a TMDb path, which the card puts on TMDb's image
+ * host, or a whole address. JustWatch answers with a path on its own host, so it
+ * has to arrive here as a whole address or the card asks TMDb for it.
+ */
+export function justWatchPosterAddress(posterUrl: string | null | undefined): string | null {
+  if (!posterUrl) return null
+  return posterUrl.startsWith('/') ? `${JUSTWATCH_IMAGE_HOST}${posterUrl}` : posterUrl
+}
+
 /** Raw node shape from GetPopularTitles / GetSearchTitles (minimal fields we read) */
 export interface JwTitleNode {
   id?: string
@@ -54,7 +66,7 @@ export function normalizeJwNode(node: JwTitleNode): JustWatchStreamingRow | null
     overview: content.shortDescription ?? null,
     tmdbId,
     imdbId: content.externalIds?.imdbId ?? null,
-    posterPath: content.posterUrl ?? null,
+    posterPath: justWatchPosterAddress(content.posterUrl),
     chartRank: chart?.rank ?? null,
     chartTrend: chart?.trend ?? null,
     daysInTop10: chart?.daysInTop10 ?? null,

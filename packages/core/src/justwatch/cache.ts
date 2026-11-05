@@ -74,7 +74,10 @@ export function buildCacheKey(parts: Record<string, string | number | null | und
 }
 
 /**
- * Return fresh cache hit, or exactly one JustWatch fetch per key while concurrent callers wait on the same promise.
+ * Return a fresh chart; or a saved chart past its time at once, marked stale, while
+ * one refresh runs behind it; or, with nothing saved, one fetch that concurrent
+ * callers share. A failed refresh leaves the saved chart in place. Charts are
+ * public: library matches and personal statuses are added by the caller.
  */
 export async function loadCachedOrFetch(
   cacheKey: string,
@@ -98,13 +101,17 @@ export async function loadCachedOrFetch(
         }
         throw new Error('JUSTWATCH_UNAVAILABLE')
       }
-    })()
+    })().finally(() => {
+      if (inflight.get(cacheKey) === p) inflight.delete(cacheKey)
+    })
     inflight.set(cacheKey, p)
   }
 
-  try {
-    return await p
-  } finally {
-    inflight.delete(cacheKey)
+  if (cached) {
+    // Nobody waits on this refresh, and the promise can still reject on the path
+    // where nothing was saved when it started.
+    void p.catch(() => undefined)
+    return { raw: cached.payload, stale: true }
   }
+  return p
 }

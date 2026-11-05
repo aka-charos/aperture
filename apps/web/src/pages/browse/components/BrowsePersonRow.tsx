@@ -45,6 +45,8 @@ export function BrowsePersonRow({ person, onNavigate }: BrowsePersonRowProps) {
         alt=""
         slotProps={{
           img: {
+            loading: 'lazy',
+            decoding: 'async',
             onLoad: () => setAvatarImgShown(true),
             style: {
               opacity: displaySrc ? (avatarImgShown ? 1 : 0) : 1,

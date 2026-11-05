@@ -713,7 +713,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         mediaType: (item.mediaType === 'movie' ? 'movie' : 'tv') as 'movie' | 'tv',
       }))
 
-      const statusMap = await batchGetSeerrMediaStatus(seerrItems)
+      const statusMap = await batchGetSeerrMediaStatus(seerrItems, { interactive: true })
 
       // Convert Map to object for JSON response
       const statuses: Record<number, {
