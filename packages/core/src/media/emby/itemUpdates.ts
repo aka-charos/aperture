@@ -37,20 +37,3 @@ export async function updateEmbyItemSafely(
     logger.warn({ err, ...context }, 'Non-fatal Emby item update failed')
   }
 }
-
-export function setForcedSortName(
-  item: Record<string, unknown>,
-  sortName: string,
-  lockSortName = true
-): void {
-  item.ForcedSortName = sortName
-
-  if (!lockSortName) {
-    return
-  }
-
-  const existingLocked = Array.isArray(item.LockedFields) ? item.LockedFields : []
-  if (!existingLocked.includes('SortName')) {
-    item.LockedFields = [...existingLocked, 'SortName']
-  }
-}

@@ -8,6 +8,8 @@
 import type { CollectionCreateResult } from '../types.js'
 import type { JellyfinItemsResponse } from './types.js'
 import type { JellyfinProviderBase } from './base.js'
+import { updateJellyfinItemSafely } from './itemUpdates.js'
+import { setForcedSortName } from '../sortName.js'
 
 /**
  * Create or update a collection (Box Set)
@@ -241,28 +243,18 @@ async function setCollectionSortTitle(
 ): Promise<void> {
   // Prepend !!!!!! to sort title so collection appears at top when sorted alphabetically
   const sortTitle = `!!!!!!${name}`
-  
-  try {
-    // First, fetch the full item data (required by Jellyfin API for updates)
-    const item = await provider.fetch<Record<string, unknown>>(
-      `/Items/${collectionId}`,
-      apiKey
-    )
-    
-    // Update the sort name and lock it to prevent automatic overwrites
-    item.ForcedSortName = sortTitle
-    item.LockedFields = ['SortName']
-    
-    // POST the full item back
-    await provider.fetch(`/Items/${collectionId}`, apiKey, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(item),
-    })
-  } catch {
-    // Non-fatal: collection will still work, just won't sort to top
-    console.warn(`Failed to set sort title for collection ${collectionId}`)
-  }
+
+  // Non-fatal: collection will still work, just won't sort to top
+  await updateJellyfinItemSafely(
+    provider,
+    apiKey,
+    collectionId,
+    (item) => {
+      setForcedSortName(item, sortTitle, false)
+      item.LockedFields = ['SortName']
+    },
+    { operation: 'setCollectionSortTitle' }
+  )
 }
 
 /**
@@ -278,40 +270,18 @@ async function setItemRankSortNames(
   itemIds: string[]
 ): Promise<void> {
   for (let i = 0; i < itemIds.length; i++) {
-    const itemId = itemIds[i]
-    const rank = i + 1
-    const rankPrefix = String(rank).padStart(2, '0')
-    
-    try {
-      // Fetch the full item data
-      const item = await provider.fetch<Record<string, unknown>>(
-        `/Items/${itemId}`,
-        apiKey
-      )
-      
-      // Get the original name for the sort title
-      const originalName = item.Name || 'Unknown'
-      const sortTitle = `${rankPrefix} - ${originalName}`
-      
-      // Update the sort name and lock it
-      item.ForcedSortName = sortTitle
-      
-      // Merge with existing locked fields if any
-      const existingLocked = Array.isArray(item.LockedFields) ? item.LockedFields : []
-      if (!existingLocked.includes('SortName')) {
-        item.LockedFields = [...existingLocked, 'SortName']
-      }
-      
-      // POST the full item back
-      await provider.fetch(`/Items/${itemId}`, apiKey, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(item),
-      })
-    } catch {
-      // Non-fatal: item will still be in collection, just won't sort by rank
-      console.warn(`Failed to set rank sort name for item ${itemId}`)
-    }
+    const rankPrefix = String(i + 1).padStart(2, '0')
+
+    // Non-fatal: item will still be in collection, just won't sort by rank
+    await updateJellyfinItemSafely(
+      provider,
+      apiKey,
+      itemIds[i],
+      (item) => {
+        const originalName = item.Name || 'Unknown'
+        setForcedSortName(item, `${rankPrefix} - ${originalName}`)
+      },
+      { operation: 'setItemRankSortName' }
+    )
   }
 }
-

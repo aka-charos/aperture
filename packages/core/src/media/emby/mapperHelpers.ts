@@ -102,21 +102,6 @@ export function mapEmbyUserData(userData: EmbyUserData | undefined, includePosit
   }
 }
 
-export function mapEmbyVideoQuality(primarySource: EmbyMediaSource | undefined) {
-  const videoStream = primarySource?.MediaStreams?.find((s) => s.Type === 'Video')
-  const audioStream = primarySource?.MediaStreams?.find((s) => s.Type === 'Audio')
-
-  return {
-    videoResolution:
-      videoStream?.Width && videoStream?.Height
-        ? `${videoStream.Width}x${videoStream.Height}`
-        : undefined,
-    videoCodec: videoStream?.Codec,
-    audioCodec: audioStream?.Codec,
-    container: primarySource?.Container,
-  }
-}
-
 export function mapEmbyItemToWatchedMovie(item: EmbyItem): WatchedItem {
   return {
     movieId: item.Id,
