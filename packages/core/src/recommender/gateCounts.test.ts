@@ -98,6 +98,10 @@ function runWriters(source: string) {
     // set to (a parameter or a literal), looked for within the statement.
     finalizes: code.match(/UPDATE recommendation_runs\b[\s\S]{0,600}?\bstatus\s*=/g)?.length ?? 0,
     finalizesWithCounts: code.match(/output_counts = \$\{outputCountsSql\(/g)?.length ?? 0,
+    // Inside the run's own SET list (up to its WHERE): a stamp on another table
+    // in the same file must not stand in for this one.
+    finalizesStamped:
+      code.match(/UPDATE recommendation_runs\b(?:(?!\bWHERE\b)[\s\S])*?\bcompleted_at\s*=\s*NOW\(\)/g)?.length ?? 0,
   }
 }
 
@@ -123,11 +127,46 @@ test('every run row written in core records its counts', () => {
   assert.deepEqual(offenders, [])
 })
 
+test('every run finalize stamps completed_at', () => {
+  // recommendationEvents filters on completed_at, so an unstamped finalize
+  // silently stops that media type's "new recommendations" notification.
+  const offenders: string[] = []
+  let finalizers = 0
+  for (const file of sourceFiles(CORE_SRC)) {
+    if (file.endsWith('.test.ts')) continue
+    const w = runWriters(readFileSync(file, 'utf8'))
+    finalizers += w.finalizes
+    if (w.finalizesStamped < w.finalizes) {
+      const rel = relative(CORE_SRC, file).split(sep).join('/')
+      offenders.push(`${rel}: ${w.finalizes} finalizes, ${w.finalizesStamped} stamping completed_at`)
+    }
+  }
+  assert.equal(finalizers, 2, 'the two finalize writers (movie, series)')
+  assert.deepEqual(offenders, [])
+})
+
 test('the writer scan sees a literal-status finalize and ignores comments', () => {
   // The two shapes the first version of this scan missed.
   const literal = runWriters("await query(`UPDATE recommendation_runs SET status = 'completed' WHERE id = $1`)")
   assert.equal(literal.finalizes, 1)
   assert.equal(literal.finalizesWithCounts, 0)
+  assert.equal(literal.finalizesStamped, 0)
+  const stamped = runWriters(
+    "await query(`UPDATE recommendation_runs SET status = $2, completed_at = NOW() WHERE id = $1`)"
+  )
+  assert.equal(stamped.finalizesStamped, 1)
+  const stampedAfterTemplate = runWriters(
+    "await query(`UPDATE recommendation_runs SET status = $2 ${withCounts ? `, output_counts = x` : ''}, completed_at = NOW() WHERE id = $1`)"
+  )
+  assert.equal(stampedAfterTemplate.finalizesStamped, 1)
+  const stampedElsewhere = runWriters(
+    [
+      "await query(`UPDATE recommendation_runs SET status = $2 WHERE id = $1`)",
+      'await query(`UPDATE job_runs SET completed_at = NOW() WHERE id = $1`)',
+    ].join('\n')
+  )
+  assert.equal(stampedElsewhere.finalizes, 1)
+  assert.equal(stampedElsewhere.finalizesStamped, 0)
   const commented = runWriters(
     [
       "// output_counts = ${outputCountsSql('$1')}",
@@ -135,7 +174,7 @@ test('the writer scan sees a literal-status finalize and ignores comments', () =
       '  -- INSERT INTO recommendation_runs SET status = 1',
     ].join('\n')
   )
-  assert.deepEqual(commented, { inserts: 0, insertsWithCounts: 0, finalizes: 0, finalizesWithCounts: 0 })
+  assert.deepEqual(commented, { inserts: 0, insertsWithCounts: 0, finalizes: 0, finalizesWithCounts: 0, finalizesStamped: 0 })
 })
 
 test('a missing 0203 column is recognised, and nothing else is', () => {
