@@ -107,7 +107,12 @@ export function getProxyTrustState(): ProxyTrustState {
  * the mode alone still does the right thing for a proxy on this host.
  */
 export async function refreshProxyTrust(): Promise<void> {
-  if (proxyTrustIsEnvManaged()) return
+  if (proxyTrustIsEnvManaged()) {
+    // Fastify compiles this list itself; isTrustedPeer needs the matcher too.
+    const env = trustProxy()
+    compile(Array.isArray(env) ? env : [])
+    return
+  }
 
   let entries: string[] = []
   try {
@@ -147,6 +152,23 @@ export async function setTrustedProxies(entries: string[]): Promise<string[]> {
 export function buildTrustProxyOption(): boolean | number | string[] | ((addr: string, hop: number) => boolean) {
   if (proxyTrustIsEnvManaged()) return trustProxy()
   return (addr: string, hop: number) => (matcher ? matcher(addr, hop) : false)
+}
+
+/**
+ * Whether the address directly connected to us is a proxy we believe.
+ *
+ * Fastify answers this only inside `request.ip`, and its `request.host` does not
+ * ask at all (see config/cors.ts), so anything deciding whether to read a forwarded
+ * header other than X-Forwarded-For needs the question put directly.
+ */
+export function isTrustedPeer(address: string | undefined): boolean {
+  if (!address) return false
+  if (proxyTrustIsEnvManaged()) {
+    const env = trustProxy()
+    if (typeof env === 'boolean') return env
+    if (typeof env === 'number') return env > 0
+  }
+  return matcher ? matcher(address, 0) : false
 }
 
 /** Test seam. */

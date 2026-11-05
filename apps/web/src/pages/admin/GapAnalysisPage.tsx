@@ -1172,7 +1172,7 @@ function GapAnalysisContent() {
           <Toolbar sx={{ justifyContent: 'space-between', gap: 2 }}>
             <Typography variant="body2">{t('admin.gaps.selectedCount', { count: selected.size })}</Typography>
             <Stack direction="row" spacing={1}>
-              <Button onClick={clearSel}>{t('common.clear')}</Button>
+              <Button onClick={clearSel}>{t('admin.common.clear')}</Button>
               <Button variant="contained" disabled={!seerrOk || requesting} onClick={onToolbarRequest}>
                 {t('admin.gaps.requestSelectedSeerr')}
               </Button>
@@ -1207,7 +1207,7 @@ function GapAnalysisContent() {
                 void executeGapRequest(b.items, b.seerrOptions)
               }}
             >
-              {t('common.confirm')}
+              {t('admin.common.confirm')}
             </Button>
           )}
         </DialogActions>
