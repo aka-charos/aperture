@@ -4276,7 +4276,11 @@
     "barMissingSeasons": "Seasons not on server: {{seasons}}",
     "removeConfirmTitle": "Remove from watchlist?",
     "removeConfirmBody": "\"{{title}}\" will be removed from your watchlist. Because your watchlist is synced with your media server favorites, this will also remove it from your favorites in Emby/Jellyfin.",
-    "removeConfirmAction": "Remove"
+    "removeConfirmAction": "Remove",
+    "homeRowDynamicTitle": "Show these on your Emby Home screen",
+    "homeRowDynamicBody": "Your tracked series are favorited on Emby. To get a Home row for them, add a Home row with Dynamic Content: choose your TV Series libraries, sort by Date last content added (Descending), set Playstate to Unplayed, and turn Favorite on.",
+    "homeRowFavoritesTabTitle": "Find these on your Jellyfin Favorites tab",
+    "homeRowFavoritesTabBody": "Your tracked series are favorited on Jellyfin. Jellyfin's Home screen can't show a filtered row, so open the Favorites tab on the Jellyfin home page, or use the Favorites filter inside a TV library."
   },
   "setup": {
     "step": {
@@ -7209,5 +7213,9 @@
       "unavailable": "Your server is not sending newsletters at the moment.",
       "error": "Could not save your choice."
     }
+  },
+  "mediaServerTypeMismatch": {
+    "message": "This server identifies itself as {{detected}}, but Aperture is set to {{selected}}. Features that differ between the two servers will not behave correctly.",
+    "useDetected": "Switch to {{detected}}"
   }
 }

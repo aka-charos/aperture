@@ -16,6 +16,7 @@ import {
   setMediaServerConfig,
   testMediaServerConnection,
   getMediaServerTypes,
+  getMediaServerCapabilities,
   getSystemSetting,
   setSystemSetting,
   InvalidServerUrlError,
@@ -68,6 +69,7 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
       displayName: customDisplayName || serverName,
       webClientUrl: publicUrl ? `${publicUrl}/web/index.html` : '',
       isConfigured: config.isConfigured,
+      capabilities: getMediaServerCapabilities(serverType),
     })
   })
 

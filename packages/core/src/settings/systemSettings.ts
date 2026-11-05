@@ -9,6 +9,7 @@ import {
   normalizeAppLocale,
   type AppLocaleCode,
 } from '../lib/locales.js'
+import { detectMediaServerType } from '../media/detect.js'
 
 const logger = createChildLogger('system-settings')
 
@@ -365,13 +366,42 @@ export async function setMediaServerConfig(config: {
 }
 
 /**
+ * Result of testing a media server connection.
+ * detectedType / typeMismatch come from an unauthenticated probe of the server and are
+ * omitted when the server could not be classified.
+ */
+export interface MediaServerConnectionTestResult {
+  success: boolean
+  serverName?: string
+  error?: string
+  /** What the server reports itself to be, when it could be determined. */
+  detectedType?: MediaServerType
+  detectedProductName?: string
+  detectedVersion?: string
+  /** True when detectedType differs from the type the admin selected. */
+  typeMismatch?: boolean
+}
+
+/**
  * Test media server connection with given credentials
  */
 export async function testMediaServerConnection(config: {
   type: MediaServerType
   baseUrl: string
   apiKey: string
-}): Promise<{ success: boolean; serverName?: string; error?: string }> {
+}): Promise<MediaServerConnectionTestResult> {
+  // Probe independently of the authenticated test: a wrong type is worth reporting
+  // even when the key is also wrong, and the probe never throws.
+  const detected = await detectMediaServerType(config.baseUrl)
+  const detection: Partial<MediaServerConnectionTestResult> = detected?.type
+    ? {
+        detectedType: detected.type,
+        ...(detected.productName ? { detectedProductName: detected.productName } : {}),
+        ...(detected.version ? { detectedVersion: detected.version } : {}),
+        typeMismatch: detected.type !== config.type,
+      }
+    : {}
+
   try {
     // Validated here too, not just in the setter: this runs against a URL the
     // caller supplies in the request body, before anything is persisted.
@@ -384,14 +414,14 @@ export async function testMediaServerConnection(config: {
     // Server info is the connection test. Both providers implement it and it is
     // on MediaServerProvider, so the old library-count fallback could never run.
     const info = await provider.getServerInfo(config.apiKey)
-    return { success: true, serverName: info.name }
+    return { success: true, serverName: info.name, ...detection }
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error'
     logger.warn(
       { err, config: { type: config.type, baseUrl: config.baseUrl } },
       'Media server connection test failed'
     )
-    return { success: false, error }
+    return { success: false, error, ...detection }
   }
 }
 
