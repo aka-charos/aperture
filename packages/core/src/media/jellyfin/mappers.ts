@@ -6,6 +6,7 @@
 
 import type { Movie, Series, Episode } from '../types.js'
 import type { JellyfinItem, JellyfinEpisode } from './types.js'
+import { mapVideoQuality } from '../videoQuality.js'
 
 export function mapJellyfinItemToMovie(item: JellyfinItem, baseUrl: string): Movie {
   const directors =
@@ -59,6 +60,7 @@ export function mapJellyfinItemToMovie(item: JellyfinItem, baseUrl: string): Mov
     tags: item.Tags || [],
     productionCountries: item.ProductionLocations || [],
     awards: item.Awards,
+    ...mapVideoQuality(item.MediaSources?.[0]),
     userData: item.UserData
       ? {
           playCount: item.UserData.PlayCount,

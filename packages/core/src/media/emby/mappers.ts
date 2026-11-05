@@ -7,9 +7,9 @@ import {
   mapEmbyMediaSources,
   mapEmbyStudios,
   mapEmbyUserData,
-  mapEmbyVideoQuality,
   seriesEndYear,
 } from './mapperHelpers.js'
+import { mapVideoQuality } from '../videoQuality.js'
 
 export { mapEmbyEpisodeToWatched, mapEmbyItemToWatchedMovie } from './mapperHelpers.js'
 
@@ -18,7 +18,7 @@ export function mapEmbyItemToMovie(item: EmbyItem, baseUrl: string): Movie {
   const writers = extractPeopleNames(item.People, ['Writer'])
   const actors = mapEmbyActors(item.People, baseUrl)
   const primarySource = item.MediaSources?.[0]
-  const quality = mapEmbyVideoQuality(primarySource)
+  const quality = mapVideoQuality(primarySource)
 
   return {
     id: item.Id,

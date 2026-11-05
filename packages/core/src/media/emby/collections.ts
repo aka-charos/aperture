@@ -5,7 +5,8 @@
 import type { CollectionCreateResult } from '../types.js'
 import type { EmbyItemsResponse } from './types.js'
 import type { EmbyProviderBase } from './base.js'
-import { setForcedSortName, updateEmbyItemSafely } from './itemUpdates.js'
+import { updateEmbyItemSafely } from './itemUpdates.js'
+import { setForcedSortName } from '../sortName.js'
 import {
   buildCollectionCreateParams,
   buildItemSearchParams,
