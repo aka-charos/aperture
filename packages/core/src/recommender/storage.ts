@@ -434,7 +434,7 @@ export async function finalizeRun(
   await withRunCounts((withCounts) =>
     query(
       `UPDATE recommendation_runs
-       SET candidate_count = $2, selected_count = $3, duration_ms = $4, status = $5, error_message = $6,
+       SET candidate_count = $2, selected_count = $3, duration_ms = $4, status = $5, error_message = $6, completed_at = NOW(),
            similarity_weight = $7, novelty_weight = $8, rating_weight = $9
            ${withCounts ? `, output_counts = ${outputCountsSql('$1')}` : ''}
        WHERE id = $1`,
