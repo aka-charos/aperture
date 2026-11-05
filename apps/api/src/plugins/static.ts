@@ -6,6 +6,7 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { getAppName, DEFAULT_APP_NAME } from '@aperture/core'
 import { resolveBrandingAsset, brandingAssetUrl } from '../lib/brandingAssets.js'
+import { isRoutePath } from '../config/cors.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -113,11 +114,7 @@ const staticPlugin: FastifyPluginAsync = async (fastify) => {
   // SPA fallback - serve index.html for non-API routes
   fastify.setNotFoundHandler(async (request, reply) => {
     // Don't intercept API routes, health checks, or OpenAPI docs
-    if (
-      request.url.startsWith('/api') ||
-      request.url.startsWith('/health') ||
-      request.url.startsWith('/openapi')
-    ) {
+    if (isRoutePath(request.url)) {
       return reply.status(404).send({ error: 'Not Found' })
     }
 

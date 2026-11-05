@@ -66,6 +66,11 @@ jobs:
       - name: Server boots
         run: pnpm --filter @aperture/api test:boot
 
+      # Who may reach what: the CORS decision, forwarded-header trust and the
+      # security headers. Needs no database.
+      - name: Security posture
+        run: pnpm --filter @aperture/api test:security
+
   docker-amd64:
     name: Build Docker Image (amd64)
     needs: [detect-changes, validate]
