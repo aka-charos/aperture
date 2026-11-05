@@ -1,11 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import {
   isExcludableWatchHistoryRow,
   IN_PROGRESS_EXCLUSION_THRESHOLD,
   WATCH_HISTORY_EXCLUDABLE_SQL,
   WATCH_HISTORY_PLAYED_SQL,
   WATCH_HISTORY_TASTE_SQL,
+  withoutExcludedIds,
 } from './watchedExclusion.js'
 
 /**
@@ -115,5 +118,52 @@ test('every column in every predicate is wh-qualified', () => {
       const qualified = sql.match(new RegExp(`\\bwh\\.${column}\\b`, 'g'))?.length ?? 0
       assert.equal(mentions, qualified, `every ${column} must be wh.${column} in: ${sql}`)
     }
+  }
+})
+
+// ============================================================================
+// Dislikes apply under include_watched; watched titles stay eligible there
+// ============================================================================
+
+const titles = [{ id: 'unseen' }, { id: 'watched' }, { id: 'disliked' }]
+const ids = (items: Array<{ id: string }>) => items.map((item) => item.id)
+
+test('with include_watched on, the set holds dislikes alone: watched stays, disliked goes', () => {
+  assert.deepEqual(ids(withoutExcludedIds(titles, new Set(['disliked']))), ['unseen', 'watched'])
+})
+
+test('with include_watched off, watched and disliked both go', () => {
+  assert.deepEqual(ids(withoutExcludedIds(titles, new Set(['watched', 'disliked']))), ['unseen'])
+})
+
+test('with dislike_behavior penalize and include_watched on, nothing is removed', () => {
+  assert.deepEqual(ids(withoutExcludedIds(titles, new Set())), ['unseen', 'watched', 'disliked'])
+})
+
+const sourceOf = (relativePath: string) =>
+  readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8')
+
+const PIPELINES = {
+  movies: sourceOf('./movies/pipeline.ts'),
+  series: sourceOf('./series/pipeline.ts'),
+}
+
+for (const [name, source] of Object.entries(PIPELINES)) {
+  test(`${name}: include_watched decides what is excluded, never whether exclusion applies`, () => {
+    assert.match(source, /if \(includeWatched\) \{\s+\/\/.*\s+excludeIds = new Set\(dislikedIds\)/)
+    assert.match(source, /const finalSelected = withoutExcludedIds\(/)
+    assert.doesNotMatch(source, /!includeWatched/)
+  })
+
+  test(`${name}: the dislike behaviour comes from the column the settings route writes`, () => {
+    assert.match(source, /COALESCE\(dislike_behavior, 'exclude'\) as dislike_behavior FROM user_preferences/)
+    assert.doesNotMatch(source, /settings\??\.dislikeBehavior/)
+  })
+}
+
+test('retrieval takes no include-watched switch, so it cannot skip the exclusion', () => {
+  for (const source of [sourceOf('./movies/candidates.ts'), PIPELINES.series]) {
+    assert.doesNotMatch(source, /includeWatched: boolean/)
+    assert.match(source, /withoutExcludedIds\(/)
   }
 })

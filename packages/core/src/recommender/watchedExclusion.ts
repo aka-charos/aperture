@@ -241,9 +241,16 @@ export async function getUserIncludeWatched(userId: string): Promise<boolean> {
   return result.rows[0]?.include_watched ?? false
 }
 
-export function filterByWatchedIds<T extends { id: string }>(
+/**
+ * Removes what a recommendation run must not offer, at retrieval and again on
+ * the final list. Both pipelines apply it unconditionally: include_watched only
+ * decides what they put in the set (the dislikes alone, rather than watched +
+ * dislikes), so gating this call on that setting is what let disliked titles
+ * through for a viewer who keeps watched titles eligible.
+ */
+export function withoutExcludedIds<T extends { id: string }>(
   items: T[],
-  watchedIds: Set<string>
+  excludeIds: Set<string>
 ): T[] {
-  return items.filter((item) => !watchedIds.has(item.id))
+  return items.filter((item) => !excludeIds.has(item.id))
 }

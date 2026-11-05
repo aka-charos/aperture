@@ -10,6 +10,7 @@ import {
 import { getActiveEmbeddingModelId, getActiveEmbeddingTableName } from '../../lib/ai-provider.js'
 import type { Candidate } from '../types.js'
 import { embeddingColumnFor, type EmbeddingSpace } from '../centering.js'
+import { withoutExcludedIds } from '../watchedExclusion.js'
 
 const logger = createChildLogger('recommender-candidates')
 
@@ -57,23 +58,27 @@ async function resolveCandidateQueryContext(
 }
 
 /**
- * Runs the actual pgvector ANN query for a single query vector, filters out
- * watched ids, and maps to Candidate[]. This exact `ORDER BY <=> LIMIT` shape
+ * Runs the actual pgvector ANN query for a single query vector, drops the
+ * excluded ids, and maps to Candidate[]. This exact `ORDER BY <=> LIMIT` shape
  * is what lets Postgres use the HNSW index on the embedding table -- a query
  * comparing against multiple vectors at once would not use it (see
  * getMultiClusterCandidates), so multi-centroid retrieval calls this once per
  * cluster instead of trying to fold multiple vectors into one query.
+ *
+ * `excludeIds` always applies. There is deliberately no include-watched switch
+ * here: that setting changes what the pipeline puts in the set (dislikes only,
+ * rather than watched + dislikes), and a switch at this level also let disliked
+ * titles through.
  */
 async function queryCandidatesForVector(
   vectorStr: string,
   limit: number,
-  includeWatched: boolean,
-  watchedIds: Set<string>,
+  excludeIds: Set<string>,
   scope: LibraryScope | null,
   ctx: CandidateQueryContext
 ): Promise<Candidate[]> {
-  // Calculate query limit - if excluding watched, need more results to filter from
-  const queryLimit = includeWatched ? limit : limit + watchedIds.size
+  // Fetch enough that the filter below still leaves `limit` rows.
+  const queryLimit = limit + excludeIds.size
 
   // Use pgvector to find similar movies, filtered by the viewer's scope (the
   // libraries the media server lets them see and the operator enabled, and their
@@ -102,12 +107,7 @@ async function queryCandidatesForVector(
     params
   )
 
-  // Filter out watched movies if not including them
-  const filteredRows = includeWatched
-    ? result.rows
-    : result.rows.filter((row) => !watchedIds.has(row.id))
-
-  return filteredRows.slice(0, limit).map((row) => ({
+  return withoutExcludedIds(result.rows, excludeIds).slice(0, limit).map((row) => ({
     movieId: row.id,
     id: row.id, // Alias for shared selection algorithm
     title: row.title,
@@ -130,9 +130,9 @@ async function queryCandidatesForVector(
 
 export async function getCandidates(
   tasteProfile: number[],
-  watchedIds: Set<string>,
+  /** Never returned. Only the pipeline decides what belongs in it. */
+  excludeIds: Set<string>,
   limit: number,
-  includeWatched: boolean = false,
   /** What this viewer may be shown; null limits to the operator's libraries only. */
   scope: LibraryScope | null = null,
   /**
@@ -148,7 +148,7 @@ export async function getCandidates(
 
   const vectorStr = `[${tasteProfile.join(',')}]`
 
-  return queryCandidatesForVector(vectorStr, limit, includeWatched, watchedIds, scope, ctx)
+  return queryCandidatesForVector(vectorStr, limit, excludeIds, scope, ctx)
 }
 
 export interface ClusterQueryInput {
@@ -192,15 +192,14 @@ export function mergeClusterCandidatesByMaxSimilarity(perClusterResults: Candida
  */
 export async function getMultiClusterCandidates(
   clusters: ClusterQueryInput[],
-  watchedIds: Set<string>,
+  excludeIds: Set<string>,
   totalLimit: number,
-  includeWatched: boolean = false,
   scope: LibraryScope | null = null,
   space: EmbeddingSpace = 'raw'
 ): Promise<Candidate[]> {
   if (clusters.length === 0) return []
   if (clusters.length === 1) {
-    return getCandidates(clusters[0].embedding, watchedIds, totalLimit, includeWatched, scope, space)
+    return getCandidates(clusters[0].embedding, excludeIds, totalLimit, scope, space)
   }
 
   const ctx = await resolveCandidateQueryContext(space)
@@ -218,8 +217,7 @@ export async function getMultiClusterCandidates(
       return queryCandidatesForVector(
         vectorStr,
         perClusterLimits[i],
-        includeWatched,
-        watchedIds,
+        excludeIds,
         scope,
         ctx
       )
