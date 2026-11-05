@@ -93,8 +93,14 @@ export function refreshRenderedStrings(): void {
  * the re-render moves the key to its new text, while anything this
  * re-render does not reach (a memoized subtree, a string computed once)
  * keeps its entry and stays clickable.
+ *
+ * A language not in memory (the editor's comparison language, say) has nothing
+ * on screen to update, and is left alone: i18next fetches a language only while
+ * it has no bundle, so this one string would stand in for the whole file. The
+ * saved string reaches it through the server's overrides when it is first used.
  */
 export function applyLiveString(locale: string, key: string, value: string): void {
+  if (!i18n.hasResourceBundle(locale, 'translation')) return
   i18n.addResource(locale, 'translation', key, value)
   i18n.emit(REFRESH_EVENT)
 }

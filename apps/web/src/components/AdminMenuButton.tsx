@@ -61,11 +61,11 @@ export function AdminMenuButton() {
 
   return (
     <>
-      <Tooltip title={t('nav.admin')}>
+      <Tooltip title={t('admin.nav.admin')}>
         <IconButton
           onClick={(e) => setAnchorEl(e.currentTarget)}
           size="small"
-          aria-label={t('nav.admin')}
+          aria-label={t('admin.nav.admin')}
           sx={{ mr: 0.5, color: inAdmin ? 'primary.main' : 'inherit' }}
         >
           <AdminPanelSettingsIcon />

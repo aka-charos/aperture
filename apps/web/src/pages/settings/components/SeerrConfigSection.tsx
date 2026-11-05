@@ -300,7 +300,7 @@ export function SeerrConfigSection() {
               disabled={saving || !hasChanges}
               size="small"
             >
-              {saving ? t('common.saving') : t('settingsSeerr.saveConfiguration')}
+              {saving ? t('admin.common.saving') : t('settingsSeerr.saveConfiguration')}
             </Button>
             
             <Button

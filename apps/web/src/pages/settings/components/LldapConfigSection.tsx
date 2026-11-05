@@ -261,7 +261,7 @@ export function LldapConfigSection() {
               disabled={saving || !hasChanges}
               size="small"
             >
-              {saving ? t('common.saving') : t('common.save')}
+              {saving ? t('admin.common.saving') : t('common.save')}
             </Button>
             <Button
               variant="outlined"

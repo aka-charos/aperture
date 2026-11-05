@@ -399,7 +399,7 @@ export function TavilyConfigSection() {
               disabled={saving || !hasChanges}
               size="small"
             >
-              {saving ? t('common.saving') : t('settingsTavily.saveConfiguration')}
+              {saving ? t('admin.common.saving') : t('settingsTavily.saveConfiguration')}
             </Button>
             <Button
               variant="outlined"

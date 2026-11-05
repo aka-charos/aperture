@@ -15,7 +15,8 @@ import staticPlugin from './plugins/static.js'
 import routes from './routes/index.js'
 import { getSwaggerConfig, swaggerUIConfig } from './config/openapi.js'
 import { useSecureCookies, apiDocsMode, helmetOptions, robotsTagHook } from './config/security.js'
-import { buildTrustProxyOption, refreshProxyTrust } from './config/proxyTrust.js'
+import { buildTrustProxyOption, isTrustedPeer, refreshProxyTrust } from './config/proxyTrust.js'
+import { corsDelegator } from './config/cors.js'
 import { AJV_OPTIONS } from './config/ajv.js'
 import { warnOnWeakSecurityPosture, noteRequest } from './config/deploymentPosture.js'
 
@@ -113,53 +114,16 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
   // assets and the SPA fallback as well as every API route.
   fastify.addHook('onRequest', robotsTagHook)
 
-  // Register CORS
+  // Register CORS. Which origins pass, and how, is decided in config/cors.ts.
   await fastify.register(cors, {
-    origin: (origin, cb) => {
-      // Allow requests with no origin (like mobile apps, curl, etc.)
-      if (!origin) {
-        cb(null, true)
-        return
-      }
-
-      // Helper to normalize URLs for comparison (remove trailing slash)
-      const normalizeUrl = (url: string) => url.replace(/\/$/, '')
-      const normalizedOrigin = normalizeUrl(origin)
-
-      // In development, allow localhost origins and configured external domains
-      if (process.env.NODE_ENV !== 'production') {
-        const allowedOrigins = [
-          'http://localhost:3456',
-          'http://localhost:3457',
-          'http://127.0.0.1:3456',
-          'http://127.0.0.1:3457',
-        ]
-        // Also allow APP_BASE_URL in development for external access
-        const appBaseUrl = process.env.APP_BASE_URL
-        if (appBaseUrl) {
-          allowedOrigins.push(normalizeUrl(appBaseUrl))
-        }
-        if (allowedOrigins.some(allowed => normalizedOrigin === normalizeUrl(allowed))) {
-          cb(null, true)
-          return
-        }
-      }
-
-      // In production, check against APP_BASE_URL
-      const appBaseUrl = process.env.APP_BASE_URL
-      if (appBaseUrl && normalizedOrigin === normalizeUrl(appBaseUrl)) {
-        cb(null, true)
-        return
-      }
-
-      // Log the rejected origin for debugging
-      logger.warn(
-        { origin: maskUrl(origin), appBaseUrl: maskUrl(appBaseUrl) },
-        'CORS request rejected - origin not allowed'
-      )
-      cb(new Error('Not allowed by CORS'), false)
-    },
-    credentials: true,
+    delegator: corsDelegator({
+      peerIsTrusted: isTrustedPeer,
+      onRefused: (origin) =>
+        logger.warn(
+          { origin: maskUrl(origin), appBaseUrl: maskUrl(process.env.APP_BASE_URL) },
+          'CORS request rejected - origin not allowed'
+        ),
+    }),
   })
 
   // Register cookie support

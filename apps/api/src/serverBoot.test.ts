@@ -91,3 +91,105 @@ test('an admin newsletter route refuses a form body', async () => {
   })
   assert.equal(res.statusCode, 415)
 })
+
+/** Ask as a production instance whose APP_BASE_URL names another address. */
+async function injectAsProductionInstance(options: Record<string, unknown>) {
+  const saved = { NODE_ENV: process.env.NODE_ENV, APP_BASE_URL: process.env.APP_BASE_URL }
+  process.env.NODE_ENV = 'production'
+  process.env.APP_BASE_URL = 'https://aperture.example.com'
+  try {
+    return await app.inject(options)
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+}
+
+test('a request from the address it arrived on gets through the real server', async () => {
+  await app.ready()
+  const res = await injectAsProductionInstance({
+    method: 'POST',
+    url: '/api/auth/login',
+    headers: { host: '192.168.1.5:3456', origin: 'http://192.168.1.5:3456' },
+    payload: {},
+  })
+  // Reaching the login handler's own check is the point: no CORS refusal first.
+  assert.equal(res.statusCode, 400)
+  assert.equal(res.headers['access-control-allow-origin'], undefined)
+})
+
+test('a foreign origin is refused by the real server, forged forwarded host or not', async () => {
+  await app.ready()
+  const res = await injectAsProductionInstance({
+    method: 'POST',
+    url: '/api/auth/login',
+    remoteAddress: '203.0.113.7',
+    headers: {
+      host: '192.168.1.5:3456',
+      origin: 'https://evil.example',
+      'x-forwarded-host': 'evil.example',
+      'x-forwarded-proto': 'https',
+    },
+    payload: {},
+  })
+  assert.equal(res.statusCode, 403)
+  assert.equal(res.headers['access-control-allow-origin'], undefined)
+  assert.equal(res.headers['access-control-allow-credentials'], undefined)
+})
+
+test('every route the server documents is one the CORS decision knows is a route', async () => {
+  await app.ready()
+  const { isRoutePath } = await import('./config/cors.js')
+  // A route outside the list would read as a public file: a foreign page's GET of
+  // it would run instead of being refused, and the SPA fallback would answer for
+  // anything under it.
+  const paths = Object.keys(app.swagger().paths as Record<string, unknown>)
+  assert.ok(paths.length > 100)
+  assert.deepEqual(paths.filter((path) => !isRoutePath(path)), [])
+})
+
+for (const url of ['/api/setup/backup/upload', '/api/setup/backup/restore']) {
+  test(`${url} refuses a rebound page, though it sits outside the setup plugin`, async () => {
+    await app.ready()
+    const res = await injectAsProductionInstance({
+      method: 'POST',
+      url,
+      remoteAddress: '192.168.1.20',
+      headers: { host: 'evil.example:3456', origin: 'http://evil.example:3456' },
+      payload: {},
+    })
+    assert.equal(res.statusCode, 403)
+    assert.match(res.json().error, /APP_BASE_URL/)
+  })
+
+  test(`${url} keeps its handler behind the setup fence with no Origin too`, async () => {
+    await app.ready()
+    // With no database the fence cannot learn whether setup is done, so it fails
+    // closed. Reaching the handler would be a 400 or 415 about the body instead.
+    const res = await injectAsProductionInstance({
+      method: 'POST',
+      url,
+      remoteAddress: '203.0.113.7',
+      headers: { host: 'aperture.example.com' },
+      payload: {},
+    })
+    assert.equal(res.statusCode, 500)
+  })
+}
+
+test('first-run setup refuses a page that could be another site rebound onto this server', async () => {
+  await app.ready()
+  // Same-origin as far as the browser and the CORS decision can tell, and from a
+  // local address: only the setup guard stands in the way.
+  const res = await injectAsProductionInstance({
+    method: 'POST',
+    url: '/api/setup/complete',
+    remoteAddress: '192.168.1.20',
+    headers: { host: 'evil.example:3456', origin: 'http://evil.example:3456' },
+    payload: {},
+  })
+  assert.equal(res.statusCode, 403)
+  assert.match(res.json().error, /APP_BASE_URL/)
+})

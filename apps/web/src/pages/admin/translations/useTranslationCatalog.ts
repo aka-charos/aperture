@@ -1,44 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import en from '../../../i18n/locales/en/translation.json'
-import es from '../../../i18n/locales/es/translation.json'
-import de from '../../../i18n/locales/de/translation.json'
-import fr from '../../../i18n/locales/fr/translation.json'
-import it from '../../../i18n/locales/it/translation.json'
-import pt from '../../../i18n/locales/pt/translation.json'
-import nl from '../../../i18n/locales/nl/translation.json'
-import ru from '../../../i18n/locales/ru/translation.json'
-import ja from '../../../i18n/locales/ja/translation.json'
-import zh from '../../../i18n/locales/zh/translation.json'
-import ko from '../../../i18n/locales/ko/translation.json'
-import hi from '../../../i18n/locales/hi/translation.json'
-import ar from '../../../i18n/locales/ar/translation.json'
-import el from '../../../i18n/locales/el/translation.json'
 import enOverrides from '../../../i18n/overrides.en.json'
 import { flattenTranslation, type TranslationTree } from '../../../i18n/flatten'
+import { LAZY_LOCALES, loadLocaleTree } from '../../../i18n/localeLoaders'
 
 export interface LocaleOption {
   code: string
   label: string
 }
 
-const BUNDLED_TREES: Record<string, TranslationTree> = {
-  en: en as TranslationTree,
-  es: es as TranslationTree,
-  de: de as TranslationTree,
-  fr: fr as TranslationTree,
-  it: it as TranslationTree,
-  pt: pt as TranslationTree,
-  nl: nl as TranslationTree,
-  ru: ru as TranslationTree,
-  ja: ja as TranslationTree,
-  zh: zh as TranslationTree,
-  ko: ko as TranslationTree,
-  hi: hi as TranslationTree,
-  ar: ar as TranslationTree,
-  el: el as TranslationTree,
+type FlatStrings = Record<string, Record<string, string>>
+
+/** English, which is in the entry chunk anyway, so the key list is there at once. */
+function englishDefaults(): FlatStrings {
+  return {
+    en: {
+      ...flattenTranslation(en as TranslationTree),
+      ...flattenTranslation(enOverrides as TranslationTree),
+    },
+  }
 }
 
-let cachedDefaults: Record<string, Record<string, string>> | null = null
+let defaultsLoad: Promise<FlatStrings> | null = null
 
 /**
  * Bundled default strings (build-time layers only: translation.json, plus
@@ -46,27 +29,31 @@ let cachedDefaults: Record<string, Record<string, string>> | null = null
  * runtime (that also includes the operator file layer and DB overrides).
  * This is the baseline "Reset to default" reverts to.
  *
- * Deliberately imports the locale JSON directly rather than reading the live
- * i18next instance, so this stays correct independent of i18next's internal
- * state (init order, which locales have been activated this session, etc).
- * This only stays pristine because i18n/config.ts clones each locale tree
- * before handing it to i18next.init() — addResourceBundle(..., true, true)
- * (used by applyRuntimeOverrides) mutates its stored resource object in
- * place, and JSON module imports are singletons, so an unlocked clone there
- * would corrupt the same object this file imports.
+ * Fetches every locale chunk, so only the editors ask, and once per tab; a failed
+ * load is not kept, so opening the page again retries.
+ *
+ * Deliberately reads the locale files rather than the live i18next instance, so
+ * this stays correct independent of i18next's internal state (which locales have
+ * been activated this session, etc). This only stays pristine because i18next
+ * never holds these objects: config.ts and the locale backend clone what they
+ * hand it, since addResourceBundle(..., true, true) (used for the runtime
+ * overrides) mutates its stored object in place, and JSON modules are singletons.
  */
-export function getBundledDefaults(): Record<string, Record<string, string>> {
-  if (cachedDefaults) return cachedDefaults
-  const result: Record<string, Record<string, string>> = {}
-  for (const [locale, tree] of Object.entries(BUNDLED_TREES)) {
-    const flat = flattenTranslation(tree)
-    if (locale === 'en') {
-      Object.assign(flat, flattenTranslation(enOverrides as TranslationTree))
-    }
-    result[locale] = flat
-  }
-  cachedDefaults = result
-  return result
+export function loadBundledDefaults(): Promise<FlatStrings> {
+  defaultsLoad ??= (async () => {
+    const result = englishDefaults()
+    await Promise.all(
+      LAZY_LOCALES.map(async (locale) => {
+        const tree = await loadLocaleTree(locale)
+        if (tree) result[locale] = flattenTranslation(tree)
+      })
+    )
+    return result
+  })().catch((err: unknown) => {
+    defaultsLoad = null
+    throw err
+  })
+  return defaultsLoad
 }
 
 interface AdminOverrideRow {
@@ -106,7 +93,7 @@ export function useTranslationCatalog(): TranslationCatalog {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const defaults = useMemo(() => getBundledDefaults(), [])
+  const [defaults, setDefaults] = useState<FlatStrings>(englishDefaults)
   const keys = useMemo(() => Object.keys(defaults.en || {}), [defaults])
   const namespaces = useMemo(
     () => [...new Set(keys.map((key) => key.split('.')[0]))].sort(),
@@ -129,10 +116,12 @@ export function useTranslationCatalog(): TranslationCatalog {
     setLoading(true)
     setError(null)
     try {
-      const [localesRes] = await Promise.all([
+      const [localesRes, bundled] = await Promise.all([
         fetch('/api/settings/locales', { credentials: 'include' }),
+        loadBundledDefaults(),
         fetchOverrides(),
       ])
+      setDefaults(bundled)
       if (localesRes.ok) {
         const data = await localesRes.json()
         setLocales(data.locales || [])
