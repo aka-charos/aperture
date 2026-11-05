@@ -68,12 +68,12 @@ function TitleCardView({ node, updateAttributes, deleteNode, selected, extension
             {attrs.year ? ` (${attrs.year})` : ''}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {t(attrs.mediaType === 'series' ? 'newsletters.editor.series' : 'newsletters.editor.movie')}
+            {t(attrs.mediaType === 'series' ? 'admin.newsletters.editor.series' : 'admin.newsletters.editor.movie')}
           </Typography>
           <Stack direction="row" flexWrap="wrap" gap={0.5} sx={{ mt: 0.75 }}>
             {attrs.fields.length === 0 ? (
               <Typography variant="caption" color="warning.main">
-                {t('newsletters.editor.noFields')}
+                {t('admin.newsletters.editor.noFields')}
               </Typography>
             ) : (
               attrs.fields.map((field) => (
@@ -94,12 +94,12 @@ function TitleCardView({ node, updateAttributes, deleteNode, selected, extension
           </Stack>
         </Box>
         <Stack direction="row">
-          <Tooltip title={t('newsletters.editor.chooseFields')}>
+          <Tooltip title={t('admin.newsletters.editor.chooseFields')}>
             <IconButton size="small" onClick={(event) => setAnchor(event.currentTarget)}>
               <TuneIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title={t('newsletters.editor.removeTitle')}>
+          <Tooltip title={t('admin.newsletters.editor.removeTitle')}>
             <IconButton size="small" onClick={() => deleteNode()}>
               <DeleteOutlineIcon fontSize="small" />
             </IconButton>
@@ -115,7 +115,7 @@ function TitleCardView({ node, updateAttributes, deleteNode, selected, extension
       >
         <Box sx={{ p: 2, width: 420, maxWidth: '90vw' }}>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            {t('newsletters.editor.fieldsFor', { title: attrs.title })}
+            {t('admin.newsletters.editor.fieldsFor', { title: attrs.title })}
           </Typography>
           <TitleFieldPicker
             fields={attrs.fields}
@@ -128,7 +128,7 @@ function TitleCardView({ node, updateAttributes, deleteNode, selected, extension
           />
           {attrs.fields.includes('fullPlot') && (
             <Typography variant="caption" color="warning.main" component="p" sx={{ mt: 1 }}>
-              {t('newsletters.editor.fullPlotWarning')}
+              {t('admin.newsletters.editor.fullPlotWarning')}
             </Typography>
           )}
         </Box>

@@ -115,48 +115,48 @@ function Toolbar({ editor, onInsertTitle }: { editor: Editor; onInsertTitle: () 
           bgcolor: 'background.paper',
         }}
       >
-        {textButton(t('newsletters.toolbar.heading'), 'H2', state.h2, () => chain().toggleHeading({ level: 2 }).run())}
-        {textButton(t('newsletters.toolbar.subheading'), 'H3', state.h3, () => chain().toggleHeading({ level: 3 }).run())}
+        {textButton(t('admin.newsletters.toolbar.heading'), 'H2', state.h2, () => chain().toggleHeading({ level: 2 }).run())}
+        {textButton(t('admin.newsletters.toolbar.subheading'), 'H3', state.h3, () => chain().toggleHeading({ level: 3 }).run())}
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-        {button(t('newsletters.toolbar.bold'), <FormatBoldIcon fontSize="small" />, state.bold, () => chain().toggleBold().run())}
-        {button(t('newsletters.toolbar.italic'), <FormatItalicIcon fontSize="small" />, state.italic, () =>
+        {button(t('admin.newsletters.toolbar.bold'), <FormatBoldIcon fontSize="small" />, state.bold, () => chain().toggleBold().run())}
+        {button(t('admin.newsletters.toolbar.italic'), <FormatItalicIcon fontSize="small" />, state.italic, () =>
           chain().toggleItalic().run()
         )}
-        {button(t('newsletters.toolbar.underline'), <FormatUnderlinedIcon fontSize="small" />, state.underline, () =>
+        {button(t('admin.newsletters.toolbar.underline'), <FormatUnderlinedIcon fontSize="small" />, state.underline, () =>
           chain().toggleUnderline().run()
         )}
-        {button(t('newsletters.toolbar.strike'), <StrikethroughSIcon fontSize="small" />, state.strike, () =>
+        {button(t('admin.newsletters.toolbar.strike'), <StrikethroughSIcon fontSize="small" />, state.strike, () =>
           chain().toggleStrike().run()
         )}
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-        {button(t('newsletters.toolbar.bulletList'), <FormatListBulletedIcon fontSize="small" />, state.bullet, () =>
+        {button(t('admin.newsletters.toolbar.bulletList'), <FormatListBulletedIcon fontSize="small" />, state.bullet, () =>
           chain().toggleBulletList().run()
         )}
-        {button(t('newsletters.toolbar.orderedList'), <FormatListNumberedIcon fontSize="small" />, state.ordered, () =>
+        {button(t('admin.newsletters.toolbar.orderedList'), <FormatListNumberedIcon fontSize="small" />, state.ordered, () =>
           chain().toggleOrderedList().run()
         )}
-        {button(t('newsletters.toolbar.quote'), <FormatQuoteIcon fontSize="small" />, state.quote, () =>
+        {button(t('admin.newsletters.toolbar.quote'), <FormatQuoteIcon fontSize="small" />, state.quote, () =>
           chain().toggleBlockquote().run()
         )}
-        {button(t('newsletters.toolbar.rule'), <HorizontalRuleIcon fontSize="small" />, false, () =>
+        {button(t('admin.newsletters.toolbar.rule'), <HorizontalRuleIcon fontSize="small" />, false, () =>
           chain().setHorizontalRule().run()
         )}
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-        {button(t('newsletters.toolbar.link'), <LinkIcon fontSize="small" />, state.link, () => {
+        {button(t('admin.newsletters.toolbar.link'), <LinkIcon fontSize="small" />, state.link, () => {
           setLinkValue((editor.getAttributes('link').href as string | undefined) ?? '')
           setLinkOpen(true)
         })}
-        {button(t('newsletters.toolbar.unlink'), <LinkOffIcon fontSize="small" />, false, () => chain().unsetLink().run(), !state.link)}
+        {button(t('admin.newsletters.toolbar.unlink'), <LinkOffIcon fontSize="small" />, false, () => chain().unsetLink().run(), !state.link)}
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-        {button(t('newsletters.toolbar.undo'), <UndoIcon fontSize="small" />, false, () => chain().undo().run(), !state.canUndo)}
-        {button(t('newsletters.toolbar.redo'), <RedoIcon fontSize="small" />, false, () => chain().redo().run(), !state.canRedo)}
+        {button(t('admin.newsletters.toolbar.undo'), <UndoIcon fontSize="small" />, false, () => chain().undo().run(), !state.canUndo)}
+        {button(t('admin.newsletters.toolbar.redo'), <RedoIcon fontSize="small" />, false, () => chain().redo().run(), !state.canRedo)}
         <Box sx={{ flex: 1 }} />
         <Button size="small" variant="outlined" startIcon={<MovieIcon />} onClick={onInsertTitle}>
-          {t('newsletters.toolbar.insertTitle')}
+          {t('admin.newsletters.toolbar.insertTitle')}
         </Button>
       </Box>
       <Dialog open={linkOpen} onClose={() => setLinkOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>{t('newsletters.toolbar.link')}</DialogTitle>
+        <DialogTitle>{t('admin.newsletters.toolbar.link')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -167,7 +167,7 @@ function Toolbar({ editor, onInsertTitle }: { editor: Editor; onInsertTitle: () 
             value={linkValue}
             onChange={(event) => setLinkValue(event.target.value)}
             error={linkValue.trim() !== '' && normalizeLink(linkValue) === null}
-            helperText={t('newsletters.toolbar.linkHelp')}
+            helperText={t('admin.newsletters.toolbar.linkHelp')}
           />
         </DialogContent>
         <DialogActions>

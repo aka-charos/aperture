@@ -89,7 +89,7 @@ Content is excluded if:
 - It's in a library your admin excluded, or one the media server doesn't let your account open (whether you get movie picks, series picks or both follows from the libraries you can open)
 - You've favorited it — it's still scored for transparency, but never picked (you've already found it)
 
-How **disliked** titles are treated — excluded entirely, or penalized but allowed — is your choice under **Titles you rated low** in [Recommendations settings](user-settings/recommendations.md).
+How **disliked** titles are treated — excluded entirely, or allowed like any other title — is your choice under **Titles you rated low** in [Recommendations settings](user-settings/recommendations.md).
 
 ---
 

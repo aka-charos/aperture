@@ -1,5 +1,8 @@
 /**
- * Backup Setup Wizard Handlers (No Auth Required)
+ * Backup Setup Wizard Handlers
+ *
+ * No session exists yet, so these are fenced by hand: this plugin is not the setup
+ * plugin, and that plugin's hook does not reach here.
  */
 
 import type { FastifyInstance } from 'fastify'
@@ -11,6 +14,7 @@ import {
   formatBytes,
 } from '@aperture/core'
 import { backupSchemas } from '../schemas.js'
+import { setupFenceClosingOnComplete } from '../../setup/fence.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { pipeline } from 'stream/promises'
@@ -23,7 +27,7 @@ export async function registerSetupHandlers(fastify: FastifyInstance) {
    */
   fastify.get(
     '/api/setup/backup/list',
-    { schema: backupSchemas.setupListBackups },
+    { schema: backupSchemas.setupListBackups, onRequest: setupFenceClosingOnComplete },
     async (_request, reply) => {
       try {
         const backups = await listBackups()
@@ -52,7 +56,7 @@ export async function registerSetupHandlers(fastify: FastifyInstance) {
    */
   fastify.post(
     '/api/setup/backup/upload',
-    { schema: backupSchemas.setupUploadBackup },
+    { schema: backupSchemas.setupUploadBackup, onRequest: setupFenceClosingOnComplete },
     async (request, reply) => {
       try {
         const data = await request.file()
@@ -115,7 +119,7 @@ export async function registerSetupHandlers(fastify: FastifyInstance) {
     Querystring: { sync?: string }
   }>(
     '/api/setup/backup/restore',
-    { schema: backupSchemas.setupRestoreBackup },
+    { schema: backupSchemas.setupRestoreBackup, onRequest: setupFenceClosingOnComplete },
     async (request, reply) => {
       try {
         const { filename, confirmText } = request.body

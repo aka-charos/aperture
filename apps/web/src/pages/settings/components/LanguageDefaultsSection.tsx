@@ -242,7 +242,7 @@ export function LanguageDefaultsSection() {
               startIcon={saving ? <CircularProgress size={16} /> : undefined}
               sx={{ alignSelf: 'flex-start' }}
             >
-              {saving ? t('common.saving') : t('language.saveDefaults')}
+              {saving ? t('admin.common.saving') : t('language.saveDefaults')}
             </Button>
           </Box>
         )}

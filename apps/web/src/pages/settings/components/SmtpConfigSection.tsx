@@ -592,7 +592,7 @@ export function SmtpConfigSection() {
               disabled={saving || !hasChanges || !portValid}
               size="small"
             >
-              {saving ? t('common.saving') : t('common.save')}
+              {saving ? t('admin.common.saving') : t('common.save')}
             </Button>
             <Button variant="outlined" onClick={() => handleTest('connect')} disabled={!canCheck} size="small">
               {testing === 'connect' ? t('settingsSmtp.testing') : t('settingsSmtp.testConnection')}

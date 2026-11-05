@@ -28,6 +28,7 @@ import { getRecommendationConfig } from '../../lib/recommendationConfig.js'
 import { refreshTasteSynopsis } from '../../lib/tasteSynopsisRefresh.js'
 import { getWatchHistory, buildTasteProfile as buildLegacyTasteProfile, storeTasteProfile as storeLegacyTasteProfile, getUserMovieRatings, getDislikedMovieIds } from './taste.js'
 import { getCandidates, getMultiClusterCandidates } from './candidates.js'
+import { withoutExcludedIds } from '../watchedExclusion.js'
 import { loadInterestMatchIndex } from '../interestMatches.js'
 import { getLibraryScopeForUser } from '../../lib/libraryScope.js'
 import { loadRecommendationRecipients } from '../recipients.js'
@@ -365,7 +366,9 @@ export async function generateRecommendationsForUser(
     // `excludeIds` is enforced at RETRIEVAL: these titles are never fetched,
     // never scored and never stored. Right for watched titles, of which a real
     // viewer has thousands -- scoring them would cost a recommendation_candidates
-    // row each for nothing that reads them.
+    // row each for nothing that reads them. It is enforced whatever include_watched
+    // says: that setting only decides what goes in, so with it on the set holds
+    // the dislikes alone and watched titles stay eligible.
     //
     // `selectionExcludeIds` is enforced at SELECTION: the title is retrieved,
     // scored and stored like any other, and is simply never picked. That is what
@@ -453,7 +456,6 @@ export async function generateRecommendationsForUser(
           tasteClusters.map((c) => ({ embedding: c.embedding, weight: c.weight })),
           excludeIds,
           cfg.maxCandidates,
-          includeWatched,
           scope,
           retrievalSpace
         )
@@ -470,7 +472,6 @@ export async function generateRecommendationsForUser(
           tasteProfile,
           excludeIds,
           cfg.maxCandidates,
-          includeWatched,
           scope,
           retrievalSpace
         )
@@ -480,7 +481,6 @@ export async function generateRecommendationsForUser(
         tasteProfile,
         excludeIds,
         cfg.maxCandidates,
-        includeWatched,
         scope,
         retrievalSpace
       )
@@ -905,20 +905,18 @@ export async function generateRecommendationsForUser(
       ...acclaimedFillers,
     ]
 
-    const finalSelected = includeWatched
-      ? selectedWithSlots
-      : (await import('../watchedExclusion.js')).filterByWatchedIds(
-          selectedWithSlots.map((candidate) => ({ ...candidate, id: candidate.movieId })),
-          excludeIds
-        )
+    const finalSelected = withoutExcludedIds(
+      selectedWithSlots.map((candidate) => ({ ...candidate, id: candidate.movieId })),
+      excludeIds
+    )
 
-    if (!includeWatched && finalSelected.length < selectedWithSlots.length) {
+    if (finalSelected.length < selectedWithSlots.length) {
       logger.info(
         {
           userId: user.id,
           removed: selectedWithSlots.length - finalSelected.length,
         },
-        'Filtered watched movies from final recommendations (safety net)'
+        'Filtered excluded movies from final recommendations (safety net)'
       )
     }
 

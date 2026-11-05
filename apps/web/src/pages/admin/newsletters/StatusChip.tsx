@@ -11,5 +11,5 @@ const COLOR: Record<NewsletterStatus, 'default' | 'info' | 'success' | 'error'> 
 
 export function StatusChip({ status }: { status: NewsletterStatus }) {
   const { t } = useTranslation()
-  return <Chip size="small" color={COLOR[status]} label={t(`newsletters.status.${status}`)} />
+  return <Chip size="small" color={COLOR[status]} label={t(`admin.newsletters.status.${status}`)} />
 }

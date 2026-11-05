@@ -99,7 +99,11 @@ import { getDislikedSeriesIds } from './taste.js'
 import { getWatchedGenreCounts } from '../genreFamiliarity.js'
 import { getWatchedYears, summarizeEraFit } from '../eraDiagnostics.js'
 import { getEffectiveAiExplanationSetting } from '../../lib/userSettings.js'
-import { WATCH_HISTORY_PLAYED_SQL, WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
+import {
+  WATCH_HISTORY_PLAYED_SQL,
+  WATCH_HISTORY_TASTE_SQL,
+  withoutExcludedIds,
+} from '../watchedExclusion.js'
 import { libraryEpisodeCountSql, REGULAR_EPISODE_SQL, seriesCompletionRate } from './libraryEpisodes.js'
 import { loadConfigForUser } from '../config.js'
 import {
@@ -338,22 +342,24 @@ async function resolveSeriesCandidateQueryContext(
 }
 
 /**
- * Runs the actual pgvector ANN query for a single query vector, filters out
- * watched ids, and maps to SeriesCandidate[]. This exact `ORDER BY <=> LIMIT`
+ * Runs the actual pgvector ANN query for a single query vector, drops the
+ * excluded ids, and maps to SeriesCandidate[]. This exact `ORDER BY <=> LIMIT`
  * shape is what lets Postgres use the HNSW index on the embedding table -- a
  * query comparing against multiple vectors at once would not use it (see
  * getMultiClusterSeriesCandidates), so multi-centroid retrieval calls this
  * once per cluster instead of trying to fold multiple vectors into one query.
+ *
+ * `excludeIds` always applies. See the movie mirror: include_watched changes
+ * what the pipeline puts in the set, never whether it is enforced.
  */
 async function querySeriesCandidatesForVector(
   vectorStr: string,
   limit: number,
-  includeWatched: boolean,
-  watchedSeriesIds: Set<string>,
+  excludeIds: Set<string>,
   scope: LibraryScope | null,
   ctx: SeriesCandidateQueryContext
 ): Promise<SeriesCandidate[]> {
-  const queryLimit = includeWatched ? limit : limit + watchedSeriesIds.size
+  const queryLimit = limit + excludeIds.size
 
   // The viewer's scope: the libraries the media server lets them see and the
   // operator enabled, and their parental rating. This used to be a rating
@@ -391,16 +397,7 @@ async function querySeriesCandidatesForVector(
     params
   )
 
-  // Filter out watched series if not including them
-  let candidates = result.rows
-  if (!includeWatched) {
-    candidates = candidates.filter((c) => !watchedSeriesIds.has(c.series_id))
-  }
-
-  // Limit to the requested limit
-  candidates = candidates.slice(0, limit)
-
-  return candidates.map((row) => ({
+  const candidates = result.rows.map((row) => ({
     seriesId: row.series_id,
     id: row.series_id, // Alias for shared selection algorithm
     title: row.title,
@@ -416,6 +413,8 @@ async function querySeriesCandidatesForVector(
     diversityBoost: 0,
     finalScore: 0,
   }))
+
+  return withoutExcludedIds(candidates, excludeIds).slice(0, limit)
 }
 
 /**
@@ -423,9 +422,8 @@ async function querySeriesCandidatesForVector(
  */
 async function getSeriesCandidates(
   tasteProfile: number[],
-  watchedSeriesIds: Set<string>,
+  excludeIds: Set<string>,
   maxCandidates: number,
-  includeWatched: boolean,
   scope: LibraryScope | null,
   space: EmbeddingSpace = 'raw'
 ): Promise<SeriesCandidate[]> {
@@ -433,7 +431,7 @@ async function getSeriesCandidates(
   if (!ctx) return []
 
   const vectorStr = `[${tasteProfile.join(',')}]`
-  return querySeriesCandidatesForVector(vectorStr, maxCandidates, includeWatched, watchedSeriesIds, scope, ctx)
+  return querySeriesCandidatesForVector(vectorStr, maxCandidates, excludeIds, scope, ctx)
 }
 
 export interface SeriesClusterQueryInput {
@@ -474,9 +472,8 @@ export function mergeSeriesClusterCandidatesByMaxSimilarity(
  */
 export async function getMultiClusterSeriesCandidates(
   clusters: SeriesClusterQueryInput[],
-  watchedSeriesIds: Set<string>,
+  excludeIds: Set<string>,
   totalLimit: number,
-  includeWatched: boolean,
   scope: LibraryScope | null,
   space: EmbeddingSpace = 'raw'
 ): Promise<SeriesCandidate[]> {
@@ -484,7 +481,7 @@ export async function getMultiClusterSeriesCandidates(
   if (clusters.length === 1) {
     // `space` passed on, as the movie mirror always did: dropped here, a single
     // centred cluster would be compared against the raw column.
-    return getSeriesCandidates(clusters[0].embedding, watchedSeriesIds, totalLimit, includeWatched, scope, space)
+    return getSeriesCandidates(clusters[0].embedding, excludeIds, totalLimit, scope, space)
   }
 
   const ctx = await resolveSeriesCandidateQueryContext(space)
@@ -502,8 +499,7 @@ export async function getMultiClusterSeriesCandidates(
       return querySeriesCandidatesForVector(
         vectorStr,
         perClusterLimits[i],
-        includeWatched,
-        watchedSeriesIds,
+        excludeIds,
         scope,
         ctx
       )
@@ -1016,12 +1012,12 @@ export async function generateSeriesRecommendationsForUser(
     }
 
     // 3. Get user's preferences for including watched content and handling disliked content
-    const userPrefs = await queryOne<{ include_watched: boolean; settings: { dislikeBehavior?: string } | null }>(
-      `SELECT include_watched, settings FROM user_preferences WHERE user_id = $1`,
+    const userPrefs = await queryOne<{ include_watched: boolean; dislike_behavior: string }>(
+      `SELECT include_watched, COALESCE(dislike_behavior, 'exclude') as dislike_behavior FROM user_preferences WHERE user_id = $1`,
       [user.id]
     )
     const includeWatched = userPrefs?.include_watched ?? false
-    const dislikeBehavior = userPrefs?.settings?.dislikeBehavior ?? 'exclude'
+    const dislikeBehavior = userPrefs?.dislike_behavior ?? 'exclude'
 
     // Get disliked series IDs if dislike_behavior is 'exclude'
     const dislikedIds = dislikeBehavior === 'exclude' 
@@ -1116,7 +1112,6 @@ export async function generateSeriesRecommendationsForUser(
           tasteClusters.map((c) => ({ embedding: c.embedding, weight: c.weight })),
           excludeIds,
           cfg.maxCandidates,
-          includeWatched,
           scope,
           retrievalSpace
         )
@@ -1133,7 +1128,6 @@ export async function generateSeriesRecommendationsForUser(
           tasteProfile,
           excludeIds,
           cfg.maxCandidates,
-          includeWatched,
           scope,
           retrievalSpace
         )
@@ -1143,7 +1137,6 @@ export async function generateSeriesRecommendationsForUser(
         tasteProfile,
         excludeIds,
         cfg.maxCandidates,
-        includeWatched,
         scope,
         retrievalSpace
       )
@@ -1515,20 +1508,18 @@ export async function generateSeriesRecommendationsForUser(
       ...acclaimedFillers,
     ]
 
-    const finalSelected = includeWatched
-      ? selectedWithSlots
-      : (await import('../watchedExclusion.js')).filterByWatchedIds(
-          selectedWithSlots.map((candidate) => ({ ...candidate, id: candidate.seriesId })),
-          excludeIds
-        )
+    const finalSelected = withoutExcludedIds(
+      selectedWithSlots.map((candidate) => ({ ...candidate, id: candidate.seriesId })),
+      excludeIds
+    )
 
-    if (!includeWatched && finalSelected.length < selectedWithSlots.length) {
+    if (finalSelected.length < selectedWithSlots.length) {
       logger.info(
         {
           userId: user.id,
           removed: selectedWithSlots.length - finalSelected.length,
         },
-        'Filtered watched series from final recommendations (safety net)'
+        'Filtered excluded series from final recommendations (safety net)'
       )
     }
 

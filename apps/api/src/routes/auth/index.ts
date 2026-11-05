@@ -33,6 +33,8 @@ import {
   clearLoginAttempts,
 } from '../../lib/loginAttempts.js'
 import { passwordlessLoginPermitted } from '../../config/security.js'
+import { addressCouldBeRebound, arrivalOf, originCouldBeRebound } from '../../config/cors.js'
+import { isTrustedPeer } from '../../config/proxyTrust.js'
 import {
   loginRateLimit,
   loginOptionsRateLimit,
@@ -179,17 +181,21 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
       schema: loginOptionsSchema,
       config: { rateLimit: loginOptionsRateLimit },
     },
-    async (_request, reply) => {
+    async (request, reply) => {
       // The app languages the admin enabled, for the login page's language
       // flag. Public like the rest of this route: it is the language list the
       // signed-in switcher offers, nothing about any account.
       const { getSystemLanguageDefaults, APP_LOCALE_OPTIONS } = await import('@aperture/core')
-      const [defaults, allowPasswordlessLogin] = await Promise.all([
+      const [defaults, passwordlessEnabled] = await Promise.all([
         getSystemLanguageDefaults(),
         isPasswordlessLoginEnabled(),
       ])
       return reply.send({
-        allowPasswordlessLogin,
+        // Answers for this address, as the login route will: this GET carries no
+        // Origin, so the address it arrived on stands in for one.
+        allowPasswordlessLogin:
+          passwordlessEnabled &&
+          !addressCouldBeRebound(arrivalOf(request, isTrustedPeer).host),
         languages: {
           defaultLanguage: defaults.defaultUiLanguage,
           options: APP_LOCALE_OPTIONS.filter((o) =>
@@ -212,7 +218,10 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { username, password } = request.body
 
-      const passwordRequired = !(await isPasswordlessLoginEnabled())
+      // A page that could be another site's, rebound onto this server, does not
+      // get to sign in by naming an account.
+      const passwordRequired =
+        !(await isPasswordlessLoginEnabled()) || originCouldBeRebound(request.headers.origin)
 
       if (!username) {
         return reply.status(400).send({ error: 'Username is required' } as never)

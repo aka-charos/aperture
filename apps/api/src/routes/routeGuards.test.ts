@@ -69,8 +69,8 @@ const PUBLIC_FILES: Record<string, string> = {
   'apps/api/src/routes/setup/handlers/topPicks.ts': 'Setup wizard; see above.',
   'apps/api/src/routes/setup/handlers/users.ts': 'Setup wizard; see above.',
   'apps/api/src/routes/backup/handlers/setup.ts':
-    'Restore-from-backup during setup. Registered under /api/setup/*, so the ' +
-    'same plugin hook fences it.',
+    'Restore-from-backup during setup. In the backup plugin, so each route names ' +
+    'the shared setup fence itself: local network only, closed once setup completes.',
 }
 
 /** Individual routes that are public inside an otherwise guarded file. */

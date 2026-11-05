@@ -430,3 +430,4 @@ aperture.yourdomain.com {
 1. **APP_BASE_URL must match your public URL** — Used for OAuth callbacks and cookie settings
 2. **Session cookies** — In production, cookies require HTTPS (`secure: true`)
 3. **Trakt OAuth** — Redirect URI must exactly match `APP_BASE_URL/api/trakt/callback`
+4. **Reaching the app by another address** (a LAN address beside the public domain) works without configuration: a request whose `Origin` is the address it arrived on passes. Behind a proxy that rewrites `Host`, that needs the proxy listed in `TRUST_PROXY` or Settings > Deployment, and a `X-Forwarded-Host` set. First-run setup and passwordless login take only an IP address, `localhost`, or `APP_BASE_URL`.

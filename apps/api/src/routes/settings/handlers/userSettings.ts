@@ -188,9 +188,6 @@ export function registerUserSettingsHandlers(fastify: FastifyInstance) {
       const userId = request.user!.id
 
       const { dislikeBehavior } = request.body
-      if (!dislikeBehavior || !['exclude', 'penalize'].includes(dislikeBehavior)) {
-        return reply.status(400).send({ error: 'dislikeBehavior must be "exclude" or "penalize"' })
-      }
 
       await query(
         `INSERT INTO user_preferences (user_id, dislike_behavior)

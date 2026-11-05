@@ -172,10 +172,16 @@ export function LanguageMenuButton() {
   const chooseApp = async (code: string) => {
     if (code === appLang) return
     const previous = appLang
-    // Apply first: the change is visible at once, and the popover re-renders
-    // in the language just picked, which is its own confirmation.
-    await applyEffectiveUiLanguage(code)
-    if (readOnly) return
+    setSaving(true)
+    setError(null)
+    // Apply first: the popover re-renders in the language just picked, which is
+    // its own confirmation. That can take a moment while the strings arrive, so
+    // the list is disabled meanwhile, and only a language that made it to the
+    // screen is saved: the account must not end up on one the viewer isn't reading.
+    const outcome = await applyEffectiveUiLanguage(code)
+    setSaving(false)
+    if (outcome === 'failed') setError(t('languageMenu.loadFailed'))
+    if (outcome !== 'applied' || readOnly) return
     // Recommendations that matched the app follow it; the save route decides
     // that (core aiLanguageAfterAppChange), so the login page gets it too.
     const prefs = await save({ uiLanguage: code })

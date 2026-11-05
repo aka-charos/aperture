@@ -3,7 +3,7 @@ import { query } from '../../lib/db.js'
 import { getMovieEmbeddings } from './embeddings.js'
 import { averageEmbeddings } from '../shared/index.js'
 import { WATCH_HISTORY_TASTE_SQL } from '../watchedExclusion.js'
-import { isDislikedRating, LIKED_RATING_MIN, DISLIKED_RATING_MAX } from '../ratingBands.js'
+import { isDislikedRating, LIKED_RATING_MIN, DISLIKED_MOVIE_IDS_SQL } from '../ratingBands.js'
 import type { WatchedMovie } from '../types.js'
 
 const logger = createChildLogger('recommender-taste')
@@ -22,13 +22,9 @@ export async function getUserMovieRatings(userId: string): Promise<Map<string, n
 }
 
 export async function getDislikedMovieIds(userId: string): Promise<Set<string>> {
-  // Get all movies rated 1-3 (disliked)
-  const result = await query<{ movie_id: string }>(
-    `SELECT movie_id FROM user_ratings
-     WHERE user_id = $1 AND movie_id IS NOT NULL AND rating <= ${DISLIKED_RATING_MAX}`,
-    [userId]
-  )
-  return new Set(result.rows.map((r) => r.movie_id))
+  // Movies rated 1-3, and any other library copy of them
+  const result = await query<{ id: string }>(DISLIKED_MOVIE_IDS_SQL, [userId])
+  return new Set(result.rows.map((r) => r.id))
 }
 
 export async function getWatchHistory(userId: string, limit: number): Promise<WatchedMovie[]> {
