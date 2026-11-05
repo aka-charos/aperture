@@ -25,6 +25,7 @@ import {
   lmStudioCapabilities,
   type LmStudioModel,
 } from './local-model-capabilities.js'
+import { describeLocalFetchFailure, localServerAuthHeaders } from './localServerFetch.js'
 import {
   isUnslothLanguageModel,
   listUnslothModels,
@@ -223,9 +224,9 @@ export async function discoverLocalModels(
   apiKey?: string,
   options: {
     /**
-     * Why the list could not be read, when the server said. Only Unsloth's
-     * reader reports one; LM Studio's probe falls back across two APIs and has
-     * no single reason to give.
+     * Why the list could not be read, when the server said. Unsloth's reader
+     * and the OpenAI-compatible `/v1/models` listing report one; LM Studio's
+     * probe falls back across two APIs and has no single reason to give.
      */
     onUnreachable?: (reason: string) => void
   } = {}
@@ -239,8 +240,114 @@ export async function discoverLocalModels(
     return unsloth ? unslothModelsForRole(unsloth, fn) : null
   }
 
+  // A generic OpenAI-compatible server (vLLM, llama.cpp, LiteLLM, a gateway…)
+  // has no LM Studio native API, so that probe alone reads as "did not answer"
+  // while the server runs perfectly well. The standard `GET /v1/models` is the
+  // one listing every such server has, so for this provider both are read AT
+  // ONCE (in sequence a slow host paid the native probe's timeouts first) and
+  // the native answer wins when there is one, since it says which models embed
+  // and which call tools. The standard listing needs an explicit address:
+  // without one the native probe's localhost default is not the operator's
+  // server.
+  const openAiListing =
+    providerId === 'openai-compatible' && baseUrl
+      ? listOpenAiCompatibleModelIds(baseUrl, apiKey)
+      : null
   const entries = await listLmStudioModels(baseUrl, apiKey, true)
-  if (!entries) return null
+  if (entries) return lmStudioModelsForRole(entries, fn)
 
-  return lmStudioModelsForRole(entries, fn)
+  if (openAiListing) {
+    const listing = await openAiListing
+    if (listing.ids) return openAiCompatibleModelsForRole(listing.ids, fn)
+    options.onUnreachable?.(listing.reason)
+  }
+  return null
+}
+
+const OPENAI_LIST_TIMEOUT_MS = 10_000
+
+/** `{base}/v1/models`, whether or not the operator's address ends in `/v1`. Pure. */
+export function openAiModelsUrl(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, '')
+  const root = /\/v1$/i.test(trimmed) ? trimmed : `${trimmed}/v1`
+  return `${root}/models`
+}
+
+/**
+ * The ids of an OpenAI listing (`{ data: [{ id }] }`), each once and in the
+ * server's order — a gateway lists one id per upstream, and repeats would
+ * reach the picker as identical rows. Null for any other shape. Pure.
+ */
+export function parseOpenAiModelList(json: unknown): string[] | null {
+  const data = (json as { data?: unknown } | null)?.data
+  if (!Array.isArray(data)) return null
+  const ids = data
+    .map((m) => (m as { id?: unknown } | null)?.id)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
+  return [...new Set(ids)]
+}
+
+/**
+ * Why a server that answered would not list its models. A 401/403 is a key
+ * problem, and which one depends on whether a key was sent: telling someone
+ * with a revoked key to add one leaves the revoked key in place. Pure.
+ */
+export function describeOpenAiListFailure(status: number, sentKey: boolean): string {
+  if (status === 401 || status === 403) {
+    return sentKey
+      ? `The server refused the saved API key (HTTP ${status}).`
+      : `The server needs an API key (HTTP ${status}).`
+  }
+  if (status === 404) {
+    return 'The server has no /v1/models listing at this address (HTTP 404). Check the base URL.'
+  }
+  return `The server answered HTTP ${status} to /v1/models.`
+}
+
+/**
+ * Read `GET {base}/v1/models`. `ids` is null when the list could not be read,
+ * with `reason` saying why in the operator's terms; an empty array is a server
+ * that answered with nothing installed.
+ */
+export async function listOpenAiCompatibleModelIds(
+  baseUrl: string,
+  apiKey?: string
+): Promise<{ ids: string[]; reason?: undefined } | { ids: null; reason: string }> {
+  try {
+    const response = await fetch(openAiModelsUrl(baseUrl), {
+      headers: localServerAuthHeaders(apiKey),
+      signal: AbortSignal.timeout(OPENAI_LIST_TIMEOUT_MS),
+    })
+    if (!response.ok) {
+      return { ids: null, reason: describeOpenAiListFailure(response.status, !!apiKey) }
+    }
+    const ids = parseOpenAiModelList(await response.json().catch(() => null))
+    return ids
+      ? { ids }
+      : { ids: null, reason: 'The server answered, but not with an OpenAI model list.' }
+  } catch (err) {
+    return {
+      ids: null,
+      reason: describeLocalFetchFailure(err, {
+        refused: 'Nothing is listening there — check the server is started and on this port.',
+        timedOut: 'A firewall between the container and the host does this.',
+      }),
+    }
+  }
+}
+
+/**
+ * Models from a bare OpenAI listing. It carries no type or capabilities, so a
+ * role is offered every id with that role's needs assumed — embeddings
+ * included, since withholding them read as "nothing installed" on a server
+ * that has an embedding model. The add dialog refuses a model that has not
+ * tested successfully, which is what catches a chat model picked for
+ * embeddings. Web Search is Google-only and gets nothing. Pure.
+ */
+export function openAiCompatibleModelsForRole(ids: string[], fn: AIFunction): DiscoveryResult {
+  if (fn === 'webSearch') return { models: [], skipped: [] }
+  return {
+    models: ids.map((id) => ({ id, name: id, capabilities: assumedFor(fn) })),
+    skipped: [],
+  }
 }

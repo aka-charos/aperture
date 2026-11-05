@@ -6,6 +6,7 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { getAppName, DEFAULT_APP_NAME } from '@aperture/core'
 import { resolveBrandingAsset, brandingAssetUrl } from '../lib/brandingAssets.js'
+import { isRoutePath } from '../config/cors.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -23,7 +24,15 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
-const staticPlugin: FastifyPluginAsync = async (fastify) => {
+/** A year: everything under /assets/ is named after its own content. */
+const ASSET_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000
+
+interface StaticPluginOptions {
+  /** The built web app. Only a test passes this. */
+  webDistPath?: string
+}
+
+const staticPlugin: FastifyPluginAsync<StaticPluginOptions> = async (fastify, options) => {
   // Only serve static files in production
   if (process.env.NODE_ENV !== 'production') {
     return
@@ -34,7 +43,7 @@ const staticPlugin: FastifyPluginAsync = async (fastify) => {
   //   ../../../web/dist resolves to /app/apps/web/dist ✓
   // In dev (compiled): __dirname is apps/api/dist/plugins
   //   ../../../web/dist resolves to apps/web/dist ✓
-  const webDistPath = path.resolve(__dirname, '../../../web/dist')
+  const webDistPath = options.webDistPath ?? path.resolve(__dirname, '../../../web/dist')
 
   // Check if dist folder exists
   if (!fs.existsSync(webDistPath)) {
@@ -108,16 +117,36 @@ const staticPlugin: FastifyPluginAsync = async (fastify) => {
     index: false,
   })
 
+  // The bundle's chunks: a new build gets new names, so a browser never needs to
+  // ask about one again, and each has a .br and .gz from scripts/precompress.mjs.
+  // A chunk gone after a deploy falls through to the handler below, whose page
+  // carries no-cache and is what starts the client's one reload (lib/staleChunk.ts).
+  await fastify.register(async (assets) => {
+    // The plugin does not say so itself, and a shared cache in front of this that
+    // isn't told could hand brotli to a client that never asked for it. A hook, not
+    // the plugin's setHeaders: that writes to the raw response, and the Vary CORS
+    // puts on the reply replaces it. Appended, because that one has to stay too.
+    assets.addHook('onSend', async (_request, reply) => {
+      const vary = reply.getHeader('vary')
+      reply.header('vary', vary ? `${String(vary)}, Accept-Encoding` : 'Accept-Encoding')
+    })
+    await assets.register(fastifyStatic, {
+      root: path.join(webDistPath, 'assets'),
+      prefix: '/assets/',
+      decorateReply: false,
+      index: false,
+      preCompressed: true,
+      immutable: true,
+      maxAge: ASSET_MAX_AGE_MS,
+    })
+  })
+
   fastify.get('/', async (_request, reply) => sendIndex(reply))
 
   // SPA fallback - serve index.html for non-API routes
   fastify.setNotFoundHandler(async (request, reply) => {
     // Don't intercept API routes, health checks, or OpenAPI docs
-    if (
-      request.url.startsWith('/api') ||
-      request.url.startsWith('/health') ||
-      request.url.startsWith('/openapi')
-    ) {
+    if (isRoutePath(request.url)) {
       return reply.status(404).send({ error: 'Not Found' })
     }
 

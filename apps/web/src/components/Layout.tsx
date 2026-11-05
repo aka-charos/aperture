@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react'
+import React, { Suspense, useCallback, useState, useEffect, useRef } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
   AppBar,
@@ -74,6 +74,8 @@ import { USER_SETTINGS_TAB_KEYS } from '@/pages/UserSettings/tabHelpers'
 import { useAppName, useLogoUrl } from '@/lib/branding'
 import { useTranslation } from 'react-i18next'
 import { applyEffectiveUiLanguage } from '@/i18n/syncUiLanguage'
+import { PageErrorBoundary } from './PageErrorBoundary'
+import { PageLoading } from './PageLoading'
 
 const DRAWER_WIDTH = 260
 const DRAWER_WIDTH_COLLAPSED = 72
@@ -919,7 +921,12 @@ function AppShell() {
       >
         {/* The first-visit tip for this screen, above the page it describes. */}
         <ScreenHint />
-        <Outlet key={i18n.language} />
+        {/* The shell stays on screen while a page's chunk loads, and if it fails. */}
+        <PageErrorBoundary resetKey={location.pathname}>
+          <Suspense fallback={<PageLoading />}>
+            <Outlet key={i18n.language} />
+          </Suspense>
+        </PageErrorBoundary>
       </Box>
 
       {/* The welcome tour: started by itself for a new account, offered once

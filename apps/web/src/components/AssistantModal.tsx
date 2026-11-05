@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { Suspense, lazy, useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -18,10 +18,20 @@ import CloseIcon from '@mui/icons-material/Close'
 import OpenInFullIcon from '@mui/icons-material/OpenInFull'
 import VerticalSplitIcon from '@mui/icons-material/VerticalSplit'
 import WebAssetIcon from '@mui/icons-material/WebAsset'
-import { AssistantChatSurface } from './assistant/AssistantChatSurface'
 import { useAssistantChat } from './assistant/useAssistantChat'
 import { useAssistantDock } from '@/hooks/useAssistantDock'
 import { FAB_SCROLL_DEADBAND_PX, FAB_TOP_ZONE_PX, nextFabVisible } from './assistant/fabVisibility'
+import { PageErrorBoundary } from './PageErrorBoundary'
+import { PageLoading } from './PageLoading'
+import { keepPageOnChunkFailure, useChunkReloadHold } from '@/lib/staleChunk'
+
+// The chat runtime (assistant-ui, the AI SDK) is the heaviest thing a page could
+// carry and this button is on every page, so it loads when the chat first opens.
+const AssistantChatSurface = lazy(() =>
+  keepPageOnChunkFailure(async () => ({
+    default: (await import('./assistant/AssistantChatSurface')).AssistantChatSurface,
+  }))
+)
 
 // Surface the assistant renders in: blocking dialog or persistent side panel
 // that leaves the rest of the app browsable.
@@ -69,6 +79,8 @@ export function AssistantModal() {
   const isSmDown = useMediaQuery(theme.breakpoints.down('sm'))
   const canDock = useMediaQuery(theme.breakpoints.up('md'))
   const [open, setOpen] = useState(false)
+  // A page's chunk failing beside an open chat must not reload the chat away.
+  useChunkReloadHold(open)
   const [surface, setSurface] = useState<AssistantSurface>(() => {
     try {
       // The dock is the default: it leaves the library browsable beside the chat
@@ -223,22 +235,41 @@ export function AssistantModal() {
     </>
   )
 
+  // The surface draws these itself once it has loaded. Until then, and if it never
+  // does, they are the way out: the docked panel has no backdrop to click, and the
+  // button that opened it is hidden while it is open.
+  const chatControlsAlone = (
+    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, p: 1 }}>{headerActions}</Box>
+  )
+
   // Shared chat surface, mounted in exactly one container at a time
   // (Dialog in modal mode, persistent Drawer when docked).
   const chatSurface = (
-    <AssistantChatSurface
-      chat={chat}
-      // Neither floating surface is wide enough to give up 280px to the
-      // conversation list; both reach it through the history toggle. The
-      // dedicated page is the one that shows it inline.
-      sidebarInline={false}
-      headerActions={headerActions}
-      onBeforeNavigate={handleClose}
-      // Docked, the library is right there: clicking a pick routes the main pane
-      // and the chat keeps its place beside it. The dialog covers that pane, so
-      // routing behind it would look like nothing happened.
-      openMediaInModal={!docked}
-    />
+    // A chunk that will not load costs the chat, not the page behind it.
+    <PageErrorBoundary resetKey="assistant" header={chatControlsAlone}>
+      <Suspense
+        fallback={
+          <>
+            {chatControlsAlone}
+            <PageLoading />
+          </>
+        }
+      >
+        <AssistantChatSurface
+          chat={chat}
+          // Neither floating surface is wide enough to give up 280px to the
+          // conversation list; both reach it through the history toggle. The
+          // dedicated page is the one that shows it inline.
+          sidebarInline={false}
+          headerActions={headerActions}
+          onBeforeNavigate={handleClose}
+          // Docked, the library is right there: clicking a pick routes the main pane
+          // and the chat keeps its place beside it. The dialog covers that pane, so
+          // routing behind it would look like nothing happened.
+          openMediaInModal={!docked}
+        />
+      </Suspense>
+    </PageErrorBoundary>
   )
 
   return (

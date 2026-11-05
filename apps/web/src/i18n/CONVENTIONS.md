@@ -17,6 +17,7 @@
 ## Locales
 
 - **Source of truth**: `locales/en/translation.json`.
+- **Loading**: English is in the entry chunk as the fallback. Every other language is its own chunk, listed in [`localeLoaders.ts`](./localeLoaders.ts) and fetched when it becomes active; a new locale needs a line there and in `supportedLngs` in `config.ts`. Never import another locale's file statically, and read a locale's shipped strings through `loadLocaleTree`.
 - Other languages under `locales/<code>/translation.json` should keep the **same key structure** as English. Until every key is localized, i18next still falls back to English for missing keys; you can also **copy** missing keys from English into each locale so files stay structurally aligned (see below).
 
 ### Syncing missing keys from English

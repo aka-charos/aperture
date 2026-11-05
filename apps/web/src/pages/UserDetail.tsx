@@ -387,7 +387,7 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
           {savingWatchHistory && (
             <Box display="flex" alignItems="center" gap={1} mt={2}>
               <CircularProgress size={16} />
-              <Typography variant="caption" color="text.secondary">{t('common.saving')}</Typography>
+              <Typography variant="caption" color="text.secondary">{t('admin.common.saving')}</Typography>
             </Box>
           )}
         </CardContent>
@@ -429,7 +429,7 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
           {savingEmailNotifications && (
             <Box display="flex" alignItems="center" gap={1} mt={2}>
               <CircularProgress size={16} />
-              <Typography variant="caption" color="text.secondary">{t('common.saving')}</Typography>
+              <Typography variant="caption" color="text.secondary">{t('admin.common.saving')}</Typography>
             </Box>
           )}
         </CardContent>
@@ -519,7 +519,7 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
           {savingDiscovery && (
             <Box display="flex" alignItems="center" gap={1} mt={2}>
               <CircularProgress size={16} />
-              <Typography variant="caption" color="text.secondary">{t('common.saving')}</Typography>
+              <Typography variant="caption" color="text.secondary">{t('admin.common.saving')}</Typography>
             </Box>
           )}
         </CardContent>
@@ -548,7 +548,7 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
               disabled={savingSeerrId}
               startIcon={savingSeerrId ? <CircularProgress size={16} /> : <SaveIcon />}
             >
-              {savingSeerrId ? t('common.saving') : t('common.save')}
+              {savingSeerrId ? t('admin.common.saving') : t('common.save')}
             </Button>
           </Box>
         </CardContent>
@@ -632,7 +632,7 @@ function UserSettingsTab({ userId, user }: { userId: string; user: User }) {
               onClick={handleSave}
               disabled={saving || !settings.globalConfig.userOverrideAllowed}
             >
-              {saving ? t('common.saving') : t('admin.userDetail.saveChanges')}
+              {saving ? t('admin.common.saving') : t('admin.userDetail.saveChanges')}
             </Button>
           </Box>
         </CardContent>
@@ -1105,7 +1105,7 @@ export function UserDetailPage() {
       <Box>
         <Breadcrumbs
           items={[
-            { label: t('nav.admin'), path: '/admin' },
+            { label: t('admin.nav.admin'), path: '/admin' },
             { label: t('admin.users'), path: '/admin/access/users' },
             { label: t('admin.userDetail.breadcrumbUser') },
           ]}
@@ -1119,7 +1119,7 @@ export function UserDetailPage() {
     <Box>
       <Breadcrumbs
         items={[
-          { label: t('nav.admin'), path: '/admin' },
+          { label: t('admin.nav.admin'), path: '/admin' },
           { label: t('admin.users'), path: '/admin/access/users' },
         ]}
         currentLabel={user.display_name || user.username}

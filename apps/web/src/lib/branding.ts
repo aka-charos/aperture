@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import i18n from '@/i18n/config'
+import i18n, { redrawTranslatedText } from '@/i18n/config'
 import { applyThemeColorOverrides, type ThemeColorOverrides } from '@/theme'
 
 /**
@@ -28,8 +28,8 @@ function emit() {
  *
  * `defaultVariables` is read out of the shared options object every time a
  * string is interpolated, not cached at init, so assigning it late takes effect.
- * Strings already on screen won't reformat by themselves, hence the
- * changeLanguage nudge — the same one the runtime i18n overrides use.
+ * Strings already on screen won't reformat by themselves, hence the redraw in
+ * `setAppName`.
  */
 function applyToI18n(name: string) {
   const interpolation = i18n.options.interpolation ?? {}
@@ -48,7 +48,7 @@ export function setAppName(name: string | null | undefined): void {
   applyToI18n(next)
   if (typeof document !== 'undefined') document.title = next
   emit()
-  void i18n.changeLanguage(i18n.language)
+  redrawTranslatedText()
 }
 
 /** Artwork bundled in the image, used unless the operator mounted their own. */

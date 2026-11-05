@@ -259,7 +259,7 @@ export function EvaluationSeedsSection() {
             onClick={() => void handleSave()}
             disabled={saving || !dirty}
           >
-            {saving ? t('common.saving') : t('common.save')}
+            {saving ? t('admin.common.saving') : t('common.save')}
           </Button>
           <Button variant="outlined" onClick={() => void handleCheck()} disabled={checking}>
             {checking ? t('settingsEvaluation.checking') : t('settingsEvaluation.check')}
