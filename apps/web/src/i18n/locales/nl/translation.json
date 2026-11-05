@@ -27,7 +27,12 @@
       "serverMessage": "{{bericht}}"
     },
     "showMore": "Show more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "pageError": {
+      "title": "Deze pagina kon niet worden getoond",
+      "body": "Als dit na een update is begonnen, haalt opnieuw laden de nieuwe versie op.",
+      "reload": "Opnieuw laden"
+    }
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -2924,7 +2929,8 @@
     "contentHeading": "Taal van aanbevelingen",
     "contentHint": "Ook voor je profiel en de assistent.",
     "readOnlyNote": "Je kijkt als iemand anders: de taal verandert alleen in dit tabblad.",
-    "saveFailed": "Kan je taal niet opslaan. Probeer het opnieuw."
+    "saveFailed": "Kan je taal niet opslaan. Probeer het opnieuw.",
+    "loadFailed": "Die taal kon niet worden geladen. Laad de pagina opnieuw en probeer het nog eens."
   },
   "discovery": {
     "title": "Ontdekken",

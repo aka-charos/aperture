@@ -41,6 +41,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Route splitting otherwise leaves a chunk per icon: the dashboard took 60
+        // requests, most under 2 kB. Rollup merges only what cannot change what runs.
+        experimentalMinChunkSize: 20_000,
+      },
+    },
   },
 })
 

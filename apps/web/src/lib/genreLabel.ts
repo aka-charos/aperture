@@ -14,7 +14,7 @@
  *   3. The stored name.
  */
 import { useTranslation } from 'react-i18next'
-import i18n from '@/i18n/config'
+import i18n, { mergeLoadedStrings } from '@/i18n/config'
 
 /**
  * The key a genre's string lives under: lowercase, every run of anything that
@@ -49,7 +49,7 @@ export function genreLabel(genre: string): string {
 /**
  * `genreLabel` for a component. Subscribing to i18next is the point: the
  * component re-renders on a language change and after strings are added
- * (config.ts and loadTmdbGenreNames nudge it), which is what re-labels. The
+ * (config.ts redraws after merging them), which is what re-labels. The
  * function itself is stable, so do not memoize labels on its identity.
  */
 export function useGenreLabel(): (genre: string) => string {
@@ -83,9 +83,11 @@ export async function loadTmdbGenreNames(language: string): Promise<void> {
       if (key && localized) keyed[key] = localized
     }
     if (Object.keys(keyed).length === 0) return
-    i18n.addResourceBundle(lng, 'translation', { genresTmdb: keyed }, true, true)
-    // The same re-render nudge the runtime overrides use (i18n/config.ts).
-    void i18n.changeLanguage(i18n.language)
+    // This answer can beat the language's own strings here (a slow first paint),
+    // and a merge before they arrive is refused. Wait for them. Should they never
+    // come, this language counts as not loaded, so a later call asks again.
+    if (!i18n.hasResourceBundle(lng, 'translation')) await i18n.loadLanguages(lng)
+    if (!mergeLoadedStrings(lng, { genresTmdb: keyed })) tmdbNamesLoaded.delete(lng)
   } catch {
     tmdbNamesLoaded.delete(lng)
   }

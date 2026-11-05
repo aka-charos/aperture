@@ -27,7 +27,12 @@
       "serverMessage": "{{message}}"
     },
     "showMore": "Show more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "pageError": {
+      "title": "Impossible d'afficher cette page",
+      "body": "Si le problème est apparu après une mise à jour, recharger la page charge la nouvelle version.",
+      "reload": "Recharger"
+    }
   },
   "nav": {
     "dashboard": "Tableau de bord",
@@ -1582,7 +1587,8 @@
     "contentHeading": "Langue des recommandations",
     "contentHint": "Aussi pour votre profil et l’assistant.",
     "readOnlyNote": "Vous naviguez en tant qu’une autre personne : la langue ne change que dans cet onglet.",
-    "saveFailed": "Impossible d’enregistrer la langue. Réessayez."
+    "saveFailed": "Impossible d’enregistrer la langue. Réessayez.",
+    "loadFailed": "Impossible de charger cette langue. Rechargez la page et réessayez."
   },
   "discovery": {
     "title": "Découvrir",

@@ -27,6 +27,11 @@
     "showLess": "Show less",
     "errors": {
       "serverMessage": "{{message}}"
+    },
+    "pageError": {
+      "title": "This page could not be shown",
+      "body": "If this started after an update, reloading picks up the new version.",
+      "reload": "Reload"
     }
   },
   "nav": {
@@ -4154,7 +4159,8 @@
     "contentHeading": "Recommendations language",
     "contentHint": "Also used for your profile and the assistant.",
     "readOnlyNote": "You are viewing as someone else: the language changes in this tab only.",
-    "saveFailed": "Could not save your language. Try again."
+    "saveFailed": "Could not save your language. Try again.",
+    "loadFailed": "That language could not be loaded. Reload the page and try again."
   },
   "discovery": {
     "title": "Discover",

@@ -27,7 +27,12 @@
       "serverMessage": "{{메시지}}"
     },
     "showMore": "Show more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "pageError": {
+      "title": "이 페이지를 표시할 수 없습니다",
+      "body": "업데이트 후 발생했다면 새로고침하면 새 버전을 불러옵니다.",
+      "reload": "새로고침"
+    }
   },
   "nav": {
     "dashboard": "대시보드",
@@ -1578,7 +1583,8 @@
     "contentHeading": "추천 언어",
     "contentHint": "프로필과 어시스턴트에도 적용됩니다.",
     "readOnlyNote": "다른 사용자로 보고 있습니다: 언어는 이 탭에서만 바뀝니다.",
-    "saveFailed": "언어를 저장하지 못했습니다. 다시 시도하세요."
+    "saveFailed": "언어를 저장하지 못했습니다. 다시 시도하세요.",
+    "loadFailed": "해당 언어를 불러올 수 없습니다. 페이지를 새로고침한 후 다시 시도하세요."
   },
   "discovery": {
     "title": "발견하다",

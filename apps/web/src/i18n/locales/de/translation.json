@@ -27,7 +27,12 @@
       "serverMessage": "{{message}}"
     },
     "showMore": "Show more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "pageError": {
+      "title": "Diese Seite konnte nicht angezeigt werden",
+      "body": "Falls das nach einem Update begonnen hat, lädt ein Neuladen die neue Version.",
+      "reload": "Neu laden"
+    }
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -1578,7 +1583,8 @@
     "contentHeading": "Sprache der Empfehlungen",
     "contentHint": "Gilt auch für dein Profil und den Assistenten.",
     "readOnlyNote": "Du siehst die App als jemand anderes: Die Sprache ändert sich nur in diesem Tab.",
-    "saveFailed": "Die Sprache konnte nicht gespeichert werden. Bitte erneut versuchen."
+    "saveFailed": "Die Sprache konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    "loadFailed": "Diese Sprache konnte nicht geladen werden. Lade die Seite neu und versuche es noch einmal."
   },
   "discovery": {
     "title": "Entdecken",

@@ -1,5 +1,6 @@
 import { isRtlLocale } from './localeDirection'
 import i18n from './config'
+import { switchLanguage, type LanguageOutcome } from './languageSwitch'
 
 function applyDocumentLangAndDir(lng: string): void {
   if (typeof document === 'undefined') return
@@ -7,10 +8,16 @@ function applyDocumentLangAndDir(lng: string): void {
   document.documentElement.dir = isRtlLocale(lng) ? 'rtl' : 'ltr'
 }
 
-/** Applies a resolved locale to i18next and the document `<html lang>` / `dir`. */
-export async function applyEffectiveUiLanguage(lng: string): Promise<void> {
-  await i18n.changeLanguage(lng)
-  applyDocumentLangAndDir(lng)
+/**
+ * Applies a resolved locale to i18next and the document `<html lang>` / `dir`, and
+ * says what became of it. Only `applied` means the language is on screen, so
+ * anything that records the choice checks first.
+ */
+export async function applyEffectiveUiLanguage(lng: string): Promise<LanguageOutcome> {
+  const outcome = await switchLanguage(i18n, lng)
+  // What is on screen, not what was asked for.
+  applyDocumentLangAndDir(i18n.language)
+  return outcome
 }
 
 /**

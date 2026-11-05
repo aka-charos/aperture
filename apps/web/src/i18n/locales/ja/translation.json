@@ -27,7 +27,12 @@
       "serverMessage": "{{メッセージ}}"
     },
     "showMore": "Show more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "pageError": {
+      "title": "このページを表示できませんでした",
+      "body": "アップデート後に発生した場合は、再読み込みすると新しいバージョンが読み込まれます。",
+      "reload": "再読み込み"
+    }
   },
   "nav": {
     "dashboard": "ダッシュボード",
@@ -1073,7 +1078,8 @@
     "contentHeading": "おすすめの言語",
     "contentHint": "プロフィールとアシスタントにも使われます。",
     "readOnlyNote": "別のユーザーとして表示中：言語はこのタブでのみ変わります。",
-    "saveFailed": "言語を保存できませんでした。もう一度お試しください。"
+    "saveFailed": "言語を保存できませんでした。もう一度お試しください。",
+    "loadFailed": "その言語を読み込めませんでした。ページを再読み込みして、もう一度お試しください。"
   },
   "discovery": {
     "title": "発見する",

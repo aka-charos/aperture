@@ -27,7 +27,12 @@
       "serverMessage": "{{messaggio}}"
     },
     "showMore": "Show more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "pageError": {
+      "title": "Impossibile mostrare questa pagina",
+      "body": "Se è iniziato dopo un aggiornamento, ricaricando viene caricata la nuova versione.",
+      "reload": "Ricarica"
+    }
   },
   "nav": {
     "dashboard": "Pannello di controllo",
@@ -1582,7 +1587,8 @@
     "contentHeading": "Lingua dei consigli",
     "contentHint": "Vale anche per il tuo profilo e l’assistente.",
     "readOnlyNote": "Stai navigando come un’altra persona: la lingua cambia solo in questa scheda.",
-    "saveFailed": "Impossibile salvare la lingua. Riprova."
+    "saveFailed": "Impossibile salvare la lingua. Riprova.",
+    "loadFailed": "Impossibile caricare questa lingua. Ricarica la pagina e riprova."
   },
   "discovery": {
     "title": "Scoprire",

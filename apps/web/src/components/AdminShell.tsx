@@ -1,3 +1,4 @@
+import { keepPageOnChunkFailure } from '@/lib/staleChunk'
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -34,9 +35,11 @@ import {
  * Lazy, and mounted only once asked for: it carries the whole admin guide
  * (~170 KB of markdown), which an admin who never opens it never downloads.
  */
-const AdminHelpDrawer = lazy(async () => ({
-  default: (await import('@/pages/admin/help/AdminHelpDrawer')).AdminHelpDrawer,
-}))
+const AdminHelpDrawer = lazy(() =>
+  keepPageOnChunkFailure(async () => ({
+    default: (await import('@/pages/admin/help/AdminHelpDrawer')).AdminHelpDrawer,
+  }))
+)
 
 const NAV_WIDTH = 250
 

@@ -27,7 +27,12 @@
       "serverMessage": "{{mensaje}}"
     },
     "showMore": "Show more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "pageError": {
+      "title": "No se pudo mostrar esta página",
+      "body": "Si empezó tras una actualización, al recargar se cargará la nueva versión.",
+      "reload": "Recargar"
+    }
   },
   "nav": {
     "dashboard": "Panel",
@@ -1582,7 +1587,8 @@
     "contentHeading": "Idioma de las recomendaciones",
     "contentHint": "También para tu perfil y el asistente.",
     "readOnlyNote": "Estás viendo como otra persona: el idioma cambia solo en esta pestaña.",
-    "saveFailed": "No se pudo guardar el idioma. Inténtalo de nuevo."
+    "saveFailed": "No se pudo guardar el idioma. Inténtalo de nuevo.",
+    "loadFailed": "No se pudo cargar ese idioma. Recarga la página e inténtalo de nuevo."
   },
   "discovery": {
     "title": "Descubrir",

@@ -238,7 +238,9 @@ export function LoginPage() {
               value={currentLanguage}
               onChange={(code) => {
                 setPickedLanguage(code)
-                void applyEffectiveUiLanguage(code)
+                void applyEffectiveUiLanguage(code).then((outcome) => {
+                  if (outcome === 'failed') setPickedLanguage(null)
+                })
               }}
             />
           </Box>

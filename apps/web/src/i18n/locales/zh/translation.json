@@ -27,7 +27,12 @@
       "serverMessage": "{{信息}}"
     },
     "showMore": "Show more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "pageError": {
+      "title": "无法显示此页面",
+      "body": "如果是在更新后出现的，重新加载即可获取新版本。",
+      "reload": "重新加载"
+    }
   },
   "nav": {
     "dashboard": "仪表盘",
@@ -1073,7 +1078,8 @@
     "contentHeading": "推荐语言",
     "contentHint": "也用于你的资料和助手。",
     "readOnlyNote": "你正在以其他用户身份查看：语言仅在此标签页中更改。",
-    "saveFailed": "无法保存语言，请重试。"
+    "saveFailed": "无法保存语言，请重试。",
+    "loadFailed": "无法加载该语言。请重新加载页面后再试。"
   },
   "discovery": {
     "title": "发现",
