@@ -10,6 +10,13 @@ import type { JellyfinItemsResponse } from './types.js'
 import type { JellyfinProviderBase } from './base.js'
 import { updateJellyfinItemSafely } from './itemUpdates.js'
 import { setForcedSortName } from '../sortName.js'
+import { mapWithConcurrency } from '../../lib/concurrency.js'
+
+/** Parallel item updates against the server; kept low so a slow server is not flooded. */
+const SORT_UPDATE_CONCURRENCY = 4
+
+/** Matches the 'NN - ' rank prefix Aperture puts in front of an item's name. */
+const RANK_PREFIX = /^(\d{2,}) - /
 
 /**
  * Create or update a collection (Box Set)
@@ -55,11 +62,13 @@ export async function createOrUpdateCollection(
     )
 
     // Remove all existing items if any
-    if (existingItems.Items && existingItems.Items.length > 0) {
-      const existingIds = existingItems.Items.map((item) => item.Id).join(',')
-      await provider.fetch(`/Collections/${collection.Id}/Items?Ids=${existingIds}`, apiKey, {
-        method: 'DELETE',
-      })
+    const previousIds = existingItems.Items?.map((item) => item.Id) ?? []
+    if (previousIds.length > 0) {
+      await provider.fetch(
+        `/Collections/${collection.Id}/Items?Ids=${previousIds.join(',')}`,
+        apiKey,
+        { method: 'DELETE' }
+      )
     }
 
     // Add new items
@@ -68,6 +77,14 @@ export async function createOrUpdateCollection(
         method: 'POST',
       })
     }
+
+    // Items that left the ranking keep no rank prefix on the user's real library entry
+    const keep = new Set(itemIds)
+    await clearRankSortNames(
+      provider,
+      apiKey,
+      previousIds.filter((id) => !keep.has(id))
+    )
   } else {
     // Create new collection
     const createParams = new URLSearchParams({
@@ -143,7 +160,12 @@ export async function deleteCollection(
   apiKey: string,
   collectionId: string
 ): Promise<void> {
+  // Read the members first: once the collection is gone they can no longer be listed
+  const memberIds = await getCollectionItems(provider, apiKey, collectionId).catch(() => [])
+
   await provider.fetch(`/Items/${collectionId}`, apiKey, { method: 'DELETE' })
+
+  await clearRankSortNames(provider, apiKey, memberIds)
 }
 
 /**
@@ -269,19 +291,49 @@ async function setItemRankSortNames(
   apiKey: string,
   itemIds: string[]
 ): Promise<void> {
-  for (let i = 0; i < itemIds.length; i++) {
+  await mapWithConcurrency(itemIds, SORT_UPDATE_CONCURRENCY, (itemId, i) => {
     const rankPrefix = String(i + 1).padStart(2, '0')
 
     // Non-fatal: item will still be in collection, just won't sort by rank
-    await updateJellyfinItemSafely(
+    return updateJellyfinItemSafely(
       provider,
       apiKey,
-      itemIds[i],
+      itemId,
       (item) => {
         const originalName = item.Name || 'Unknown'
         setForcedSortName(item, `${rankPrefix} - ${originalName}`)
       },
       { operation: 'setItemRankSortName' }
     )
-  }
+  })
+}
+
+/**
+ * Undo setItemRankSortNames for items that are no longer ranked.
+ * Only touches an item whose forced sort name is exactly "NN - <its name>", i.e. one this
+ * module wrote, so a sort name the user set themselves is never cleared.
+ */
+async function clearRankSortNames(
+  provider: JellyfinProviderBase,
+  apiKey: string,
+  itemIds: string[]
+): Promise<void> {
+  await mapWithConcurrency(itemIds, SORT_UPDATE_CONCURRENCY, (itemId) =>
+    updateJellyfinItemSafely(
+      provider,
+      apiKey,
+      itemId,
+      (item) => {
+        const forced = item.ForcedSortName
+        const match = typeof forced === 'string' ? RANK_PREFIX.exec(forced) : null
+        if (!match || forced !== `${match[1]} - ${item.Name}`) return false
+
+        delete item.ForcedSortName
+        if (Array.isArray(item.LockedFields)) {
+          item.LockedFields = item.LockedFields.filter((field) => field !== 'SortName')
+        }
+      },
+      { operation: 'clearRankSortName' }
+    )
+  )
 }

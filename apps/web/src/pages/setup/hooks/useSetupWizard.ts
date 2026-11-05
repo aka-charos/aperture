@@ -314,6 +314,7 @@ export function useSetupWizard(): SetupWizardContext {
     setServerUrl(server.address)
     setServerName(server.name)
     setTestSuccess(false)
+    setDetectedServerType(null)
     setError('')
   }, [])
 

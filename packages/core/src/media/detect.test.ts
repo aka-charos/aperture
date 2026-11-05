@@ -1,15 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { classifyMediaServer, detectMediaServerType } from './detect.js'
+import { classifyMediaServer, describeDetection, detectMediaServerType } from './detect.js'
 import { getMediaServerCapabilities } from './capabilities.js'
 
-function fakeFetch(body: unknown, init: { ok?: boolean; throws?: boolean } = {}): typeof fetch {
+function fakeFetch(body: unknown, init: { status?: number; throws?: boolean } = {}): typeof fetch {
   return (async () => {
     if (init.throws) throw new Error('connect ECONNREFUSED')
-    return {
-      ok: init.ok ?? true,
-      json: async () => body,
-    } as unknown as Response
+    const text = typeof body === 'string' ? body : JSON.stringify(body)
+    return new Response(text, { status: init.status ?? 200 })
   }) as typeof fetch
 }
 
@@ -46,24 +44,44 @@ test('leaves unrecognised servers unclassified instead of guessing', () => {
 
 test('detectMediaServerType reads /System/Info/Public and tolerates a trailing slash', async () => {
   let requested = ''
-  const impl = (async (url: string) => {
+  let redirect: RequestInit['redirect']
+  const impl = (async (url: string, init?: RequestInit) => {
     requested = url
-    return {
-      ok: true,
-      json: async () => ({ ProductName: 'Jellyfin Server', Version: '10.10.7', ServerName: 'Home' }),
-    } as unknown as Response
+    redirect = init?.redirect
+    return new Response(
+      JSON.stringify({ ProductName: 'Jellyfin Server', Version: '10.10.7', ServerName: 'Home' })
+    )
   }) as unknown as typeof fetch
 
   const result = await detectMediaServerType('http://jf:8096/', impl)
   assert.equal(requested, 'http://jf:8096/System/Info/Public')
+  assert.equal(redirect, 'manual')
   assert.equal(result?.type, 'jellyfin')
   assert.equal(result?.serverName, 'Home')
 })
 
-test('detectMediaServerType returns null on network errors, HTTP errors and bad bodies', async () => {
+test('detectMediaServerType returns null on network errors, HTTP errors, redirects and bad bodies', async () => {
   assert.equal(await detectMediaServerType('http://x', fakeFetch({}, { throws: true })), null)
-  assert.equal(await detectMediaServerType('http://x', fakeFetch({}, { ok: false })), null)
-  assert.equal(await detectMediaServerType('http://x', fakeFetch(null)), null)
+  assert.equal(await detectMediaServerType('http://x', fakeFetch({}, { status: 500 })), null)
+  assert.equal(await detectMediaServerType('http://x', fakeFetch('', { status: 302 })), null)
+  assert.equal(await detectMediaServerType('http://x', fakeFetch('null')), null)
+  assert.equal(await detectMediaServerType('http://x', fakeFetch('<html>not json</html>')), null)
+})
+
+test('detectMediaServerType refuses oversized responses', async () => {
+  const big = JSON.stringify({ ProductName: 'Jellyfin Server', pad: 'x'.repeat(64 * 1024) })
+  assert.equal(await detectMediaServerType('http://x', fakeFetch(big)), null)
+})
+
+test('describeDetection exposes only the type and mismatch flag', () => {
+  const jf = classifyMediaServer({ ProductName: 'Jellyfin Server', Version: '10.10.7', ServerName: 'Home' })
+
+  assert.deepEqual(describeDetection(jf, 'emby'), { detectedType: 'jellyfin', typeMismatch: true })
+  assert.deepEqual(describeDetection(jf, 'jellyfin'), { detectedType: 'jellyfin', typeMismatch: false })
+  // Nothing from the remote server beyond the classified type is returned
+  assert.deepEqual(Object.keys(describeDetection(jf, 'emby')).sort(), ['detectedType', 'typeMismatch'])
+  assert.deepEqual(describeDetection(null, 'emby'), {})
+  assert.deepEqual(describeDetection(classifyMediaServer({}), 'emby'), {})
 })
 
 test('capabilities: dynamic home rows are Emby-only; unknown type behaves like Emby', () => {

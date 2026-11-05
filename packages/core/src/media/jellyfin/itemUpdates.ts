@@ -5,46 +5,97 @@
  * no user, so that call fails with an API key. The item has to be read through
  * `GET /Users/{userId}/Items/{id}` with an administrator's id instead; the update itself
  * is `POST /Items/{id}`, which needs no user.
+ *
+ * A user can only read what their account may see, so every enabled administrator is a
+ * candidate: the first one that can read the item is used.
  */
 
-import { getUsers } from './users.js'
 import { logger, type JellyfinProviderBase } from './base.js'
+import type { JellyfinUser } from './types.js'
 
-const adminUserIds = new WeakMap<JellyfinProviderBase, string>()
+const ADMIN_CACHE_TTL_MS = 10 * 60 * 1000
 
-/**
- * Id of an enabled administrator account, used as the user context for reading items.
- * Cached for the lifetime of the provider instance.
- */
-export async function resolveAdminUserId(
+interface AdminCacheEntry {
+  /** Enabled administrators, those with unrestricted library access first. */
+  ids: string[]
+  /** Last administrator that successfully read an item; tried first next time. */
+  preferred?: string
+  expiresAt: number
+}
+
+// Keyed by server URL and not by provider instance: callers build a fresh provider per operation.
+const adminCache = new Map<string, AdminCacheEntry>()
+
+/** Forget cached administrators (used by tests and after a failed lookup). */
+export function clearAdminUserCache(): void {
+  adminCache.clear()
+}
+
+async function getAdminCandidates(
   provider: JellyfinProviderBase,
   apiKey: string
-): Promise<string> {
-  const cached = adminUserIds.get(provider)
-  if (cached) return cached
+): Promise<AdminCacheEntry> {
+  const cached = adminCache.get(provider.baseUrl)
+  if (cached && cached.expiresAt > Date.now()) return cached
 
-  const users = await getUsers(provider, apiKey)
-  const admin = users.find((u) => u.isAdmin && !u.isDisabled)
-  if (!admin) {
+  const users = await provider.fetch<JellyfinUser[]>('/Users', apiKey)
+  const admins = users.filter((u) => u.Policy.IsAdministrator && !u.Policy.IsDisabled)
+  if (admins.length === 0) {
     throw new Error('No enabled administrator account found on the Jellyfin server')
   }
 
-  adminUserIds.set(provider, admin.id)
-  return admin.id
+  // Unrestricted accounts see every library, so they are the most likely to read any item.
+  const unrestricted = (u: JellyfinUser) =>
+    u.Policy.EnableAllFolders !== false && u.Policy.MaxParentalRating == null
+  const ids = [...admins.filter(unrestricted), ...admins.filter((u) => !unrestricted(u))].map(
+    (u) => u.Id
+  )
+
+  const entry: AdminCacheEntry = { ids, expiresAt: Date.now() + ADMIN_CACHE_TTL_MS }
+  adminCache.set(provider.baseUrl, entry)
+  return entry
 }
 
+/** Read an item as the first administrator who can see it. */
+async function readItemAsAdmin(
+  provider: JellyfinProviderBase,
+  apiKey: string,
+  itemId: string
+): Promise<Record<string, unknown>> {
+  const entry = await getAdminCandidates(provider, apiKey)
+  const order = entry.preferred
+    ? [entry.preferred, ...entry.ids.filter((id) => id !== entry.preferred)]
+    : entry.ids
+
+  let lastError: unknown
+  for (const userId of order) {
+    try {
+      const item = await provider.fetch<Record<string, unknown>>(
+        `/Users/${userId}/Items/${itemId}`,
+        apiKey
+      )
+      entry.preferred = userId
+      return item
+    } catch (err) {
+      lastError = err
+    }
+  }
+
+  throw lastError
+}
+
+/**
+ * Read an item, let `mutate` edit it, and post it back. If `mutate` returns `false`
+ * the item is left alone and nothing is posted.
+ */
 export async function updateJellyfinItem(
   provider: JellyfinProviderBase,
   apiKey: string,
   itemId: string,
-  mutate: (item: Record<string, unknown>) => void
+  mutate: (item: Record<string, unknown>) => void | boolean
 ): Promise<void> {
-  const adminUserId = await resolveAdminUserId(provider, apiKey)
-  const item = await provider.fetch<Record<string, unknown>>(
-    `/Users/${adminUserId}/Items/${itemId}`,
-    apiKey
-  )
-  mutate(item)
+  const item = await readItemAsAdmin(provider, apiKey, itemId)
+  if (mutate(item) === false) return
 
   await provider.fetch(`/Items/${itemId}`, apiKey, {
     method: 'POST',
@@ -58,7 +109,7 @@ export async function updateJellyfinItemSafely(
   provider: JellyfinProviderBase,
   apiKey: string,
   itemId: string,
-  mutate: (item: Record<string, unknown>) => void,
+  mutate: (item: Record<string, unknown>) => void | boolean,
   context: Record<string, unknown>
 ): Promise<void> {
   try {

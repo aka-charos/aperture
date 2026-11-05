@@ -9,7 +9,7 @@ import {
   normalizeAppLocale,
   type AppLocaleCode,
 } from '../lib/locales.js'
-import { detectMediaServerType } from '../media/detect.js'
+import { describeDetection, detectMediaServerType } from '../media/detect.js'
 
 const logger = createChildLogger('system-settings')
 
@@ -376,10 +376,31 @@ export interface MediaServerConnectionTestResult {
   error?: string
   /** What the server reports itself to be, when it could be determined. */
   detectedType?: MediaServerType
-  detectedProductName?: string
-  detectedVersion?: string
   /** True when detectedType differs from the type the admin selected. */
   typeMismatch?: boolean
+}
+
+async function runAuthenticatedConnectionTest(
+  config: { type: MediaServerType; baseUrl: string; apiKey: string },
+  baseUrl: string
+): Promise<MediaServerConnectionTestResult> {
+  try {
+    // Import dynamically to avoid circular dependencies
+    const { createMediaServerProvider } = await import('../media/index.js')
+    const provider = createMediaServerProvider(config.type, baseUrl)
+
+    // Server info is the connection test. Both providers implement it and it is
+    // on MediaServerProvider, so the old library-count fallback could never run.
+    const info = await provider.getServerInfo(config.apiKey)
+    return { success: true, serverName: info.name }
+  } catch (err) {
+    const error = err instanceof Error ? err.message : 'Unknown error'
+    logger.warn(
+      { err, config: { type: config.type, baseUrl: config.baseUrl } },
+      'Media server connection test failed'
+    )
+    return { success: false, error }
+  }
 }
 
 /**
@@ -390,39 +411,25 @@ export async function testMediaServerConnection(config: {
   baseUrl: string
   apiKey: string
 }): Promise<MediaServerConnectionTestResult> {
-  // Probe independently of the authenticated test: a wrong type is worth reporting
-  // even when the key is also wrong, and the probe never throws.
-  const detected = await detectMediaServerType(config.baseUrl)
-  const detection: Partial<MediaServerConnectionTestResult> = detected?.type
-    ? {
-        detectedType: detected.type,
-        ...(detected.productName ? { detectedProductName: detected.productName } : {}),
-        ...(detected.version ? { detectedVersion: detected.version } : {}),
-        typeMismatch: detected.type !== config.type,
-      }
-    : {}
-
+  // Validated here too, not just in the setter: this runs against a URL the
+  // caller supplies in the request body, before anything is persisted. The type
+  // probe only ever sees a URL that passed, so it honours the same rules.
+  let baseUrl: string
   try {
-    // Validated here too, not just in the setter: this runs against a URL the
-    // caller supplies in the request body, before anything is persisted.
-    const baseUrl = validateServerUrl(config.baseUrl, 'Media server URL')
-
-    // Import dynamically to avoid circular dependencies
-    const { createMediaServerProvider } = await import('../media/index.js')
-    const provider = createMediaServerProvider(config.type, baseUrl)
-
-    // Server info is the connection test. Both providers implement it and it is
-    // on MediaServerProvider, so the old library-count fallback could never run.
-    const info = await provider.getServerInfo(config.apiKey)
-    return { success: true, serverName: info.name, ...detection }
+    baseUrl = validateServerUrl(config.baseUrl, 'Media server URL')
   } catch (err) {
-    const error = err instanceof Error ? err.message : 'Unknown error'
-    logger.warn(
-      { err, config: { type: config.type, baseUrl: config.baseUrl } },
-      'Media server connection test failed'
-    )
-    return { success: false, error, ...detection }
+    return { success: false, error: err instanceof Error ? err.message : 'Invalid server URL' }
   }
+
+  // The type probe is independent of the authenticated test (and never throws), so run
+  // them together: a wrong type is reported even when the key is also wrong, and an
+  // unreachable host does not pay the probe timeout before the real test starts.
+  const [detected, result] = await Promise.all([
+    detectMediaServerType(baseUrl),
+    runAuthenticatedConnectionTest(config, baseUrl),
+  ])
+
+  return { ...result, ...describeDetection(detected, config.type) }
 }
 
 /**

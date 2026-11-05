@@ -27,6 +27,8 @@ interface PublicSystemInfo {
 }
 
 const DETECT_TIMEOUT_MS = 8000
+/** A real /System/Info/Public reply is well under 1 KB; refuse to buffer anything big. */
+const MAX_BODY_BYTES = 16 * 1024
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : null
@@ -56,9 +58,33 @@ export function classifyMediaServer(info: PublicSystemInfo): DetectedMediaServer
   return { ...base, type: null, basis: null }
 }
 
+/** Read at most MAX_BODY_BYTES of the body; null if it is larger or has none. */
+async function readLimitedText(response: Response): Promise<string | null> {
+  if (!response.body) return null
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > MAX_BODY_BYTES) return null
+      chunks.push(value)
+    }
+  } finally {
+    reader.cancel().catch(() => {})
+  }
+
+  return Buffer.concat(chunks).toString('utf8')
+}
+
 /**
  * Ask the server at baseUrl which product it is.
- * Never throws: an unreachable server, a non-JSON reply or a timeout returns null.
+ * Never throws: an unreachable server, a redirect, an oversized or non-JSON reply, or a
+ * timeout returns null. Redirects are not followed, so the probe cannot be bounced
+ * to a different host than the one the admin entered.
  */
 export async function detectMediaServerType(
   baseUrl: string,
@@ -71,11 +97,15 @@ export async function detectMediaServerType(
   try {
     const response = await fetchImpl(url, {
       headers: { Accept: 'application/json' },
+      redirect: 'manual',
       signal: controller.signal,
     })
     if (!response.ok) return null
 
-    const info = (await response.json()) as PublicSystemInfo | null
+    const text = await readLimitedText(response)
+    if (text === null) return null
+
+    const info = JSON.parse(text) as PublicSystemInfo | null
     if (!info || typeof info !== 'object') return null
 
     return classifyMediaServer(info)
@@ -84,4 +114,17 @@ export async function detectMediaServerType(
   } finally {
     clearTimeout(timeout)
   }
+}
+
+/**
+ * The part of a detection that is safe to return to the browser: only the classified type
+ * and whether it disagrees with the selected one. Product name, version and server name
+ * from an admin-supplied URL are deliberately not echoed.
+ */
+export function describeDetection(
+  detected: DetectedMediaServer | null,
+  selectedType: MediaServerType
+): { detectedType?: MediaServerType; typeMismatch?: boolean } {
+  if (!detected?.type) return {}
+  return { detectedType: detected.type, typeMismatch: detected.type !== selectedType }
 }

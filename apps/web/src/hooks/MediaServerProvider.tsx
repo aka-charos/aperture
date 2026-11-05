@@ -7,7 +7,6 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  DEFAULT_MEDIA_SERVER_CAPABILITIES,
   MediaServerContext,
   type MediaServerCapabilities,
   type MediaServerContextValue,
@@ -21,7 +20,7 @@ interface MediaServerProviderProps {
 interface MediaServerInfoResponse {
   type?: string
   isConfigured?: boolean
-  capabilities?: Partial<MediaServerCapabilities>
+  capabilities?: MediaServerCapabilities
 }
 
 function toKind(type: string | undefined): MediaServerKind | null {
@@ -32,7 +31,7 @@ export function MediaServerProvider({ children }: MediaServerProviderProps) {
   const [state, setState] = useState<MediaServerContextValue>({
     type: null,
     isConfigured: false,
-    capabilities: DEFAULT_MEDIA_SERVER_CAPABILITIES,
+    capabilities: null,
     loading: true,
   })
 
@@ -48,11 +47,11 @@ export function MediaServerProvider({ children }: MediaServerProviderProps) {
         setState({
           type: toKind(data.type),
           isConfigured: !!data.isConfigured,
-          capabilities: { ...DEFAULT_MEDIA_SERVER_CAPABILITIES, ...data.capabilities },
+          capabilities: data.capabilities ?? null,
           loading: false,
         })
       } catch {
-        // Keep the permissive defaults: failing to load must not hide features.
+        // Capabilities stay null (unknown); callers show nothing server-specific.
         if (!cancelled) setState((prev) => ({ ...prev, loading: false }))
       }
     }

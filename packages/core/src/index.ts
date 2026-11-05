@@ -317,6 +317,7 @@ export {
   InvalidCredentialsError,
   detectMediaServerType,
   classifyMediaServer,
+  describeDetection,
   getMediaServerCapabilities,
   type DetectedMediaServer,
   type MediaServerCapabilities,
