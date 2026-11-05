@@ -31,6 +31,7 @@ import {
   deleteComparisonRun,
   cancelComparison,
   MAX_COMPARISON_MODELS,
+  OFFSITE_RUNNER_FILE_NAME,
   getProvidersForFunction,
   getModelsForFunctionWithCustom,
   discoverLocalModels,
@@ -381,7 +382,9 @@ const analysisCompareRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const run = await getComparisonRun(request.params.runId)
       if (!run) return reply.status(404).send({ error: 'No such comparison.' })
-      return reply.send(run)
+      // On the run, not the models list: that one waits on local servers, and
+      // the by-hand panel showing this run needs the name at once.
+      return reply.send({ ...run, runnerFileName: OFFSITE_RUNNER_FILE_NAME })
     }
   )
 

@@ -39,7 +39,7 @@ Released or expired batches can still be imported. If a title was analysed anoth
 
 ### Running an Analysis Bench File
 
-The Analysis bench's **Run a model by hand** downloads a file in the same format, and the same runner answers it. The difference is that a bench file holds one prompt **per model**, and each line names the model it is for. Run the runner once per model, naming its lines with `--label` (the name you typed on the bench) and the model to answer them with `--model`:
+The Analysis bench's **Run a model by hand** downloads a file in the same format, and the same runner answers it: the comparison waiting for answers offers both **Download prompts** and **Download runner script**, and prints the command for each model still owing an answer. The difference is that a bench file holds one prompt **per model**, and each line names the model it is for. Run the runner once per model, naming its lines with `--label` (the name you typed on the bench) and the model to answer them with `--model`:
 
 ```
 node run-offsite-analysis.mjs bench-xxxxxxxx.jsonl --label qwen --model qwen3-30b-a3b

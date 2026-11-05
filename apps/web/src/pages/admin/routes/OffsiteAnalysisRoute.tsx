@@ -39,6 +39,8 @@ import {
   UploadFile as UploadIcon,
 } from '@mui/icons-material'
 
+import { RunnerDownloadButton } from '../analysisRunner/RunnerDownloadButton'
+
 interface BatchCounts {
   pending: number
   ready: number
@@ -372,16 +374,7 @@ export default function OffsiteAnalysisRoute() {
             <Typography variant="body2">{t('offsiteAnalysis.runStepResume')}</Typography>
           </li>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          component="a"
-          href="/api/analysis-offsite/runner"
-          download={runnerFileName ?? undefined}
-          disabled={!runnerFileName}
-        >
-          {t('offsiteAnalysis.downloadRunner')}
-        </Button>
+        <RunnerDownloadButton fileName={runnerFileName} onResult={setError} />
       </Paper>
 
       {/* 3 — import */}

@@ -53,6 +53,9 @@ import {
   Stop as StopIcon,
 } from '@mui/icons-material'
 import { useLibraryTitleSearch, type LibrarySearchHit } from '@/hooks/useLibraryTitleSearch'
+import { RunnerDownloadButton } from '../analysisRunner/RunnerDownloadButton'
+import { benchFileName, benchRunCommands, outstandingLabels } from '../analysisRunner/commands'
+import { downloadToFile } from '../analysisRunner/downloadToFile'
 
 type SearchHit = LibrarySearchHit
 
@@ -97,6 +100,8 @@ interface RunView {
   replayOf?: { runId: string; promptVersion: number } | null
   /** The whole comparison as one document — rendered by core, shown verbatim. */
   text: string
+  /** The runner's name, a core constant the by-hand panel needs for its commands. */
+  runnerFileName?: string
 }
 
 interface RunSummary {
@@ -171,6 +176,7 @@ export default function AnalysisBenchRoute() {
   const [pasted, setPasted] = useState('')
   const [importing, setImporting] = useState(false)
   const [importNote, setImportNote] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
   const loadRuns = useCallback(async () => {
     const res = await fetch('/api/analysis-compare/runs', { credentials: 'include' })
@@ -306,6 +312,7 @@ export default function AnalysisBenchRoute() {
     // of arriving at a different one - a replay, a previous run from the list,
     // a fresh bench.
     setImportNote(null)
+    setDownloadError(null)
     if (res.ok) setRun((await res.json()) as RunView)
   }
 
@@ -361,19 +368,14 @@ export default function AnalysisBenchRoute() {
   const downloadPrompts = async () => {
     if (!run) return
     setImportNote(null)
-    const res = await fetch(`/api/analysis-compare/${run.id}/download`, { credentials: 'include' })
-    if (!res.ok) {
-      const json = await res.json().catch(() => null)
-      setError(json?.error ?? t('adminAnalysisBench.manualDownloadFailed'))
-      return
+    setDownloadError(null)
+    const result = await downloadToFile(
+      `/api/analysis-compare/${run.id}/download`,
+      benchFileName(run.id)
+    )
+    if (!result.ok) {
+      setDownloadError(result.message ?? t('adminAnalysisBench.manualDownloadFailed'))
     }
-    const blob = new Blob([await res.text()], { type: 'application/x-ndjson' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `bench-${run.id}.jsonl`
-    link.click()
-    URL.revokeObjectURL(url)
   }
 
   const importAnswers = async () => {
@@ -832,15 +834,80 @@ export default function AnalysisBenchRoute() {
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
                 {t('adminAnalysisBench.manualAwaitingHelp')}
               </Typography>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<DownloadIcon />}
-                onClick={downloadPrompts}
-                sx={{ mb: 1.5 }}
-              >
-                {t('adminAnalysisBench.manualDownload')}
-              </Button>
+              {/* In the panel, not the page's alert: that sits a long scroll
+                  above the buttons that failed. */}
+              {downloadError && (
+                <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setDownloadError(null)}>
+                  {downloadError}
+                </Alert>
+              )}
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={downloadPrompts}
+                >
+                  {t('adminAnalysisBench.manualDownload')}
+                </Button>
+                <RunnerDownloadButton
+                  size="small"
+                  fileName={run.runnerFileName ?? null}
+                  onResult={setDownloadError}
+                />
+              </Stack>
+              {run.runnerFileName && (
+                <Box sx={{ mb: 1.5 }}>
+                  <Typography variant="body2" fontWeight={600}>
+                    {t('adminAnalysisBench.manualRunnerTitle')}
+                  </Typography>
+                  <Box component="ol" sx={{ pl: 3, mt: 0.75, mb: 0, '& li': { mb: 0.75 } }}>
+                    <li>
+                      <Typography variant="body2">
+                        {t('adminAnalysisBench.manualRunnerStepFolder')}
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body2">{t('offsiteAnalysis.runStepNode')}</Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body2">{t('offsiteAnalysis.runStepContext')}</Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body2">{t('offsiteAnalysis.runStepServer')}</Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body2">
+                        {t('adminAnalysisBench.manualRunnerStepCommands')}
+                      </Typography>
+                      <Box
+                        component="pre"
+                        sx={{
+                          mt: 0.75,
+                          mb: 0,
+                          p: 1.25,
+                          borderRadius: 1,
+                          bgcolor: 'action.hover',
+                          fontSize: 13,
+                          overflowX: 'auto',
+                          whiteSpace: 'pre',
+                        }}
+                      >
+                        {benchRunCommands(
+                          run.runnerFileName,
+                          run.id,
+                          outstandingLabels(run.entries)
+                        ).join('\n')}
+                      </Box>
+                    </li>
+                    <li>
+                      <Typography variant="body2">
+                        {t('adminAnalysisBench.manualRunnerStepPaste')}
+                      </Typography>
+                    </li>
+                  </Box>
+                </Box>
+              )}
               <TextField
                 fullWidth
                 multiline
