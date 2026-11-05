@@ -4410,7 +4410,7 @@
       "title": "Installatie voltooid!",
       "gettingStarted": "Aan de slag",
       "loginPrimary": "Meld u aan met uw Media Server-beheerdersreferenties",
-      "loginSecondary": "Gebruik dezelfde gebruikersnaam en hetzelfde wachtwoord als voor Emby/Jellyfin",
+      "loginSecondary": "Gebruik dezelfde gebruikersnaam en hetzelfde wachtwoord als voor HarisFlix",
       "schedulesTitle": "Automatische schema's",
       "schedulesIntro": "{{appName}} voert achtergrondtaken uit om de aanbevelingen actueel te houden. Standaardschema's kunnen worden gewijzigd in Beheer → Taken.",
       "schedWatchHistory": "Bekijk Geschiedenis",

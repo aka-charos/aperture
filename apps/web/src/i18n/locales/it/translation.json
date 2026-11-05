@@ -4217,7 +4217,7 @@
       "title": "Configurazione completata!",
       "gettingStarted": "Iniziare",
       "loginPrimary": "Accedi con le tue credenziali di amministratore di Media Server",
-      "loginSecondary": "Utilizza lo stesso nome utente e password che usi per Emby/Jellyfin",
+      "loginSecondary": "Utilizza lo stesso nome utente e password che usi per HarisFlix",
       "schedulesTitle": "Pianificazioni automatiche",
       "schedulesIntro": "{{appName}} esegue processi in background per mantenere aggiornati i consigli. Le pianificazioni predefinite possono essere modificate in Amministrazione → Lavori.",
       "schedWatchHistory": "Guarda Storia",

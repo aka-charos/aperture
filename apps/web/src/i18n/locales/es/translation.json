@@ -4217,7 +4217,7 @@
       "title": "¡Configuración completa!",
       "gettingStarted": "Empezando",
       "loginPrimary": "Inicie sesión con sus credenciales de administrador de Media Server",
-      "loginSecondary": "Utilice el mismo nombre de usuario y contraseña que utiliza para Emby/Jellyfin",
+      "loginSecondary": "Utilice el mismo nombre de usuario y contraseña que utiliza para HarisFlix",
       "schedulesTitle": "Horarios automáticos",
       "schedulesIntro": "{{appName}} ejecuta trabajos en segundo plano para mantener actualizadas las recomendaciones. Los horarios predeterminados se pueden modificar en Admin → Trabajos.",
       "schedWatchHistory": "Ver historial",

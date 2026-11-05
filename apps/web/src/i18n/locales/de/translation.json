@@ -4213,7 +4213,7 @@
       "title": "Setup abgeschlossen!",
       "gettingStarted": "Erste Schritte",
       "loginPrimary": "Melde dich mit deinen Admin-Zugangsdaten des Mediaservers an",
-      "loginSecondary": "Verwende denselben Benutzernamen und Passwort wie bei Emby/Jellyfin",
+      "loginSecondary": "Verwende denselben Benutzernamen und Passwort wie bei HarisFlix",
       "schedulesTitle": "Automatische Zeitpläne",
       "schedulesIntro": "{{appName}} führt Hintergrundaufgaben aus, um Empfehlungen aktuell zu halten. Standardpläne können unter Admin → Jobs angepasst werden.",
       "schedWatchHistory": "Verlauf",
