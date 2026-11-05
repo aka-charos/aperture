@@ -4,7 +4,7 @@
  * Access the configured media server type and its capabilities.
  *
  *   const { capabilities } = useMediaServer()
- *   if (capabilities.dynamicHomeRows) { ... }
+ *   if (capabilities?.dynamicHomeRows) { ... }   // null until loaded
  *
  * Prefer checking a capability over comparing `type` to 'emby' / 'jellyfin'.
  */

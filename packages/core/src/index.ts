@@ -85,6 +85,7 @@ export {
   getMediaServerProvider,
   detectMediaServerType,
   classifyMediaServer,
+  describeDetection,
   getMediaServerCapabilities,
   type DetectedMediaServer,
   type MediaServerCapabilities,

@@ -17,6 +17,7 @@ export type { MediaServerProvider } from './MediaServerProvider.js'
 export {
   detectMediaServerType,
   classifyMediaServer,
+  describeDetection,
   type DetectedMediaServer,
 } from './detect.js'
 export { getMediaServerCapabilities, type MediaServerCapabilities } from './capabilities.js'

@@ -46,7 +46,7 @@
     "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc --noEmit",
     "test:justwatch": "node --import tsx --test src/justwatch/normalize.test.ts",
-    "test:media": "node --import tsx --test src/media/detect.test.ts src/media/jellyfin/jellyfin.test.ts",
+    "test:media": "node --import tsx --test src/media/detect.test.ts src/media/jellyfin/jellyfin.test.ts src/media/shared.test.ts",
     "test:strm": "node --import tsx --test src/strm/posterOverlay.test.ts src/strm/artwork.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist"

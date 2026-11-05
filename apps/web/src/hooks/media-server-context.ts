@@ -1,6 +1,10 @@
 import { createContext } from 'react'
 
-/** Features that differ between Emby and Jellyfin. Mirrors MediaServerCapabilities in @aperture/core. */
+/**
+ * Features that differ between Emby and Jellyfin.
+ * Mirrors MediaServerCapabilities in packages/core/src/media/capabilities.ts, which is the
+ * source of truth (core cannot be imported in the browser): keep the two in step.
+ */
 export interface MediaServerCapabilities {
   /** Home screen supports a configurable, filtered row (Emby "Dynamic Content"). */
   dynamicHomeRows: boolean
@@ -12,16 +16,13 @@ export interface MediaServerContextValue {
   /** Configured server type, or null until loaded / when the request failed. */
   type: MediaServerKind | null
   isConfigured: boolean
-  capabilities: MediaServerCapabilities
+  /**
+   * Capabilities reported by the API, or null until they have loaded (or if the request
+   * failed). There is deliberately no client-side default, so a flag cannot silently
+   * disagree with the server: treat null as "unknown" and show nothing server-specific.
+   */
+  capabilities: MediaServerCapabilities | null
   loading: boolean
-}
-
-/**
- * Used until the server answers. Defaults to Emby-style behavior (matching the API's own
- * fallback) so nothing server-specific is hidden while loading.
- */
-export const DEFAULT_MEDIA_SERVER_CAPABILITIES: MediaServerCapabilities = {
-  dynamicHomeRows: true,
 }
 
 export const MediaServerContext = createContext<MediaServerContextValue | null>(null)
