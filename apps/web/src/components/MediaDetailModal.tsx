@@ -7,14 +7,24 @@
  * clicked from: the assistant chat, whose scroll position and in-flight
  * conversation don't survive a round trip through the router.
  */
-import { useEffect, useRef } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, IconButton } from '@mui/material'
 import { useIsPhone } from '@/hooks/useIsPhone'
 import CloseIcon from '@mui/icons-material/Close'
 import { useTranslation } from 'react-i18next'
-import { MediaDetailPage } from '../pages/media-detail'
 import type { MediaType } from '../pages/media-detail/types'
 import type { OpenMediaDetail } from '../hooks/media-detail-modal-context'
+import { PageErrorBoundary } from './PageErrorBoundary'
+import { PageLoading } from './PageLoading'
+import { keepPageOnChunkFailure } from '@/lib/staleChunk'
+
+// Most pages can open this dialog and most visits never do, so the title page
+// arrives with the first click rather than with every page that hosts it.
+const MediaDetailPage = lazy(() =>
+  keepPageOnChunkFailure(async () => ({
+    default: (await import('../pages/media-detail')).MediaDetailPage,
+  }))
+)
 
 export interface MediaDetailTarget {
   mediaType: MediaType
@@ -81,13 +91,17 @@ export function MediaDetailModal({ target, onClose, onOpenMedia }: MediaDetailMo
         {target && (
           // Keyed so switching items remounts rather than mixing the previous
           // item's component state (graph focus, expanded seasons) into the new one.
-          <MediaDetailPage
-            key={`${target.mediaType}:${target.id}`}
-            mediaType={target.mediaType}
-            id={target.id}
-            onBack={onClose}
-            onOpenMedia={onOpenMedia}
-          />
+          <PageErrorBoundary resetKey={`${target.mediaType}:${target.id}`}>
+            <Suspense fallback={<PageLoading />}>
+              <MediaDetailPage
+                key={`${target.mediaType}:${target.id}`}
+                mediaType={target.mediaType}
+                id={target.id}
+                onBack={onClose}
+                onOpenMedia={onOpenMedia}
+              />
+            </Suspense>
+          </PageErrorBoundary>
         )}
       </DialogContent>
     </Dialog>

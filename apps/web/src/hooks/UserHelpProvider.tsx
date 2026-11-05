@@ -1,3 +1,4 @@
+import { keepPageOnChunkFailure } from '@/lib/staleChunk'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { docsForLocation, tourForLocation } from '@/pages/guide/routeDocs'
@@ -7,9 +8,11 @@ import { UserHelpContext, type OpenHelpOptions, type UserHelpContextValue } from
  * Lazy, and mounted only once asked for: it carries the whole user guide,
  * which someone who never opens help never downloads.
  */
-const UserHelpDrawer = lazy(async () => ({
-  default: (await import('@/pages/guide/UserHelpDrawer')).UserHelpDrawer,
-}))
+const UserHelpDrawer = lazy(() =>
+  keepPageOnChunkFailure(async () => ({
+    default: (await import('@/pages/guide/UserHelpDrawer')).UserHelpDrawer,
+  }))
+)
 
 interface Request {
   docs: readonly string[]

@@ -42,6 +42,11 @@ test('switching on after init records each string under its resolved key, and sw
   applyLiveString('en', 'greet', 'Hi {{name}}')
   assert.equal(i18n.t('greet', { name: 'Ada' }), 'Hi Ada')
 
+  // A language not in memory stays that way: a bundle holding this one string
+  // would stop i18next ever fetching the whole file.
+  applyLiveString('el', 'greet', 'Γεια {{name}}')
+  assert.equal(i18n.hasResourceBundle('el', 'translation'), false)
+
   setInlineEditEnabled(false)
   i18n.t('greet', { name: 'Ada' })
   assert.equal(getTextIndex().size, 0)
