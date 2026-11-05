@@ -1,6 +1,7 @@
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import { normalizeAppLocale, type AppLocaleCode } from '../lib/locales.js'
+import { detectMediaServerType } from '../media/detect.js'
 
 const logger = createChildLogger('system-settings')
 
@@ -355,13 +356,42 @@ export async function setMediaServerConfig(config: {
 }
 
 /**
+ * Result of testing a media server connection.
+ * detectedType / typeMismatch come from an unauthenticated probe of the server and are
+ * omitted when the server could not be classified.
+ */
+export interface MediaServerConnectionTestResult {
+  success: boolean
+  serverName?: string
+  error?: string
+  /** What the server reports itself to be, when it could be determined. */
+  detectedType?: MediaServerType
+  detectedProductName?: string
+  detectedVersion?: string
+  /** True when detectedType differs from the type the admin selected. */
+  typeMismatch?: boolean
+}
+
+/**
  * Test media server connection with given credentials
  */
 export async function testMediaServerConnection(config: {
   type: MediaServerType
   baseUrl: string
   apiKey: string
-}): Promise<{ success: boolean; serverName?: string; error?: string }> {
+}): Promise<MediaServerConnectionTestResult> {
+  // Probe independently of the authenticated test: a wrong type is worth reporting
+  // even when the key is also wrong, and the probe never throws.
+  const detected = await detectMediaServerType(config.baseUrl)
+  const detection: Partial<MediaServerConnectionTestResult> = detected?.type
+    ? {
+        detectedType: detected.type,
+        ...(detected.productName ? { detectedProductName: detected.productName } : {}),
+        ...(detected.version ? { detectedVersion: detected.version } : {}),
+        typeMismatch: detected.type !== config.type,
+      }
+    : {}
+
   try {
     // Import dynamically to avoid circular dependencies
     const { createMediaServerProvider } = await import('../media/index.js')
@@ -372,19 +402,23 @@ export async function testMediaServerConnection(config: {
       const info = await (
         provider as { getServerInfo: (key: string) => Promise<{ id: string; name: string }> }
       ).getServerInfo(config.apiKey)
-      return { success: true, serverName: info.name }
+      return { success: true, serverName: info.name, ...detection }
     }
 
     // Fallback: try to get movie libraries
     const libraries = await provider.getMovieLibraries(config.apiKey)
-    return { success: true, serverName: `${config.type} server (${libraries.length} libraries)` }
+    return {
+      success: true,
+      serverName: `${config.type} server (${libraries.length} libraries)`,
+      ...detection,
+    }
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error'
     logger.warn(
       { err, config: { type: config.type, baseUrl: config.baseUrl } },
       'Media server connection test failed'
     )
-    return { success: false, error }
+    return { success: false, error, ...detection }
   }
 }
 

@@ -6,6 +6,7 @@ import { RtlProviders } from './RtlProviders'
 import { AuthProvider } from './hooks/AuthProvider'
 import { useAuth } from './hooks/useAuth'
 import { WatchingProvider } from './hooks/useWatching'
+import { MediaServerProvider } from './hooks/useMediaServer'
 import { SetupProvider } from './hooks/SetupProvider'
 import { useSetupStatus } from './hooks/useSetupStatus'
 import { UserRatingsProvider } from './hooks/UserRatingsProvider'
@@ -93,12 +94,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // Include AssistantModal for AI chat on all authenticated pages
   return (
     <ViewModeProvider>
-      <UserRatingsProvider>
-        <WatchingProvider>
-          {children}
-          <AssistantModal />
-        </WatchingProvider>
-      </UserRatingsProvider>
+      <MediaServerProvider>
+        <UserRatingsProvider>
+          <WatchingProvider>
+            {children}
+            <AssistantModal />
+          </WatchingProvider>
+        </UserRatingsProvider>
+      </MediaServerProvider>
     </ViewModeProvider>
   )
 }

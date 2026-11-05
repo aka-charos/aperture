@@ -13,6 +13,14 @@ export { JellyfinProviderBase } from './jellyfin/base.js'
 // Export interface
 export type { MediaServerProvider } from './MediaServerProvider.js'
 
+// Export server type detection and capability map
+export {
+  detectMediaServerType,
+  classifyMediaServer,
+  type DetectedMediaServer,
+} from './detect.js'
+export { getMediaServerCapabilities, type MediaServerCapabilities } from './capabilities.js'
+
 // Export shared types
 export * from './types.js'
 

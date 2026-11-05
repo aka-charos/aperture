@@ -32,6 +32,7 @@ import {
 } from '@mui/icons-material'
 import { useTranslation } from 'react-i18next'
 import type { SetupWizardContext } from '../types'
+import { MediaServerTypeMismatchAlert } from '../../../components/MediaServerTypeMismatchAlert'
 
 interface MediaServerStepProps {
   wizard: SetupWizardContext
@@ -42,6 +43,7 @@ export function MediaServerStep({ wizard }: MediaServerStepProps) {
   const {
     error,
     testSuccess,
+    detectedServerType,
     serverName,
     mediaServerTypes,
     discoveredServers,
@@ -179,6 +181,16 @@ export function MediaServerStep({ wizard }: MediaServerStepProps) {
         <Alert severity="success" sx={{ mb: 2 }} icon={<CheckCircleIcon />}>
           {t('setup.mediaServer.connectedTo', { name: serverName || t('setup.mediaServer.connectedFallback') })}
         </Alert>
+      )}
+
+      {detectedServerType && (
+        <Box sx={{ mb: 2 }}>
+          <MediaServerTypeMismatchAlert
+            selectedType={serverType}
+            detectedType={detectedServerType}
+            onUseDetected={() => setServerType(detectedServerType)}
+          />
+        </Box>
       )}
 
       {/* Reconfigure Section - Collapsible when existing server */}

@@ -249,7 +249,7 @@ Aperture creates a hidden Season 00 with a placeholder episode. This placeholder
 
 ### Jellyfin
 
-Jellyfin handles sorting differently and doesn't need this workaround, but the placeholder doesn't cause issues.
+Jellyfin reads `<dateadded>` from NFO files, and its "Latest" row groups episodes under their series, so the series position follows the newest episode's date added just as it does on Emby. Aperture therefore writes the same placeholder for Jellyfin. (This is based on reading Jellyfin's source, not on a live Jellyfin test.)
 
 ---
 

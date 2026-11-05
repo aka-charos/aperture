@@ -2742,7 +2742,11 @@
     "noEpisodeData": "אין נתוני פרק זמינים",
     "checkBackSoon": "בדוק שוב בקרוב",
     "seriesComplete": "סדרה שלמה",
-    "episodesTotal": "{{count}} פרקים"
+    "episodesTotal": "{{count}} פרקים",
+    "homeRowDynamicTitle": "Show these on your Emby Home screen",
+    "homeRowDynamicBody": "Your tracked series are favorited on Emby. To get a Home row for them, add a Home row with Dynamic Content: choose your TV Series libraries, sort by Date last content added (Descending), set Playstate to Unplayed, and turn Favorite on.",
+    "homeRowFavoritesTabTitle": "Find these on your Jellyfin Favorites tab",
+    "homeRowFavoritesTabBody": "Your tracked series are favorited on Jellyfin. Jellyfin's Home screen can't show a filtered row, so open the Favorites tab on the Jellyfin home page, or use the Favorites filter inside a TV library."
   },
   "setup": {
     "step": {
@@ -3675,5 +3679,9 @@
     "sectionBlurb": "כל שורה היא רצועת TMDb Discover. אם שורה מפרטת מספר ז'אנרים, TMDb מחזירה כותרים התואמים לכולם. התוצאות אינן כוללות פריטים שכבר נמצאים בספרייה שלך, צפו בהם או התבקשו.",
     "loadError": "לא ניתן היה לטעון את שורת הז'אנר",
     "emptyStrip": "אין כותרות תואמות לשורה זו לאחר הסינון."
+  },
+  "mediaServerTypeMismatch": {
+    "message": "This server identifies itself as {{detected}}, but Aperture is set to {{selected}}. Features that differ between the two servers will not behave correctly.",
+    "useDetected": "Switch to {{detected}}"
   }
 }

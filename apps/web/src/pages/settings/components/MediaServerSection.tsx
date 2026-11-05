@@ -27,6 +27,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ErrorIcon from '@mui/icons-material/Error'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import WarningIcon from '@mui/icons-material/Warning'
+import { MediaServerTypeMismatchAlert } from '../../../components/MediaServerTypeMismatchAlert'
 
 interface MediaServerConfig {
   type: string | null
@@ -49,7 +50,13 @@ export function MediaServerSection() {
   const [testing, setTesting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [testResult, setTestResult] = useState<{ success: boolean; serverName?: string; error?: string } | null>(null)
+  const [testResult, setTestResult] = useState<{
+    success: boolean
+    serverName?: string
+    error?: string
+    detectedType?: string
+    typeMismatch?: boolean
+  } | null>(null)
 
   // Form state
   const [serverType, setServerType] = useState<string>('')
@@ -325,6 +332,14 @@ export function MediaServerSection() {
                 <>{t('settingsMediaServer.connectionFailed', { error: testResult.error ?? '' })}</>
               )}
             </Alert>
+          )}
+
+          {testResult?.typeMismatch && testResult.detectedType && (
+            <MediaServerTypeMismatchAlert
+              selectedType={serverType}
+              detectedType={testResult.detectedType}
+              onUseDetected={() => handleFieldChange('type', testResult.detectedType as string)}
+            />
           )}
 
           {/* Error/Success Messages */}

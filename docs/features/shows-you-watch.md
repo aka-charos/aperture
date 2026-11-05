@@ -143,22 +143,25 @@ Click refresh to:
 
 ---
 
-## Shows You Watch Library
+## Shows You Watch on Your Media Server
 
-### In Your Media Server
+Since v0.7.0, Shows You Watch no longer creates a library on your media server. It keeps your tracked series in sync with your media server's **series favorites** instead (use **Sync favorites** to push and pull). The Shows You Watch page in Aperture shows the exact steps for your server type.
 
-Shows You Watch also creates a library in Emby/Jellyfin:
+### Emby
 
-- Library name: "Shows You Watch - YourName" (or custom)
-- Contains your tracked series
-- Updates automatically
-- See [Virtual Libraries](virtual-libraries.md)
+Emby can host a configurable Home row. Add a Home row with **Dynamic Content**:
 
-### Benefits
+- **Libraries:** your TV Series libraries
+- **Sort:** Date last content added, **Descending**
+- **Playstate:** **Unplayed**
+- **Favorite:** **Enabled**
 
-- Quick access from your media server
-- One-click continue watching
-- Visible on your media server home screen
+### Jellyfin
+
+Jellyfin's Home screen only offers a fixed set of sections (library tiles, Continue Watching, Next Up, Latest Media and so on) and cannot host a filtered row. Your tracked series are still favorited on Jellyfin, so find them:
+
+- On the **Favorites** tab of the Jellyfin home page, or
+- With the **Favorites** filter inside a TV library.
 
 ---
 

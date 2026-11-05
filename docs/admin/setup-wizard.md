@@ -76,6 +76,7 @@ Connect Aperture to your Emby or Jellyfin server.
 2. Click **Test Connection**
 3. Green checkmark = success
 4. Red X = check URL and API key
+5. Yellow warning = the server reports itself as a different type than the one you selected (for example, a Jellyfin server while **Emby** is selected). Click **Switch to ...** and test again. Some features, such as the Home screen guidance for Shows You Watch, differ between Emby and Jellyfin, so the type needs to be right. The warning does not block saving.
 
 ### Troubleshooting
 

@@ -31,7 +31,7 @@ import ViewListIcon from '@mui/icons-material/ViewList'
 import { useWatchingData } from './hooks'
 import { useUserRatings } from '../../hooks/useUserRatings'
 import { useViewMode } from '../../hooks/useViewMode'
-import { WatchingCard, WatchingListItem, AddSeriesDialog } from './components'
+import { WatchingCard, WatchingListItem, AddSeriesDialog, HomeRowHint } from './components'
 
 type FilterType = 'all' | 'airing' | 'upcoming'
 
@@ -215,6 +215,8 @@ export function WatchingPage() {
           </>
         )}
       </Box>
+
+      {series.length > 0 && <HomeRowHint />}
 
       {/* Stats & Controls */}
       {series.length > 0 && (

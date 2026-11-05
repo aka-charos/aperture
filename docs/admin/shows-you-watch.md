@@ -121,8 +121,11 @@ In Aperture:
 - Days until next episode
 
 In Media Server:
-- Virtual library with tracked series
-- Easy access from home screen
+- Tracked series are favorited (use **Sync favorites** to keep them aligned)
+- Emby: surface them with a Dynamic Content Home row
+- Jellyfin: find them on the Favorites tab of the home page (Jellyfin has no filtered Home rows)
+
+See [Shows You Watch](../features/shows-you-watch.md#shows-you-watch-on-your-media-server) for the row settings.
 
 ### Grid and List Views
 

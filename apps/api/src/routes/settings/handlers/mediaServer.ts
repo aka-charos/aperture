@@ -16,6 +16,7 @@ import {
   setMediaServerConfig,
   testMediaServerConnection,
   getMediaServerTypes,
+  getMediaServerCapabilities,
   getSystemSetting,
   setSystemSetting,
   type MediaServerType,
@@ -66,6 +67,7 @@ export function registerMediaServerHandlers(fastify: FastifyInstance) {
       serverName,
       webClientUrl: baseUrl ? `${baseUrl}/web/index.html` : '',
       isConfigured: config.isConfigured,
+      capabilities: getMediaServerCapabilities(serverType),
     })
   })
 
