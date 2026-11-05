@@ -4213,7 +4213,7 @@
       "title": "设置完成！",
       "gettingStarted": "入门",
       "loginPrimary": "使用您的媒体服务器管理员凭据登录",
-      "loginSecondary": "使用与 Emby/Jellyfin 相同的用户名和密码",
+      "loginSecondary": "使用与 HarisFlix 相同的用户名和密码",
       "schedulesTitle": "自动时间表",
       "schedulesIntro": "{{appName}} 运行后台作业以保持推荐的新鲜度。 可以在管理 → 作业中修改默认计划。",
       "schedWatchHistory": "观看历史",

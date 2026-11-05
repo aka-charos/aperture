@@ -4213,7 +4213,7 @@
       "title": "セットアップ完了！",
       "gettingStarted": "はじめる",
       "loginPrimary": "メディアサーバー管理者の資格情報を使用してログインします。",
-      "loginSecondary": "Emby/Jellyfin に使用するものと同じユーザー名とパスワードを使用してください",
+      "loginSecondary": "HarisFlix に使用するものと同じユーザー名とパスワードを使用してください",
       "schedulesTitle": "自動スケジュール",
       "schedulesIntro": "{{appName}} はバックグラウンド ジョブを実行して、推奨事項を最新の状態に保ちます。 デフォルトのスケジュールは、「管理」→「ジョブ」で変更できます。",
       "schedWatchHistory": "視聴履歴",
