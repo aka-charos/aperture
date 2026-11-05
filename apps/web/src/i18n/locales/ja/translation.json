@@ -8,21 +8,15 @@
     },
     "appName": "{{appName}}",
     "save": "保存",
-    "saving": "保存中…",
     "loading": "読み込み中…",
     "cancel": "キャンセル",
     "close": "閉じる",
-    "clear": "クリア",
-    "confirm": "確認",
     "dismiss": "却下する",
     "noDescription": "説明はありません。",
     "rowsPerPage": "ページあたりの行数",
-    "delete": "消去",
     "back": "戻る",
     "continue": "続く",
-    "later": "後で",
     "getStarted": "始めましょう",
-    "dontShowAgain": "これを二度と表示しないでください",
     "errors": {
       "serverMessage": "{{メッセージ}}"
     },
@@ -41,7 +35,6 @@
     "browse": "閲覧",
     "watchHistory": "視聴履歴",
     "watchStats": "視聴統計",
-    "admin": "管理",
     "gapAnalysis": "ギャップ分析",
     "expandSidebar": "サイドバーを展開",
     "collapseSidebar": "サイドバーを折りたたむ",
@@ -921,6 +914,17 @@
         "some": "Only these parts",
         "unlabelledNote": "An older analysis that is not divided into parts shows nothing here until it is rewritten."
       }
+    },
+    "common": {
+      "saving": "保存中…",
+      "clear": "クリア",
+      "confirm": "確認",
+      "delete": "消去",
+      "later": "後で",
+      "dontShowAgain": "これを二度と表示しないでください"
+    },
+    "nav": {
+      "admin": "管理"
     }
   },
   "login": {

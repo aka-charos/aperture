@@ -447,7 +447,7 @@ export default function NewsletterGroupsRoute() {
                           <EditOutlinedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title={t('common.delete')}>
+                      <Tooltip title={t('admin.common.delete')}>
                         <IconButton size="small" onClick={() => void remove(group)}>
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>

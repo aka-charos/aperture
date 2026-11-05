@@ -505,7 +505,7 @@ export function JobConfigDialog({
           disabled={saving || runLimitInvalid}
           startIcon={saving ? <CircularProgress size={16} /> : null}
         >
-          {saving ? t('common.saving') : t('common.save')}
+          {saving ? t('admin.common.saving') : t('common.save')}
         </Button>
       </DialogActions>
     </Dialog>

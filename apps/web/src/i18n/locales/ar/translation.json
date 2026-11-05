@@ -8,21 +8,15 @@
     },
     "appName": "{{appName}}",
     "save": "حفظ",
-    "saving": "جارٍ الحفظ…",
     "loading": "جارٍ التحميل…",
     "cancel": "إلغاء",
     "close": "إغلاق",
-    "clear": "مسح",
-    "confirm": "تأكيد",
     "dismiss": "رفض",
     "noDescription": "لا يوجد وصف متاح.",
     "rowsPerPage": "صفوف لكل صفحة",
-    "delete": "يمسح",
     "back": "رجوع",
     "continue": "يكمل",
-    "later": "لاحقاً",
     "getStarted": "ابدأ",
-    "dontShowAgain": "لا تظهر هذا مرة أخرى",
     "errors": {
       "serverMessage": "{{رسالة}}"
     },
@@ -41,7 +35,6 @@
     "browse": "تصفّح",
     "watchHistory": "سجلّ المشاهدة",
     "watchStats": "إحصاءات المشاهدة",
-    "admin": "الإدارة",
     "gapAnalysis": "تحليل الفجوات",
     "expandSidebar": "توسيع الشريط الجانبي",
     "collapseSidebar": "طيّ الشريط الجانبي",
@@ -925,6 +918,17 @@
         "some": "Only these parts",
         "unlabelledNote": "An older analysis that is not divided into parts shows nothing here until it is rewritten."
       }
+    },
+    "common": {
+      "saving": "جارٍ الحفظ…",
+      "clear": "مسح",
+      "confirm": "تأكيد",
+      "delete": "يمسح",
+      "later": "لاحقاً",
+      "dontShowAgain": "لا تظهر هذا مرة أخرى"
+    },
+    "nav": {
+      "admin": "الإدارة"
     }
   },
   "home": {

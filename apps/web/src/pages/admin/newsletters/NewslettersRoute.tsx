@@ -179,7 +179,7 @@ export default function NewslettersRoute() {
                     <TableCell>{new Date(newsletter.updatedAt).toLocaleString()}</TableCell>
                     <TableCell align="right" onClick={(event) => event.stopPropagation()}>
                       {newsletter.status !== 'sending' && (
-                        <Tooltip title={t('common.delete')}>
+                        <Tooltip title={t('admin.common.delete')}>
                           <IconButton size="small" onClick={() => void remove(newsletter)}>
                             <DeleteOutlineIcon fontSize="small" />
                           </IconButton>

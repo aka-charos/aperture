@@ -8,21 +8,15 @@
     },
     "appName": "{{appName}}",
     "save": "सहेजें",
-    "saving": "सहेजा जा रहा है…",
     "loading": "लोड हो रहा है…",
     "cancel": "रद्द करें",
     "close": "बंद करें",
-    "clear": "साफ़ करें",
-    "confirm": "पुष्टि करें",
     "dismiss": "नकार देना",
     "noDescription": "कोई विवरण उपलब्ध नहीं।",
     "rowsPerPage": "प्रति पृष्ठ पंक्तियाँ",
-    "delete": "मिटाना",
     "back": "पीछे",
     "continue": "जारी रखना",
-    "later": "बाद में",
     "getStarted": "शुरू हो जाओ",
-    "dontShowAgain": "इसे दोबारा मत दिखाओ",
     "errors": {
       "serverMessage": "{{संदेश}}"
     },
@@ -41,7 +35,6 @@
     "browse": "ब्राउज़ करें",
     "watchHistory": "देखने का इतिहास",
     "watchStats": "देखने के आँकड़े",
-    "admin": "व्यवस्थापक",
     "gapAnalysis": "अंतर विश्लेषण",
     "expandSidebar": "साइडबार बड़ा करें",
     "collapseSidebar": "साइडबार छोटा करें",
@@ -921,6 +914,17 @@
         "some": "Only these parts",
         "unlabelledNote": "An older analysis that is not divided into parts shows nothing here until it is rewritten."
       }
+    },
+    "common": {
+      "saving": "सहेजा जा रहा है…",
+      "clear": "साफ़ करें",
+      "confirm": "पुष्टि करें",
+      "delete": "मिटाना",
+      "later": "बाद में",
+      "dontShowAgain": "इसे दोबारा मत दिखाओ"
+    },
+    "nav": {
+      "admin": "व्यवस्थापक"
     }
   },
   "home": {

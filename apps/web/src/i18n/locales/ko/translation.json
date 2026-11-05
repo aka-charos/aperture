@@ -8,21 +8,15 @@
     },
     "appName": "{{appName}}",
     "save": "저장",
-    "saving": "저장 중…",
     "loading": "불러오는 중…",
     "cancel": "취소",
     "close": "닫기",
-    "clear": "지우기",
-    "confirm": "확인",
     "dismiss": "해고하다",
     "noDescription": "설명이 없습니다.",
     "rowsPerPage": "페이지당 행 수",
-    "delete": "삭제",
     "back": "뒤로",
     "continue": "계속하다",
-    "later": "나중에",
     "getStarted": "시작하기",
-    "dontShowAgain": "다시 표시하지 않음",
     "errors": {
       "serverMessage": "{{메시지}}"
     },
@@ -41,7 +35,6 @@
     "browse": "둘러보기",
     "watchHistory": "시청 기록",
     "watchStats": "시청 통계",
-    "admin": "관리",
     "gapAnalysis": "갭 분석",
     "expandSidebar": "사이드바 펼치기",
     "collapseSidebar": "사이드바 접기",
@@ -921,6 +914,17 @@
         "some": "Only these parts",
         "unlabelledNote": "An older analysis that is not divided into parts shows nothing here until it is rewritten."
       }
+    },
+    "common": {
+      "saving": "저장 중…",
+      "clear": "지우기",
+      "confirm": "확인",
+      "delete": "삭제",
+      "later": "나중에",
+      "dontShowAgain": "다시 표시하지 않음"
+    },
+    "nav": {
+      "admin": "관리"
     }
   },
   "home": {

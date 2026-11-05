@@ -8,21 +8,15 @@
     },
     "appName": "{{appName}}",
     "save": "Speichern",
-    "saving": "Speichert…",
     "loading": "Lädt…",
     "cancel": "Abbrechen",
     "close": "Schließen",
-    "clear": "Löschen",
-    "confirm": "Bestätigen",
     "dismiss": "Verwerfen",
     "noDescription": "Keine Beschreibung verfügbar.",
     "rowsPerPage": "Zeilen pro Seite",
-    "delete": "Löschen",
     "back": "Zurück",
     "continue": "Weiter",
-    "later": "Später",
     "getStarted": "Loslegen",
-    "dontShowAgain": "Nicht noch einmal anzeigen",
     "errors": {
       "serverMessage": "{{message}}"
     },
@@ -41,7 +35,6 @@
     "browse": "Durchsuchen",
     "watchHistory": "Verlauf",
     "watchStats": "Statistiken",
-    "admin": "Admin",
     "gapAnalysis": "Lückenanalyse",
     "expandSidebar": "Seitenleiste erweitern",
     "collapseSidebar": "Seitenleiste reduzieren",
@@ -921,6 +914,17 @@
         "some": "Only these parts",
         "unlabelledNote": "An older analysis that is not divided into parts shows nothing here until it is rewritten."
       }
+    },
+    "common": {
+      "saving": "Speichert…",
+      "clear": "Löschen",
+      "confirm": "Bestätigen",
+      "delete": "Löschen",
+      "later": "Später",
+      "dontShowAgain": "Nicht noch einmal anzeigen"
+    },
+    "nav": {
+      "admin": "Admin"
     }
   },
   "home": {

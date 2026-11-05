@@ -8,21 +8,15 @@
     },
     "appName": "{{appName}}",
     "save": "Save",
-    "saving": "Saving…",
     "loading": "Loading…",
     "cancel": "Cancel",
     "close": "Close",
-    "clear": "Clear",
-    "confirm": "Confirm",
     "dismiss": "Dismiss",
     "noDescription": "No description available.",
     "rowsPerPage": "Rows per page",
-    "delete": "Delete",
     "back": "Back",
     "continue": "Continue",
-    "later": "Later",
     "getStarted": "Get Started",
-    "dontShowAgain": "Don't show this again",
     "showMore": "Show more",
     "showLess": "Show less",
     "errors": {
@@ -42,7 +36,6 @@
     "browse": "Browse",
     "watchHistory": "Watch History",
     "watchStats": "Watch Stats",
-    "admin": "Admin",
     "gapAnalysis": "Gap Analysis",
     "expandSidebar": "Expand sidebar",
     "collapseSidebar": "Collapse sidebar",
@@ -921,6 +914,17 @@
         "some": "Only these parts",
         "unlabelledNote": "An older analysis that is not divided into parts shows nothing here until it is rewritten."
       }
+    },
+    "common": {
+      "saving": "Saving…",
+      "clear": "Clear",
+      "confirm": "Confirm",
+      "delete": "Delete",
+      "later": "Later",
+      "dontShowAgain": "Don't show this again"
+    },
+    "nav": {
+      "admin": "Admin"
     }
   },
   "adminDocs": {

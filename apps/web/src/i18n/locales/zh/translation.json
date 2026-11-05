@@ -8,21 +8,15 @@
     },
     "appName": "{{appName}}",
     "save": "保存",
-    "saving": "正在保存…",
     "loading": "加载中…",
     "cancel": "取消",
     "close": "关闭",
-    "clear": "清除",
-    "confirm": "确认",
     "dismiss": "解雇",
     "noDescription": "没有可用的描述。",
     "rowsPerPage": "每页行数",
-    "delete": "删除",
     "back": "后退",
     "continue": "继续",
-    "later": "之后",
     "getStarted": "开始使用",
-    "dontShowAgain": "不要再显示这个",
     "errors": {
       "serverMessage": "{{信息}}"
     },
@@ -41,7 +35,6 @@
     "browse": "浏览",
     "watchHistory": "观看历史",
     "watchStats": "观看统计",
-    "admin": "管理",
     "gapAnalysis": "缺口分析",
     "expandSidebar": "展开侧边栏",
     "collapseSidebar": "收起侧边栏",
@@ -921,6 +914,17 @@
         "some": "Only these parts",
         "unlabelledNote": "An older analysis that is not divided into parts shows nothing here until it is rewritten."
       }
+    },
+    "common": {
+      "saving": "正在保存…",
+      "clear": "清除",
+      "confirm": "确认",
+      "delete": "删除",
+      "later": "之后",
+      "dontShowAgain": "不要再显示这个"
+    },
+    "nav": {
+      "admin": "管理"
     }
   },
   "login": {

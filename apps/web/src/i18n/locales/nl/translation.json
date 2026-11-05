@@ -8,21 +8,15 @@
     },
     "appName": "{{appName}}",
     "save": "Redden",
-    "saving": "Besparing…",
     "loading": "Laden…",
     "cancel": "Annuleren",
     "close": "Dichtbij",
-    "clear": "Duidelijk",
-    "confirm": "Bevestigen",
     "dismiss": "Afwijzen",
     "noDescription": "Geen beschrijving beschikbaar.",
     "rowsPerPage": "Rijen per pagina",
-    "delete": "Verwijderen",
     "back": "Rug",
     "continue": "Doorgaan",
-    "later": "Later",
     "getStarted": "Aan de slag",
-    "dontShowAgain": "Laat dit niet meer zien",
     "errors": {
       "serverMessage": "{{bericht}}"
     },
@@ -41,7 +35,6 @@
     "browse": "Blader",
     "watchHistory": "Bekijk Geschiedenis",
     "watchStats": "Bekijk statistieken",
-    "admin": "Beheerder",
     "gapAnalysis": "Gap-analyse",
     "expandSidebar": "Zijbalk uitvouwen",
     "collapseSidebar": "Zijbalk samenvouwen",
@@ -921,6 +914,17 @@
         "some": "Only these parts",
         "unlabelledNote": "An older analysis that is not divided into parts shows nothing here until it is rewritten."
       }
+    },
+    "common": {
+      "saving": "Besparing…",
+      "clear": "Duidelijk",
+      "confirm": "Bevestigen",
+      "delete": "Verwijderen",
+      "later": "Later",
+      "dontShowAgain": "Laat dit niet meer zien"
+    },
+    "nav": {
+      "admin": "Beheerder"
     }
   },
   "home": {

@@ -8,21 +8,15 @@
     },
     "appName": "{{appName}}",
     "save": "Сохранять",
-    "saving": "Сохранение…",
     "loading": "Загрузка…",
     "cancel": "Отмена",
     "close": "Закрывать",
-    "clear": "Прозрачный",
-    "confirm": "Подтверждать",
     "dismiss": "Увольнять",
     "noDescription": "Описание отсутствует.",
     "rowsPerPage": "Строков на странице",
-    "delete": "Удалить",
     "back": "Назад",
     "continue": "Продолжать",
-    "later": "Позже",
     "getStarted": "Начать",
-    "dontShowAgain": "Больше не показывать это",
     "errors": {
       "serverMessage": "{{сообщение}}"
     },
@@ -41,7 +35,6 @@
     "browse": "Просматривать",
     "watchHistory": "История просмотра",
     "watchStats": "Смотреть статистику",
-    "admin": "Админ",
     "gapAnalysis": "Анализ пробелов",
     "expandSidebar": "Развернуть боковую панель",
     "collapseSidebar": "Свернуть боковую панель",
@@ -923,6 +916,17 @@
         "some": "Only these parts",
         "unlabelledNote": "An older analysis that is not divided into parts shows nothing here until it is rewritten."
       }
+    },
+    "common": {
+      "saving": "Сохранение…",
+      "clear": "Прозрачный",
+      "confirm": "Подтверждать",
+      "delete": "Удалить",
+      "later": "Позже",
+      "dontShowAgain": "Больше не показывать это"
+    },
+    "nav": {
+      "admin": "Админ"
     }
   },
   "home": {
