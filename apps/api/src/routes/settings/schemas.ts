@@ -493,27 +493,20 @@ export const dislikeBehaviorSchema = {
 export const updateDislikeBehaviorSchema = {
   tags: ['settings'],
   summary: 'Update dislike behavior preference',
-  description: 'Set how disliked content affects recommendations. "exclude" removes them entirely, "reduce" lowers their score, "ignore" has no effect.',
+  description: 'Set what happens to titles rated 1-3. "exclude" keeps them out of recommendations. "penalize" allows them like any other title: despite its name, it does not change their score.',
   body: {
     type: 'object' as const,
     additionalProperties: true,
+    required: ['dislikeBehavior'],
     properties: {
-      behavior: { 
-        type: 'string' as const, 
-        enum: ['exclude', 'reduce', 'ignore'],
-        description: 'How to handle disliked content: exclude (never recommend), reduce (lower score), ignore (no effect)'
-      },
-      reductionFactor: { 
-        type: 'number' as const, 
-        minimum: 0, 
-        maximum: 1,
-        description: 'Score multiplier when behavior is "reduce" (0.5 = half score)',
-        example: 0.3
+      dislikeBehavior: {
+        type: 'string' as const,
+        enum: ['exclude', 'penalize'],
+        description: 'exclude: never recommended. penalize: allowed like any other title, score unchanged.',
       },
     },
     example: {
-      behavior: 'reduce',
-      reductionFactor: 0.3,
+      dislikeBehavior: 'exclude',
     },
   },
 }

@@ -3,6 +3,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
+  DISLIKED_MOVIE_IDS_SQL,
+  DISLIKED_RATING_MAX,
+  DISLIKED_SERIES_IDS_SQL,
+} from './ratingBands.js'
+import {
   isExcludableWatchHistoryRow,
   IN_PROGRESS_EXCLUSION_THRESHOLD,
   WATCH_HISTORY_EXCLUDABLE_SQL,
@@ -158,6 +163,32 @@ for (const [name, source] of Object.entries(PIPELINES)) {
   test(`${name}: the dislike behaviour comes from the column the settings route writes`, () => {
     assert.match(source, /COALESCE\(dislike_behavior, 'exclude'\) as dislike_behavior FROM user_preferences/)
     assert.doesNotMatch(source, /settings\??\.dislikeBehavior/)
+  })
+}
+
+const DISLIKE_LOOKUPS = [
+  { name: 'movies', sql: DISLIKED_MOVIE_IDS_SQL, externalIds: ['tmdb_id', 'imdb_id'], file: './movies/taste.ts' },
+  { name: 'series', sql: DISLIKED_SERIES_IDS_SQL, externalIds: ['tmdb_id', 'imdb_id', 'tvdb_id'], file: './series/taste.ts' },
+]
+
+for (const { name, sql, externalIds, file } of DISLIKE_LOOKUPS) {
+  test(`${name}: a dislike reaches every library copy of the title`, () => {
+    for (const column of externalIds) {
+      assert.match(sql, new RegExp(`OR t\\.${column} IN \\(`))
+      assert.match(sql, new RegExp(`rated\\.${column} IS NOT NULL`))
+    }
+  })
+
+  test(`${name}: every branch asks about this viewer's disliked band`, () => {
+    const branches = 1 + externalIds.length
+    assert.equal(sql.match(/ur\.user_id = \$1/g)?.length, branches)
+    assert.equal(sql.match(new RegExp(`ur\\.rating <= ${DISLIKED_RATING_MAX}\\b`, 'g'))?.length, branches)
+  })
+
+  test(`${name}: the lookup runs the shared query, with no threshold of its own`, () => {
+    const source = sourceOf(file)
+    assert.match(source, /DISLIKED_(MOVIE|SERIES)_IDS_SQL, \[userId\]/)
+    assert.doesNotMatch(source, /rating <= /)
   })
 }
 

@@ -12,7 +12,7 @@
     "test:security": "node --import tsx --test src/config/security.test.ts",
     "test:boot": "node --import tsx --test --test-force-exit src/serverBoot.test.ts",
     "test:auth": "node --import tsx --test src/lib/impersonation.test.ts src/lib/providerCredentials.test.ts src/lib/accountEnabled.test.ts src/lib/permissions.test.ts src/lib/watcherAudience.test.ts src/lib/secretExposure.test.ts",
-    "test:schemas": "node --import tsx --test src/routes/aiFunctionSchemas.test.ts",
+    "test:schemas": "node --import tsx --test src/routes/aiFunctionSchemas.test.ts src/routes/settings/dislikeBehaviorSchema.test.ts",
     "test:jobs": "node --import tsx --test src/routes/jobs/jobDefaults.test.ts src/routes/jobs/state.test.ts src/routes/jobs/configDrift.test.ts src/routes/jobs/runLimit.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist",
