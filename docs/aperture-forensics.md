@@ -2275,7 +2275,7 @@ Upstream's budget applied to everything. Here `interactive` is opt-in, because g
 
 ## F-182
 
-**`semanticSearch` sorted by rating between the query and the cut, so its list was not what its heading said.** Each half fetched its nearest titles by cosine, then the two were sorted together by `rating ?? 0` and cut to the limit. A close match with a low rating was dropped, and an unrated title counted as 0, under cards saying "closest to" / "The {{count}} nearest titles in your library" ([F-013](#f-013)) and a prompt rule saying "ranked by text similarity ALONE". The `brief` format got the same list. The sort's comment gave the reason: similarity scores can't be compared across tables. That is true ([F-074](#f-074)), but it doesn't call for a rating sort, and the sort also ran on single-type searches, where nothing crosses tables.
+**`semanticSearch` sorted by rating between the query and the cut, so its list was not what its heading said.** Each half fetched its nearest titles by cosine, then the two were sorted together by `rating ?? 0` and cut to the limit. A close match with a low rating was dropped, and an unrated title counted as 0 and sank to the bottom, under cards saying "closest to" / "The {{count}} nearest titles in your library" ([F-013](#f-013)) and a prompt rule saying "ranked by text similarity ALONE". The `brief` format got the same list. The sort's comment gave the reason: similarity scores can't be compared across tables. That is true ([F-074](#f-074)), but it doesn't call for a rating sort, and the sort also ran on single-type searches, where nothing crosses tables.
 
 **The fix.** One media type keeps the database's order. Two alternate by rank within their media type, the other side filling in when one runs short, and only then the limit applies (`semanticOrder.ts`, pinned). Accepted trade-off, the operator's call: a close but poorly rated title can now rank first, because that is what the list claims to be.
 
@@ -2283,9 +2283,11 @@ Upstream's budget applied to everything. Here `interactive` is opt-in, because g
 
 **Scope and evidence.** Made from reading the code; live searches were not measured, so how often the old order changed an answer is unknown. Requests for things to watch take the web-backed discovery path and `handlers/chat.ts` removes this tool on those turns, so this only reaches library lookups, searches of what the viewer has watched, and fallback turns.
 
-**Known gap, kept as it was.** Titles are deduplicated across each half's whole fetch (limit + 5), before the cut. A series whose title matches a movie is dropped even when that movie then falls past the limit, so neither appears. The old code could do the same.
+**Known gap, kept as it was.** Titles are deduplicated across each half's whole fetch (limit + 5), before the cut, and the movie wins. A series whose title matches a movie is dropped even when that movie then falls past the limit, so neither appears. The old code could do the same. Comparing titles during the merge closes this, showing the copy nearer by rank; it was built (`0109ec84`) and backed out to keep the movie winning. The case is expected to be rare; that was not measured.
 
-## F-183
+**Known cost, accepted.** Turns go by rank whatever the distance, and there is no floor, so a small or poorly matching media type still gets half the top slots: in a library with few series, a query that fits only films shows every series at positions 2, 4, 6 and so on, and pushes closer films past the limit. The first card is always a movie when any movie is found. Accepted because a shared sort is the worse failure: it would give one population every slot. A cap would need a threshold nobody has measured, and a share would need a main media type a text query doesn't have. Not measured live; if it shows up in real answers, look here first.
+
+## F-185
 
 **The assistant could not enforce a stated limit on the turns those requests reach.** "An unwatched sci-fi film under 90 minutes" routes to discovery, where `handlers/chat.ts` removes `searchContent` (the only tool with a runtime filter) and `semanticSearch`, and `findCandidatesInLibrary` took only `seedTitle`. The words reached the web search and the embedding, neither of which can promise a length, and all three sections could return a three-hour film.
 

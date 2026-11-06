@@ -16,6 +16,7 @@ import {
   wasCaughtUp,
   isWithinUpcomingHorizon,
   isRecentlyAired,
+  isEndedStatus,
   recentlyAiredSinceDate,
   upcomingHorizonDate,
   type AiredEpisode,
@@ -106,7 +107,7 @@ function effectiveSeriesStatus(
   tmdbStatus: string | null
 ): string | null {
   if (!tmdbStatus) return mediaServerStatus
-  if (tmdbStatus === 'Ended' || tmdbStatus === 'Canceled') return tmdbStatus
+  if (isEndedStatus(tmdbStatus)) return tmdbStatus
   return 'Continuing'
 }
 

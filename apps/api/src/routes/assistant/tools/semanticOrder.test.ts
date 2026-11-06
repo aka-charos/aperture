@@ -1,8 +1,8 @@
 /**
  * Pins the order of `semanticSearch`'s answer. Nothing here knows a rating: a
  * rating sort once sat between the query and the cut, so a close match was
- * dropped for scoring low and an unrated title went first, under a heading that
- * says "closest to".
+ * dropped for rating low, and an unrated title counted as 0 and sank to the
+ * bottom, under a heading that says "closest to".
  */
 
 import { test, describe } from 'node:test'

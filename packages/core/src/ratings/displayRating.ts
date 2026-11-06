@@ -42,7 +42,7 @@ const PLACEHOLDER = /^\$[1-9][0-9]*$/
  * passes whatever the value. On a similarity search that guess is expensive: told
  * plenty of titles fit, it walks the vector index to fill the LIMIT, and when only
  * a handful do it walks all of it (10.8 s against 0.7 s for "rated 8.5 or higher",
- * F-183). The two branches read columns it has statistics for. They select the
+ * F-185). The two branches read columns it has statistics for. They select the
  * same rows as the CASE: a NULL fails either way.
  *
  * @param value a query placeholder such as `$4`, used twice; nothing else is taken

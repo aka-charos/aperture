@@ -42,6 +42,24 @@ export type ChatIntent = 'discovery' | 'library'
 const RECOMMENDATION_HINTS =
   /\b(recommend|suggest|what should i watch|what to watch|something to watch|anything good|find me|similar to|something like|(?:movie|film|show|series)s? like)\b/i
 /**
+ * Asking what airs next for shows they already follow. The answer is facts about
+ * their own list, not titles to go and watch, and a discovery turn would order a
+ * web search for it, so this is checked before the open-world list: "coming soon"
+ * alone stays discovery, "coming soon for my shows" does not. Beaten only by
+ * RECOMMENDATION_HINTS ("recommend something like the shows I follow").
+ */
+const NEXT_EPISODE_HINTS = /\b(?:next|upcoming)\s+episodes?\b/i
+const FOLLOWED_SHOWS_HINTS =
+  /\b(?:my\s+(?:shows?|series)|(?:shows?|series)\s+(?:that\s+)?i(?:['’]?m| am)?\s+(?:follow|following|watch|watching))\b/i
+const WHEN_HINTS =
+  /\b(?:coming|upcoming|next|soon|airs?|airing|returns?|returning|back|premieres?|(?:new|latest)\s+episodes?)\b/i
+/**
+ * Their shows as the aim of a search, not its subject: "the best new shows based
+ * on my series" wants titles to go and watch, and this prefilter is unappealable,
+ * so such a request has to stay with the rules below.
+ */
+const TASTE_AIM_HINTS = /\b(?:best|top \d+|based on|fans? of|given)\b/i
+/**
  * Obvious library signals — about the user's own collection/activity.
  *
  * Deliberately excludes bare taste statements: "I like noir", "I love
@@ -66,6 +84,12 @@ const DISCOVERY_HINTS =
  */
 export function prefilterIntent(text: string): ChatIntent | null {
   if (RECOMMENDATION_HINTS.test(text)) return 'discovery'
+  if (
+    !TASTE_AIM_HINTS.test(text) &&
+    (NEXT_EPISODE_HINTS.test(text) || (FOLLOWED_SHOWS_HINTS.test(text) && WHEN_HINTS.test(text)))
+  ) {
+    return 'library'
+  }
 
   const library = LIBRARY_HINTS.test(text)
   const discovery = DISCOVERY_HINTS.test(text)
@@ -114,7 +138,7 @@ export async function classifyIntent(messages: UIMessage[]): Promise<ChatIntent>
         'Classify a request sent to a personal media assistant. It can search the web for things to watch, or answer questions about the user\'s own library.\n' +
         'Decide by WHAT KIND OF ANSWER the request wants — NOT by whether it mentions the user.\n' +
         '- \'discovery\' = the answer is titles to go watch: any recommendation, or exploration by genre, style, mood, theme, era, director or similarity (e.g. "neo noir movies", "feel-good comedies", "movies like Heat", "best sci-fi of 2025"). This INCLUDES personalized requests. "suggest film noir based on my history", "what should I watch given my taste" and "recommend something from my library" are all discovery: the recommendation is the answer, and the taste is only how to aim it.\n' +
-        "- 'library' = the answer is facts about the user's own collection or activity: listing their watch history, their ratings, counts and stats, whether they own a particular title, or what to continue watching.\n" +
+        "- 'library' = the answer is facts about the user's own collection or activity: listing their watch history, their ratings, counts and stats, whether they own a particular title, what to continue watching, or when the next episodes of shows they follow are expected.\n" +
         'Test: if a good answer is a list of things to go and watch, it is discovery. If a good answer is information about what they already have or have already done, it is library.\n' +
         'Reply with exactly one word — discovery or library — and nothing else. When genuinely torn, answer discovery.\n\n' +
         `Request: ${text}`,

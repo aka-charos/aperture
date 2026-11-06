@@ -7,10 +7,15 @@
 
 export {
   getUpcomingEpisodes,
+  getUpcomingEpisodesReport,
   getUpcomingEpisodeForSeries,
   getLatestAiredEpisodes,
   getSeasonProgress,
+  getEpisodeStandings,
+  type EpisodeStanding,
   type UpcomingEpisode,
+  type UpcomingEpisodesReport,
+  type UpcomingGap,
 } from './upcomingEpisodes.js'
 
 export {
@@ -25,6 +30,8 @@ export {
   type AiredEpisode,
   type SeasonProgress,
 } from './episodeWindows.js'
+
+export { isEndedStatus } from './seriesStatus.js'
 
 export { refreshStaleTmdbTotals } from './tmdbTotals.js'
 

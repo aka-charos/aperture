@@ -29,6 +29,37 @@ export const EpisodeRefSchema = z.object({
   number: z.number().describe('Episode number within the season'),
 })
 
+/** The latest episode that has come out, and where it stands for this viewer. */
+export const UpcomingAiredSchema = z.object({
+  season: z.number(),
+  number: z.number(),
+  title: z.string(),
+  airDate: z.string().describe('YYYY-MM-DD'),
+  inLibrary: z.boolean().describe('The media server holds it. False: aired, not in the library yet.'),
+  played: z.boolean().describe('This viewer has played it'),
+})
+
+/**
+ * What comes next for a followed show (getUpcomingEpisodes). Sits on a card that
+ * is the SHOW, so `id` stays the series and the card opens its page: an episode
+ * that has not aired has none.
+ */
+export const UpcomingInfoSchema = z.object({
+  next: z.object({
+    season: z.number(),
+    number: z.number(),
+    title: z.string(),
+    airDate: z.string().describe('YYYY-MM-DD'),
+    status: z
+      .enum(['expected', 'pastDue'])
+      .describe('Never proof it is playable. pastDue: the expected day has passed, unconfirmed.'),
+    basis: z
+      .enum(['tmdbForecast', 'serverListing'])
+      .describe("Where the date comes from: TMDb's forecast, or a future date on the media server"),
+  }),
+  latestAired: UpcomingAiredSchema.nullable(),
+})
+
 // Content item schema matching Tool UI ItemCarousel format
 export const ContentItemSchema = z.object({
   id: z.string().describe('Unique content ID'),
@@ -91,11 +122,16 @@ export const ContentItemSchema = z.object({
       'The card `id` is the episode, so use these fields to talk about it: name the series and ' +
       'the SxEy position, never present an episode as though it were the series.'
   ),
+  upcoming: UpcomingInfoSchema.optional().describe(
+    'Present ONLY on a getUpcomingEpisodes card: the next episode of this show and its date.'
+  ),
   actions: z.array(ActionSchema).optional().describe('Action buttons'),
 })
 
 export type ContentItem = z.infer<typeof ContentItemSchema>
 export type Action = z.infer<typeof ActionSchema>
 export type EpisodeRef = z.infer<typeof EpisodeRefSchema>
+export type UpcomingInfo = z.infer<typeof UpcomingInfoSchema>
+export type UpcomingAired = z.infer<typeof UpcomingAiredSchema>
 
 

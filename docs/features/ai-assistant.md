@@ -22,7 +22,7 @@
 
 > "A slow, wintry film — nothing longer than two hours"
 
-Concept queries are answered with **semantic search** over your library's embeddings, not just title matching. Answers arrive as **poster cards**, each with a reason attached, in a grid that fits the width of the chat. Click a card, its title, or **More ›** at the end of a cut synopsis to open the title (playback starts there); each card also has a favorite toggle, and an episode card has **Play**, which opens that episode directly.
+Concept queries are answered with **semantic search** over your library's embeddings, not just title matching. Answers arrive as **poster cards**, each with a reason attached, in a grid that fits the width of the chat. Click a card, its title, or **More ›** at the end of a cut synopsis to open the title (playback starts there); each card also has a favorite toggle, and an episode card has **Play**, which opens that episode directly. When Encore answers about one title, its larger card lets you rate it and, for a series, add it to Watching. In a narrow chat, that card folds the rest of the synopsis and the credits behind **Show more**.
 
 ### Answer questions about *you*
 
@@ -41,6 +41,12 @@ It can read your history (including by genre, country, or rating), your ratings,
 > "Which episode of The X-Files is the one with the carnival?"
 
 Person lookups return **person cards**; where episode embeddings are enabled, episode-level search finds individual episodes and links to their series.
+
+### Ask what's coming next
+
+> "What's coming next for the shows I follow?"
+
+The answer covers the shows you've added to **Shows You Watch**, each with its next episode and date, soonest first. Shows you've only played aren't included, but you can ask about any show in your library by name. A date is **expected**: it comes from TMDb or your media server, and it doesn't promise the episode will be ready to play that day. The card separately says when the latest episode aired and whether it's already in your library. If TMDb can't be asked, the assistant says it couldn't check rather than that nothing is coming.
 
 ### Discover what you *don't* have
 

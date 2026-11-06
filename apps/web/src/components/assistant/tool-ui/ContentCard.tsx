@@ -52,6 +52,7 @@ import { RankBadge, WatchedBadge, getProxiedImageUrl } from '@aperture/ui'
 import { useMediaDetailModal } from '@/hooks/useMediaDetailModal'
 import { COMPACT_THREAD, chatText } from '../density'
 import { NOTHING_FITS, fitSynopsis } from './synopsisFit'
+import { UpcomingLines } from './UpcomingLines'
 import type { ContentItem } from './types'
 
 interface ContentCardProps {
@@ -602,6 +603,7 @@ export function ContentCard({
               <Box sx={{ flex: 1, minWidth: 0 }}>{title}</Box>
               {ratings && <Box sx={{ mt: '2px', display: 'flex' }}>{ratings}</Box>}
             </Box>
+            {item.upcoming && <UpcomingLines upcoming={item.upcoming} />}
             {overview}
           </Box>
         </Box>
@@ -696,6 +698,7 @@ export function ContentCard({
           />
         </Box>
         {director}
+        {item.upcoming && <UpcomingLines upcoming={item.upcoming} />}
         {overview}
         {reason}
 

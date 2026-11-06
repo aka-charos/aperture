@@ -1,4 +1,4 @@
--- What the assistant's stated limits (F-183) do on a real library. Read-only.
+-- What the assistant's stated limits (F-185) do on a real library. Read-only.
 --   psql -f scripts/probe-title-limits.sql
 --
 -- The active embedding table is not knowable from SQL here (system_settings is
@@ -35,7 +35,7 @@ SELECT 'embeddings_3072' AS tbl, model, count(*) FROM embeddings_3072 GROUP BY 2
 -- 3. The plan for a narrow limit and a broad one. Fine: filter the titles first, then
 --    sort (exact), or the index scan stopping when LIMIT is full. To look out for: an
 --    index scan emitting about the whole set and taking seconds, which means the
---    planner thought far more titles fit than do (F-183).
+--    planner thought far more titles fit than do (F-185).
 BEGIN;
 SET LOCAL hnsw.iterative_scan = strict_order;
 EXPLAIN (ANALYZE, BUFFERS)
