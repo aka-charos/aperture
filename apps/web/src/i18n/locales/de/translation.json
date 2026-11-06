@@ -7203,7 +7203,7 @@
     }
   },
   "mediaServerTypeMismatch": {
-    "message": "This server identifies itself as {{detected}}, but Aperture is set to {{selected}}. Features that differ between the two servers will not behave correctly.",
+    "message": "This server identifies itself as {{detected}}, but {{appName}} is set to {{selected}}. Features that differ between the two servers will not behave correctly.",
     "useDetected": "Switch to {{detected}}"
   }
 }
