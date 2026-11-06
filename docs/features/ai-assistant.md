@@ -108,6 +108,7 @@ A suggestion carousel has a **create-playlist** action: the titles it recommende
 - **Chain turns** — "more like the second one", "anything with the same director?", "now something lighter"
 - **Ask it to justify** — "why this one?" gets you the reasoning behind a card
 - **Use it for intersection questions** — the things Browse filters can't express ("the 90s comedies I rated 8+")
+- **State your limits and they hold** — in "an unwatched sci-fi film under 90 minutes", the genre, years, minimum rating, length, film or show, and unwatched are checked against the library, on every list in the answer. A title whose length or rating isn't known doesn't count as fitting, and for a show the length means a typical episode. If your limits leave a list empty, the assistant says so
 
 ---
 

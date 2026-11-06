@@ -2389,7 +2389,9 @@
     "upcomingPastDue": "Was expected {{date}}",
     "upcomingLatestInLibrary": "Latest {{code}}, aired {{date}}: in your library",
     "upcomingLatestUnplayed": "Latest {{code}}, aired {{date}}: in your library, not played yet",
-    "upcomingLatestNotInLibrary": "Latest {{code}}, aired {{date}}: not in your library yet"
+    "upcomingLatestNotInLibrary": "Latest {{code}}, aired {{date}}: not in your library yet",
+    "carouselLimitsNoneFit": "Nothing was found that fits the limits in your request.",
+    "carouselLimitsDropped": "Web picks left out for not fitting the limits in your request: {{dropped}}"
   },
   "similarityGraph": {
     "loadingFallback": "Lädt…",

@@ -4019,7 +4019,9 @@
     "upcomingPastDue": "Was expected {{date}}",
     "upcomingLatestInLibrary": "Latest {{code}}, aired {{date}}: in your library",
     "upcomingLatestUnplayed": "Latest {{code}}, aired {{date}}: in your library, not played yet",
-    "upcomingLatestNotInLibrary": "Latest {{code}}, aired {{date}}: not in your library yet"
+    "upcomingLatestNotInLibrary": "Latest {{code}}, aired {{date}}: not in your library yet",
+    "carouselLimitsNoneFit": "Δεν βρέθηκε κάτι που να ταιριάζει στους περιορισμούς του αιτήματός σας.",
+    "carouselLimitsDropped": "Προτάσεις από τον ιστό που έμειναν εκτός επειδή δεν ταιριάζουν στους περιορισμούς του αιτήματός σας: {{dropped}}"
   },
   "dashboard": {
     "greetingMorning": "Καλημέρα",

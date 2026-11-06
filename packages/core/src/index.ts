@@ -1993,6 +1993,7 @@ export {
   refreshImdbRatings,
   refreshRatings,
   refreshQualityRatingsSafely,
+  displayRatingAtLeastSql,
   displayRatingSql,
   storedQualityRating,
   unifiedRatingShares,

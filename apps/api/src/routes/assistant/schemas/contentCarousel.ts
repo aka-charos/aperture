@@ -45,6 +45,9 @@ export const ContentCarouselI18nKeySchema = z.enum([
   'carouselSemanticEmpty',
   'carouselSemanticDesc',
   'carouselSemanticError',
+  // Limits stated in the request
+  'carouselLimitsNoneFit',
+  'carouselLimitsDropped',
   // Episode search
   'carouselEpisodesTitle',
   'carouselEpisodesDesc',

@@ -23,6 +23,7 @@ import { requireCapability } from '../../../lib/permissions.js'
 import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents, withRequestContext, withLibraryScope } from '../helpers/index.js'
 import { createTools, createN8nTools, createEpisodeTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
+import { toolsUnderLimits, turnStatedLimits } from '../tools/titleLimits.js'
 import { persistTurn, persistQuestion, type TurnPart } from '../helpers/persistTurn.js'
 import { markTurnStarted, markTurnFinished } from '../helpers/activeTurns.js'
 import type { ToolContext } from '../types.js'
@@ -397,8 +398,15 @@ export function registerChatHandler(fastify: FastifyInstance) {
               // loop will run. Forcing toolChoice 'none' there turns "ran out of
               // budget mid-search" into "answered with whatever it found", which
               // is worse than a good answer and far better than silence.
-              prepareStep: ({ stepNumber }) => {
-                if (stepNumber !== MAX_STEPS - 1) return undefined
+              prepareStep: ({ stepNumber, steps }) => {
+                if (stepNumber !== MAX_STEPS - 1) {
+                  // Once a turn has stated limits, the tools that cannot honour
+                  // them stop being on offer: an answer held to "under 90 minutes"
+                  // must not be padded with whatever is top rated.
+                  return turnStatedLimits(steps)
+                    ? { activeTools: toolsUnderLimits(Object.keys(tools) as (keyof typeof tools)[]) }
+                    : undefined
+                }
                 // Warn, not info: reaching this means the model burned every
                 // search it had. The turn still answers, but something upstream
                 // (a filter returning nothing, a tool it can't drive) made it
