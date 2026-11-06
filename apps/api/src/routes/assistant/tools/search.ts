@@ -17,6 +17,7 @@ import { annotateWatchedItems } from '../helpers/unwatched.js'
 import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
 import { normalizeCountryQuery } from '../helpers/countryMatch.js'
 import { briefResult, FORMAT_PARAM_DESCRIPTION } from './utils.js'
+import { keepNewTitles, mergeNearestByRank } from './semanticOrder.js'
 import type { ContentCarouselI18nKey } from '../schemas/contentCarousel.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
@@ -719,7 +720,8 @@ export function createSearchTools(ctx: ToolContext) {
           const queryEmbedding = await ctx.embedding.embedOne(concept)
           const embeddingStr = `[${queryEmbedding.join(',')}]`
 
-          const items: ContentItem[] = []
+          const movieItems: ContentItem[] = []
+          const seriesItems: ContentItem[] = []
           // ContentItem folds the year into `subtitle`; a brief line wants it back.
           const yearById = new Map<string, number | null>()
           const seenTitles = new Set<string>() // Deduplicate by title
@@ -784,15 +786,10 @@ export function createSearchTools(ctx: ToolContext) {
               [embeddingStr, modelId, safeLimit + 5, ...extra]
             )
 
-            for (const m of movieResults.rows) {
-              const titleKey = m.title.toLowerCase()
-              // Skip if this is the excluded title or a duplicate
-              if (excludeLower && titleKey.includes(excludeLower)) continue
-              if (seenTitles.has(titleKey)) continue
-              seenTitles.add(titleKey)
+            for (const m of keepNewTitles(movieResults.rows, seenTitles, excludeLower)) {
               const playLink = buildPlayLink(ctx.mediaServer, m.provider_item_id, 'movie')
               yearById.set(m.id, m.year)
-              items.push(formatContentItem(m, 'movie', playLink))
+              movieItems.push(formatContentItem(m, 'movie', playLink))
             }
           }
 
@@ -813,23 +810,18 @@ export function createSearchTools(ctx: ToolContext) {
               [embeddingStr, modelId, safeLimit + 5, ...extra]
             )
 
-            for (const s of seriesResults.rows) {
-              const titleKey = s.title.toLowerCase()
-              // Skip if this is the excluded title or a duplicate
-              if (excludeLower && titleKey.includes(excludeLower)) continue
-              if (seenTitles.has(titleKey)) continue
-              seenTitles.add(titleKey)
+            for (const s of keepNewTitles(seriesResults.rows, seenTitles, excludeLower)) {
               const playLink = buildPlayLink(ctx.mediaServer, s.provider_item_id, 'series')
               yearById.set(s.id, s.year)
-              items.push(formatContentItem(s, 'series', playLink))
+              seriesItems.push(formatContentItem(s, 'series', playLink))
             }
           }
 
-          // Sort combined results by rating (since we can't compare similarity scores across tables)
-          items.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
-
-          // Limit final results
-          const finalItems = items.slice(0, safeLimit)
+          // Each half is nearest first already. The two tables share a vector
+          // space, but their distance distributions are two populations, so a
+          // shared sort would give whichever sits higher every slot; they merge
+          // by rank within their media type instead.
+          const finalItems = mergeNearestByRank(movieItems, seriesItems, safeLimit)
           await annotateWatchedItems(ctx.userId, finalItems)
 
           if (format === 'brief') {
