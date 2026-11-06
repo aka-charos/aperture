@@ -13,6 +13,7 @@ import { createRecommendationTools } from './recommendations.js'
 import { createPeopleTools } from './people.js'
 import { createHelpTools } from './help.js'
 import { createDiscoveryTools } from './discovery.js'
+import { createUpcomingTools } from './upcoming.js'
 
 // Async, conditional on settings — merged separately in the chat handler
 export { createN8nTools } from './n8n.js'
@@ -35,5 +36,6 @@ export function createTools(ctx: ToolContext) {
     ...createPeopleTools(ctx),
     ...createHelpTools(ctx),
     ...createDiscoveryTools(ctx),
+    ...createUpcomingTools(ctx),
   }
 }

@@ -42,6 +42,12 @@ It can read your history (including by genre, country, or rating), your ratings,
 
 Person lookups return **person cards**; where episode embeddings are enabled, episode-level search finds individual episodes and links to their series.
 
+### Ask what's coming next
+
+> "What's coming next for the shows I follow?"
+
+The answer covers the shows you've added to **Shows You Watch**, each with its next episode and date, soonest first. Shows you've only played aren't included, but you can ask about any show in your library by name. A date is **expected**: it comes from TMDb or your media server, and it doesn't promise the episode will be ready to play that day. The card separately says when the latest episode aired and whether it's already in your library. If TMDb can't be asked, the assistant says it couldn't check rather than that nothing is coming.
+
 ### Discover what you *don't* have
 
 For "find me something new" requests, the assistant searches **web sources** (Google grounding, Tavily) alongside your library and combines the results. A discovery answer comes in up to three sections:

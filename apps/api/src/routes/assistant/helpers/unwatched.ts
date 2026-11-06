@@ -128,6 +128,9 @@ const EXEMPT_TOOLS = new Set([
   // on the parent would empty the answer. Episode-level watch status is a
   // parameter on the tool instead.
   'searchEpisodes',
+  // Reports on shows the user is by definition watching, so filtering on the
+  // show would empty the answer. Nothing in it is a suggestion.
+  'getUpcomingEpisodes',
 ])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
