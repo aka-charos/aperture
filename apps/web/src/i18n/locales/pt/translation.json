@@ -5377,7 +5377,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "Studio, which is also the light appearance, answers the default pair with its own cobalt. Save any other pair and every appearance uses it as saved."
+    "lightModeNote": "Light and Dark answer the default pair with their own cobalt, and Black uses it as is. Save any other pair and all three use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -7166,13 +7166,9 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is always the Studio look. For dark, choose Classic or Studio. Remembered in this browser.",
-    "themeLabel": "Tema",
-    "classic": "Clássico",
-    "classicDescription": "O visual escuro original.",
-    "studio": "Studio",
-    "studioDescription": "Destaques em cobalto, tipografia nítida e superfícies claras ou escuras.",
-    "system": "Seguir dispositivo"
+    "cardDescription": "Light and Dark have cobalt accents; Black is the original near-black. Remembered in this browser.",
+    "black": "Black",
+    "switchToBlack": "Switch to the black appearance"
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",

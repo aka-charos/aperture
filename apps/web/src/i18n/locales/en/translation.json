@@ -4241,7 +4241,7 @@
   "settingsThemeColors": {
     "title": "Brand colors",
     "subtitle": "The two accent colors used throughout the app — buttons, highlights, gradients, and badges. Other colors (errors, warnings, success) stay fixed.",
-    "lightModeNote": "Studio, which is also the light appearance, answers the default pair with its own cobalt. Save any other pair and every appearance uses it as saved.",
+    "lightModeNote": "Light and Dark answer the default pair with their own cobalt, and Black uses it as is. Save any other pair and all three use it as saved.",
     "primaryLabel": "Primary",
     "secondaryLabel": "Secondary",
     "invalidHex": "Enter a color like #6366f1",
@@ -7117,13 +7117,9 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is always the Studio look. For dark, choose Classic or Studio. Remembered in this browser.",
-    "themeLabel": "Theme",
-    "classic": "Classic",
-    "classicDescription": "The original dark look.",
-    "studio": "Studio",
-    "studioDescription": "Cobalt accents, crisp typography, and light or dark surfaces.",
-    "system": "Follow device"
+    "cardDescription": "Light and Dark have cobalt accents; Black is the original near-black. Remembered in this browser.",
+    "black": "Black",
+    "switchToBlack": "Switch to the black appearance"
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",

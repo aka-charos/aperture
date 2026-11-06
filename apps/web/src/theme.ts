@@ -1,22 +1,21 @@
 import { createTheme, alpha, type Theme, type ThemeOptions, type Shadows, type TypographyVariantsOptions } from '@mui/material/styles'
 
-/** The two appearances. Dark is the original; light is the calm, bordered one. */
+/** MUI's two palette modes. Light and Dark are Studio's schemes; Black is `palette` below. */
 export type ColorMode = 'light' | 'dark'
 
 /**
- * The theme a viewer chooses. Light is always Studio's (`STUDIO_SCHEMES`), so
- * this only picks the dark look: Classic, the original near-black, or Studio.
+ * The three appearances a viewer chooses between. Black is the original
+ * near-black look; Light and Dark are the two sides of Studio (`STUDIO_SCHEMES`).
  */
-export type UiTheme = 'classic' | 'studio'
-export const UI_THEMES: readonly UiTheme[] = ['classic', 'studio']
+export type Appearance = 'light' | 'black' | 'dark'
+export const APPEARANCES: readonly Appearance[] = ['light', 'black', 'dark']
 
 /**
- * The look a built theme actually has, which a component that must differ asks
- * through `theme.aperture.name` (a colour that differs is a token instead). In
- * light it is 'studio' whatever was chosen. 'graphite' is the former light mode,
- * which nothing on screen uses; see `createGraphiteTheme`.
+ * The look a built theme has, which a component that must differ asks through
+ * `theme.aperture.name` (a colour that differs is a token instead). 'graphite'
+ * is the former light mode, which nothing on screen uses; see `createGraphiteTheme`.
  */
-export type AppliedTheme = UiTheme | 'graphite'
+export type AppliedTheme = 'black' | 'studio' | 'graphite'
 
 /**
  * Colours that are not part of MUI's palette shape but differ between the two
@@ -58,7 +57,7 @@ export interface SurfaceTokens {
   logoPlate: string
   /**
    * The label on a primary or secondary fill, poster badges included. White in
-   * Classic's dark appearance; Studio's dark accents are pale and need dark type.
+   * Black; Dark's accents are pale and need dark type.
    */
   onBrand: string
   /** The same for a success, warning, error or information fill. */
@@ -192,9 +191,9 @@ export const palette = {
 
 /**
  * The FORMER light mode (Graphite), kept to borrow from when improving Studio's
- * light. Nothing on screen uses it: `createAppTheme` answers light with Studio,
- * and only `createGraphiteTheme` reaches this. Everything below that says "the
- * light mode" down to `buildLightOptions` means this one.
+ * light. Nothing on screen uses it: only `createGraphiteTheme` reaches this.
+ * Everything below that says "the light mode" down to `buildLightOptions` means
+ * this one.
  *
  * It is laid out the way a light palette guide lays out a site: two
  * ACCENT colours for calls to action (near-black, and charcoal as the second
@@ -736,7 +735,7 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
   }
 }
 
-function buildDarkOptions(): ThemeOptions {
+function buildBlackOptions(): ThemeOptions {
   return {
     palette: {
       mode: 'dark',
@@ -852,9 +851,8 @@ function buildDarkOptions(): ThemeOptions {
 
 /**
  * Studio: cobalt accents, Manrope type, and surfaces that separate by a border
- * rather than a shadow. Its light scheme is THE light appearance; its dark one
- * is the optional dark look. One scheme per appearance, so a colour is changed
- * in one place.
+ * rather than a shadow. Its two schemes are the Light and Dark appearances. One
+ * scheme per appearance, so a colour is changed in one place.
  *
  * Unlike Graphite, Studio's light has white cards on a pale canvas, so the
  * "nothing lighter than the page" rule in theme.test.ts stays Graphite's; the
@@ -981,23 +979,29 @@ function studioBrand(s: StudioScheme) {
 /** Manrope draws Latin, Cyrillic and Greek; anything else falls through to Inter. */
 const STUDIO_FONT = '"Manrope", "Inter", "Roboto", sans-serif'
 
+/**
+ * Every reading size is Black's (`typographyFor`, or MUI's default where that
+ * names none), and a test holds them equal: moving between appearances must not
+ * shrink the text. Studio differs in face, weight and spacing only. Buttons are
+ * the one exception, a step up from Black's, whose smaller size exists only
+ * because monospace sets wide.
+ */
 const STUDIO_TYPOGRAPHY: TypographyVariantsOptions = {
   fontFamily: STUDIO_FONT,
   fontFamilyMonospace: MONO_FONT,
-  fontSize: 14,
   h1: { fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-0.045em' },
   h2: { fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.04em' },
   h3: { fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.035em' },
-  h4: { fontSize: '1.8rem', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.25 },
+  h4: { fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.25 },
   h5: { fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.025em' },
   h6: { fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' },
   subtitle1: { fontWeight: 700 },
   subtitle2: { fontWeight: 700 },
-  body1: { fontSize: '0.875rem', lineHeight: 1.65 },
-  body2: { fontSize: '0.8125rem', lineHeight: 1.6 },
-  caption: { fontSize: '0.75rem', lineHeight: 1.5 },
-  button: { fontSize: '0.8125rem', fontWeight: 700, textTransform: 'none' },
-  overline: { fontSize: '0.6875rem', letterSpacing: '0.13em', fontWeight: 800 },
+  body1: { lineHeight: 1.6 },
+  body2: { lineHeight: 1.55 },
+  caption: { lineHeight: 1.5 },
+  button: { fontSize: '0.875rem', fontWeight: 700, textTransform: 'none' },
+  overline: { letterSpacing: '0.13em', fontWeight: 800 },
 }
 
 function studioSurfaces(s: StudioScheme, onBrand: string): SurfaceTokens {
@@ -1081,7 +1085,7 @@ function buildStudioOptions(s: StudioScheme): ThemeOptions {
         styleOverrides: {
           root: { borderRadius: 5, minHeight: 36, paddingInline: 14 },
           // The app's dense rows use small buttons; 36px would change their height.
-          sizeSmall: { minHeight: 30, paddingInline: 10, fontSize: '0.75rem' },
+          sizeSmall: { minHeight: 30, paddingInline: 10, fontSize: '0.8125rem' },
           containedPrimary: {
             backgroundColor: brand.action,
             color: brand.onAction,
@@ -1101,15 +1105,12 @@ function buildStudioOptions(s: StudioScheme): ThemeOptions {
       },
       MuiTab: {
         styleOverrides: {
-          root: { textTransform: 'none', fontWeight: 700, minHeight: 46, fontSize: '0.8125rem' },
+          root: { textTransform: 'none', fontWeight: 700, minHeight: 46, fontSize: '0.875rem' },
         },
       },
       MuiTabs: { styleOverrides: { indicator: { height: 2 } } },
       MuiChip: {
-        styleOverrides: {
-          root: { borderRadius: 4, fontWeight: 600 },
-          sizeSmall: { fontSize: '0.6875rem' },
-        },
+        styleOverrides: { root: { borderRadius: 4, fontWeight: 600 } },
       },
       MuiDrawer: {
         styleOverrides: { paper: { backgroundColor: s.sheet, borderInlineEnd: `1px solid ${s.line}` } },
@@ -1150,7 +1151,7 @@ function buildStudioOptions(s: StudioScheme): ThemeOptions {
       MuiTableCell: {
         styleOverrides: {
           root: { borderBottomColor: s.line },
-          head: { color: s.muted, fontSize: '0.6875rem', letterSpacing: '0.04em', fontWeight: 700 },
+          head: { color: s.muted, letterSpacing: '0.04em', fontWeight: 700 },
         },
       },
       MuiTableRow: {
@@ -1261,35 +1262,26 @@ export function stageGlow(theme: Theme): string {
 }
 
 /**
- * The colour the browser's own chrome is told for each mode (the phone address
- * bar, through `<meta name="theme-color">`): the light mode's sheet, which the
- * app bar is drawn in, and the dark mode's page background. Read from the theme's
- * own values so a palette change cannot leave the address bar behind.
+ * The colour the browser's own chrome is told for each appearance (the phone
+ * address bar, through `<meta name="theme-color">`): for Light and Dark their
+ * sheet, which the app bar is drawn in, and for Black its page background. Read
+ * from the theme's own values so a palette change cannot leave the address bar
+ * behind.
  */
-/** Light is always Studio's; the chosen theme only decides the dark look. */
-function appliesStudio(mode: ColorMode, uiTheme: UiTheme): boolean {
-  return mode === 'light' || uiTheme === 'studio'
+export function documentChromeColor(appearance: Appearance): string {
+  return appearance === 'black' ? palette.background.default : STUDIO_SCHEMES[appearance].sheet
 }
 
-export function documentChromeColor(mode: ColorMode, uiTheme: UiTheme = 'classic'): string {
-  return appliesStudio(mode, uiTheme) ? STUDIO_SCHEMES[mode].sheet : palette.background.default
-}
-
-export function createAppTheme(
-  direction: 'ltr' | 'rtl',
-  mode: ColorMode = 'dark',
-  language = 'en',
-  uiTheme: UiTheme = 'classic'
-): Theme {
-  if (appliesStudio(mode, uiTheme)) {
-    return createTheme({
-      ...buildStudioOptions(STUDIO_SCHEMES[mode]),
-      typography: STUDIO_TYPOGRAPHY,
-      direction,
-      aperture: { name: 'studio' },
-    })
+export function createAppTheme(direction: 'ltr' | 'rtl', appearance: Appearance = 'black', language = 'en'): Theme {
+  if (appearance === 'black') {
+    return createTheme({ ...buildBlackOptions(), typography: typographyFor(language), direction, aperture: { name: 'black' } })
   }
-  return createTheme({ ...buildDarkOptions(), typography: typographyFor(language), direction, aperture: { name: 'classic' } })
+  return createTheme({
+    ...buildStudioOptions(STUDIO_SCHEMES[appearance]),
+    typography: STUDIO_TYPOGRAPHY,
+    direction,
+    aperture: { name: 'studio' },
+  })
 }
 
 /**

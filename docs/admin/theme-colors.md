@@ -17,14 +17,14 @@ Admin console → **Appearance** → **Theme colours** (`/admin/appearance/color
 
 Only the **`main` shade** of each colour is yours — MUI derives the lighter and darker variants and contrast text, and the brand **gradients** (buttons, badges, highlights, header accents) are recomputed from your pair. Deliberately fixed: semantic colours (error/warning/success/info) and all backgrounds.
 
-## Light and Dark Appearances
+## Appearances
 
-Each viewer picks light or dark for their browser (the sun/moon button in the top bar, or Settings → Display), and under Display which dark look they want, Classic or Studio. Dark and Classic are the defaults. Light always looks like Studio.
+Each viewer picks **Light**, **Black** or **Dark** for their browser (the sun or moon button in the top bar, or Settings → Display). Black is the default.
 
-- With the **default pair** (indigo and purple), Classic's dark uses it as is, and Studio, light and dark, uses its own cobalt instead.
-- **Save any other pair** and every appearance uses it exactly as saved. Check that your colours read on both a dark and a light background; a colour bright enough for the dark canvas can be too pale on the light one.
+- With the **default pair** (indigo and purple), Black uses it as is, and Light and Dark use their own cobalt instead.
+- **Save any other pair** and all three use it exactly as saved. Check that your colours read on both a dark and a light background; a colour bright enough for a dark canvas can be too pale on the light one.
 
-**Reset to default** puts the default pair back, which also gives Studio its own cobalt again.
+**Reset to default** puts the default pair back, which also gives Light and Dark their own cobalt again.
 
 ---
 

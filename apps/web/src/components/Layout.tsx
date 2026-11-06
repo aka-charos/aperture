@@ -79,7 +79,6 @@ import { PageErrorBoundary } from './PageErrorBoundary'
 import { PageLoading } from './PageLoading'
 
 const DRAWER_WIDTH = 260
-const DRAWER_WIDTH_STUDIO = 228
 const DRAWER_WIDTH_COLLAPSED = 72
 /**
  * The app bar's own height, per breakpoint. Everything below it is positioned
@@ -243,8 +242,7 @@ function AppShell() {
    * moves the content under the pointer.
    */
   const studio = theme.aperture.name === 'studio'
-  const expandedWidth = studio ? DRAWER_WIDTH_STUDIO : DRAWER_WIDTH
-  const drawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : expandedWidth
+  const drawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH
   const wordmarkFont = studio ? theme.typography.fontFamily : '"Open Sans", sans-serif'
   const showLabels = !collapsed || flyout
 
@@ -474,18 +472,22 @@ function AppShell() {
       <List>
         {userMenuItems.map((item) => (
           <React.Fragment key={item.path}>
-          {studio && labels && item.opensGroup && (
+          {/* On the rail too, wordless: appearing only with the labels, the
+              headings pushed every row down under the pointer as the flyout opened. */}
+          {studio && item.opensGroup && (
             <ListSubheader
               disableSticky
+              aria-hidden={!labels}
               sx={{
                 bgcolor: 'transparent',
                 typography: 'overline',
                 lineHeight: 2.5,
+                height: 30,
                 px: 3,
                 mt: item.opensGroup === 'forYou' ? 0 : 1.5,
               }}
             >
-              {t(`nav.group.${item.opensGroup}`)}
+              {labels && t(`nav.group.${item.opensGroup}`)}
             </ListSubheader>
           )}
           <ListItem disablePadding>
@@ -504,10 +506,10 @@ function AppShell() {
                 sx={{
                   justifyContent: labels ? 'flex-start' : 'center',
                   px: labels && !studio ? 3 : 2,
-                  ...(studio && {
-                    py: 0.75,
-                    '& .MuiListItemText-primary': { fontSize: '0.8125rem', fontWeight: 600 },
-                  }),
+                  // The same with and without a label, so opening the rail's
+                  // flyout leaves each row under the pointer.
+                  minHeight: studio ? 41 : 44,
+                  ...(studio && { py: 0.75 }),
                   '&.Mui-selected': {
                     bgcolor: 'nav.selectedBg',
                     color: 'nav.selectedText',
@@ -544,7 +546,8 @@ function AppShell() {
                   <ListItemText
                     primary={t(item.textKey)}
                     primaryTypographyProps={{
-                      fontWeight: isPathActive(item.path) ? 600 : 400,
+                      fontSize: '0.8125rem',
+                      fontWeight: studio || isPathActive(item.path) ? 600 : 400,
                     }}
                   />
                 )}
@@ -760,7 +763,7 @@ function AppShell() {
           {/* Help for the screen you are on: its user guide pages in a drawer. */}
           <UserHelpButton />
 
-          {/* Light or dark, for this browser. Not on a phone, where the bar
+          {/* Light, Black or Dark, for this browser. Not on a phone, where the bar
               has no room for it; the user menu carries it there instead. */}
           <Box sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
             <ColorModeButton />
@@ -885,7 +888,7 @@ function AppShell() {
             display: { xs: 'block', md: 'none' },
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
-              width: expandedWidth,
+              width: DRAWER_WIDTH,
               overflowX: 'hidden',
             },
           }}
@@ -901,7 +904,7 @@ function AppShell() {
             display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
-              width: flyout ? expandedWidth : drawerWidth,
+              width: flyout ? DRAWER_WIDTH : drawerWidth,
               transition: theme.transitions.create('width', {
                 easing: theme.transitions.easing.sharp,
                 duration: theme.transitions.duration.leavingScreen,

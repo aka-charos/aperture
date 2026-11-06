@@ -5398,7 +5398,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "Studio, which is also the light appearance, answers the default pair with its own cobalt. Save any other pair and every appearance uses it as saved."
+    "lightModeNote": "Light and Dark answer the default pair with their own cobalt, and Black uses it as is. Save any other pair and all three use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -7160,13 +7160,9 @@
     "switchToLight": "Αλλαγή σε φωτεινή εμφάνιση",
     "switchToDark": "Αλλαγή σε σκοτεινή εμφάνιση",
     "cardTitle": "Εμφάνιση",
-    "cardDescription": "Η φωτεινή έχει πάντα την όψη Studio. Για τη σκοτεινή, διαλέξτε Κλασικό ή Studio. Αποθηκεύεται σε αυτόν τον browser.",
-    "themeLabel": "Θέμα",
-    "classic": "Κλασικό",
-    "classicDescription": "Η αρχική σκοτεινή εμφάνιση.",
-    "studio": "Studio",
-    "studioDescription": "Τόνοι μπλε του κοβαλτίου, καθαρή τυπογραφία και φωτεινές ή σκοτεινές επιφάνειες.",
-    "system": "Όπως η συσκευή"
+    "cardDescription": "Η φωτεινή και η σκοτεινή έχουν τόνους μπλε του κοβαλτίου· η μαύρη είναι η αρχική, σχεδόν μαύρη. Αποθηκεύεται σε αυτόν τον browser.",
+    "black": "Μαύρη",
+    "switchToBlack": "Αλλαγή σε μαύρη εμφάνιση"
   },
   "newsletters": {
     "subscription": {

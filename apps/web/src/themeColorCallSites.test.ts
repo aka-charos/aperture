@@ -46,7 +46,7 @@ const DARK_ONLY: Array<{ pattern: RegExp; what: string }> = [
  */
 const ALLOWED: Record<string, string> = {
   'theme.ts': 'defines the dark mode itself',
-  'components/SimilarityGraph/SimilarityGraph.tsx': 'draws inside a DarkStage in both modes',
+  'components/SimilarityGraph/SimilarityGraph.tsx': 'draws inside a DarkStage in every appearance',
 }
 
 function sourceFiles(dir: string): string[] {

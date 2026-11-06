@@ -5373,7 +5373,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "Studio, which is also the light appearance, answers the default pair with its own cobalt. Save any other pair and every appearance uses it as saved."
+    "lightModeNote": "Light and Dark answer the default pair with their own cobalt, and Black uses it as is. Save any other pair and all three use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -7160,13 +7160,9 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is always the Studio look. For dark, choose Classic or Studio. Remembered in this browser.",
-    "themeLabel": "테마",
-    "classic": "클래식",
-    "classicDescription": "원래의 다크 모습.",
-    "studio": "Studio",
-    "studioDescription": "코발트 강조색, 선명한 글꼴, 밝거나 어두운 화면입니다.",
-    "system": "기기 설정 따르기"
+    "cardDescription": "Light and Dark have cobalt accents; Black is the original near-black. Remembered in this browser.",
+    "black": "Black",
+    "switchToBlack": "Switch to the black appearance"
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",
