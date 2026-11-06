@@ -824,6 +824,8 @@ export {
   seriesFinishedSql,
   type WatchStatusForUser,
   type SeriesWatchProgress,
+  getHouseholdReach,
+  type HouseholdReach,
 } from './watching/index.js'
 
 // Social layer: admin-managed connections and peer recommendations

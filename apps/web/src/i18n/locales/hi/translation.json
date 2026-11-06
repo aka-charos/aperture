@@ -1157,8 +1157,18 @@
       "completed": "पुरा होना।",
       "episodePlays": "एपिसोड चलता है",
       "averageViewerProgress": "औसत दर्शक प्रगति ({{गिनती}} एपिसोड)",
-      "userReach": "उपयोगकर्ता पहुंच",
-      "movieWatchersTooltip": "आपके {{कुल}} उपयोगकर्ताओं का {{pct}}%",
+      "reachLevel": {
+        "niche": "सीमित",
+        "familiar": "जाना-पहचाना",
+        "popular": "लोकप्रिय",
+        "mostWatched": "सबसे ज़्यादा देखा गया"
+      },
+      "reachHint": {
+        "niche": "यहाँ के कम देखे गए शीर्षकों में से एक।",
+        "familiar": "यहाँ इसे ज़्यादातर शीर्षकों से अधिक लोगों ने देखा है।",
+        "popular": "यहाँ के काफ़ी देखे गए शीर्षकों में से एक।",
+        "mostWatched": "यहाँ के सबसे ज़्यादा देखे गए शीर्षकों में से एक।"
+      },
       "criticRatings": "आलोचक रेटिंग",
       "scoreTooltipTomatometer": "टोमाटोमीटर: {{पीसीटी}}%",
       "scoreTooltipAudience": "श्रोता: {{pct}}%",

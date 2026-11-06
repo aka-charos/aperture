@@ -387,8 +387,8 @@ export interface MovieWatchStats {
   lastWatched: string | null
   averageUserRating: number | null
   totalRatings: number
-  watchPercentage: number
-  totalUsers: number
+  /** Decided by the server; absent when nobody has watched it or the level couldn't be read. */
+  householdReach?: string
   watchers?: Watcher[]
   /**
    * Who the names in `watchers` were chosen for, decided by the server: `all`
@@ -410,8 +410,8 @@ export interface SeriesWatchStats {
   averageUserRating: number | null
   totalRatings: number
   averageProgress: number
-  watchPercentage: number
-  totalUsers: number
+  /** Decided by the server; absent when nobody has watched it or the level couldn't be read. */
+  householdReach?: string
   watchers?: Watcher[]
   /**
    * Who the names in `watchers` were chosen for, decided by the server: `all`

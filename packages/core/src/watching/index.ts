@@ -18,6 +18,9 @@ export {
   type UpcomingGap,
 } from './upcomingEpisodes.js'
 
+export type { HouseholdReach } from './householdReach.js'
+export { getHouseholdReach } from './householdReachStore.js'
+
 export {
   UPCOMING_EPISODE_HORIZON_MONTHS,
   RECENTLY_AIRED_WINDOW_MONTHS,

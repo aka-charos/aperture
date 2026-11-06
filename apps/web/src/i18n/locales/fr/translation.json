@@ -1158,8 +1158,18 @@
       "completed": "Complété",
       "episodePlays": "Lectures d'épisodes",
       "averageViewerProgress": "Progression moyenne des téléspectateurs ({{count}} épisodes)",
-      "userReach": "Portée des utilisateurs",
-      "movieWatchersTooltip": "{{pct}} % de vos {{total}} utilisateurs",
+      "reachLevel": {
+        "niche": "Confidentiel",
+        "familiar": "Connu",
+        "popular": "Populaire",
+        "mostWatched": "Très regardé"
+      },
+      "reachHint": {
+        "niche": "L'un des titres les moins regardés ici.",
+        "familiar": "Plus de personnes ici l'ont regardé que la plupart des titres.",
+        "popular": "L'un des titres assez regardés ici.",
+        "mostWatched": "L'un des titres les plus regardés ici."
+      },
       "criticRatings": "Notes des critiques",
       "scoreTooltipTomatometer": "Tomatomètre : {{pct}} %",
       "scoreTooltipAudience": "Audience : {{pct}} %",

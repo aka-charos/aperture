@@ -1157,8 +1157,18 @@
       "completed": "완전한",
       "episodePlays": "에피소드 재생",
       "averageViewerProgress": "평균 시청자 진행률({{count}}개 에피소드)",
-      "userReach": "사용자 도달범위",
-      "movieWatchersTooltip": "{{total}} 사용자 중 {{pct}}%",
+      "reachLevel": {
+        "niche": "소수 취향",
+        "familiar": "익숙함",
+        "popular": "인기",
+        "mostWatched": "최다 시청"
+      },
+      "reachHint": {
+        "niche": "여기서 비교적 적게 본 작품 중 하나입니다.",
+        "familiar": "여기서 대부분의 작품보다 본 사람이 많습니다.",
+        "popular": "여기서 비교적 많이 본 작품 중 하나입니다.",
+        "mostWatched": "여기서 가장 많이 본 작품 중 하나입니다."
+      },
       "criticRatings": "비평가 평점",
       "scoreTooltipTomatometer": "토마토미터: {{pct}}%",
       "scoreTooltipAudience": "청중: {{pct}}%",

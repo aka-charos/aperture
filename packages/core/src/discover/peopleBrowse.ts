@@ -1,6 +1,6 @@
 import { AsyncCache } from '../lib/asyncCache.js'
 import { query, queryOne } from '../lib/db.js'
-import { binderFor, libraryScopeSql, type LibraryScope } from '../lib/libraryScope.js'
+import { binderFor, libraryScopeKey, libraryScopeSql, type LibraryScope } from '../lib/libraryScope.js'
 
 /**
  * Infinite scroll asks for one page at a time, and each page used to rebuild the
@@ -63,18 +63,8 @@ const peopleLists = new AsyncCache<PeopleList>({
   weigh: (list) => list.byName.length,
 })
 
-/**
- * The cache key: everything `libraryScopeSql` binds. Ids are sorted because their
- * order means nothing, and JSON keeps a null list apart from an empty one (no
- * restriction, against no library at all). `hasMovies` and `hasSeries` are left
- * out: they follow from the ids, and the SQL never reads them.
- */
-export function peopleListKey(scope: LibraryScope): string {
-  return JSON.stringify([
-    scope.libraryIds ? [...scope.libraryIds].sort() : null,
-    scope.maxParentalRating,
-  ])
-}
+/** The cache key: one list per audience. */
+export const peopleListKey = libraryScopeKey
 
 /**
  * Case folding for a name search. Lowercasing alone is not enough: JavaScript turns

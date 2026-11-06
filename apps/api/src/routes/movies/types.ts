@@ -4,7 +4,7 @@
  * TypeScript interfaces for movie-related API endpoints.
  */
 
-import type { LocalizedSynopsis, StudioLogo, UnifiedRatingSource } from '@aperture/core'
+import type { HouseholdReach, LocalizedSynopsis, StudioLogo, UnifiedRatingSource } from '@aperture/core'
 
 export interface MovieRow {
   id: string
@@ -177,8 +177,7 @@ export interface WatchStatsResponse {
   lastWatched: Date | null
   averageUserRating: number | null
   totalRatings: number
-  watchPercentage: number
-  totalUsers: number
+  householdReach?: HouseholdReach
 }
 
 export interface FilterRangesResponse {

@@ -1088,8 +1088,18 @@
       "completed": "Завершенный",
       "episodePlays": "Эпизоды воспроизводятся",
       "averageViewerProgress": "Средний прогресс зрителей (эпизодов: {{count}})",
-      "userReach": "Охват пользователей",
-      "movieWatchersTooltip": "{{pct}}% ваших пользователей ({{total}})",
+      "reachLevel": {
+        "niche": "Нишевое",
+        "familiar": "Известное",
+        "popular": "Популярное",
+        "mostWatched": "Самое смотримое"
+      },
+      "reachHint": {
+        "niche": "Одно из реже смотримых названий здесь.",
+        "familiar": "Здесь это смотрели больше людей, чем большинство других названий.",
+        "popular": "Одно из довольно часто смотримых названий здесь.",
+        "mostWatched": "Одно из самых смотримых названий здесь."
+      },
       "criticRatings": "Рейтинги критиков",
       "scoreTooltipTomatometer": "Томатометр: {{pct}} %",
       "scoreTooltipAudience": "Аудитория: {{pct}}%",

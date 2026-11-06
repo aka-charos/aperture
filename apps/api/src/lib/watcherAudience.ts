@@ -13,6 +13,23 @@
  *   is them.
  */
 
+/**
+ * One named person in a watch-stats response, as a response schema. Dates are
+ * untyped so they serialise as `JSON.stringify` would: a typed date throws on an
+ * invalid one and turns a missing date into a 500.
+ */
+export const WATCHER_RESPONSE_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    userId: { type: 'string' as const },
+    name: { type: 'string' as const },
+    playCount: { type: 'number' as const },
+    episodesWatched: { type: 'number' as const },
+    lastWatched: {},
+    favorite: { type: 'boolean' as const },
+  },
+}
+
 export type WatcherAudience =
   /** Every watcher may be named (admins). */
   | { kind: 'all' }

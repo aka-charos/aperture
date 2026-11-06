@@ -1086,8 +1086,18 @@
       "completed": "Voltooid",
       "episodePlays": "Aflevering wordt afgespeeld",
       "averageViewerProgress": "Gemiddelde kijkvoortgang ({{count}} afleveringen)",
-      "userReach": "Gebruikersbereik",
-      "movieWatchersTooltip": "{{pct}}% van uw {{total}} gebruikers",
+      "reachLevel": {
+        "niche": "Niche",
+        "familiar": "Bekend",
+        "popular": "Populair",
+        "mostWatched": "Meest bekeken"
+      },
+      "reachHint": {
+        "niche": "Een van de minder bekeken titels hier.",
+        "familiar": "Meer mensen hier hebben dit gezien dan de meeste titels.",
+        "popular": "Een van de vaker bekeken titels hier.",
+        "mostWatched": "Een van de meest bekeken titels hier."
+      },
       "criticRatings": "Criticibeoordelingen",
       "scoreTooltipTomatometer": "Tomatenmeter: {{pct}}%",
       "scoreTooltipAudience": "Publiek: {{pct}}%",

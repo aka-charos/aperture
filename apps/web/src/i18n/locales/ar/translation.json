@@ -1161,8 +1161,18 @@
       "completed": "مكتمل",
       "episodePlays": "يتم تشغيل الحلقة",
       "averageViewerProgress": "متوسط ​​تقدم المشاهد ({{count}} حلقة)",
-      "userReach": "وصول المستخدم",
-      "movieWatchersTooltip": "{{pct}}% من مستخدميك البالغ عددهم {{total}}.",
+      "reachLevel": {
+        "niche": "محدود",
+        "familiar": "معروف",
+        "popular": "شائع",
+        "mostWatched": "الأكثر مشاهدة"
+      },
+      "reachHint": {
+        "niche": "من العناوين الأقل مشاهدة هنا.",
+        "familiar": "شاهده هنا أشخاص أكثر من معظم العناوين.",
+        "popular": "من العناوين التي تحظى بمشاهدة جيدة هنا.",
+        "mostWatched": "من أكثر العناوين مشاهدة هنا."
+      },
       "criticRatings": "التقييمات النقدية",
       "scoreTooltipTomatometer": "مقياس الطماطم: {{pct}}%",
       "scoreTooltipAudience": "الجمهور: {{pct}}%",

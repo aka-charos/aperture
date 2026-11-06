@@ -39,7 +39,7 @@ Directly under the actions, a **Community Activity** strip shows how the househo
 
 - **Watched / Plays / Favorited** counts, and for series, **Completed** and episode plays
 - **Average Viewer Progress** — how far into it viewers typically get
-- **User Reach** — what percentage of the server's users have touched it
+- **Household Reach** — how this title's audience compares with the other titles you can open, from fewest to most viewers: **Niche**, **Familiar**, **Popular**, **Most watched**. Films are compared with films, and series with series. It compares titles, not people, and it doesn't appear when every title has the same audience.
 
 The counts expand into a list of **who** watched and favorited it only for people you're allowed to see: admins see everyone, and anyone connected to others (see [Watch This](watch-this.md)) sees themselves and their connections. Everyone else sees the counts alone.
 

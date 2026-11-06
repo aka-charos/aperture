@@ -10,6 +10,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import type { Media, MovieWatchStats, SeriesWatchStats, Watcher } from '../types'
 import { isMovie } from '../types'
 import { decorativeColor } from '@/theme'
+import { ReachScale } from './ReachScale'
 import { WatcherListDialog } from './WatcherListDialog'
 import { useAuth } from '@/hooks/useAuth'
 import { unnamedCount, watcherLabel } from '../watcherNames'
@@ -26,7 +27,6 @@ interface Stat {
   icon: ReactElement
   value: string
   label: string
-  tooltip?: string
   /**
    * Named people behind this number. Present only when the server sent names,
    * which is the whole gate — the strip has no idea who is allowed to see them
@@ -49,7 +49,6 @@ interface Meter {
   id: string
   label: string
   pct: number
-  color: 'primary' | 'secondary'
 }
 
 const ICON_SX = { fontSize: 18 } as const
@@ -58,14 +57,14 @@ const ICON_SX = { fontSize: 18 } as const
  * How many of this instance's users have watched a title, as one line.
  *
  * This was a bordered, gradient-filled card at the top of the info card — a
- * heading, an icon, `h5` numerals and a 6px bar, about 150px of page for four
- * integers and a percentage that the bar only restated. It sits in the hero
- * now, between the genres and the actions, because it is a fact about the
- * title rather than a section of its own, and because reading it required
- * scrolling past the fold on a page whose top half was empty.
+ * heading, an icon, `h5` numerals and a 6px bar, about 150px of page for a few
+ * integers. It sits in the hero now, between the genres and the actions, because
+ * it is a fact about the title rather than a section of its own, and because
+ * reading it required scrolling past the fold on a page whose top half was empty.
  *
- * The reach bar survives the compression at 3px, since a proportion is the one
- * number here that a reader takes in faster as a length than as digits.
+ * The progress bar survives the compression at 3px, since a proportion is the
+ * one number here that a reader takes in faster as a length than as digits.
+ * Household reach is a named level, never a percentage (see `ReachScale`).
  *
  * Rendered as flex-wrap with no breakpoints: this page also renders inside
  * MediaDetailModal and beside the assistant dock, so the available width is
@@ -97,10 +96,6 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
       icon: <VisibilityIcon sx={{ ...ICON_SX, color: decorativeColor('info') }} />,
       value: String(s.totalWatchers),
       label: t('mediaDetail.infoCard.watched'),
-      tooltip: t('mediaDetail.infoCard.movieWatchersTooltip', {
-        pct: s.watchPercentage,
-        total: s.totalUsers,
-      }),
       watchers: s.watchers,
       watchersTitle: t('mediaDetail.infoCard.watchedByTitle'),
       total: s.totalWatchers,
@@ -133,14 +128,6 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         icon: <StarIcon sx={{ ...ICON_SX, color: decorativeColor('warning') }} />,
         value: s.averageUserRating.toFixed(1),
         label: t('mediaDetail.infoCard.avgRatingCount', { count: s.totalRatings }),
-      })
-    }
-    if (s.watchPercentage > 0) {
-      meters.push({
-        id: 'reach',
-        label: t('mediaDetail.infoCard.householdReach'),
-        pct: s.watchPercentage,
-        color: 'primary',
       })
     }
   } else {
@@ -195,15 +182,6 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         id: 'progress',
         label: t('mediaDetail.infoCard.averageViewerProgress', { count: s.totalEpisodes }),
         pct: s.averageProgress,
-        color: 'primary',
-      })
-    }
-    if (s.watchPercentage > 0) {
-      meters.push({
-        id: 'reach',
-        label: t('mediaDetail.infoCard.userReach'),
-        pct: s.watchPercentage,
-        color: 'secondary',
       })
     }
   }
@@ -230,7 +208,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
       }}
     >
       {stats.map((stat) => {
-        const { id, icon, value, label, tooltip, watchers, total } = stat
+        const { id, icon, value, label, watchers, total } = stat
         // Names only where the server sent some. An empty list means the
         // counter has no one behind it this viewer may see, which is not a
         // reason to offer an empty dialog.
@@ -297,9 +275,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
                 : t('mediaDetail.infoCard.watchersOpenHint')}
             </Box>
           </>
-        ) : (
-          tooltip
-        )
+        ) : null
 
         return title ? (
           <Tooltip key={id} title={title}>
@@ -310,7 +286,7 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
         )
       })}
 
-      {meters.map(({ id, label, pct, color }) => (
+      {meters.map(({ id, label, pct }) => (
         <Box
           key={id}
           sx={{
@@ -327,13 +303,12 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
           <Typography variant="body2" color="text.secondary" noWrap>
             {label}
           </Typography>
-          <Typography variant="body2" fontWeight={700} color={`${color}.main`}>
+          <Typography variant="body2" fontWeight={700} color="primary.main">
             {pct}%
           </Typography>
           <LinearProgress
             variant="determinate"
             value={pct}
-            color={color}
             sx={{
               flex: 1,
               minWidth: 48,
@@ -346,6 +321,8 @@ export function CommunityStrip({ media, watchStats }: CommunityStripProps) {
           />
         </Box>
       ))}
+
+      <ReachScale level={watchStats.householdReach} />
     </Box>
 
       {openStat?.watchers && (

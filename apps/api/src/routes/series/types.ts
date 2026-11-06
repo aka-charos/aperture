@@ -4,7 +4,7 @@
  * TypeScript interfaces for series-related API endpoints.
  */
 
-import type { LocalizedSynopsis, StudioLogo, UnifiedRatingSource } from '@aperture/core'
+import type { HouseholdReach, LocalizedSynopsis, StudioLogo, UnifiedRatingSource } from '@aperture/core'
 
 export interface SeriesRow {
   id: string
@@ -190,8 +190,7 @@ export interface SeriesWatchStatsResponse {
   averageUserRating: number | null
   totalRatings: number
   averageProgress: number
-  watchPercentage: number
-  totalUsers: number
+  householdReach?: HouseholdReach
 }
 
 export interface SeriesFilterRangesResponse {
