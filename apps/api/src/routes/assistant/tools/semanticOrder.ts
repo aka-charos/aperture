@@ -16,44 +16,46 @@
  */
 
 /**
- * The rows of one media type worth keeping, in the order they arrived.
- *
- * Skips the title the user asked to exclude and any title already in `seenTitles`,
- * which it adds to. Passing the movie rows first is what makes the movie win when
- * a movie and a series share a title.
- *
- * @param excludeLower lowercase; matched as a substring of the title
- */
-export function keepNewTitles<T extends { title: string }>(
-  rows: readonly T[],
-  seenTitles: Set<string>,
-  excludeLower?: string
-): T[] {
-  const kept: T[] = []
-  for (const row of rows) {
-    const titleKey = row.title.toLowerCase()
-    if (excludeLower && titleKey.includes(excludeLower)) continue
-    if (seenTitles.has(titleKey)) continue
-    seenTitles.add(titleKey)
-    kept.push(row)
-  }
-  return kept
-}
-
-/**
  * Two nearest-first lists as one, alternating by rank (movie 1, series 1,
- * movie 2, ...), cut to `limit`. When one side runs out the other fills the
+ * movie 2, ...), up to `limit`. When one side runs out the other fills the
  * remaining slots, so a search of one media type is that list, in its order.
+ *
+ * Titles are compared here, as they are placed, rather than before the merge: a
+ * title dropped from one side in favour of a copy on the other side that then
+ * falls past the limit would be in neither. So of two rows with one title the
+ * nearer by rank is the one shown, and the movie on a tie. A skipped row does not
+ * use up its side's turn.
+ *
+ * @param excludeLower lowercase; a title containing it is left out
  */
-export function mergeNearestByRank<T>(
+export function mergeNearestByRank<T extends { name: string }>(
   movies: readonly T[],
   series: readonly T[],
-  limit: number
+  limit: number,
+  excludeLower?: string
 ): T[] {
   const merged: T[] = []
-  for (let rank = 0; rank < Math.max(movies.length, series.length); rank++) {
-    if (rank < movies.length) merged.push(movies[rank]!)
-    if (rank < series.length) merged.push(series[rank]!)
+  const seenTitles = new Set<string>()
+  const sides = [movies[Symbol.iterator](), series[Symbol.iterator]()] as const
+
+  const nextFrom = (side: Iterator<T>): T | undefined => {
+    for (let step = side.next(); !step.done; step = side.next()) {
+      const titleKey = step.value.name.toLowerCase()
+      if (excludeLower && titleKey.includes(excludeLower)) continue
+      if (seenTitles.has(titleKey)) continue
+      seenTitles.add(titleKey)
+      return step.value
+    }
+    return undefined
   }
-  return merged.slice(0, limit)
+
+  let turn: 0 | 1 = 0
+  while (merged.length < limit) {
+    const other: 0 | 1 = turn === 0 ? 1 : 0
+    const item = nextFrom(sides[turn]) ?? nextFrom(sides[other])
+    if (!item) break
+    merged.push(item)
+    turn = other
+  }
+  return merged
 }
