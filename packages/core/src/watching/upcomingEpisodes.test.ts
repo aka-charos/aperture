@@ -11,6 +11,7 @@ const {
   getUpcomingEpisodeForSeries,
   getUpcomingEpisodes,
   getUpcomingEpisodesReport,
+  getEpisodeStandings,
 } = await import('./upcomingEpisodes.js')
 
 /**
@@ -59,7 +60,9 @@ beforeEach(() => {
       if (sql.includes('FROM system_settings')) {
         return { rows: apiKey ? [{ value: apiKey }] : [], rowCount: apiKey ? 1 : 0 }
       }
-      if (sql.includes('FROM episodes')) return { rows: localRows, rowCount: localRows.length }
+      if (sql.includes('FROM episodes') || sql.includes('JOIN episodes')) {
+        return { rows: localRows, rowCount: localRows.length }
+      }
       if (sql.includes('UPDATE series')) {
         writes.push({ sql, params })
         return { rows: [], rowCount: 1 }
@@ -91,7 +94,7 @@ test('a local future episode wins and asks TMDb nothing', async () => {
       episode_number: 4,
       title: 'Local',
       overview: null,
-      premiere_date: '2099-01-01',
+      air_date: '2099-01-01',
     },
   ]
   globalThis.fetch = async () => {
@@ -333,7 +336,7 @@ test('the report says why each show has no episode, and never merges the reasons
       episode_number: 4,
       title: 'Local',
       overview: null,
-      premiere_date: '2099-01-01',
+      air_date: '2099-01-01',
     },
   ]
   globalThis.fetch = (async (url: Parameters<typeof fetch>[0]) => {
@@ -380,4 +383,20 @@ test('the report separates a missing key from a show the caller left out', async
   })
   assert.equal(report.gaps.get(row.id), 'noTmdbKey')
   assert.equal(report.gaps.get(leftOut.id), 'notAsked')
+})
+
+test('standings answer per series, and asking for nothing queries nothing', async () => {
+  const id = randomUUID()
+  const missing = randomUUID()
+  localRows = [{ series_id: id, held: true, played: false }]
+  const episodes = new Map([
+    [id, { seasonNumber: 2, episodeNumber: 4 }],
+    [missing, { seasonNumber: 1, episodeNumber: 1 }],
+  ])
+  const standings = await getEpisodeStandings('viewer', episodes)
+  assert.deepEqual(standings.get(id), { held: true, played: false })
+  assert.equal(standings.has(missing), false, 'no row: the caller reads it as not held')
+
+  localRows = [{ series_id: id, held: true, played: true }]
+  assert.equal((await getEpisodeStandings('viewer', new Map())).size, 0)
 })

@@ -36,7 +36,7 @@ export interface UpcomingEpisode {
   episodeNumber: number
   title: string
   overview: string | null
-  airDate: string // ISO date string
+  airDate: string // YYYY-MM-DD
   source: 'emby' | 'tmdb'
 }
 
@@ -279,9 +279,11 @@ export async function getUpcomingEpisodeForSeries(
     episode_number: number
     title: string
     overview: string | null
-    premiere_date: string
+    air_date: string
   }>(
-    `SELECT season_number, episode_number, title, overview, premiere_date
+    // to_char, not the bare DATE: see getLatestAiredEpisodes.
+    `SELECT season_number, episode_number, title, overview,
+            to_char(premiere_date, 'YYYY-MM-DD') AS air_date
      FROM episodes
      WHERE series_id = $1 
        AND premiere_date >= $2
@@ -290,14 +292,14 @@ export async function getUpcomingEpisodeForSeries(
     [seriesId, today]
   )
 
-  if (embyEpisode && embyEpisode.premiere_date) {
+  if (embyEpisode && embyEpisode.air_date) {
     return {
       seriesId,
       seasonNumber: embyEpisode.season_number,
       episodeNumber: embyEpisode.episode_number,
       title: embyEpisode.title,
       overview: embyEpisode.overview,
-      airDate: embyEpisode.premiere_date,
+      airDate: embyEpisode.air_date,
       source: 'emby',
     }
   }
@@ -355,10 +357,12 @@ export async function getUpcomingEpisodesReport(
     episode_number: number
     title: string
     overview: string | null
-    premiere_date: string
+    air_date: string
   }>(
-    `SELECT DISTINCT ON (series_id) 
-            series_id, season_number, episode_number, title, overview, premiere_date
+    // to_char, not the bare DATE: see getLatestAiredEpisodes.
+    `SELECT DISTINCT ON (series_id)
+            series_id, season_number, episode_number, title, overview,
+            to_char(premiere_date, 'YYYY-MM-DD') AS air_date
      FROM episodes
      WHERE series_id = ANY($1)
        AND premiere_date >= $2
@@ -374,7 +378,7 @@ export async function getUpcomingEpisodesReport(
       episodeNumber: ep.episode_number,
       title: ep.title,
       overview: ep.overview,
-      airDate: ep.premiere_date,
+      airDate: ep.air_date,
       source: 'emby',
     })
   }
@@ -496,6 +500,50 @@ export async function getLatestAiredEpisodes(
     if (latest) result.set(row.series_id, latest)
   }
 
+  return result
+}
+
+/** Where one episode stands: a file on the server, and whether this viewer played it. */
+export interface EpisodeStanding {
+  held: boolean
+  played: boolean
+}
+
+/**
+ * The standing of one exact episode per series. A show with no row for it is left
+ * out, and reads as not held. `held` needs a path: a row alone can be the media
+ * server's placeholder for a missing episode, which has no file to play. The
+ * highest number held would not do either, since a season can have gaps.
+ */
+export async function getEpisodeStandings(
+  userId: string,
+  episodes: ReadonlyMap<string, { seasonNumber: number; episodeNumber: number }>
+): Promise<Map<string, EpisodeStanding>> {
+  const result = new Map<string, EpisodeStanding>()
+  if (episodes.size === 0) return result
+
+  const wanted = [...episodes.entries()]
+  const rows = await query<{ series_id: string; held: boolean; played: boolean }>(
+    `SELECT e.series_id, e.path IS NOT NULL AS held,
+            EXISTS (
+              SELECT 1 FROM watch_history wh
+              WHERE wh.episode_id = e.id AND wh.user_id = $1 AND ${WATCH_HISTORY_PLAYED_SQL}
+            ) AS played
+     FROM unnest($2::uuid[], $3::int[], $4::int[]) AS want(series_id, season_number, episode_number)
+     JOIN episodes e
+       ON e.series_id = want.series_id
+      AND e.season_number = want.season_number
+      AND e.episode_number = want.episode_number`,
+    [
+      userId,
+      wanted.map(([seriesId]) => seriesId),
+      wanted.map(([, episode]) => episode.seasonNumber),
+      wanted.map(([, episode]) => episode.episodeNumber),
+    ]
+  )
+  for (const row of rows.rows) {
+    result.set(row.series_id, { held: row.held === true, played: row.played === true })
+  }
   return result
 }
 

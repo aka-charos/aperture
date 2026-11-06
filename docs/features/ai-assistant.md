@@ -46,7 +46,7 @@ Person lookups return **person cards**; where episode embeddings are enabled, ep
 
 > "What's coming next for the shows I follow?"
 
-The answer covers the shows on your **Shows You Watch** list, each with its next episode and date, soonest first. A date is **expected**: it comes from TMDb or your media server, and it doesn't promise the episode will be ready to play that day. The card separately says when the latest episode aired and whether it's already in your library. If TMDb can't be asked, the assistant says it couldn't check rather than that nothing is coming.
+The answer covers the shows you've added to **Shows You Watch**, each with its next episode and date, soonest first. Shows you've only played aren't included, but you can ask about any show in your library by name. A date is **expected**: it comes from TMDb or your media server, and it doesn't promise the episode will be ready to play that day. The card separately says when the latest episode aired and whether it's already in your library. If TMDb can't be asked, the assistant says it couldn't check rather than that nothing is coming.
 
 ### Discover what you *don't* have
 

@@ -77,6 +77,14 @@ describe('prefilterIntent', () => {
     }
   })
 
+  test('their shows as the aim of a search do not make it a lookup', () => {
+    // The first used to reach the classifier and the second was discovery. Either
+    // way the web search must stay available: a library turn has none.
+    assert.equal(prefilterIntent('what are the best new shows based on my series'), null)
+    assert.equal(prefilterIntent('best new thrillers for fans of the shows I watch'), 'discovery')
+    assert.equal(prefilterIntent('are there new shows for people who like the series I watch'), null)
+  })
+
   test('new and coming soon stay open-world without a followed show', () => {
     assert.equal(prefilterIntent('what movies are coming soon'), 'discovery')
     assert.equal(prefilterIntent('new releases on streaming'), 'discovery')

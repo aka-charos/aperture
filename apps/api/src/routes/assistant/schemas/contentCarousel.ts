@@ -52,6 +52,8 @@ export const ContentCarouselI18nKeySchema = z.enum([
   'carouselEpisodesError',
   // Upcoming episodes
   'carouselUpcomingTitle',
+  'carouselUpcomingSeriesTitle',
+  'carouselUpcomingNotInLibrary',
   'carouselUpcomingDesc',
   'carouselUpcomingDescPartial',
   'carouselUpcomingNothing',

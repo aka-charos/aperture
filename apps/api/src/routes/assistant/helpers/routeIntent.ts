@@ -51,7 +51,14 @@ const RECOMMENDATION_HINTS =
 const NEXT_EPISODE_HINTS = /\b(?:next|upcoming)\s+episodes?\b/i
 const FOLLOWED_SHOWS_HINTS =
   /\b(?:my\s+(?:shows?|series)|(?:shows?|series)\s+(?:that\s+)?i(?:['’]?m| am)?\s+(?:follow|following|watch|watching))\b/i
-const WHEN_HINTS = /\b(?:coming|upcoming|next|new|soon|airs?|airing|returns?|returning|back|premieres?|latest)\b/i
+const WHEN_HINTS =
+  /\b(?:coming|upcoming|next|soon|airs?|airing|returns?|returning|back|premieres?|(?:new|latest)\s+episodes?)\b/i
+/**
+ * Their shows as the aim of a search, not its subject: "the best new shows based
+ * on my series" wants titles to go and watch, and this prefilter is unappealable,
+ * so such a request has to stay with the rules below.
+ */
+const TASTE_AIM_HINTS = /\b(?:best|top \d+|based on|fans? of|given)\b/i
 /**
  * Obvious library signals — about the user's own collection/activity.
  *
@@ -77,8 +84,12 @@ const DISCOVERY_HINTS =
  */
 export function prefilterIntent(text: string): ChatIntent | null {
   if (RECOMMENDATION_HINTS.test(text)) return 'discovery'
-  if (NEXT_EPISODE_HINTS.test(text)) return 'library'
-  if (FOLLOWED_SHOWS_HINTS.test(text) && WHEN_HINTS.test(text)) return 'library'
+  if (
+    !TASTE_AIM_HINTS.test(text) &&
+    (NEXT_EPISODE_HINTS.test(text) || (FOLLOWED_SHOWS_HINTS.test(text) && WHEN_HINTS.test(text)))
+  ) {
+    return 'library'
+  }
 
   const library = LIBRARY_HINTS.test(text)
   const discovery = DISCOVERY_HINTS.test(text)

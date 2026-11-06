@@ -1,6 +1,6 @@
 import test, { afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import type { AiredEpisode, SeasonProgress, UpcomingEpisode, UpcomingGap } from '@aperture/core/watching'
+import type { AiredEpisode, EpisodeStanding, UpcomingEpisode, UpcomingGap } from '@aperture/core/watching'
 
 process.env.DATABASE_URL ??= 'postgres://unused:unused@127.0.0.1/unused'
 
@@ -8,9 +8,16 @@ const { closePool, getPool } = await import('../../../lib/db.js')
 const { createUpcomingTools } = await import('./upcoming.js')
 const { withUnwatchedFilter } = await import('../helpers/unwatched.js')
 const { withStatusEvents } = await import('../helpers/status.js')
-const { filterItemsToScope } = await import('../helpers/libraryScope.js')
-const { airDay, buildUpcomingAnswer, describeLatestAired, describeNext, upcomingAnswerKind, UPCOMING_MAX_LISTED_TITLES } =
-  await import('./upcomingAnswer.js')
+const { filterItemsToScope, withLibraryScope } = await import('../helpers/libraryScope.js')
+const { withToolErrorHandling } = await import('./utils.js')
+const {
+  buildUpcomingAnswer,
+  describeLatestAired,
+  describeNext,
+  upcomingAnswerKind,
+  UPCOMING_MAX_LISTED_TITLES,
+  UPCOMING_MAX_NAME_MATCHES,
+} = await import('./upcomingAnswer.js')
 type FollowedShow = import('./upcomingAnswer.js').FollowedShow
 
 const TODAY = '2026-11-06'
@@ -45,8 +52,9 @@ function answer(input: {
   episodes?: UpcomingEpisode[]
   gaps?: Record<string, UpcomingGap>
   latest?: Record<string, AiredEpisode>
-  progress?: Record<string, Map<number, SeasonProgress>>
+  standings?: Record<string, EpisodeStanding>
   limit?: number
+  series?: string
 }) {
   return buildUpcomingAnswer({
     id: 'upcoming-1',
@@ -56,9 +64,10 @@ function answer(input: {
       gaps: new Map(Object.entries(input.gaps ?? {})),
     },
     latestAired: new Map(Object.entries(input.latest ?? {})),
-    seasonProgress: new Map(Object.entries(input.progress ?? {})),
+    standings: new Map(Object.entries(input.standings ?? {})),
     today: TODAY,
     limit: input.limit ?? 20,
+    series: input.series,
   })
 }
 
@@ -84,6 +93,18 @@ test('empty, no key and a failed lookup are different answers', () => {
   const unknown = answer({ shows: [show('a')], gaps: { a: 'noTmdbEntry' } })
   assert.equal(unknown.answer, 'noTmdbEntry')
   assert.equal(unknown.descriptionKey, 'carouselUpcomingNoTmdbEntry')
+})
+
+test('a named show outside the library says so, under its own heading', () => {
+  const missing = answer({ shows: [], series: 'Severance' })
+  assert.equal(missing.answer, 'notInLibrary')
+  assert.equal(missing.descriptionKey, 'carouselUpcomingNotInLibrary')
+  assert.deepEqual(missing.descriptionParams, { series: 'Severance' })
+  assert.equal(missing.titleKey, 'carouselUpcomingSeriesTitle')
+  assert.deepEqual(missing.titleParams, { series: 'Severance' })
+  // Not followed is a different answer, for a different question.
+  assert.equal(answer({ shows: [] }).titleKey, 'carouselUpcomingTitle')
+  assert.equal(answer({ shows: [] }).titleParams, undefined)
 })
 
 test('a failed lookup is never read as nothing being announced', () => {
@@ -116,7 +137,7 @@ test('dates beat a partial failure, and the caption owns up to it', () => {
 })
 
 test('the verdict order holds whatever else is true', () => {
-  const counts = { followed: 2, scheduled: 0, nothingAnnounced: 1 }
+  const counts = { shows: 2, named: false, scheduled: 0, nothingAnnounced: 1 }
   assert.equal(upcomingAnswerKind({ ...counts, reasons: new Set(['noTmdbKey']) }), 'noTmdbKey')
   assert.equal(upcomingAnswerKind({ ...counts, reasons: new Set(['lookupFailed']) }), 'lookupFailed')
   assert.equal(upcomingAnswerKind({ ...counts, reasons: new Set(['noTmdbEntry']) }), 'nothingAnnounced')
@@ -148,41 +169,30 @@ test('the upcoming episode carries no synopsis: it would spoil what has not aire
   assert.equal(items[0].overview, undefined)
 })
 
-const aired = (source: 'emby' | 'tmdb', episodeNumber = 4): AiredEpisode => ({
+const aired = (source: 'emby' | 'tmdb'): AiredEpisode => ({
   seasonNumber: 2,
-  episodeNumber,
+  episodeNumber: 4,
   title: 'Aired',
   airDate: '2026-10-30',
   source,
 })
 
-test('an aired episode is in the library only when the server holds it', () => {
-  assert.equal(describeLatestAired(aired('emby'), undefined)?.inLibrary, true)
-  assert.equal(describeLatestAired(aired('tmdb'), undefined)?.inLibrary, false)
-
-  const seasons = new Map([[2, { serverLastEpisode: 4, playedLastEpisode: null }]])
-  assert.equal(describeLatestAired(aired('tmdb', 4), seasons)?.inLibrary, true, 'held, undated')
-  assert.equal(describeLatestAired(aired('tmdb', 5), seasons)?.inLibrary, false, 'server is behind')
-  assert.equal(describeLatestAired(undefined, seasons), null)
+test('an aired episode is in the library only when that episode has a file', () => {
+  const held = { held: true, played: false }
+  const placeholder = { held: false, played: false }
+  // Whichever source dated it: a server row can be a placeholder for a missing
+  // episode, and a TMDb date can be for one the server holds undated.
+  assert.equal(describeLatestAired(aired('emby'), held)?.inLibrary, true)
+  assert.equal(describeLatestAired(aired('tmdb'), held)?.inLibrary, true)
+  assert.equal(describeLatestAired(aired('emby'), placeholder)?.inLibrary, false)
+  assert.equal(describeLatestAired(aired('emby'), undefined)?.inLibrary, false, 'no row')
+  assert.equal(describeLatestAired(undefined, held), null)
 })
 
-test('played is read per episode, and nothing played is not episode zero', () => {
-  const played = (playedLastEpisode: number | null) =>
-    describeLatestAired(
-      aired('emby', 4),
-      new Map([[2, { serverLastEpisode: 4, playedLastEpisode }]])
-    )?.played
-  assert.equal(played(4), true)
-  assert.equal(played(3), false)
-  assert.equal(played(null), false)
-})
-
-test('airDay reads the stored day whatever the server clock', () => {
-  assert.equal(airDay('2026-11-20'), '2026-11-20')
-  assert.equal(airDay('2026-11-20T22:00:00.000Z'), '2026-11-20')
-  // How node-pg delivers a DATE: local midnight. toISOString would say the 19th
-  // on any host east of UTC.
-  assert.equal(airDay(new Date(2026, 10, 20)), '2026-11-20')
+test('played is about that episode, and absent is not played', () => {
+  assert.equal(describeLatestAired(aired('emby'), { held: true, played: true })?.played, true)
+  assert.equal(describeLatestAired(aired('emby'), { held: true, played: false })?.played, false)
+  assert.equal(describeLatestAired(aired('emby'), undefined)?.played, false)
 })
 
 // ============================================================================
@@ -261,7 +271,7 @@ test('the result renders as a carousel and carries the keys the client dispatche
 const scope = { libraryIds: ['lib-a'], maxParentalRating: 13, hasMovies: true, hasSeries: true }
 const ctx = { userId: 'viewer-1', scope } as unknown as Parameters<typeof createUpcomingTools>[0]
 
-type Execute = (input: { limit?: number }, options: unknown) => Promise<Record<string, unknown>>
+type Execute = (input: { series?: string; limit?: number }, options: unknown) => Promise<Record<string, unknown>>
 const execute = (context = ctx) =>
   createUpcomingTools(context).getUpcomingEpisodes.execute as unknown as Execute
 
@@ -303,7 +313,73 @@ test('a show outside the scope answers exactly like a show not followed', async 
   assert.deepEqual(result.items, [])
   assert.deepEqual(result.nothingAnnounced, [])
   assert.deepEqual(result.couldNotCheck, [])
-  assert.deepEqual(result.counts, { followed: 0, scheduled: 0, nothingAnnounced: 0, couldNotCheck: 0 })
+  assert.deepEqual(result.counts, { shows: 0, scheduled: 0, nothingAnnounced: 0, couldNotCheck: 0 })
+})
+
+test('a named show is looked up in the scoped library, followed or not, and bounded', async () => {
+  const seen: Array<{ sql: string; params: unknown[] }> = []
+  mockPool((sql, params) => {
+    seen.push({ sql, params })
+    return { rows: [] }
+  })
+  const result = await execute()({ series: '  Severance ' }, {})
+
+  assert.equal(result.answer, 'notInLibrary', 'out of scope answers like a missing show')
+  assert.equal(seen.length, 1)
+  assert.doesNotMatch(seen[0].sql, /user_watching_series/)
+  assert.match(seen[0].sql, /unaccent\(s\.title\) ILIKE/)
+  assert.match(seen[0].sql, /s\.provider_library_id = ANY/)
+  assert.match(seen[0].sql, new RegExp(`LIMIT ${UPCOMING_MAX_NAME_MATCHES}`))
+  assert.deepEqual(seen[0].params, ['%Severance%', 'Severance', ['lib-a'], 13])
+})
+
+test('a blank name asks about the followed list', async () => {
+  const seen: string[] = []
+  mockPool((sql) => {
+    seen.push(sql)
+    return { rows: [] }
+  })
+  const result = await execute()({ series: '   ' }, {})
+  assert.equal(result.answer, 'notFollowing')
+  assert.match(seen[0], /user_watching_series/)
+})
+
+test('a status a live lookup just wrote is the one reported', async () => {
+  // TMDb's answer writes tmdb_status, so read before the lookup it would call a
+  // show that has just ended still running.
+  const id = '33333333-3333-4333-8333-333333333333'
+  let stored: string | null = null
+  mockPool((sql) => {
+    if (sql.includes('FROM user_watching_series')) {
+      return { rows: [{ id, title: 'Over', year: null, poster_url: null, genres: [], community_rating: null }] }
+    }
+    if (sql.includes('FROM system_settings')) return { rows: [{ value: 'key' }] }
+    if (sql.includes('UPDATE series')) {
+      stored = 'Ended'
+      return { rows: [] }
+    }
+    if (sql.includes('SELECT id, tmdb_id FROM series')) return { rows: [{ id, tmdb_id: '987654' }] }
+    if (sql.includes('SELECT id, tmdb_status FROM series')) return { rows: [{ id, tmdb_status: stored }] }
+    return { rows: [] }
+  })
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async () =>
+    Response.json({
+      id: 987654,
+      name: 'Over',
+      next_episode_to_air: null,
+      last_episode_to_air: null,
+      number_of_episodes: 8,
+      number_of_seasons: 1,
+      seasons: [],
+      status: 'Ended',
+    })
+  restores.push(() => {
+    globalThis.fetch = realFetch
+  })
+  const result = await execute()({}, {})
+  assert.equal(result.answer, 'nothingAnnounced')
+  assert.deepEqual(result.nothingAnnounced, [{ title: 'Over', ended: true, latestAired: null }])
 })
 
 test('the answer is built from the shared lookups, with no key meaning no forecast', async () => {
@@ -358,4 +434,25 @@ test('a card survives the scope wrapper as the show it names', async () => {
   const kept = await filterItemsToScope(scope, items)
   assert.equal(kept.length, 1)
   assert.deepEqual(asked.at(-1)?.[0], [id])
+})
+
+test('a scope check that fails shows an error, not a stale answer over no cards', async () => {
+  const id = '44444444-4444-4444-8444-444444444444'
+  mockPool(() => {
+    throw new Error('database down')
+  })
+  const { items, answer: kind } = answer({ shows: [show(id)], episodes: [episode(id, '2026-11-20')] })
+  assert.equal(kind, 'scheduled')
+  const tools = withToolErrorHandling(
+    withLibraryScope(
+      { getUpcomingEpisodes: { execute: async () => ({ items, answer: kind }) } } as never,
+      scope
+    )
+  ) as { getUpcomingEpisodes: { execute: () => Promise<Record<string, unknown>> } }
+
+  const result = await tools.getUpcomingEpisodes.execute()
+  assert.equal(typeof result.error, 'string')
+  // Fails closed: no card and no verdict about them gets through.
+  assert.equal('items' in result, false)
+  assert.equal('answer' in result, false)
 })

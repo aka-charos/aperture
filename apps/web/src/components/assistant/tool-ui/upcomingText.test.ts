@@ -24,7 +24,8 @@ test('a day stays that day whatever the viewer clock', () => {
     process.env.TZ = zone
     assert.match(formatAirDay('2026-11-20', 'en-US'), /Nov 20, 2026/, zone)
   }
-  process.env.TZ = original
+  if (original === undefined) delete process.env.TZ
+  else process.env.TZ = original
 })
 
 test('an unreadable date is shown as sent rather than as Invalid Date', () => {

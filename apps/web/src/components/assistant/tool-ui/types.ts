@@ -119,6 +119,8 @@ export type ContentCarouselI18nKey =
   | 'carouselEpisodesEmpty'
   | 'carouselEpisodesError'
   | 'carouselUpcomingTitle'
+  | 'carouselUpcomingSeriesTitle'
+  | 'carouselUpcomingNotInLibrary'
   | 'carouselUpcomingDesc'
   | 'carouselUpcomingDescPartial'
   | 'carouselUpcomingNothing'
