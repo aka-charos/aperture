@@ -33,7 +33,7 @@ Each card holds **provider → model → API key**, plus whatever that role and 
 - **Retrieval mode** (and, for a mode on OpenRouter, a pinned **upstream**) on the Embeddings card, for models that support one. Each mode is a separate set of vectors; see [Embedding models](embedding-models.md).
 - **Test** sends a real (billable) request tagged as a settings test. For embeddings it reports the **measured vector width** and whether a matching storage table exists; on OpenRouter it also reports the model's reasoning levels and flex availability, and on flex sends one request to check which tier served it.
 
-Model catalogs ship with the app: OpenAI, Anthropic, Google, Groq, Deepseek, OpenRouter, Z.AI, Hugging Face, Ollama, LM Studio (reads the installed models off the server), Unsloth Studio (the same, for the text roles; no embeddings), and generic OpenAI-compatible endpoints.
+Model catalogs ship with the app: OpenAI, Anthropic, Google, Groq, Deepseek, OpenRouter, Z.AI, Hugging Face, Ollama, LM Studio (reads the installed models off the server), Unsloth Studio (the same, for the text roles; no embeddings), and generic OpenAI-compatible endpoints. A generic server's models are read from its own `GET /v1/models` (LM Studio's richer listing wins where one answers), offered to every role but Web Search; if the listing can't be read, the card says why, including whether a key is missing or was refused.
 
 ## Unsloth Studio
 

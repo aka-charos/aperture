@@ -44,4 +44,4 @@ The section is always in exactly one of three states:
 ## Rewriting
 
 - **Rewrite this analysis** — offered when the analysis was written with an older version of the instructions that is no longer good enough; the section says so. It reads the sources again and writes the text fresh with the currently configured model.
-- **Administrators** additionally get a re-run control showing the source count, how much text was read, the prompt version, and which search mode produced it (self-hosted search or Google grounding).
+- **Administrators** additionally get a re-run control showing the source count, how much text was read, the prompt version, which search mode produced it (self-hosted search or Google grounding), and how long it took, with the writing time beside the total. Analyses written before this was recorded show no time.

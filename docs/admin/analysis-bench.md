@@ -12,6 +12,8 @@ Admin console → **AI models** → **Analysis bench** (`/admin/ai/analysis-benc
 2. **Pick the models** — checkboxes grouped by provider (up to 8, ordered). Cloud providers are always listed; **local providers are live-probed** for their installed models. Unconfigured or unreachable providers are shown as such
 3. **Run** — the run starts in the background (**202 + run id**; the UI polls every 4 s). A local model can take **~45 minutes**; a **Stop** control cooperatively cancels
 
+A model Aperture can't reach can still answer: **Run a model by hand** holds the comparison open while the waiting panel offers **Download prompts** and **Download runner script**, with the steps and a ready-made command for each model still owing an answer. If either download is refused or the connection drops, the panel says so. See [Running an Analysis Bench File](offsite-analysis.md#running-an-analysis-bench-file).
+
 ## The Control That Makes It Fair
 
 The server **retrieves the sources once** and hands every model a **byte-identical prompt**. Differences in the outputs are attributable to the models, not to different search results. Grounding mode is **refused outright** — the bench only runs when retrieval mode is the self-hosted service ([fastCRW](crw.md)), because Gemini's native search would retrieve per-model.

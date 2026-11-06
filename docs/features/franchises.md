@@ -49,7 +49,7 @@ Click a franchise's **name** (or **Part of Collection** on any movie's detail pa
 
 - A summary: how many films, how many are in your library, and how many you've watched
 - **In your library** — the films you have, each with its watched tick
-- **Not in your library** — released films the server doesn't have, with a **Request** button when Seerr is set up and your account may request (otherwise it says why not). A film already requested shows its request status instead
+- **Not in your library** — released films the server doesn't have, with a **Request** button when Seerr is set up and your account may request (otherwise it says why not). A film already requested shows its request status instead. If Seerr doesn't answer about a film in time, that film has no button; opening the page again asks again
 - **Upcoming** — announced films with their release date (or "Release date not announced"); these can't be requested yet
 
 If TMDb can't be reached, only the films already in your library are listed, and the page says so. Requests made here appear under [My Requests](my-requests.md).
