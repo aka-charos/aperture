@@ -22,7 +22,7 @@
 
 > "A slow, wintry film — nothing longer than two hours"
 
-Concept queries are answered with **semantic search** over your library's embeddings, not just title matching. Answers arrive as **poster cards**, each with a reason attached, in a grid that fits the width of the chat. Click a card, its title, or **More ›** at the end of a cut synopsis to open the title (playback starts there); each card also has a favorite toggle, and an episode card has **Play**, which opens that episode directly.
+Concept queries are answered with **semantic search** over your library's embeddings, not just title matching. Answers arrive as **poster cards**, each with a reason attached, in a grid that fits the width of the chat. Click a card, its title, or **More ›** at the end of a cut synopsis to open the title (playback starts there); each card also has a favorite toggle, and an episode card has **Play**, which opens that episode directly. When Encore answers about one title, its larger card lets you rate it and, for a series, add it to Watching. In a narrow chat, that card folds the rest of the synopsis and the credits behind **Show more**.
 
 ### Answer questions about *you*
 

@@ -1721,7 +1721,14 @@
       "twinMark": "Also watched by the person whose taste overlaps yours",
       "twinMarkConnection": "{{name}} watched this too",
       "rewriteExplanation": "Rewrite this explanation",
-      "rewriteExplanationFailed": "Could not rewrite it: {{detail}}"
+      "rewriteExplanationFailed": "Could not rewrite it: {{detail}}",
+      "tooltipQualityScale": "For example: {{examples}}.",
+      "ratingScoreExample": "{{rating}} → {{pct}}%",
+      "qualityFrom": "From rating {{rating}}",
+      "qualityUnrated": "No rating: given the default score",
+      "qualityScoredOn": "Scored on {{scored}}; the rating is now {{rating}}. Updates when your recommendations are regenerated.",
+      "qualityScoredOnUnknown": "Scored on an older rating; it is now {{rating}}. Updates when your recommendations are regenerated.",
+      "qualityScoredOnOnly": "Scored on {{scored}}"
     },
     "seasons": {
       "title": "エピソード",
@@ -1874,7 +1881,16 @@
         "circumstances": "Production Context",
         "reception": "Critical Reception"
       },
-      "generatingNote": "This takes a few minutes. You can leave this page — it will be here when you come back."
+      "generatingNote": "This takes a few minutes. You can leave this page — it will be here when you come back.",
+      "summary_one": "{{count}} section · {{minutes}} min read",
+      "summary_other": "{{count}} sections · {{minutes}} min read",
+      "summaryPlain": "{{minutes}} min read",
+      "basedOnSources_one": "Based on {{count}} source",
+      "basedOnSources_other": "Based on {{count}} sources",
+      "readAll": "Read all",
+      "viewSources": "View",
+      "hideSources": "Hide",
+      "sectionOf": "{{current}} of {{total}}"
     },
     "recommendDialog": {
       "title": "{{title}} を紹介",
@@ -2346,7 +2362,9 @@
     "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it.",
     "sectionUntitled": "Results",
     "moreLink": "More",
-    "moreAbout": "More about {{title}}"
+    "moreAbout": "More about {{title}}",
+    "ratingFailed": "Couldn't save your rating. Please try again.",
+    "watchingFailed": "Couldn't update your Watching list. Please try again."
   },
   "similarityGraph": {
     "loadingFallback": "読み込み中…",
