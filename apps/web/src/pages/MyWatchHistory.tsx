@@ -585,7 +585,7 @@ export function MyWatchHistoryPage() {
                               top: 8,
                               left: 8,
                               backgroundColor: 'primary.main',
-                              color: 'white',
+                              color: 'surface.onBrand',
                               fontWeight: 600,
                               fontSize: '0.7rem',
                               height: 22,

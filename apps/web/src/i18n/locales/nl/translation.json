@@ -58,7 +58,12 @@
     "watchThis": "Moet je zien",
     "userMenu": "Account menu",
     "nextFromHere": "Next from here",
-    "openMenu": "Open menu"
+    "openMenu": "Open menu",
+    "group": {
+      "forYou": "Voor jou",
+      "yourLibrary": "Je bibliotheek",
+      "activity": "Activiteit"
+    }
   },
   "admin": {
     "title": "Administratie",
@@ -5366,7 +5371,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own near-black and charcoal. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "Studio, which is also the light appearance, answers the default pair with its own cobalt. Save any other pair and every appearance uses it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -7153,7 +7158,13 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is a flat gray page with near-black type and buttons; dark is easier on the eyes in a dim room. Remembered in this browser."
+    "cardDescription": "Light is always the Studio look. For dark, choose Classic or Studio. Remembered in this browser.",
+    "themeLabel": "Thema",
+    "classic": "Klassiek",
+    "classicDescription": "Het oorspronkelijke donkere uiterlijk.",
+    "studio": "Studio",
+    "studioDescription": "Kobaltblauwe accenten, heldere typografie en lichte of donkere vlakken.",
+    "system": "Apparaat volgen"
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",

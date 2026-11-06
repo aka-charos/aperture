@@ -464,7 +464,7 @@ export function MyRecommendationsPage() {
                     height: 20,
                     minWidth: 20,
                     bgcolor: theme.palette.primary.main,
-                    color: 'white',
+                    color: 'surface.onBrand',
                     fontSize: '0.75rem',
                     '& .MuiChip-label': { px: 0.75 },
                   }}

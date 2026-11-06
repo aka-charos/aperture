@@ -76,7 +76,7 @@ export function TitleTile({
                 insetInlineStart: 6,
                 bgcolor: 'rgba(0,0,0,0.6)',
                 color: 'common.white',
-                '&:hover': { bgcolor: 'primary.main' },
+                '&:hover': { bgcolor: 'primary.main', color: 'surface.onBrand' },
               }}
             >
               <AltRouteIcon sx={{ fontSize: 16 }} />

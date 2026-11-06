@@ -58,7 +58,12 @@
     "watchThis": "值得一看",
     "userMenu": "Account menu",
     "nextFromHere": "Next from here",
-    "openMenu": "Open menu"
+    "openMenu": "Open menu",
+    "group": {
+      "forYou": "为你推荐",
+      "yourLibrary": "你的媒体库",
+      "activity": "活动"
+    }
   },
   "admin": {
     "title": "管理",
@@ -5366,7 +5371,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own near-black and charcoal. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "Studio, which is also the light appearance, answers the default pair with its own cobalt. Save any other pair and every appearance uses it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -7153,7 +7158,13 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is a flat gray page with near-black type and buttons; dark is easier on the eyes in a dim room. Remembered in this browser."
+    "cardDescription": "Light is always the Studio look. For dark, choose Classic or Studio. Remembered in this browser.",
+    "themeLabel": "主题",
+    "classic": "经典",
+    "classicDescription": "原始深色外观。",
+    "studio": "Studio",
+    "studioDescription": "钴蓝色点缀、清晰字体和浅色或深色界面。",
+    "system": "跟随设备"
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",

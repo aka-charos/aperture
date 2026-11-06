@@ -37,7 +37,7 @@ function RTScoreBadge({ score, type }: { score: number | string; type: 'critic' 
           alignItems: 'center',
           gap: 0.5,
           bgcolor: isFresh ? 'success.main' : 'error.main',
-          color: 'white',
+          color: 'surface.onStatus',
           px: 1,
           py: 0.25,
           borderRadius: 1,

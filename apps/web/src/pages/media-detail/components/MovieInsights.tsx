@@ -1016,7 +1016,7 @@ export function MovieInsights({ insights, mediaType = 'movie', onOpenMedia, onRe
                               fontSize: '0.65rem',
                               fontWeight: 700,
                               bgcolor: alpha(theme.palette.primary.main, 0.9),
-                              color: 'white',
+                              color: 'surface.onBrand',
                             }}
                           />
                         )}

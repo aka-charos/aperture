@@ -58,7 +58,12 @@
     "watchThis": "यह देखें",
     "userMenu": "Account menu",
     "nextFromHere": "Next from here",
-    "openMenu": "Open menu"
+    "openMenu": "Open menu",
+    "group": {
+      "forYou": "आपके लिए",
+      "yourLibrary": "आपकी लाइब्रेरी",
+      "activity": "गतिविधि"
+    }
   },
   "admin": {
     "title": "प्रशासन",
@@ -5366,7 +5371,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own near-black and charcoal. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "Studio, which is also the light appearance, answers the default pair with its own cobalt. Save any other pair and every appearance uses it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -7153,7 +7158,13 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is a flat gray page with near-black type and buttons; dark is easier on the eyes in a dim room. Remembered in this browser."
+    "cardDescription": "Light is always the Studio look. For dark, choose Classic or Studio. Remembered in this browser.",
+    "themeLabel": "थीम",
+    "classic": "क्लासिक",
+    "classicDescription": "मूल गहरा रूप।",
+    "studio": "Studio",
+    "studioDescription": "कोबाल्ट रंग, साफ़ अक्षर और लाइट या डार्क सतहें।",
+    "system": "डिवाइस के अनुसार"
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",

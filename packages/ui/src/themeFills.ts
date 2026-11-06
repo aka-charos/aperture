@@ -12,6 +12,8 @@ import type { Theme } from '@mui/material/styles'
 interface SurfaceFills {
   fill?: string
   fillDeep?: string
+  onBrand?: string
+  onStatus?: string
 }
 
 function surfaceOf(theme: Theme): SurfaceFills | undefined {
@@ -26,4 +28,14 @@ export function neutralFill(theme: Theme): string {
 /** Behind a poster while it loads. */
 export function neutralFillDeep(theme: Theme): string {
   return surfaceOf(theme)?.fillDeep ?? theme.palette.grey[900]
+}
+
+/** The label on a primary or secondary fill; a theme without the token keeps white. */
+export function onBrandFill(theme: Theme): string {
+  return surfaceOf(theme)?.onBrand ?? '#fff'
+}
+
+/** The label on a success, warning, error or information fill. */
+export function onStatusFill(theme: Theme): string {
+  return surfaceOf(theme)?.onStatus ?? '#fff'
 }

@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react'
-import { documentChromeColor, type ColorMode } from '@/theme'
+import { documentChromeColor, type ColorMode, type UiTheme } from '@/theme'
 
 /**
- * Light or dark, chosen per BROWSER.
+ * Light or dark, and which dark look (`UiTheme`), chosen per BROWSER.
  *
  * Deliberately not an account preference: those live in `user_settings`, whose
  * `updated_at` the recommendation activity gate reads, so flipping the theme
@@ -13,27 +13,48 @@ import { documentChromeColor, type ColorMode } from '@/theme'
  * Not in `clientCaches.ts` either: it holds no user's data, so signing out or
  * viewing as someone else must not reset it.
  *
- * Absent means dark, which is what every instance looked like before the light
- * mode existed.
+ * Absent means Classic and dark, which is what every instance looked like before
+ * either choice existed.
  */
 const STORAGE_KEY = 'aperture-color-mode'
+const THEME_STORAGE_KEY = 'aperture-ui-theme'
 export const DEFAULT_COLOR_MODE: ColorMode = 'dark'
+export const DEFAULT_UI_THEME: UiTheme = 'classic'
+
+/** What was chosen, as against the mode that choice comes to right now. */
+export type ColorModeChoice = ColorMode | 'system'
 
 /** Pure: a stored value, read defensively. Anything unrecognised is "no choice". */
-export function parseColorMode(raw: unknown): ColorMode | null {
-  return raw === 'light' || raw === 'dark' ? raw : null
+export function parseColorModeChoice(raw: unknown): ColorModeChoice | null {
+  return raw === 'light' || raw === 'dark' || raw === 'system' ? raw : null
 }
 
-function readStored(): ColorMode {
+/** Pure: a stored theme. Anything unrecognised is the original look, never an opt-in. */
+export function parseUiTheme(raw: unknown): UiTheme {
+  return raw === 'studio' ? 'studio' : DEFAULT_UI_THEME
+}
+
+/** Pure: the mode a choice comes to on a device that does or does not prefer dark. */
+export function resolveColorMode(choice: ColorModeChoice, deviceIsDark: boolean): ColorMode {
+  if (choice !== 'system') return choice
+  return deviceIsDark ? 'dark' : 'light'
+}
+
+function readStored(key: string): string | null {
   try {
-    return parseColorMode(localStorage.getItem(STORAGE_KEY)) ?? DEFAULT_COLOR_MODE
+    return localStorage.getItem(key)
   } catch {
     // Storage blocked (private mode, site data off): the default, every time.
-    return DEFAULT_COLOR_MODE
+    return null
   }
 }
 
-let mode: ColorMode = typeof window === 'undefined' ? DEFAULT_COLOR_MODE : readStored()
+const hasWindow = typeof window !== 'undefined'
+const deviceDark = hasWindow && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null
+
+let choice: ColorModeChoice = (hasWindow && parseColorModeChoice(readStored(STORAGE_KEY))) || DEFAULT_COLOR_MODE
+let uiTheme: UiTheme = hasWindow ? parseUiTheme(readStored(THEME_STORAGE_KEY)) : DEFAULT_UI_THEME
+let mode: ColorMode = resolveColorMode(choice, deviceDark?.matches ?? true)
 const listeners = new Set<() => void>()
 /** Full-page dark stages on screen (the sign-in page); see `holdDarkDocument`. */
 let darkHolds = 0
@@ -50,14 +71,18 @@ function applyToDocument() {
   const shown: ColorMode = darkHolds > 0 ? 'dark' : mode
   document.documentElement.style.colorScheme = shown
   document.documentElement.dataset.colorMode = shown
+  document.documentElement.dataset.uiTheme = uiTheme
   const meta = document.querySelector('meta[name="theme-color"]')
-  meta?.setAttribute('content', documentChromeColor(shown))
+  meta?.setAttribute('content', documentChromeColor(shown, uiTheme))
 }
 applyToDocument()
 
-function adopt(next: ColorMode) {
-  if (next === mode) return
-  mode = next
+function adopt(nextChoice: ColorModeChoice, nextTheme: UiTheme) {
+  const nextMode = resolveColorMode(nextChoice, deviceDark?.matches ?? true)
+  if (nextChoice === choice && nextTheme === uiTheme && nextMode === mode) return
+  choice = nextChoice
+  uiTheme = nextTheme
+  mode = nextMode
   applyToDocument()
   for (const listener of listeners) listener()
 }
@@ -65,24 +90,46 @@ function adopt(next: ColorMode) {
 // Another tab's choice. `storage` fires in every OTHER tab of this origin, so
 // without it two open tabs disagree, and the next press in the stale one flips
 // from the wrong side.
-if (typeof window !== 'undefined') {
+if (hasWindow) {
   window.addEventListener('storage', (event) => {
-    if (event.key === STORAGE_KEY || event.key === null) adopt(readStored())
+    if (event.key === STORAGE_KEY || event.key === THEME_STORAGE_KEY || event.key === null) {
+      adopt(parseColorModeChoice(readStored(STORAGE_KEY)) ?? DEFAULT_COLOR_MODE, parseUiTheme(readStored(THEME_STORAGE_KEY)))
+    }
   })
+}
+// The device changing its mind. Only "Follow device" comes to anything different.
+deviceDark?.addEventListener('change', () => adopt(choice, uiTheme))
+
+function remember(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // Not remembered, but still applied for this visit.
+  }
 }
 
 export function getColorMode(): ColorMode {
   return mode
 }
 
-export function setColorMode(next: ColorMode): void {
-  if (next === mode) return
-  try {
-    localStorage.setItem(STORAGE_KEY, next)
-  } catch {
-    // Not remembered, but still applied for this visit.
-  }
-  adopt(next)
+export function getColorModeChoice(): ColorModeChoice {
+  return choice
+}
+
+export function getUiTheme(): UiTheme {
+  return uiTheme
+}
+
+export function setColorMode(next: ColorModeChoice): void {
+  if (next === choice) return
+  remember(STORAGE_KEY, next)
+  adopt(next, uiTheme)
+}
+
+export function setUiTheme(next: UiTheme): void {
+  if (next === uiTheme) return
+  remember(THEME_STORAGE_KEY, next)
+  adopt(choice, next)
 }
 
 /**
@@ -112,4 +159,14 @@ function subscribe(listener: () => void) {
 /** The current mode, re-rendering the caller when it changes. */
 export function useColorMode(): ColorMode {
   return useSyncExternalStore(subscribe, getColorMode, () => DEFAULT_COLOR_MODE)
+}
+
+/** What was chosen, for the control that chooses it. */
+export function useColorModeChoice(): ColorModeChoice {
+  return useSyncExternalStore(subscribe, getColorModeChoice, () => DEFAULT_COLOR_MODE)
+}
+
+/** The current theme, re-rendering the caller when it changes. */
+export function useUiTheme(): UiTheme {
+  return useSyncExternalStore(subscribe, getUiTheme, () => DEFAULT_UI_THEME)
 }

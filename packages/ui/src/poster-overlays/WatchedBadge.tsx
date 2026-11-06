@@ -1,5 +1,6 @@
 import React from 'react'
 import { Box, Tooltip, alpha, useTheme } from '@mui/material'
+import { onStatusFill } from '../themeFills.js'
 import Check from '@mui/icons-material/Check'
 import { usePosterDisplaySettings } from '../posterDisplaySettings.js'
 
@@ -47,7 +48,7 @@ export function WatchedBadge({ label, size = 22, sx = {} }: WatchedBadgeProps) {
           alignItems: 'center',
           justifyContent: 'center',
           bgcolor: alpha(theme.palette.success.main, 0.92),
-          color: '#fff',
+          color: onStatusFill(theme),
           boxShadow: '0 1px 4px rgba(0,0,0,0.5)',
           ...sx,
         }}

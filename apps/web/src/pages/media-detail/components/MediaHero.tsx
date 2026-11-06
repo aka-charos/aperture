@@ -67,6 +67,7 @@ import {
 } from '@aperture/ui'
 import { genreLabel } from '@/lib/genreLabel'
 import { decorativeButtonColor, decorativeColor } from '@/theme'
+import { heroTitleInCondensedFace } from '../heroTitle'
 
 // The "open in <server>" CTA is branded like the app it opens, not the instance's own
 // theme — these are the media servers' own colors, not admin-configurable.
@@ -642,7 +643,7 @@ export function MediaHero({
                     : t('mediaDetail.hero.watched')
                 }
                 size="small"
-                sx={{ bgcolor: 'primary.main', color: 'white', fontWeight: 600 }}
+                sx={{ bgcolor: 'primary.main', color: 'surface.onBrand', fontWeight: 600 }}
               />
             )}
           </Box>
@@ -689,6 +690,15 @@ export function MediaHero({
                 fontSize: '2rem',
                 [HERO_ROOMY]: { fontSize: '3rem' },
                 overflowWrap: 'anywhere',
+                ...(theme.aperture.name === 'studio' &&
+                  heroTitleInCondensedFace(media.title) && {
+                    fontFamily: '"Barlow Condensed", sans-serif',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.015em',
+                    fontSize: '2.25rem',
+                    [HERO_ROOMY]: { fontSize: '3.5rem' },
+                  }),
               }}
             >
               {media.title}
@@ -826,14 +836,14 @@ export function MediaHero({
                     variant={unexplored ? 'outlined' : 'filled'}
                     icon={
                       enjoyed ? (
-                        <ThumbUpIcon sx={{ color: 'white !important', fontSize: 16 }} />
+                        <ThumbUpIcon sx={{ color: `${theme.palette.surface.onStatus} !important`, fontSize: 16 }} />
                       ) : unexplored ? (
                         <HubOutlinedIcon sx={{ color: 'info.main', fontSize: 16 }} />
                       ) : undefined
                     }
                     sx={
                       enjoyed
-                        ? { bgcolor: 'success.main', color: 'white', fontWeight: 500 }
+                        ? { bgcolor: 'success.main', color: 'surface.onStatus', fontWeight: 500 }
                         : unexplored
                           ? { borderColor: 'info.main', color: 'info.main' }
                           : {
@@ -918,7 +928,7 @@ export function MediaHero({
                   sx={{
                     ...actionBtnSx,
                     ...(isWatching && {
-                      color: 'white',
+                      color: 'surface.onBrand',
                       background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.9)} 0%, ${alpha(theme.palette.secondary.main, 0.9)} 100%)`,
                     }),
                   }}

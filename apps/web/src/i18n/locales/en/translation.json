@@ -58,7 +58,12 @@
     "sharedWithMeBadge_other": "{{count}} new recommendations",
     "userMenu": "Account menu",
     "openMenu": "Open menu",
-    "nextFromHere": "Next from here"
+    "nextFromHere": "Next from here",
+    "group": {
+      "forYou": "For you",
+      "yourLibrary": "Your library",
+      "activity": "Activity"
+    }
   },
   "admin": {
     "title": "Administration",
@@ -4234,7 +4239,7 @@
   "settingsThemeColors": {
     "title": "Brand colors",
     "subtitle": "The two accent colors used throughout the app — buttons, highlights, gradients, and badges. Other colors (errors, warnings, success) stay fixed.",
-    "lightModeNote": "The light appearance answers the default pair with its own near-black and charcoal. Save any other pair and both appearances use it as saved.",
+    "lightModeNote": "Studio, which is also the light appearance, answers the default pair with its own cobalt. Save any other pair and every appearance uses it as saved.",
     "primaryLabel": "Primary",
     "secondaryLabel": "Secondary",
     "invalidHex": "Enter a color like #6366f1",
@@ -7110,7 +7115,13 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is a flat gray page with near-black type and buttons; dark is easier on the eyes in a dim room. Remembered in this browser."
+    "cardDescription": "Light is always the Studio look. For dark, choose Classic or Studio. Remembered in this browser.",
+    "themeLabel": "Theme",
+    "classic": "Classic",
+    "classicDescription": "The original dark look.",
+    "studio": "Studio",
+    "studioDescription": "Cobalt accents, crisp typography, and light or dark surfaces.",
+    "system": "Follow device"
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",

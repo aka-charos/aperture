@@ -165,7 +165,7 @@ export function DiscoveryFilters({
                 height: 20,
                 minWidth: 20,
                 bgcolor: hasActiveFilters ? 'rgba(255,255,255,0.2)' : 'primary.main',
-                color: 'white',
+                color: hasActiveFilters ? 'white' : 'surface.onBrand',
                 '& .MuiChip-label': { px: 0.75 },
               }}
             />

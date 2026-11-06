@@ -3129,7 +3129,12 @@
     "watchThis": "Δείτε το",
     "userMenu": "Μενού λογαριασμού",
     "nextFromHere": "Τι να δω μετά",
-    "openMenu": "Άνοιγμα μενού"
+    "openMenu": "Άνοιγμα μενού",
+    "group": {
+      "forYou": "Για εσάς",
+      "yourLibrary": "Η βιβλιοθήκη σας",
+      "activity": "Δραστηριότητα"
+    }
   },
   "settingsMdblist": {
     "title": "Ενσωμάτωση MDBList",
@@ -5391,7 +5396,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own near-black and charcoal. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "Studio, which is also the light appearance, answers the default pair with its own cobalt. Save any other pair and every appearance uses it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -7153,7 +7158,13 @@
     "switchToLight": "Αλλαγή σε φωτεινή εμφάνιση",
     "switchToDark": "Αλλαγή σε σκοτεινή εμφάνιση",
     "cardTitle": "Εμφάνιση",
-    "cardDescription": "Η φωτεινή είναι μια επίπεδη γκρι σελίδα με σχεδόν μαύρα γράμματα και κουμπιά· η σκοτεινή ξεκουράζει τα μάτια σε χαμηλό φωτισμό. Αποθηκεύεται σε αυτόν τον browser."
+    "cardDescription": "Η φωτεινή έχει πάντα την όψη Studio. Για τη σκοτεινή, διαλέξτε Κλασικό ή Studio. Αποθηκεύεται σε αυτόν τον browser.",
+    "themeLabel": "Θέμα",
+    "classic": "Κλασικό",
+    "classicDescription": "Η αρχική σκοτεινή εμφάνιση.",
+    "studio": "Studio",
+    "studioDescription": "Τόνοι μπλε του κοβαλτίου, καθαρή τυπογραφία και φωτεινές ή σκοτεινές επιφάνειες.",
+    "system": "Όπως η συσκευή"
   },
   "newsletters": {
     "subscription": {

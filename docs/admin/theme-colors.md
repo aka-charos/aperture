@@ -19,12 +19,12 @@ Only the **`main` shade** of each colour is yours — MUI derives the lighter an
 
 ## Light and Dark Appearances
 
-The app has two appearances, and each viewer picks one for their browser (the sun/moon button in the top bar, or Settings → Display). The dark one is the default.
+Each viewer picks light or dark for their browser (the sun/moon button in the top bar, or Settings → Display), and under Display which dark look they want, Classic or Studio. Dark and Classic are the defaults. Light always looks like Studio.
 
-- With the **default pair** (indigo and purple), the light appearance uses its own accents instead, a slate teal and a deep mauve chosen to read on its gray canvas.
-- **Save any other pair** and both appearances use it exactly as saved. Check that your colours read on both a dark and a light background; a colour bright enough for the dark canvas can be too pale on the light one.
+- With the **default pair** (indigo and purple), Classic's dark uses it as is, and Studio, light and dark, uses its own cobalt instead.
+- **Save any other pair** and every appearance uses it exactly as saved. Check that your colours read on both a dark and a light background; a colour bright enough for the dark canvas can be too pale on the light one.
 
-**Reset to default** puts the default pair back, which also gives the light appearance its own accents again.
+**Reset to default** puts the default pair back, which also gives Studio its own cobalt again.
 
 ---
 

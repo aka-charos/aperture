@@ -151,7 +151,7 @@ export function TopPicksSeriesListItem({
                   top: 8,
                   right: 8,
                   backgroundColor: alpha(theme.palette.secondary.main, 0.9),
-                  color: 'white',
+                  color: 'surface.onBrand',
                   fontWeight: 600,
                   fontSize: '0.65rem',
                   height: 20,

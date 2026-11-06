@@ -196,14 +196,41 @@ export function GlobalSearch() {
     <>
       {/* Search trigger button in header */}
       <Tooltip title={searchShortcutTooltip}>
-        <IconButton
-          data-tour="app-search"
-          onClick={() => setOpen(true)}
-          color="inherit"
-          sx={{ opacity: 0.8 }}
-        >
-          <SearchIcon />
-        </IconButton>
+        {theme.aperture.name === 'studio' ? (
+          <ButtonBase
+            data-tour="app-search"
+            onClick={() => setOpen(true)}
+            aria-label={searchShortcutTooltip}
+            sx={{
+              display: 'flex',
+              justifyContent: 'flex-start',
+              gap: 1,
+              borderRadius: 1,
+              px: { xs: 1, md: 1.5 },
+              py: 1,
+              mr: 1,
+              minWidth: 0,
+              width: { md: 200, lg: 280 },
+              color: 'text.secondary',
+              textAlign: 'start',
+              bgcolor: { md: 'background.default' },
+            }}
+          >
+            <SearchIcon fontSize="small" />
+            <Typography variant="body2" noWrap sx={{ display: { xs: 'none', md: 'block' } }}>
+              {t('globalSearch.placeholder')}
+            </Typography>
+          </ButtonBase>
+        ) : (
+          <IconButton
+            data-tour="app-search"
+            onClick={() => setOpen(true)}
+            color="inherit"
+            sx={{ opacity: 0.8 }}
+          >
+            <SearchIcon />
+          </IconButton>
+        )}
       </Tooltip>
 
       {/* Search Dialog */}

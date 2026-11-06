@@ -252,7 +252,7 @@ export function ScheduleTable({
                         label={t('admin.jobsPage.ui.statusRunning')}
                         sx={{
                           bgcolor: 'primary.main',
-                          color: 'white',
+                          color: 'surface.onBrand',
                           height: 20,
                           fontSize: '0.7rem',
                           animation: 'pulse 2s infinite',
@@ -473,7 +473,7 @@ export function ScheduleTable({
                       label={t('admin.jobsPage.ui.statusRunning')}
                       sx={{
                         bgcolor: 'primary.main',
-                        color: 'white',
+                        color: 'surface.onBrand',
                         animation: 'pulse 2s infinite',
                         '@keyframes pulse': {
                           '0%, 100%': { opacity: 1 },

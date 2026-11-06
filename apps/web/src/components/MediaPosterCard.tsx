@@ -281,7 +281,7 @@ export function MediaPosterCard({
               top: 8,
               right: 8,
               backgroundColor: alpha(sourceColor || theme.palette.primary.main, 0.9),
-              color: 'white',
+              color: sourceColor ? 'white' : 'surface.onBrand',
               fontWeight: 600,
               fontSize: '0.7rem',
               height: 22,

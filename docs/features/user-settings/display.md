@@ -10,7 +10,11 @@ Click your **avatar** in the top bar and pick **Display**.
 
 ## Appearance
 
-**Light** or **Dark**. Light is a soft gray canvas with slate and mauve accents; dark is easier on the eyes in a dim room. The same switch is the sun/moon button in the top bar (in the avatar menu on a phone). The choice is remembered in **this browser**, not on your account, so a phone and a laptop can differ. Until you pick, the app is dark.
+**Light**, **Dark** or **Follow device**. Light has white cards on a pale page with cobalt accents; dark is easier on the eyes in a dim room. **Follow device** switches whenever your phone or computer does. The sun/moon button in the top bar (in the avatar menu on a phone) picks light or dark outright, so choose **Follow device** again here to go back to it. Until you pick, the app is dark.
+
+**Classic** or **Studio** chooses your dark look. Classic is the original near-black. Studio is the dark side of the light look: navy surfaces, cobalt accents, Manrope type, a search field in the top bar and headings in the sidebar. Light always looks like Studio, so going between Classic's dark and light also changes the sidebar and the top bar.
+
+All of this is remembered in **this browser**, not on your account, so a phone and a laptop can differ. It changes nothing but how the app looks: your recommendations are not touched.
 
 ## Show Rating Badge on Library Posters
 
