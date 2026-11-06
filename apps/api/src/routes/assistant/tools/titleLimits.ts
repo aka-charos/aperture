@@ -19,7 +19,7 @@
  * they need are in titleLimitsQuery.ts.
  */
 import { z } from 'zod'
-import { displayRatingSql, WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { displayRatingAtLeastSql, WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 export type WatchStatus = 'all' | 'watched' | 'unwatched'
 export type LimitMedia = 'movie' | 'series'
@@ -293,7 +293,7 @@ export function titleLimitClauses(
   if (limits.yearMin != null) clauses.push(`${alias}.year >= ${bind(limits.yearMin)}`)
   if (limits.yearMax != null) clauses.push(`${alias}.year <= ${bind(limits.yearMax)}`)
   if (limits.minRating != null) {
-    clauses.push(`${displayRatingSql(alias)} >= ${bind(limits.minRating)}`)
+    clauses.push(displayRatingAtLeastSql(alias, bind(limits.minRating)))
   }
   if (limits.maxRuntime != null) {
     if (media === 'movie') {

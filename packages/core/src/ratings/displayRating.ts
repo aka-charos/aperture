@@ -32,3 +32,31 @@ export function displayRatingSql(alias?: string): string {
   const a = alias ? `${alias}.` : ''
   return `(CASE WHEN ${a}quality_rating_sources IS NULL THEN ${a}community_rating ELSE ${a}quality_rating END)`
 }
+
+const PLACEHOLDER = /^\$[1-9][0-9]*$/
+
+/**
+ * `displayRatingSql(alias) >= value`, written so the planner can estimate it.
+ *
+ * Postgres keeps no statistics on the CASE, so it guesses a third of the table
+ * passes whatever the value. On a similarity search that guess is expensive: told
+ * plenty of titles fit, it walks the vector index to fill the LIMIT, and when only
+ * a handful do it walks all of it (10.8 s against 0.7 s for "rated 8.5 or higher",
+ * F-183). The two branches read columns it has statistics for. They select the
+ * same rows as the CASE: a NULL fails either way.
+ *
+ * @param value a query placeholder such as `$4`, used twice; nothing else is taken
+ */
+export function displayRatingAtLeastSql(alias: string | undefined, value: string): string {
+  if (alias !== undefined && !ALIAS.test(alias)) {
+    throw new Error(`displayRatingAtLeastSql: not a table alias: ${alias}`)
+  }
+  if (!PLACEHOLDER.test(value)) {
+    throw new Error(`displayRatingAtLeastSql: not a placeholder: ${value}`)
+  }
+  const a = alias ? `${alias}.` : ''
+  return (
+    `((${a}quality_rating_sources IS NULL AND ${a}community_rating >= ${value}) ` +
+    `OR (${a}quality_rating_sources IS NOT NULL AND ${a}quality_rating >= ${value}))`
+  )
+}

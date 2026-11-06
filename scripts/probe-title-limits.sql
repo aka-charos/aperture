@@ -32,10 +32,10 @@ ORDER BY 1, 3 DESC;
 --    back short of what the library holds.
 SELECT 'embeddings_3072' AS tbl, model, count(*) FROM embeddings_3072 GROUP BY 2;
 
--- 3. The plan for a narrow limit. The risk to read for: Limit > Sort > Hash Join
---    over the index scan (no LIMIT reaches the index, so it walks until exhausted or
---    max_scan_tuples) against Limit > Nested Loop (stops when full). Compare the
---    execution time with the broad query below it.
+-- 3. The plan for a narrow limit and a broad one. Fine: filter the titles first, then
+--    sort (exact), or the index scan stopping when LIMIT is full. To look out for: an
+--    index scan emitting about the whole set and taking seconds, which means the
+--    planner thought far more titles fit than do (F-183).
 BEGIN;
 SET LOCAL hnsw.iterative_scan = strict_order;
 EXPLAIN (ANALYZE, BUFFERS)

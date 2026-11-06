@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { displayRatingSql, WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { displayRatingAtLeastSql, WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 import {
   describeTitleLimits,
   discoveryLimitsNote,
@@ -94,7 +94,7 @@ test('accents and non-Latin names compare instead of folding away', () => {
 
 test('ratings use the rating a title shows, never the raw column', () => {
   const { clauses, values } = clausesFor({ minRating: 7 }, 'movie')
-  assert.deepEqual(clauses, [`${displayRatingSql('t')} >= $1`])
+  assert.deepEqual(clauses, [displayRatingAtLeastSql('t', '$1')])
   assert.deepEqual(values, [7])
 })
 
@@ -145,7 +145,7 @@ test('placeholders number from wherever the query has got to, in clause order', 
     't.genres && $5::text[]',
     't.year >= $6',
     't.year <= $7',
-    `${displayRatingSql('t')} >= $8`,
+    displayRatingAtLeastSql('t', '$8'),
     '(t.runtime_minutes > 0 AND t.runtime_minutes <= $9)',
   ])
   assert.deepEqual(values, [['Drama'], 1970, 1979, 7, 90])

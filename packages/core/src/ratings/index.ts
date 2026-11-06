@@ -38,7 +38,7 @@ export {
   type UnifiedRatingSource,
   type UnifiedRatingMediaType,
 } from './unifiedRating.js'
-export { displayRatingSql } from './displayRating.js'
+export { displayRatingAtLeastSql, displayRatingSql } from './displayRating.js'
 export {
   ensureQualityRatings,
   refreshQualityRatings,
