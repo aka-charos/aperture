@@ -1912,6 +1912,8 @@
     "favoriteRemoved": "Removed from your favorites",
     "favoriteFailed": "Couldn't update favorites. Please try again.",
     "favoriteNotInLibrary": "That title isn't in your library, so it can't be favorited.",
+    "ratingFailed": "Couldn't save your rating. Please try again.",
+    "watchingFailed": "Couldn't update your Watching list. Please try again.",
     "directedBy": "Dir. {{name}}",
     "createdBy": "Created by {{name}}",
     "movie": "Movie",
