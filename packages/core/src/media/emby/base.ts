@@ -71,7 +71,7 @@ export class EmbyProviderBase {
     if (!response.ok) {
       const text = await response.text()
       logger.error({ status: response.status, url, body: text, duration }, '❌ Emby API error')
-      throw embyHttpError(response.status, response.statusText)
+      throw embyHttpError(response.status, response.statusText, text)
     }
 
     const text = await response.text()

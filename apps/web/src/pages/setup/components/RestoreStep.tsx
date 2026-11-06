@@ -130,7 +130,9 @@ export function RestoreStep({ wizard }: RestoreStepProps) {
       setError(null)
       setRestoreDialogOpen(false)
 
-      const res = await fetch('/api/setup/backup/restore', {
+      // `sync`: wait for the real outcome. Without it the route answers at once,
+      // and this page announced success and reloaded while the restore still ran.
+      const res = await fetch('/api/setup/backup/restore?sync=true', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

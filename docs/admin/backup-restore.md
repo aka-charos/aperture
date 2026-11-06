@@ -20,9 +20,19 @@ Restoring replaces the whole database, so the panel makes you prove it:
 
 1. Click restore on a backup
 2. Type **RESTORE** to confirm
-3. Aperture **creates a pre-restore safety backup first**, then runs `pg_restore --clean --if-exists`
+3. Aperture **creates a pre-restore safety backup first**. If that backup fails, the restore stops and nothing changes. You can skip it in the dialog when you already have a recent copy; on a large database it roughly doubles the wait.
+4. Aperture reads the backup through to the end, then applies it in **one transaction**
 
-The safety backup is your undo path — a bad restore can itself be restored.
+A restore either completes or leaves the data as it was. If it fails at any point, the error appears on this page and nothing has been replaced.
+
+While it runs:
+
+- **The app is unavailable to everyone.** The API answers 503 until the transaction ends, and sign-in waits too. Keep the page open, since it is the one place that still shows progress.
+- **It needs free disk space in the backup folder**, for a temporary copy of the backup as plain SQL. That is much larger than the compressed file. The database also needs room to hold the old and new data until the transaction ends.
+
+Sessions come from the backup as well, so you may need to sign in again afterwards. Reload when the page offers it.
+
+The safety backup is your undo path once a restore has succeeded.
 
 ## What's in a Backup
 

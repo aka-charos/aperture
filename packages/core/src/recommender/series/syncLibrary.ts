@@ -13,6 +13,7 @@ import {
 import { randomUUID } from 'crypto'
 import type { Episode } from '../../media/types.js'
 import { fetchParallel, streamingBatchProcess } from '../shared/syncHelpers.js'
+import { fetchPageShrinking } from '../shared/pageShrinking.js'
 import { clampMaxCandidatesToLibrary } from '../../lib/recommendationConfig.js'
 import {
   SERIES_PAGE_SIZE,
@@ -351,17 +352,27 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
       const baseAdded = episodesAdded
       const baseUpdated = episodesUpdated
 
+      const parentIds = libraryId ? [libraryId] : undefined
+      const libraryLabel = libraryId ? `library ${libraryId}` : 'all libraries'
+      const episodePage = { pageSize: EPISODE_PAGE_SIZE }
+
       // Use streaming batch processing to avoid memory issues with large libraries
       const streamResult = await streamingBatchProcess<Episode>(
         // Fetch function
-        (startIndex, limit) =>
-          provider.getEpisodes(apiKey, {
+        (startIndex) =>
+          fetchPageShrinking(
+            (start, limit) => provider.getEpisodes(apiKey, { startIndex: start, limit, parentIds }),
             startIndex,
-            limit,
-            parentIds: libraryId ? [libraryId] : undefined,
-          }),
+            episodePage,
+            libraryLabel,
+            ({ limit, nextLimit, status, serverException }) =>
+              addLog(
+                jobId,
+                'warn',
+                `The media server answered HTTP ${status}${serverException ? ` (${serverException})` : ''} for ${limit} episodes at offset ${startIndex} of ${libraryLabel}. Retrying with ${nextLimit}.`
+              )
+          ),
         episodeCount,
-        EPISODE_PAGE_SIZE,
         // Process batch function - prepares and inserts episodes
         async (episodes) => {
           for (const episode of episodes) {

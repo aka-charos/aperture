@@ -1,9 +1,9 @@
 import { spawn, ChildProcess } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
-import * as zlib from 'zlib'
 import { createChildLogger } from '../lib/logger.js'
 import { getDatabaseUrl } from '../config/env.js'
+import { BackupCancelledError, restoreInTransaction, writeArchive } from './restore.js'
 import { getBackupConfig, updateLastBackupInfo } from './backupConfig.js'
 import {
   createJobProgress,
@@ -103,8 +103,9 @@ async function ensureBackupDir(backupPath: string): Promise<void> {
 /**
  * Create a database backup
  * @param jobId Optional job ID for progress tracking
+ * @param options.prune Set false to keep every older backup, for a safety backup taken before restoring one of them
  */
-export async function createBackup(jobId?: string): Promise<BackupResult> {
+export async function createBackup(jobId?: string, options: { prune?: boolean } = {}): Promise<BackupResult> {
   const startTime = Date.now()
   const trackProgress = !!jobId
 
@@ -163,58 +164,27 @@ export async function createBackup(jobId?: string): Promise<BackupResult> {
       activeBackupProcesses.set(jobId, pgDump)
     }
 
-    // Write directly to file (pg_dump handles compression internally)
-    const writeStream = fs.createWriteStream(filePath)
-
-    // Collect stderr for error reporting
-    let stderr = ''
-    let wasCancelled = false
-
-    pgDump.stderr.on('data', (data) => {
-      stderr += data.toString()
-      // Log any pg_dump messages
-      if (trackProgress && jobId && data.toString().trim()) {
-        addLog(jobId, 'debug', `   pg_dump: ${data.toString().trim()}`)
-      }
-    })
-
-    // Pipe pg_dump -> file (compression handled by pg_dump)
-    try {
-      await new Promise<void>((resolve, reject) => {
-        pgDump.stdout.pipe(writeStream)
-
-        writeStream.on('finish', resolve)
-        writeStream.on('error', reject)
-        pgDump.on('error', reject)
-        pgDump.on('close', (code, signal) => {
-          // Check if it was cancelled
-          if (signal === 'SIGTERM' || (jobId && isJobCancelled(jobId))) {
-            wasCancelled = true
-            reject(new Error('Backup cancelled'))
-          } else if (code !== 0) {
-            reject(new Error(`pg_dump exited with code ${code}: ${stderr}`))
-          }
-        })
+    if (trackProgress && jobId) {
+      pgDump.stderr.on('data', (data: Buffer) => {
+        if (data.toString().trim()) addLog(jobId, 'debug', `   pg_dump: ${data.toString().trim()}`)
       })
-    } finally {
-      // Clean up process tracking
-      if (jobId) {
-        activeBackupProcesses.delete(jobId)
-      }
     }
 
-    // If cancelled, clean up partial file and return
-    if (wasCancelled || (jobId && isJobCancelled(jobId))) {
-      try {
-        await fs.promises.unlink(filePath)
-        logger.info({ filename }, 'Deleted partial backup file after cancellation')
-      } catch {
-        // Ignore if file doesn't exist
+    try {
+      await writeArchive(pgDump, filePath, () => !!jobId && isJobCancelled(jobId))
+    } catch (err) {
+      if (err instanceof BackupCancelledError) {
+        logger.info({ filename }, 'Backup cancelled, nothing kept')
+        return {
+          success: false,
+          error: 'Backup cancelled by user',
+          duration: Date.now() - startTime,
+        }
       }
-      return {
-        success: false,
-        error: 'Backup cancelled by user',
-        duration: Date.now() - startTime,
+      throw err
+    } finally {
+      if (jobId) {
+        activeBackupProcesses.delete(jobId)
       }
     }
 
@@ -241,7 +211,7 @@ export async function createBackup(jobId?: string): Promise<BackupResult> {
       addLog(jobId, 'info', '🗑️ Checking for old backups to remove...')
     }
 
-    const pruned = await pruneOldBackups()
+    const pruned = options.prune === false ? 0 : await pruneOldBackups()
     if (pruned > 0 && trackProgress && jobId) {
       addLog(jobId, 'info', `   Removed ${pruned} old backup(s)`)
     }
@@ -312,6 +282,8 @@ export async function restoreBackup(
     const dbConfig = parseDatabaseUrl()
     const filePath = path.join(config.backupPath, filename)
 
+    if (path.basename(filename) !== filename) throw new Error('Invalid backup filename')
+
     // Validate backup file exists
     if (!await fileExists(filePath)) {
       throw new Error(`Backup file not found: ${filename}`)
@@ -340,7 +312,7 @@ export async function restoreBackup(
         addLog(jobId, 'info', '🔒 Creating pre-restore safety backup...')
       }
 
-      const preBackupResult = await createBackup()
+      const preBackupResult = await createBackup(undefined, { prune: false })
       if (preBackupResult.success) {
         preRestoreBackup = preBackupResult.filename
         logger.info({ preRestoreBackup }, 'Pre-restore backup created')
@@ -348,11 +320,7 @@ export async function restoreBackup(
           addLog(jobId, 'info', `✅ Safety backup created: ${preRestoreBackup}`)
         }
       } else {
-        logger.warn({ error: preBackupResult.error }, 'Failed to create pre-restore backup, continuing anyway')
-        if (trackProgress && jobId) {
-          addLog(jobId, 'warn', `⚠️ Could not create safety backup: ${preBackupResult.error}`)
-          addLog(jobId, 'info', '   Continuing with restore anyway...')
-        }
+        throw new Error(`Restore stopped because the safety backup failed: ${preBackupResult.error ?? 'Unknown error'}`)
       }
       stepOffset = 1
     }
@@ -371,103 +339,18 @@ export async function restoreBackup(
     // Step 4: Run restore
     if (trackProgress && jobId) {
       setJobStep(jobId, 2 + stepOffset, 'Restoring database')
-      if (isCustomFormat) {
-        addLog(jobId, 'info', '📥 Running pg_restore (custom format)...')
-      } else {
-        addLog(jobId, 'info', `📥 Running psql restore${isCompressed ? ' (decompressing)' : ''}...`)
-      }
+      addLog(jobId, 'info', `📥 Reading ${isCustomFormat ? 'the archive' : isCompressed ? 'and decompressing the backup' : 'the backup'}...`)
       addLog(jobId, 'warn', '⚠️ This will overwrite existing data!')
     }
 
-    // Collect stderr for error reporting
-    let stderr = ''
-    let lastLogTime = Date.now()
-
-    if (isCustomFormat) {
-      // Use pg_restore for custom format (.dump) files
-      // --clean drops existing objects, --if-exists prevents errors
-      const pgRestore = spawn('pg_restore', [
-        '-h', dbConfig.host,
-        '-p', dbConfig.port,
-        '-U', dbConfig.user,
-        '-d', dbConfig.database,
-        '--clean',
-        '--if-exists',
-        '--no-owner',
-        '--no-acl',
-        filePath,
-      ], {
-        env: {
-          ...process.env,
-          PGPASSWORD: dbConfig.password,
-        },
-      })
-
-      pgRestore.stderr.on('data', (data) => {
-        stderr += data.toString()
-        if (trackProgress && jobId && Date.now() - lastLogTime > 2000) {
-          addLog(jobId, 'debug', '   Restore in progress...')
-          lastLogTime = Date.now()
+    await restoreInTransaction(filePath, dbConfig, {
+      scratchRoot: config.backupPath,
+      onApplying: () => {
+        if (trackProgress && jobId) {
+          addLog(jobId, 'info', '🔒 Applying in one transaction. Nothing changes unless all of it succeeds.')
         }
-      })
-
-      await new Promise<void>((resolve, reject) => {
-        pgRestore.on('error', reject)
-        pgRestore.on('close', (code) => {
-          // pg_restore returns non-zero for warnings too, check stderr for actual errors
-          if (code !== 0 && stderr.toLowerCase().includes('error')) {
-            reject(new Error(`pg_restore exited with code ${code}: ${stderr}`))
-          } else {
-            resolve()
-          }
-        })
-      })
-    } else {
-      // Use psql for plain text SQL files (.sql, .sql.gz)
-      const psql = spawn('psql', [
-        '-h', dbConfig.host,
-        '-p', dbConfig.port,
-        '-U', dbConfig.user,
-        '-d', dbConfig.database,
-        '-v', 'ON_ERROR_STOP=1',
-      ], {
-        env: {
-          ...process.env,
-          PGPASSWORD: dbConfig.password,
-        },
-      })
-
-      psql.stderr.on('data', (data) => {
-        stderr += data.toString()
-        if (trackProgress && jobId && Date.now() - lastLogTime > 2000) {
-          addLog(jobId, 'debug', '   Restore in progress...')
-          lastLogTime = Date.now()
-        }
-      })
-
-      const readStream = fs.createReadStream(filePath)
-
-      await new Promise<void>((resolve, reject) => {
-        psql.on('error', reject)
-        psql.on('close', (code) => {
-          if (code !== 0) {
-            reject(new Error(`psql exited with code ${code}: ${stderr}`))
-          } else {
-            resolve()
-          }
-        })
-
-        if (isCompressed) {
-          const gunzip = zlib.createGunzip()
-          readStream.pipe(gunzip).pipe(psql.stdin)
-          gunzip.on('error', reject)
-        } else {
-          readStream.pipe(psql.stdin)
-        }
-
-        readStream.on('error', reject)
-      })
-    }
+      },
+    })
 
     // Step 5: Finalize
     if (trackProgress && jobId) {

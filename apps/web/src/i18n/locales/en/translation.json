@@ -2747,7 +2747,7 @@
     "tooltipDelete": "Delete",
     "restoreDialogTitle": "Restore Database",
     "restoreWarningTitle": "Warning:",
-    "restoreWarningBody": "This will replace all current data with the backup. A pre-restore backup will be created automatically.",
+    "restoreWarningBody": "This will replace all current data with the backup. A safety backup of the current data is taken first unless you skip it below, and the restore stops if that backup fails.",
     "restoreFrom": "You are about to restore from: {{filename}}",
     "restoreConfirmPrompt": "To confirm, type {{word}} below:",
     "restorePlaceholder": "Type RESTORE to confirm",
@@ -2755,7 +2755,16 @@
     "restoreButton": "Restore Database",
     "uploadSuccess": "Backup uploaded: {{filename}} ({{size}})",
     "configSaved": "Backup configuration saved",
-    "sessionExpired": "Session expired. Please refresh and try again."
+    "sessionExpired": "Session expired. Please refresh and try again.",
+    "operationFailed": "Operation failed",
+    "backupCompleteIn": "Backup created: {{filename}} ({{seconds}}s)",
+    "restoreCompleteIn": "Database restored ({{seconds}}s)",
+    "restoreCompleteNext": "Reload to continue. Sessions came from the backup too, so you may need to sign in again.",
+    "reloadAfterRestore": "Reload",
+    "restoreInProgressNotice": "A restore can take several minutes on a large database, and the app is unavailable to everyone until it finishes. Keep this page open. If it fails, the data stays as it was.",
+    "restoreSignsYouOut": "The app is unavailable while the restore runs. Sessions come from the backup too, so you may need to sign in again afterwards. The restore also needs free disk space in the backup folder for the expanded data.",
+    "skipPreRestoreBackup": "Skip the safety backup",
+    "skipPreRestoreBackupHelp": "On a large database the safety backup roughly doubles the wait. Skip it only if you already have a recent copy."
   },
   "settingsTmdb": {
     "title": "TMDb Integration",

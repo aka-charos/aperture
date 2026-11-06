@@ -1,5 +1,6 @@
 import { query } from '../../lib/db.js'
 import { addLog } from '../../jobs/progress.js'
+import { listingIsComplete } from '../shared/listingComplete.js'
 import type { LibrarySeriesSyncResult } from './syncTypes.js'
 
 export async function reconcileRemovedSeries(
@@ -11,11 +12,17 @@ export async function reconcileRemovedSeries(
 
   for (const lib of libraryResults) {
     if (lib.expectedSeriesCount > 0) {
-      if (lib.fetchedSeriesCount !== lib.expectedSeriesCount) {
+      if (
+        !listingIsComplete({
+          expected: lib.expectedSeriesCount,
+          fetched: lib.fetchedSeriesCount,
+          distinct: lib.seenSeriesProviderIds.size,
+        })
+      ) {
         addLog(
           jobId,
           'warn',
-          `⚠️ Skipping stale series cleanup for library ${lib.libraryId ?? 'all'}: fetched ${lib.fetchedSeriesCount} but expected ${lib.expectedSeriesCount}`
+          `⚠️ Skipping stale series cleanup for library ${lib.libraryId ?? 'all'}: fetched ${lib.fetchedSeriesCount} (${lib.seenSeriesProviderIds.size} distinct) but expected ${lib.expectedSeriesCount}`
         )
       } else {
         const seenSeries = [...lib.seenSeriesProviderIds]
@@ -48,11 +55,17 @@ export async function reconcileRemovedSeries(
     }
 
     if (lib.expectedEpisodeCount > 0) {
-      if (lib.fetchedEpisodeCount !== lib.expectedEpisodeCount) {
+      if (
+        !listingIsComplete({
+          expected: lib.expectedEpisodeCount,
+          fetched: lib.fetchedEpisodeCount,
+          distinct: lib.seenEpisodeProviderIds.size,
+        })
+      ) {
         addLog(
           jobId,
           'warn',
-          `⚠️ Skipping stale episode cleanup for library ${lib.libraryId ?? 'all'}: fetched ${lib.fetchedEpisodeCount} but expected ${lib.expectedEpisodeCount}`
+          `⚠️ Skipping stale episode cleanup for library ${lib.libraryId ?? 'all'}: fetched ${lib.fetchedEpisodeCount} (${lib.seenEpisodeProviderIds.size} distinct) but expected ${lib.expectedEpisodeCount}`
         )
       } else {
         const seenEpisodes = [...lib.seenEpisodeProviderIds]

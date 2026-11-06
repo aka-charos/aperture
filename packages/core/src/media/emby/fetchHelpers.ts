@@ -2,6 +2,8 @@
  * Emby fetch helpers — timeout, error normalization, and response parsing.
  */
 
+import { MediaServerHttpError } from '../httpError.js'
+
 export const EMBY_FETCH_TIMEOUT_MS = 60_000
 
 export function embyTimeoutError(baseUrl: string): Error {
@@ -16,8 +18,8 @@ export function embyConnectionError(baseUrl: string): Error {
   )
 }
 
-export function embyHttpError(status: number, statusText: string): Error {
-  return new Error(`Emby API error: ${status} ${statusText}`)
+export function embyHttpError(status: number, statusText: string, body: string): MediaServerHttpError {
+  return new MediaServerHttpError('Emby', status, statusText, body)
 }
 
 export function isEmbyNotFoundError(err: unknown): boolean {

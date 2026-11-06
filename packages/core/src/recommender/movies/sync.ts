@@ -1,3 +1,4 @@
+import { listingIsComplete } from '../shared/listingComplete.js'
 import { createChildLogger } from '../../lib/logger.js'
 import { mergeWatchHistorySyncRow, watchHistorySyncUpdateSql } from '../watchHistorySyncRows.js'
 import { partitionHistorySyncUsers } from '../historySyncUsers.js'
@@ -74,11 +75,17 @@ async function reconcileRemovedMovies(
 
   for (const lib of libraryResults) {
     if (lib.expectedCount === 0) continue
-    if (lib.fetchedCount !== lib.expectedCount) {
+    if (
+      !listingIsComplete({
+        expected: lib.expectedCount,
+        fetched: lib.fetchedCount,
+        distinct: lib.seenProviderIds.size,
+      })
+    ) {
       addLog(
         jobId,
         'warn',
-        `⚠️ Skipping stale movie cleanup for library ${lib.libraryId ?? 'all'}: fetched ${lib.fetchedCount} but expected ${lib.expectedCount}`
+        `⚠️ Skipping stale movie cleanup for library ${lib.libraryId ?? 'all'}: fetched ${lib.fetchedCount} (${lib.seenProviderIds.size} distinct) but expected ${lib.expectedCount}`
       )
       continue
     }

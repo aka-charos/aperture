@@ -204,6 +204,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: 'include',
       })
     } finally {
+      // The next person at this browser must not start from these.
+      clearUserScopedCaches()
       setUser(null)
       setImpersonation(null)
       setCapabilities({})

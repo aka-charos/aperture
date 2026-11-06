@@ -7,6 +7,8 @@
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { WATCHING_CACHE_KEY } from '@/lib/clientCaches'
+import { useAuth } from './useAuth'
+import { readWatchingCache, serializeWatchingCache } from './watchingCache'
 import {
   WatchingContext,
   type WatchingRefreshResult,
@@ -14,18 +16,6 @@ import {
 } from './watching-context'
 
 const CACHE_KEY = WATCHING_CACHE_KEY
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 1 day in milliseconds
-
-interface CachedData {
-  series: WatchingSeries[]
-  timestamp: number
-  version: number // For cache invalidation on schema changes
-}
-
-// v6: adds recentlyAiredEpisode (v5 episodesAired/episodesMissing, v4
-// normalized status, v2 the union)
-const CACHE_VERSION = 6
-
 /** Watchlist membership only — history-sourced rows must not count as "watching" */
 function watchlistIds(series: WatchingSeries[]): Set<string> {
   return new Set(series.filter((s) => s.inWatchlist).map((s) => s.seriesId))
@@ -35,41 +25,22 @@ interface WatchingProviderProps {
   children: ReactNode
 }
 
-function getCache(): CachedData | null {
+/** This viewer's cached list, or null. Anything else in the slot is dropped. */
+function getCache(userId: string | null): WatchingSeries[] | null {
   try {
     const cached = localStorage.getItem(CACHE_KEY)
-    if (!cached) return null
-
-    const data: CachedData = JSON.parse(cached)
-
-    // Check version
-    if (data.version !== CACHE_VERSION) {
-      localStorage.removeItem(CACHE_KEY)
-      return null
-    }
-
-    // Check TTL
-    const age = Date.now() - data.timestamp
-    if (age > CACHE_TTL_MS) {
-      localStorage.removeItem(CACHE_KEY)
-      return null
-    }
-
-    return data
+    const series = readWatchingCache<WatchingSeries>(cached, userId, Date.now())
+    if (!series && cached) localStorage.removeItem(CACHE_KEY)
+    return series
   } catch {
-    localStorage.removeItem(CACHE_KEY)
     return null
   }
 }
 
-function setCache(series: WatchingSeries[]): void {
+function setCache(userId: string | null, series: WatchingSeries[]): void {
+  if (!userId) return
   try {
-    const data: CachedData = {
-      series,
-      timestamp: Date.now(),
-      version: CACHE_VERSION,
-    }
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data))
+    localStorage.setItem(CACHE_KEY, serializeWatchingCache(series, userId, Date.now()))
   } catch (err) {
     console.warn('Failed to cache watching data:', err)
   }
@@ -89,16 +60,18 @@ export function WatchingProvider({ children }: WatchingProviderProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const fetchedRef = useRef(false)
+  const { user } = useAuth()
+  const userId = user?.id ?? null
+  const fetchedForRef = useRef<string | null>(null)
 
   // Fetch full watching data
   const fetchWatchingData = useCallback(async (useCache = true) => {
     // Check cache first
     if (useCache) {
-      const cached = getCache()
+      const cached = getCache(userId)
       if (cached) {
-        setSeries(cached.series)
-        setWatchingIds(watchlistIds(cached.series))
+        setSeries(cached)
+        setWatchingIds(watchlistIds(cached))
         setLoading(false)
         return
       }
@@ -115,22 +88,22 @@ export function WatchingProvider({ children }: WatchingProviderProps) {
       setError(null)
 
       // Cache the result
-      setCache(data.series)
+      setCache(userId, data.series)
     } catch (err) {
       console.error('Failed to fetch watching data:', err)
       setError(err instanceof Error ? err.message : 'Failed to load watching list')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [userId])
 
-  // Initial fetch on mount
+  // Initial fetch, and again for a different viewer
   useEffect(() => {
-    if (!fetchedRef.current) {
-      fetchedRef.current = true
+    if (fetchedForRef.current !== userId) {
+      fetchedForRef.current = userId
       fetchWatchingData(true)
     }
-  }, [fetchWatchingData])
+  }, [fetchWatchingData, userId])
 
   const isWatching = useCallback((seriesId: string) => {
     return watchingIds.has(seriesId)
@@ -194,14 +167,14 @@ export function WatchingProvider({ children }: WatchingProviderProps) {
 
       // Update cache with new series list
       setSeries((current) => {
-        setCache(current)
+        setCache(userId, current)
         return current
       })
     } catch (err) {
       console.error('Failed to remove from watching:', err)
       throw err
     }
-  }, [fetchWatchingData])
+  }, [fetchWatchingData, userId])
 
   const toggleWatching = useCallback(async (seriesId: string) => {
     if (watchingIds.has(seriesId)) {

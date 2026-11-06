@@ -2,7 +2,7 @@
  * Jobs Progress Handlers
  */
 
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import {
   getJobProgress,
   getAllJobProgress,
@@ -11,9 +11,23 @@ import {
   type JobProgress,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
+import { JOB_PROGRESS_TOKEN_HEADER, verifyJobProgressToken } from '../../../lib/jobProgressToken.js'
 import { jobSchemas } from '../schemas.js'
 
 const logger = createChildLogger('jobs-progress')
+
+/**
+ * An admin, or whoever holds the signed token for this one job. The token is how
+ * a restore stays watchable: it replaces `sessions`, so the admin who started it
+ * has no session to poll with. See lib/jobProgressToken.ts.
+ */
+async function requireAdminOrProgressToken(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const header = request.headers[JOB_PROGRESS_TOKEN_HEADER]
+  const token = typeof header === 'string' ? header : undefined
+  const { jobId } = request.params as { jobId: string }
+  if (verifyJobProgressToken(token, jobId)) return
+  return requireAdmin(request, reply)
+}
 
 export async function registerProgressHandlers(fastify: FastifyInstance) {
   /**
@@ -22,7 +36,7 @@ export async function registerProgressHandlers(fastify: FastifyInstance) {
    */
   fastify.get<{ Params: { jobId: string } }>(
     '/api/jobs/progress/:jobId',
-    { preHandler: requireAdmin, schema: jobSchemas.getJobProgress },
+    { preHandler: requireAdminOrProgressToken, schema: jobSchemas.getJobProgress },
     async (request, reply) => {
       const { jobId } = request.params
       const progress = getJobProgress(jobId)

@@ -4,6 +4,7 @@
  * Core class with constructor, authentication helpers, and fetch functionality.
  */
 
+import { MediaServerHttpError } from '../httpError.js'
 import { createChildLogger } from '../../lib/logger.js'
 
 export const logger = createChildLogger('jellyfin-provider')
@@ -69,7 +70,7 @@ export class JellyfinProviderBase {
     if (!response.ok) {
       const text = await response.text()
       logger.error({ status: response.status, url, body: text, duration }, '❌ Jellyfin API error')
-      throw new Error(`Jellyfin API error: ${response.status} ${response.statusText}`)
+      throw new MediaServerHttpError('Jellyfin', response.status, response.statusText, text)
     }
 
     // Some endpoints return empty response

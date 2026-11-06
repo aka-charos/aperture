@@ -16,6 +16,7 @@ import {
   cancelJob,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
+import { createJobProgressToken } from '../../../lib/jobProgressToken.js'
 import { backupSchemas } from '../schemas.js'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -205,6 +206,9 @@ export async function registerOperationsHandlers(fastify: FastifyInstance) {
           return reply.send({
             success: true,
             jobId,
+            // The restore replaces `sessions`, so the page watching it needs a
+            // credential that does not live in the database.
+            progressToken: createJobProgressToken(jobId),
             filename,
             message: 'Restore started. Track progress with /api/jobs/progress/:jobId',
           })

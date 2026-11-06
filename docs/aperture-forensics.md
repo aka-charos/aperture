@@ -2272,3 +2272,36 @@ Upstream's budget applied to everything. Here `interactive` is opt-in, because g
 ## F-181
 
 **Movie runs never stamped `completed_at`, so the new-recommendations notification could not fire for movies.** Found while measuring [F-180](#f-180). The movie finalize wrote status, counts and weights but not the stamp; the series one did. `recommendationEvents` filters on that column, so every movie run looked as if it had not finished yet, and nothing failed or logged. On a production library no completed movie run carried the stamp and every series run did. The finalize now stamps it, and `gateCounts.test.ts` fails on a finalize that does not. Old rows are not backfilled: notifications only look forward, and a backfill could report old runs. Not verified end to end: no notification has been sent through the fixed path.
+
+## F-182
+
+**A failed restore could leave a half-replaced database, and a failed backup could read as a good one.** All read from the code; none of it was seen on a live instance. `pg_restore --clean` ran straight at the database, so an error part-way left some tables replaced and others not. A failed safety backup logged "continuing anyway". And `createBackup` resolved on the write stream's `finish`, which can fire before `pg_dump`'s exit code, so a dump that failed part-way could count as a good backup, and stopping on a failed safety backup would not have fired. The safety backup also pruned old backups first, so with the retention limit reached it could delete the very file about to be restored.
+
+**Adapted from upstream `7dbcd1e2`, `12b81a67` and `f596aa0f`.** The backup is expanded to a SQL file, then applied by `psql --single-transaction` with `ON_ERROR_STOP`. Through a pipe, an archive failing half-way reads to psql as a clean end of input and `--single-transaction` would commit the truncated restore, hence the file. Differences from upstream:
+
+- The file goes in the backup folder rather than the system temp directory: that volume already holds dumps, and a NAS container's own disk can be small. Left-over folders from a killed process are removed at the next restore.
+- `SET transaction_timeout = 0` leaves the header for every server rather than only older ones, so no version read is needed; it only asks for the default.
+- The progress token travels in a header, not the query string, so it stays out of the access log.
+- The backup filename stays as it was, without upstream's random suffix. Writing to `.partial` with `wx` already makes two backups in one second fail rather than overwrite.
+
+**One transaction turned a brief failure into a long wait.** `DROP TABLE` holds ACCESS EXCLUSIVE until commit, so reads of a replaced table queue instead of failing, and the auth hook reads `sessions` on every request with a cookie. An open tab's polling would fill the pool, and the token alone would not help, since the progress request runs that hook first. Upstream's commits don't address this. So `isDatabaseRestoring` (core `backup/restore.ts`) is true for the transaction only, and while it is the auth hook answers 503 at once for every API route but job progress (`lib/restoreGate.ts`); the page shell skips its name lookup. Reasoned from how Postgres locks work, not observed. Background jobs are not stopped: one that touches a locked table waits for the commit and then runs against the restored data.
+
+**The setup wizard said "restored" while the restore was running.** It called the route without `sync`, showed success, and reloaded three seconds later. It now waits for the real outcome. A proxy that cuts long requests would break this ([F-141](#f-141)); the wizard is normally reached on a local address.
+
+**Upstream's description of the symptom doesn't apply here.** `f596aa0f` says a 401 read as "finished". `requireAdmin` answers JSON, so the old poller threw, logged to the console and kept polling, and the panel froze. Only a non-JSON answer cleared it.
+
+**Not tested against PostgreSQL.** Neither `pg_restore` nor `psql` is on the development machine. `restore.test.ts` uses stand-in programs and pins the ordering and failure paths, not what a real dump does inside one transaction. A dump's `--clean` statements include extensions, so an external database whose role cannot drop them should now fail and roll back. **Check after deploying:** restore a real backup on a scratch stack, and watch whether the page keeps updating and what `/health` does during it.
+
+**Also changed:** live backup size no longer shows while a backup runs, because the list only holds finished files; the row reads "Writing..." until it finishes.
+
+## F-183
+
+**A sync could delete a title because of a paging slip.** All three library syncs compared the number of rows read with the server's total. An item moving across a page boundary mid-scan is read twice while another is skipped, the count still matches, and the skipped item is deleted, with its ratings and history following by cascade. Read from the code; not seen happening. `listingIsComplete` (`recommender/shared/listingComplete.ts`) also requires that many distinct ids. Upstream `7dbcd1e2` did this for episodes only; here movies and series use it too, since those deletes cost more.
+
+**One bad row stopped the catalog updating.** A 500 from the media server failed the whole `sync-series` job. `fetchPageShrinking` retries a 500 at the same offset with a quarter of the page, and keeps the smaller size for the rest of that library; one item that still fails stops the job and names its offset. Only episodes page this way. Upstream's check is Emby-only; `MediaServerHttpError` is shared with Jellyfin, because of the mirror rule, and keeps each server's message wording because `isEmbyNotFoundError` matches on it.
+
+## F-184
+
+**The Watching cache showed one person's list to the next.** It had one slot per browser, a day's life and no owner, `logout` left it, and a hit skipped the fetch, so nothing corrected it. Read from the code, not reproduced. The same trap in the Discovery cache was removed in [F-179](#f-179). The entry now records its owner (`hooks/watchingCache.ts`), an entry without one reads as a miss, and `logout` clears the user-scoped caches. Upstream's `9cac3a0f` validates membership with a new request instead, which was not needed once the entry names its owner.
+
+**A stalled image held a browser connection for minutes.** The proxy's `fetch` had no deadline. It now has one, covering the body too, and it ends on the browser disconnecting. Upstream `626a68f9` uses 8 s; this uses 15 s, because this host is slow and a timed-out poster is a visible loss, while the median measured here is about half a second ([F-179](#f-179)). The 15 s was chosen, not measured. The test is upstream's, with its timings from `d5b918fb`, and it needs a signed-in request because the route is guarded here.

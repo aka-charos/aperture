@@ -1058,6 +1058,7 @@ export {
   formatBytes,
   cancelBackupProcess,
   checkDatabaseClientCompatibility,
+  isDatabaseRestoring,
   type BackupConfig,
   type BackupInfo,
   type BackupResult,
