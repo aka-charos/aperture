@@ -40,6 +40,29 @@ export interface UpcomingEpisode {
   source: 'emby' | 'tmdb'
 }
 
+/**
+ * Why a show came back with no upcoming episode. These are different answers and
+ * a caller stating one to a person must not merge them: only `noneAnnounced` is
+ * TMDb actually saying nothing is scheduled.
+ */
+export type UpcomingGap =
+  /** TMDb answered: it knows the show and lists no dated next episode. */
+  | 'noneAnnounced'
+  /** No TMDb id on the row, or TMDb does not know that id. */
+  | 'noTmdbEntry'
+  /** No TMDb key configured, so TMDb could not be asked. */
+  | 'noTmdbKey'
+  /** TMDb was asked and did not answer: an error, a timeout, or past the time budget. */
+  | 'lookupFailed'
+  /** Left out by the caller's `tmdbFallbackIds`. */
+  | 'notAsked'
+
+export interface UpcomingEpisodesReport {
+  episodes: Map<string, UpcomingEpisode>
+  /** One entry for every requested show that is not in `episodes`. */
+  gaps: Map<string, UpcomingGap>
+}
+
 interface TMDbNextEpisode {
   id: number
   name: string
@@ -150,6 +173,8 @@ async function writeTmdbTotals(
 /** TMDb's answer about one show. Public data: it holds nothing about a viewer. */
 interface Forecast {
   next: TMDbNextEpisode | null
+  /** False when TMDb answered that it has no such show. */
+  known: boolean
 }
 
 const forecasts = new AsyncCache<Forecast>({
@@ -177,7 +202,7 @@ async function getForecast(tmdbId: string, apiKey: string): Promise<Forecast | n
         if (lookup.status === 'failed') return null
         const details = lookup.status === 'ok' ? lookup.data : null
         await writeTmdbTotals('tmdb_id', tmdbId, details)
-        return { next: details?.next_episode_to_air ?? null }
+        return { next: details?.next_episode_to_air ?? null, known: lookup.status === 'ok' }
       })
     )
     return forecast ?? null
@@ -199,17 +224,25 @@ function tmdbUpcomingEpisode(seriesId: string, next: TMDbNextEpisode): UpcomingE
   }
 }
 
-/** The forecasts for many shows, within a time budget. */
+/**
+ * The forecasts for many shows, within a time budget. A show in neither map was
+ * not answered: TMDb failed, or the budget ran out first.
+ */
 async function lookUpForecasts(
   rows: ReadonlyArray<{ id: string; tmdb_id: string }>,
   apiKey: string,
   budgetMs: number
-): Promise<Map<string, UpcomingEpisode>> {
+): Promise<{
+  found: Map<string, UpcomingEpisode>
+  empty: Map<string, 'noneAnnounced' | 'noTmdbEntry'>
+}> {
   const found = new Map<string, UpcomingEpisode>()
+  const empty = new Map<string, 'noneAnnounced' | 'noTmdbEntry'>()
   const all = Promise.all(
     rows.map(async (row) => {
       const forecast = await getForecast(row.tmdb_id, apiKey)
       if (forecast?.next?.air_date) found.set(row.id, tmdbUpcomingEpisode(row.id, forecast.next))
+      else if (forecast) empty.set(row.id, forecast.known ? 'noneAnnounced' : 'noTmdbEntry')
     })
   )
 
@@ -226,8 +259,8 @@ async function lookUpForecasts(
       'TMDb upcoming episode lookups ran past the request budget'
     )
   }
-  // A copy: lookups still running must not change a map the caller is reading.
-  return new Map(found)
+  // Copies: lookups still running must not change a map the caller is reading.
+  return { found: new Map(found), empty: new Map(empty) }
 }
 
 /**
@@ -294,10 +327,23 @@ export async function getUpcomingEpisodes(
   seriesIds: string[],
   options?: { tmdbFallbackIds?: Set<string>; forecastBudgetMs?: number }
 ): Promise<Map<string, UpcomingEpisode>> {
+  return (await getUpcomingEpisodesReport(seriesIds, options)).episodes
+}
+
+/**
+ * `getUpcomingEpisodes` for a caller that has to say why a show has nothing: the
+ * same queries and the same forecast cache, plus a `gaps` entry for every show
+ * without an episode. A lookup that failed is `lookupFailed`, never `noneAnnounced`.
+ */
+export async function getUpcomingEpisodesReport(
+  seriesIds: string[],
+  options?: { tmdbFallbackIds?: Set<string>; forecastBudgetMs?: number }
+): Promise<UpcomingEpisodesReport> {
   const result = new Map<string, UpcomingEpisode>()
-  
+  const gaps = new Map<string, UpcomingGap>()
+
   if (seriesIds.length === 0) {
-    return result
+    return { episodes: result, gaps }
   }
 
   const today = new Date().toISOString().split('T')[0]
@@ -337,6 +383,11 @@ export async function getUpcomingEpisodes(
   const seriesNeedingTmdb = seriesIds.filter(
     (id) => !result.has(id) && (!options?.tmdbFallbackIds || options.tmdbFallbackIds.has(id))
   )
+  for (const id of seriesIds) {
+    if (!result.has(id) && options?.tmdbFallbackIds && !options.tmdbFallbackIds.has(id)) {
+      gaps.set(id, 'notAsked')
+    }
+  }
 
   if (seriesNeedingTmdb.length > 0) {
     // Get TMDB IDs for these series
@@ -346,19 +397,28 @@ export async function getUpcomingEpisodes(
       [seriesNeedingTmdb]
     )
 
+    const withTmdbId = new Set(tmdbIds.rows.map((row) => row.id))
+    for (const id of seriesNeedingTmdb) {
+      if (!withTmdbId.has(id)) gaps.set(id, 'noTmdbEntry')
+    }
+
     const apiKey = tmdbIds.rows.length > 0 ? await getTMDbApiKey() : null
     if (apiKey) {
-      for (const [seriesId, episode] of await lookUpForecasts(
+      const { found, empty } = await lookUpForecasts(
         tmdbIds.rows,
         apiKey,
         options?.forecastBudgetMs ?? FORECAST_BATCH_BUDGET_MS
-      )) {
-        result.set(seriesId, episode)
+      )
+      for (const [seriesId, episode] of found) result.set(seriesId, episode)
+      for (const { id } of tmdbIds.rows) {
+        if (!found.has(id)) gaps.set(id, empty.get(id) ?? 'lookupFailed')
       }
+    } else {
+      for (const { id } of tmdbIds.rows) gaps.set(id, 'noTmdbKey')
     }
   }
 
-  return result
+  return { episodes: result, gaps }
 }
 
 /**

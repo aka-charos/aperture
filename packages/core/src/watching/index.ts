@@ -7,10 +7,13 @@
 
 export {
   getUpcomingEpisodes,
+  getUpcomingEpisodesReport,
   getUpcomingEpisodeForSeries,
   getLatestAiredEpisodes,
   getSeasonProgress,
   type UpcomingEpisode,
+  type UpcomingEpisodesReport,
+  type UpcomingGap,
 } from './upcomingEpisodes.js'
 
 export {

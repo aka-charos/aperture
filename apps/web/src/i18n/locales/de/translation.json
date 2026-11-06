@@ -1103,7 +1103,14 @@
       "twinMark": "Also watched by the person whose taste overlaps yours",
       "twinMarkConnection": "{{name}} watched this too",
       "rewriteExplanation": "Rewrite this explanation",
-      "rewriteExplanationFailed": "Could not rewrite it: {{detail}}"
+      "rewriteExplanationFailed": "Could not rewrite it: {{detail}}",
+      "tooltipQualityScale": "For example: {{examples}}.",
+      "ratingScoreExample": "{{rating}} → {{pct}}%",
+      "qualityFrom": "From rating {{rating}}",
+      "qualityUnrated": "No rating: given the default score",
+      "qualityScoredOn": "Scored on {{scored}}; the rating is now {{rating}}. Updates when your recommendations are regenerated.",
+      "qualityScoredOnUnknown": "Scored on an older rating; it is now {{rating}}. Updates when your recommendations are regenerated.",
+      "qualityScoredOnOnly": "Scored on {{scored}}"
     },
     "seasons": {
       "title": "Episoden",
@@ -1256,7 +1263,16 @@
         "circumstances": "Production Context",
         "reception": "Critical Reception"
       },
-      "generatingNote": "This takes a few minutes. You can leave this page — it will be here when you come back."
+      "generatingNote": "This takes a few minutes. You can leave this page — it will be here when you come back.",
+      "summary_one": "{{count}} section · {{minutes}} min read",
+      "summary_other": "{{count}} sections · {{minutes}} min read",
+      "summaryPlain": "{{minutes}} min read",
+      "basedOnSources_one": "Based on {{count}} source",
+      "basedOnSources_other": "Based on {{count}} sources",
+      "readAll": "Read all",
+      "viewSources": "View",
+      "hideSources": "Hide",
+      "sectionOf": "{{current}} of {{total}}"
     },
     "recommendDialog": {
       "title": "{{title}} als Tipp senden",
@@ -2346,7 +2362,21 @@
     "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it.",
     "sectionUntitled": "Results",
     "moreLink": "More",
-    "moreAbout": "More about {{title}}"
+    "moreAbout": "More about {{title}}",
+    "carouselUpcomingTitle": "Coming up in the shows you follow",
+    "carouselUpcomingDesc": "The next episode of {{count}} of them. Dates are expected, not a promise it will be ready to play.",
+    "carouselUpcomingDescPartial": "The next episode of {{count}} of them. Dates are expected, not a promise it will be ready to play. {{unchecked}} more could not be checked.",
+    "carouselUpcomingNothing": "No next episode is announced for the {{count}} shows checked.",
+    "carouselUpcomingNothingPartial": "No next episode is announced for the {{count}} shows checked. {{unchecked}} more could not be checked.",
+    "carouselUpcomingNotFollowing": "You are not following any shows here yet.",
+    "carouselUpcomingNoTmdbKey": "Upcoming episodes cannot be forecast because TMDb is not set up on this server, so this does not mean nothing is coming.",
+    "carouselUpcomingLookupFailed": "TMDb did not answer for {{unchecked}} of the shows you follow, so this does not mean nothing is coming. Try again shortly.",
+    "carouselUpcomingNoTmdbEntry": "TMDb has no entry for {{unchecked}} of the shows you follow, so there is no forecast for them.",
+    "upcomingExpected": "Expected {{date}}",
+    "upcomingPastDue": "Was expected {{date}}",
+    "upcomingLatestInLibrary": "Latest {{code}}, aired {{date}}: in your library",
+    "upcomingLatestUnplayed": "Latest {{code}}, aired {{date}}: in your library, not played yet",
+    "upcomingLatestNotInLibrary": "Latest {{code}}, aired {{date}}: not in your library yet"
   },
   "similarityGraph": {
     "loadingFallback": "Lädt…",
@@ -3466,7 +3496,8 @@
       "discoveryReasons": "Writing up why each fits…",
       "discoveryAssembling": "Putting your list together…",
       "episodes": "Looking through episodes…",
-      "analysis": "Reading the analysis"
+      "analysis": "Reading the analysis",
+      "upcoming": "Checking what's coming up…"
     },
     "tooltipOpenFullPage": "Open full page",
     "scrollToAnswer": "Back to the answer",

@@ -5,8 +5,13 @@ import { randomUUID } from 'node:crypto'
 process.env.DATABASE_URL ??= 'postgres://unused:unused@127.0.0.1/unused'
 
 const { closePool, getPool } = await import('../lib/db.js')
-const { FORECAST_CONCURRENCY, FORECAST_TIMEOUT_MS, getUpcomingEpisodeForSeries, getUpcomingEpisodes } =
-  await import('./upcomingEpisodes.js')
+const {
+  FORECAST_CONCURRENCY,
+  FORECAST_TIMEOUT_MS,
+  getUpcomingEpisodeForSeries,
+  getUpcomingEpisodes,
+  getUpcomingEpisodesReport,
+} = await import('./upcomingEpisodes.js')
 
 /**
  * The forecast cache is a module-level singleton shared by every test here, which
@@ -311,4 +316,68 @@ test('the request stops waiting at its budget; the answer lands in the cache lat
   const later = await getUpcomingEpisodes([slow.id])
   assert.equal(later.has(slow.id), true)
   assert.equal(result.has(slow.id), false, 'a map already returned does not change')
+})
+
+test('the report says why each show has no episode, and never merges the reasons', async () => {
+  const onServer = show()
+  const forecast = show()
+  const noneAnnounced = show()
+  const unknownToTmdb = show()
+  const failing = show()
+  const noTmdbId = randomUUID()
+  seriesRows = [onServer, forecast, noneAnnounced, unknownToTmdb, failing]
+  localRows = [
+    {
+      series_id: onServer.id,
+      season_number: 1,
+      episode_number: 4,
+      title: 'Local',
+      overview: null,
+      premiere_date: '2099-01-01',
+    },
+  ]
+  globalThis.fetch = (async (url: Parameters<typeof fetch>[0]) => {
+    const asked = String(url)
+    if (asked.includes(`/tv/${forecast.tmdb_id}`)) return Response.json(tmdbShow())
+    if (asked.includes(`/tv/${noneAnnounced.tmdb_id}`)) return Response.json(tmdbShow(null))
+    if (asked.includes(`/tv/${unknownToTmdb.tmdb_id}`)) return new Response(null, { status: 404 })
+    return new Response(null, { status: 503 })
+  }) as typeof fetch
+
+  const ids = [onServer.id, forecast.id, noneAnnounced.id, unknownToTmdb.id, failing.id, noTmdbId]
+  const report = await getUpcomingEpisodesReport(ids)
+
+  assert.equal(report.episodes.get(onServer.id)?.source, 'emby')
+  assert.equal(report.episodes.get(forecast.id)?.source, 'tmdb')
+  assert.deepEqual(Object.fromEntries(report.gaps), {
+    [noneAnnounced.id]: 'noneAnnounced',
+    [unknownToTmdb.id]: 'noTmdbEntry',
+    [failing.id]: 'lookupFailed',
+    [noTmdbId]: 'noTmdbEntry',
+  })
+})
+
+test('the report reads an answer that missed the budget as a failure', async () => {
+  const slow = show()
+  seriesRows = [slow]
+  globalThis.fetch = (async () => {
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    return Response.json(tmdbShow(null))
+  }) as typeof fetch
+  const report = await getUpcomingEpisodesReport([slow.id], { forecastBudgetMs: 5 })
+  assert.equal(report.gaps.get(slow.id), 'lookupFailed')
+  // Let the lookup land before the pool mock is restored.
+  await new Promise((resolve) => setTimeout(resolve, 100))
+})
+
+test('the report separates a missing key from a show the caller left out', async () => {
+  const row = show()
+  const leftOut = show()
+  seriesRows = [row, leftOut]
+  apiKey = null
+  const report = await getUpcomingEpisodesReport([row.id, leftOut.id], {
+    tmdbFallbackIds: new Set([row.id]),
+  })
+  assert.equal(report.gaps.get(row.id), 'noTmdbKey')
+  assert.equal(report.gaps.get(leftOut.id), 'notAsked')
 })

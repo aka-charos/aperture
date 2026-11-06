@@ -50,6 +50,38 @@ describe('prefilterIntent', () => {
     }
   })
 
+  test('what airs next for followed shows is a library question', () => {
+    // No web search for this: the answer is in their own list. Several of these
+    // carry an open-world word ("coming soon", "new") that would otherwise hand
+    // them to the classifier or straight to discovery.
+    for (const text of [
+      "what's coming next for the shows I follow?",
+      "what's coming up for the shows I'm watching",
+      'what is coming soon for the shows i watch',
+      'any new episodes coming soon for my shows',
+      'are any of my series back soon',
+      'when is the next episode of Severance',
+      'upcoming episodes this week',
+    ]) {
+      assert.equal(prefilterIntent(text), 'library', text)
+    }
+  })
+
+  test('following a show does not turn a recommendation into a lookup', () => {
+    for (const text of [
+      'recommend something new like the shows I follow',
+      'suggest the next episode to try',
+      'find me a new series like my shows',
+    ]) {
+      assert.equal(prefilterIntent(text), 'discovery', text)
+    }
+  })
+
+  test('new and coming soon stay open-world without a followed show', () => {
+    assert.equal(prefilterIntent('what movies are coming soon'), 'discovery')
+    assert.equal(prefilterIntent('new releases on streaming'), 'discovery')
+  })
+
   test('a taste statement is not a library question', () => {
     // "I like noir" describes the person, not their collection. Matching it as a
     // library signal is what let a bare pronoun hard-route past the classifier.

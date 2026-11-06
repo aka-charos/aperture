@@ -44,7 +44,31 @@ export interface ContentItem {
    * which means the card has to navigate to `seriesId` instead of `id`.
    */
   episode?: EpisodeRef
+  /** Present only on a getUpcomingEpisodes card, which is the show, not the episode. */
+  upcoming?: UpcomingInfo
   actions?: Action[]
+}
+
+/** Mirrors API `UpcomingInfoSchema`. An `expected` date is never proof of playability. */
+export interface UpcomingInfo {
+  next: {
+    season: number
+    number: number
+    title: string
+    /** YYYY-MM-DD */
+    airDate: string
+    status: 'expected' | 'pastDue'
+    basis: 'tmdbForecast' | 'serverListing'
+  }
+  latestAired: {
+    season: number
+    number: number
+    title: string
+    /** YYYY-MM-DD */
+    airDate: string
+    inLibrary: boolean
+    played: boolean
+  } | null
 }
 
 export interface EpisodeRef {
@@ -94,6 +118,15 @@ export type ContentCarouselI18nKey =
   | 'carouselEpisodesDesc'
   | 'carouselEpisodesEmpty'
   | 'carouselEpisodesError'
+  | 'carouselUpcomingTitle'
+  | 'carouselUpcomingDesc'
+  | 'carouselUpcomingDescPartial'
+  | 'carouselUpcomingNothing'
+  | 'carouselUpcomingNothingPartial'
+  | 'carouselUpcomingNotFollowing'
+  | 'carouselUpcomingNoTmdbKey'
+  | 'carouselUpcomingLookupFailed'
+  | 'carouselUpcomingNoTmdbEntry'
   | 'carouselSimilarTitle'
   | 'carouselSimilarLookupNotFound'
   | 'carouselSimilarNoEmbedding'

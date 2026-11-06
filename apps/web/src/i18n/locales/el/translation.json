@@ -1423,7 +1423,8 @@
       "discoveryReasons": "Γράφω γιατί ταιριάζει ο καθένας…",
       "discoveryAssembling": "Συνθέτω τη λίστα σας…",
       "episodes": "Κοιτάζω τα επεισόδια…",
-      "analysis": "Διαβάζω την ανάλυση"
+      "analysis": "Διαβάζω την ανάλυση",
+      "upcoming": "Checking what's coming up…"
     },
     "tooltipOpenFullPage": "Άνοιγμα σε πλήρη σελίδα",
     "scrollToAnswer": "Πίσω στην απάντηση",
@@ -3991,7 +3992,21 @@
     "analysisSpoilerReveal": "This part places the film in its tradition and may reveal how it ends — tap to read",
     "analysisNotYet": "No analysis has been written for this title yet. Open its page to generate one.",
     "analysisDeclined": "An analysis was attempted, but there was not enough published writing about this title to work from.",
-    "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it."
+    "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it.",
+    "carouselUpcomingTitle": "Coming up in the shows you follow",
+    "carouselUpcomingDesc": "The next episode of {{count}} of them. Dates are expected, not a promise it will be ready to play.",
+    "carouselUpcomingDescPartial": "The next episode of {{count}} of them. Dates are expected, not a promise it will be ready to play. {{unchecked}} more could not be checked.",
+    "carouselUpcomingNothing": "No next episode is announced for the {{count}} shows checked.",
+    "carouselUpcomingNothingPartial": "No next episode is announced for the {{count}} shows checked. {{unchecked}} more could not be checked.",
+    "carouselUpcomingNotFollowing": "You are not following any shows here yet.",
+    "carouselUpcomingNoTmdbKey": "Upcoming episodes cannot be forecast because TMDb is not set up on this server, so this does not mean nothing is coming.",
+    "carouselUpcomingLookupFailed": "TMDb did not answer for {{unchecked}} of the shows you follow, so this does not mean nothing is coming. Try again shortly.",
+    "carouselUpcomingNoTmdbEntry": "TMDb has no entry for {{unchecked}} of the shows you follow, so there is no forecast for them.",
+    "upcomingExpected": "Expected {{date}}",
+    "upcomingPastDue": "Was expected {{date}}",
+    "upcomingLatestInLibrary": "Latest {{code}}, aired {{date}}: in your library",
+    "upcomingLatestUnplayed": "Latest {{code}}, aired {{date}}: in your library, not played yet",
+    "upcomingLatestNotInLibrary": "Latest {{code}}, aired {{date}}: not in your library yet"
   },
   "dashboard": {
     "greetingMorning": "Καλημέρα",
