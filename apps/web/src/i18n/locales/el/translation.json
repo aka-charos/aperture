@@ -3991,7 +3991,9 @@
     "analysisSpoilerReveal": "This part places the film in its tradition and may reveal how it ends — tap to read",
     "analysisNotYet": "No analysis has been written for this title yet. Open its page to generate one.",
     "analysisDeclined": "An analysis was attempted, but there was not enough published writing about this title to work from.",
-    "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it."
+    "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it.",
+    "carouselLimitsNoneFit": "Δεν βρέθηκε κάτι που να ταιριάζει στους περιορισμούς του αιτήματός σας.",
+    "carouselLimitsDropped": "Προτάσεις από τον ιστό που έμειναν εκτός επειδή δεν ταιριάζουν στους περιορισμούς του αιτήματός σας: {{dropped}}"
   },
   "dashboard": {
     "greetingMorning": "Καλημέρα",

@@ -41,6 +41,8 @@ CRITICAL: Choose the RIGHT search tool:
 - **semanticSearch** - Same kind of query, ranked by text similarity ALONE: no personalization, no watched filter. For impersonal library lookups ("does the library have anything about X").
 - **searchContent** - For specific/filterable searches (titles, genres, years, ratings, content ratings, directors, actors, studios, runtime, etc.)
 
+CRITICAL: a limit the user states is a filter, never part of the search text. searchMyRecommendations, semanticSearch and findCandidatesInLibrary all take **genre, yearMin, yearMax, minRating, maxRuntime**, and the search enforces them; putting "under 90 minutes" in a concept enforces nothing, and a three-hour film can still come back as the closest match. Pass only what they actually asked for, not what you think would suit them. If a result carries **limitsNote**, what it says is true of the answer: say it plainly. Any fallback search gets the same limits. The other list tools (getTopRated, getUnwatched, getMyRecommendations and the like) do not know these limits, and stop being available once a search has stated them.
+
 Note: when a discovery/web tool is available, an open "find me something like…" request goes there FIRST — it is the primary path for recommendations. The tools above are for library-scoped questions and for falling back.
 
 **searchContent has COMPREHENSIVE filters:**
@@ -121,6 +123,8 @@ CRITICAL: Interpret temporal language:
 | "Shows still running" | searchContent(status: "Continuing", type: "series") | Status filter |
 | "what mind-bending sci-fi do I have?" | searchMyRecommendations(concept: "mind-bending sci-fi", type: "movies") | Their library, ranked for them |
 | "what mind-bending sci-fi is in the library?" | semanticSearch(concept: "mind-bending sci-fi", type: "movies") | Impersonal lookup |
+| "something tense I have that's under 90 minutes" | searchMyRecommendations(concept: "tense", maxRuntime: 90) | Mood + stated limit |
+| "bleak sci-fi from the 70s rated at least 7 in the library" | semanticSearch(concept: "bleak", genre: "Science Fiction", yearMin: 1970, yearMax: 1979, minRating: 7, type: "movies") | Mood + stated limits |
 | "Do I have Inception?" | searchContent(query: "Inception") | Exact title |
 | "Movies from 2020-2023" | searchContent(yearMin: 2020, yearMax: 2023, type: "movies") | Year range |
 | "Recent Tom Hanks movies" | searchContent(actor: "Tom Hanks", yearMin: 2022, sortBy: "year", sortOrder: "desc", type: "movies") | Recent + actor |

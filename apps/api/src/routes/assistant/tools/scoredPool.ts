@@ -19,9 +19,18 @@ import {
   libraryScopeSql,
   scopedAnnQuery,
 } from '@aperture/core'
+import { query } from '../../../lib/db.js'
 import { readTwinSharedIds, resolveTwinSharedTitles } from '../../../lib/twinShared.js'
 import { blendQueryAndTaste } from './tasteBlend.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
+import {
+  hasTitleLimits,
+  mediaTypesOf,
+  NO_LIMITS,
+  titleLimitsSql,
+  watchStatusCondition,
+  type ResolvedLimits,
+} from './titleLimits.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
 
@@ -36,10 +45,6 @@ const logger = createChildLogger('scored-pool')
  * second opinion.
  */
 export const ANN_POOL_SIZE = 400
-
-/** Narrow a plural media type to the singular one the queries use. */
-export const asMedia = (type: 'movies' | 'series' | 'both'): 'movie' | 'series' =>
-  type === 'series' ? 'series' : 'movie'
 
 /**
  * Which reserved slot, if any, put a pick in the list.
@@ -128,8 +133,32 @@ export interface ScoredPoolSearchOptions {
    * on the request; the discovery taste section passes the mirror of it.
    */
   queryWeight?: number
+  /** Stated limits a card must fit (titleLimits.ts). */
+  limits?: ResolvedLimits
+  /**
+   * Also drop what they have played since the run. The pool leaves out what was
+   * watched when it was scored, which may be days ago.
+   */
+  unwatchedOnly?: boolean
   /** Label for the log line, so two callers are distinguishable in a log. */
   caller?: string
+}
+
+/**
+ * Whether the viewer has a finished run of any media type searched. Without one
+ * the pool is empty whatever was asked, and that is not a limit's doing.
+ */
+export async function hasCompletedRun(
+  userId: string,
+  type: 'movies' | 'series' | 'both'
+): Promise<boolean> {
+  const result = await query(
+    `SELECT 1 FROM recommendation_runs
+      WHERE user_id = $1 AND status = 'completed' AND media_type = ANY($2)
+      LIMIT 1`,
+    [userId, mediaTypesOf(type)]
+  )
+  return result.rows.length > 0
 }
 
 /**
@@ -148,14 +177,22 @@ export interface ScoredPoolSearchOptions {
  */
 export async function searchScoredPool(
   ctx: ToolContext,
-  { concept, type = 'both', limit = 12, queryWeight, caller = 'tool' }: ScoredPoolSearchOptions
+  {
+    concept,
+    type = 'both',
+    limit = 12,
+    queryWeight,
+    limits = NO_LIMITS,
+    unwatchedOnly = false,
+    caller = 'tool',
+  }: ScoredPoolSearchOptions
 ): Promise<ContentItem[]> {
   const embedding = await ctx.embedding.embedOne(concept)
   const embeddingStr = `[${embedding.join(',')}]`
 
   const items: ContentItem[] = []
 
-  for (const media of type === 'both' ? (['movie', 'series'] as const) : [asMedia(type)]) {
+  for (const media of mediaTypesOf(type)) {
     const isMovie = media === 'movie'
     const table = await getActiveEmbeddingTableName(
       isMovie ? 'embeddings' : 'series_embeddings'
@@ -167,6 +204,17 @@ export async function searchScoredPool(
     // pool is filtered to what they may open now (ctx.scope).
     const poolParams: unknown[] = [ctx.userId, media, embeddingStr, ctx.embedding.setId, ANN_POOL_SIZE]
     const inScope = libraryScopeSql(ctx.scope, 'c', binderFor(poolParams))
+
+    // Limits go inside `near`, so the pool is the nearest titles that FIT. Applied
+    // after it, they would thin a fixed 400 nearest and a narrow limit would leave
+    // nothing to blend. Without limits the query is the one it always was.
+    const limitSql = titleLimitsSql(limits, media, 'fit', binderFor(poolParams))
+    const limitJoin = hasTitleLimits(limits.limits)
+      ? `JOIN ${contentTable} fit ON fit.id = e.${idColumn}`
+      : ''
+    // $1 is already the viewer. After `near`, because 400 nearest leave plenty
+    // for what a viewer has played since one run.
+    const unplayed = unwatchedOnly ? `AND ${watchStatusCondition('unwatched', isMovie, 'c.id', 1)}` : ''
 
     // A bare LIMIT 400 cannot be trusted: an HNSW scan never returns more rows
     // than ef_search (default 40), so at the default this pool came back with
@@ -198,7 +246,8 @@ export async function searchScoredPool(
              SELECT e.${idColumn} AS item_id,
                     1 - (e.embedding <=> $3::halfvec) AS query_score
                FROM ${table} e
-              WHERE e.model = $4
+               ${limitJoin}
+              WHERE e.model = $4 ${limitSql}
               ORDER BY e.embedding <=> $3::halfvec
               LIMIT $5
            )
@@ -210,7 +259,7 @@ export async function searchScoredPool(
                ON rc.${idColumn} = near.item_id
               AND rc.run_id = (SELECT id FROM latest)
              JOIN ${contentTable} c ON c.id = near.item_id
-            WHERE ${inScope}`,
+            WHERE ${inScope} ${unplayed}`,
       poolParams
     )
 
@@ -239,6 +288,7 @@ export async function searchScoredPool(
         concept,
         media,
         queryWeight: queryWeight ?? 'default',
+        limits: hasTitleLimits(limits.limits) ? limits.limits : undefined,
         annPool: ANN_POOL_SIZE,
         matched: rows.rows.length,
         returned: ranked.length,

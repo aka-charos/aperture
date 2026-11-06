@@ -1993,6 +1993,8 @@
     "carouselSemanticEmpty": "No content found matching \"{{concept}}\". Try a different description.",
     "carouselSemanticDesc": "The {{count}} nearest titles in your library",
     "carouselSemanticError": "Search failed: {{message}}",
+    "carouselLimitsNoneFit": "Nothing was found that fits the limits in your request.",
+    "carouselLimitsDropped": "Web picks left out for not fitting the limits in your request: {{dropped}}",
     "carouselEpisodesTitle": "Episodes closest to \"{{concept}}\"",
     "carouselEpisodesDesc": "The {{count}} nearest episodes in your library",
     "carouselEpisodesEmpty": "No episodes found matching \"{{concept}}\". Try describing what happens in it.",

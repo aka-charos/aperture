@@ -21,6 +21,11 @@
  * They draw on one library from three directions, so overlap is the normal case
  * and the dedupe is load-bearing rather than defensive.
  *
+ * Limits the request states ("a film", "unwatched", "under 90 minutes") hold on
+ * all three. The web picks are checked once they have library rows, since nothing
+ * is known about them before that; the other two search under the limits, so a
+ * narrow one still fills them. The result says what the limits emptied.
+ *
  * Same render path as every other content tool (everything shown is a library
  * item). Only added to the toolset on discovery-routed turns.
  */
@@ -33,11 +38,21 @@ import { resolveCandidates } from '../discovery/resolveCandidates.js'
 import { gatherWebCandidates } from '../discovery/webCandidates.js'
 import { buildTasteBrief } from '../discovery/tasteBrief.js'
 import { enrichCardReasonsProgressive } from '../discovery/enrichReasons.js'
+import { filterItemsToScope } from '../helpers/libraryScope.js'
 import { filterUnwatchedItems } from '../helpers/unwatched.js'
 import { normalizeTitle } from '../helpers/titleMatch.js'
 import { findSimilarItems } from './search.js'
-import { searchScoredPool } from './scoredPool.js'
+import { hasCompletedRun, searchScoredPool } from './scoredPool.js'
 import { TASTE_SECTION_QUERY_WEIGHT } from './tasteBlend.js'
+import {
+  describeTitleLimits,
+  discoveryLimitsNote,
+  joinNotes,
+  mediaTypesOf,
+  readTitleLimits,
+  TITLE_LIMIT_PARAMS,
+} from './titleLimits.js'
+import { itemsWithinLimits, resolveTitleLimits } from './titleLimitsQuery.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext } from '../types.js'
 
@@ -109,13 +124,19 @@ export const DISCOVERY_PROMPT =
   'taste section already IS that search, run in parallel, and calling it again just repeats ' +
   'the same list under a second heading. If findCandidatesInLibrary returns no cards at all, ' +
   'fall back to getTopRated or getMyRecommendations so the user still gets picks. Only present ' +
-  'titles these tools return — never invent titles.'
+  'titles these tools return — never invent titles.\n' +
+  'HARD LIMITS: when the request states a limit, pass it to findCandidatesInLibrary: genre, ' +
+  'yearMin/yearMax, minRating, maxRuntime, type ("film" = movies, "show" = series) and ' +
+  'watchStatus ("unwatched", "that I haven\'t seen"). They are enforced on all three sections. ' +
+  'Pass only what the user actually asked for. When the result carries limitsNote, it overrides ' +
+  'the fallback above: do not reach for getTopRated, getUnwatched, getMyRecommendations or any ' +
+  'other list tool, which do not know these limits, and tell the user plainly what its note says.'
 
 export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) {
   return {
     findCandidatesInLibrary: tool({
       description:
-        "Gather web-sourced recommendation candidates for this request and match them to the user's library, returning them as the primary 'Recommendations'. When a specific title is referenced via seedTitle, also add embeddings-similar library picks as 'Also worth checking'. Always also returns 'From your taste profile' — the same personalized in-library search searchMyRecommendations performs, run in parallel here, so that tool does not need calling afterwards. The three sections never share a title. Call this exactly ONCE, first. Everything returned is IN the library — titles the library does not have are dropped and must never be mentioned. Each pick includes a short 'reason' that is already shown on its card — synthesize a short closing note rather than repeating them per title. Only present what this tool returns — never invent titles.",
+        "Gather web-sourced recommendation candidates for this request and match them to the user's library, returning them as the primary 'Recommendations'. When a specific title is referenced via seedTitle, also add embeddings-similar library picks as 'Also worth checking'. Always also returns 'From your taste profile' — the same personalized in-library search searchMyRecommendations performs, run in parallel here, so that tool does not need calling afterwards. The three sections never share a title. Call this exactly ONCE, first. Everything returned is IN the library — titles the library does not have are dropped and must never be mentioned. Each pick includes a short 'reason' that is already shown on its card — synthesize a short closing note rather than repeating them per title. Only present what this tool returns — never invent titles. Limits stated in the request (genre, years, minimum rating, maximum runtime, film or show, unwatched) go in their parameters and hold on all three sections; limitsNote reports what they left out.",
       inputSchema: nullSafe(z.object({
         seedTitle: z
           .string()
@@ -123,6 +144,17 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           .describe(
             'If the request references a specific title (e.g. "movies similar to X"), the title X — used to add embeddings-based related picks from the library.'
           ),
+        type: z
+          .enum(['movies', 'series', 'both'])
+          .optional()
+          .default('both')
+          .describe('Only films ("movies") or only shows ("series"), when the request says which.'),
+        watchStatus: z
+          .enum(['all', 'unwatched'])
+          .optional()
+          .default('all')
+          .describe('"unwatched" when the request asks only for titles the user has not played.'),
+        ...TITLE_LIMIT_PARAMS,
       })),
       // A generator, not an async function: every value it yields reaches the
       // client as a preliminary tool result, and the LAST one it yields is the
@@ -130,7 +162,19 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
       // what lets the cards appear as soon as they are resolved instead of after
       // the reason rewrite, which on a measured turn was 115 of its 138 seconds.
       // See helpers/toolStream.ts for what this costs the wrapper layer.
-      execute: async function* ({ seedTitle }) {
+      execute: async function* ({ seedTitle, type = 'both', watchStatus = 'all', ...limitParams }) {
+        const limits = await resolveTitleLimits(ctx.scope, readTitleLimits(limitParams), type)
+        const wantedMedia: string[] = mediaTypesOf(type)
+        const unwatchedOnly = (ctx.excludeWatched ?? false) || watchStatus === 'unwatched'
+        // In the words the note to the model uses. The composer's own toggle is
+        // not listed: the user set it, not this request, and it has its own card.
+        const statedLimits = [
+          describeTitleLimits(limits.limits),
+          type === 'movies' ? 'films only' : type === 'series' ? 'shows only' : '',
+          watchStatus === 'unwatched' ? 'not yet played' : '',
+        ]
+          .filter(Boolean)
+          .join('; ')
         // This one tool call runs nine sequential stages, several of them slow, so
         // it reports its own sub-phases — the per-tool status wrapper only ever
         // sees "entering findCandidatesInLibrary".
@@ -156,13 +200,18 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         //
         // Fails open to nothing: a turn that produced good web picks must not
         // fail over its secondary strip.
+        let tasteFailed = false
         const tastePromise = searchScoredPool(ctx, {
           concept: queryText,
+          type,
           limit: TASTE_POOL,
           queryWeight: TASTE_SECTION_QUERY_WEIGHT,
+          limits,
+          unwatchedOnly,
           caller: 'discovery',
         }).catch((err) => {
           logger.warn({ err }, 'Taste section failed; continuing without it')
+          tasteFailed = true
           return [] as ContentItem[]
         })
 
@@ -189,12 +238,27 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         const resolved = await resolveCandidates(candidates, ctx)
         const { notInLibrary } = resolved
 
-        // "Unwatched only" (composer toggle): drop watched titles here, before
-        // the enrichment pass, so we neither pay to write notes for cards that
-        // are about to disappear nor leak them into `picks`.
-        const webItems = ctx.excludeWatched
-          ? await filterUnwatchedItems(ctx.userId, resolved.items)
+        // Everything counted against the limits below is what this viewer may open:
+        // a title in a closed library answers as one the library does not have, so
+        // it must not turn up in a count of what the limits left out. Without limits
+        // nothing is counted, and the outer wrapper does this as it always did.
+        const visibleItems = statedLimits
+          ? await filterItemsToScope(ctx.scope, resolved.items)
           : resolved.items
+
+        // The request's own limits. Here because this is the first point a web
+        // pick is a library row with a runtime and a rating to read.
+        const fittingItems = await itemsWithinLimits(
+          visibleItems.filter((i) => wantedMedia.includes(i.type)),
+          limits
+        )
+
+        // "Unwatched only" (composer toggle, or the request itself): drop watched
+        // titles here, before the enrichment pass, so we neither pay to write notes
+        // for cards that are about to disappear nor leak them into `picks`.
+        const webItems = unwatchedOnly
+          ? await filterUnwatchedItems(ctx.userId, fittingItems)
+          : fittingItems
 
         // The library's answer rate for this request, which nothing recorded
         // before: a turn that shipped four cards out of eleven web picks looked
@@ -207,7 +271,8 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
             candidates: candidates.length,
             matched: resolved.items.length,
             notInLibrary: resolved.notInLibrary.length,
-            droppedAsWatched: resolved.items.length - webItems.length,
+            droppedByLimits: visibleItems.length - fittingItems.length,
+            droppedAsWatched: fittingItems.length - webItems.length,
           },
           'Discovery candidates resolved against the library'
         )
@@ -215,14 +280,27 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         // Secondary section: embeddings-similar to the referenced title, deduped
         // against the web picks so nothing appears twice. Only when a title was given.
         let alsoItems: ContentItem[] = []
+        // What the note says about this section. A seed the library does not hold,
+        // or one with no embedding, had nothing to do with the limits. Not found
+        // under a stated type is reported, since that may be the type's doing.
+        let seedSection: { found: number | null; emptiedByLimits: boolean } | null = null
         if (seedTitle?.trim()) {
           onStatus?.('discoveryRelated')
           try {
             const webIds = new Set(webItems.map((i) => i.id))
             const sim = await findSimilarItems(ctx, seedTitle.trim(), {
+              // The stated type settles a seed that matches both a film and a show,
+              // which otherwise resolves to neither.
+              type: type === 'both' ? undefined : type,
               limit: SUPPLEMENT_POOL,
-              excludeWatched: ctx.excludeWatched ?? false,
+              excludeWatched: unwatchedOnly,
+              limits,
             })
+            if (sim.foundTitle && !sim.noEmbedding) {
+              seedSection = { found: null, emptiedByLimits: sim.items.length === 0 }
+            } else if (!sim.foundTitle && type !== 'both') {
+              seedSection = { found: 0, emptiedByLimits: false }
+            }
             // How many survive depends on the job they are doing. As a
             // SUPPLEMENT they are capped: a request answered by four direct
             // homages ended up with ten nearest-neighbours-of-the-seed stacked
@@ -246,17 +324,14 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         // normal case, not the edge case — the same film under two headings
         // with two different notes reads as a bug.
         //
-        // Watched titles are dropped BEFORE the slice, not after. The pool
-        // excludes what was watched as of the last recommendation run, which
-        // may be days old, and the outer `withUnwatchedFilter` only strips the
-        // finished result — so filtering late would silently return two cards
+        // Watched titles are dropped BEFORE the slice, in the query, not after.
+        // The pool excludes what was watched as of the last recommendation run,
+        // which may be days old, and the outer `withUnwatchedFilter` only strips
+        // the finished result — so filtering late would silently return two cards
         // where six were asked for, and pay for notes on the four that vanish.
         const shownIds = new Set([...webItems, ...alsoItems].map((i) => i.id))
         const tastePool = await tastePromise
-        const tasteCandidates = ctx.excludeWatched
-          ? await filterUnwatchedItems(ctx.userId, tastePool)
-          : tastePool
-        const tasteItems = tasteCandidates
+        const tasteItems = tastePool
           .filter((i) => !shownIds.has(i.id))
           .filter((i) => !seedKey || normalizeTitleKey(i.name) !== seedKey)
           .slice(0, TASTE_MAX)
@@ -264,7 +339,6 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         logger.info(
           {
             fetched: tastePool.length,
-            afterWatched: tasteCandidates.length,
             shown: tasteItems.length,
             dedupedAgainst: shownIds.size,
             queryWeight: TASTE_SECTION_QUERY_WEIGHT,
@@ -273,6 +347,46 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
         )
 
         const combined = [...webItems, ...alsoItems, ...tasteItems]
+
+        // What the limits did, for the model to pass on. Absent without limits.
+        // `found` is only knowable for the web picks: the other two searched under
+        // the limits, so there is no list they were cut from. For those, an empty
+        // search under limits is put down to the limits unless something else
+        // explains it. A section whose cards all went to another is not empty.
+        const webEmptied =
+          visibleItems.length > 0 &&
+          (fittingItems.length === 0 || (webItems.length === 0 && watchStatus === 'unwatched'))
+        const tasteEmptied =
+          statedLimits !== '' &&
+          tastePool.length === 0 &&
+          !tasteFailed &&
+          (await hasCompletedRun(ctx.userId, type))
+        const limitsEmptiedAny =
+          webEmptied || tasteEmptied || seedSection?.emptiedByLimits === true
+        const limitsNote = joinNotes(
+          statedLimits
+            ? discoveryLimitsNote(statedLimits, [
+                {
+                  label: 'Web picks',
+                  found: visibleItems.length,
+                  shown: webItems.length,
+                  emptiedByLimits: webEmptied,
+                },
+                ...(seedSection
+                  ? [{ label: `Close to ${seedTitle?.trim()}`, shown: alsoItems.length, ...seedSection }]
+                  : []),
+                {
+                  label: 'From the taste profile',
+                  found: null,
+                  shown: tasteItems.length,
+                  emptiedByLimits: tasteEmptied,
+                },
+              ])
+            : null,
+          limits.ignoredGenreNote
+        )
+        // On the first section shown, because a section with no cards gets no tab.
+        const droppedByLimits = visibleItems.length - fittingItems.length
         // One stamp for the whole turn. These ids are React keys on the client,
         // so a fresh Date.now() per emission would remount the entire list on
         // every progress update instead of rewriting the notes in place.
@@ -358,22 +472,31 @@ export function createDiscoveryResolveTool(ctx: ToolContext, queryText: string) 
           if (carousels.length === 0) {
             // The all-watched case is a distinct outcome from an empty search —
             // saying "nothing found" there would be misleading.
-            const allWatched = resolved.items.length > 0 && webItems.length === 0
+            const allWatched = fittingItems.length > 0 && webItems.length === 0
             carousels.push(
-              createCarouselResult(`discovery-empty-${stamp}`, [], {
-                description: allWatched
-                  ? 'Every match for this request has already been watched.'
-                  : notInLibrary.length > 0
-                    ? 'None of the web-sourced picks are in the library.'
-                    : 'No web-sourced picks were found for this request.',
-              })
+              createCarouselResult(
+                `discovery-empty-${stamp}`,
+                [],
+                limitsEmptiedAny
+                  ? { descriptionKey: 'carouselLimitsNoneFit' }
+                  : {
+                      description: allWatched
+                        ? 'Every match for this request has already been watched.'
+                        : notInLibrary.length > 0
+                          ? 'None of the web-sourced picks are in the library.'
+                          : 'No web-sourced picks were found for this request.',
+                    }
+              )
             )
+          } else if (droppedByLimits > 0) {
+            carousels[0].descriptionKey = 'carouselLimitsDropped'
+            carousels[0].descriptionParams = { dropped: droppedByLimits }
           }
 
           // Deliberately NOT returning the unmatched titles: anything the model can
           // see, it will eventually mention, and nothing outside the library should
           // ever reach the user.
-          return { carousels, picks }
+          return { carousels, picks, ...(limitsNote ? { limitsNote } : {}) }
         }
 
         // The cards are already readable: every web pick carries the note the

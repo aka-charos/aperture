@@ -2350,7 +2350,9 @@
     "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it.",
     "sectionUntitled": "Results",
     "moreLink": "More",
-    "moreAbout": "More about {{title}}"
+    "moreAbout": "More about {{title}}",
+    "carouselLimitsNoneFit": "Nothing was found that fits the limits in your request.",
+    "carouselLimitsDropped": "Web picks left out for not fitting the limits in your request: {{dropped}}"
   },
   "similarityGraph": {
     "loadingFallback": "Cargando…",

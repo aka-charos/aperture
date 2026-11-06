@@ -24,7 +24,7 @@ import { anyTitleMatchesSql } from '../helpers/titleMatch.js'
 import { briefResult, FORMAT_PARAM_DESCRIPTION, nullSafe } from './utils.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext } from '../types.js'
-import type { WatchStatus } from './search.js'
+import type { WatchStatus } from './titleLimits.js'
 import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 /** Row shape returned by the episode ANN query. */
@@ -111,7 +111,7 @@ export function formatEpisodeItem(
 /**
  * Membership in the user's episode watch history.
  *
- * Deliberately the same shape as `watchStatusCondition` in search.ts — plain
+ * Deliberately the same shape as `watchStatusCondition` in titleLimits.ts — plain
  * membership, not the progress-threshold predicate — so the two tools agree
  * about what "watched" means. `watch_history` stores one row per episode with a
  * check constraint making exactly one of movie_id/episode_id non-null, so this
