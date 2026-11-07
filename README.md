@@ -14,13 +14,13 @@ Works for **movies** and **TV series**, in **14 languages**, and shows each view
 
 ## About this fork
 
-This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) is a fork of [dgruhin-hrizn/aperture](https://github.com/dgruhin-hrizn/aperture). It is based on upstream **v0.7.8** and carries more than six hundred commits of features and fixes on top. Upstream has since released v0.7.9 and v0.7.10; those releases are **not** merged here.
+This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) is a fork of [dgruhin-hrizn/aperture](https://github.com/dgruhin-hrizn/aperture). It is based on upstream **v0.7.8** and carries more than seven hundred commits of features and fixes on top. Upstream has since released versions up to v1.0.0; those releases are **not** merged here, though some of their fixes and performance work have been adapted.
 
 - Active development happens on **`dev`**. That is the branch to deploy from.
-- `main` is a stale mirror of upstream v0.7.8 and exists only to make rebases easy.
+- `main` is a plain mirror of upstream, kept identical to it. Nothing is developed there, and nothing from `dev` goes to it.
 - Images are published to **`ghcr.io/aka-charos/aperture:dev`** whenever a push to `dev` changes the application (`apps/`, `packages/`, `db/`, `docker/` or the lockfile) and passes lint and typecheck. That tag is built for **amd64 only** — see [ARM hosts](#arm-hosts).
 - Version identity is two fields, not one string: `APP_VERSION` is the upstream lineage (`0.7.8`), `APP_BUILD` is the fork build (`mod.<commits>.g<sha>`). Both appear in the admin console and in `/api/health`.
-- GitHub shows this fork as hundreds of commits "behind" upstream. That counter overstates the gap: only a handful of upstream commits are really missing. See [Staying in step with upstream](docs/upstream-sync.md).
+- GitHub shows this fork as hundreds of commits "behind" upstream. That counter overstates the gap, since most of it is work already here under other hashes. What is really missing is upstream's release work from v0.7.9 to v1.0.0. See [Staying in step with upstream](docs/upstream-sync.md).
 
 **This README is written as a delta against upstream v0.7.8**, in three layers:
 
@@ -28,12 +28,12 @@ This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) 
 - [What this fork changes](#what-this-fork-changes) — the same ground area by area. Each section is marked **new** or **reworked**, and a reworked one opens with what upstream already had.
 - [What this fork fixes](#what-this-fork-fixes) — defects in code inherited from upstream, grouped by area.
 
-What arrived unchanged is under [Inherited from upstream](#inherited-from-upstream). The commits behind it are classified in [docs/fork-divergence.md](docs/fork-divergence.md), up to 2026-10-17; the sections below also describe work merged since then, which that file does not classify yet. Of the 634 commits it covers:
+What arrived unchanged is under [Inherited from upstream](#inherited-from-upstream). The commits behind it are classified in [docs/fork-divergence.md](docs/fork-divergence.md), up to 2026-11-07. Of the 792 commits it covers:
 
-- **56** add something upstream had no form of.
-- **275** enhance something upstream already had.
-- **93** fix a defect in inherited code, and **50** more fixes ride inside other commits.
-- **143** fix the fork's own work.
+- **66** add something upstream had no form of.
+- **325** enhance something upstream already had.
+- **108** fix a defect in inherited code, and **57** more fixes ride inside other commits.
+- **201** fix the fork's own work.
 - The rest are docs, chores and measurement.
 
 ### At a glance
@@ -819,10 +819,10 @@ After changing an export in `packages/core` or `packages/ui`, rebuild the packag
 The fork-divergence record is kept current with `scripts/fork-commit-bundle.mjs`. Bundle the commits into readable evidence files under the gitignored `.zcode/fork-classify/`:
 
 ```bash
-node scripts/fork-commit-bundle.mjs --diff-cap 0 --base upstream/dev --range <first-fork-commit>^..HEAD
+node scripts/fork-commit-bundle.mjs --diff-cap 0 --base 812d200367a7 --range <first-fork-commit>^..HEAD
 ```
 
-The default range, `upstream/dev..dev`, also reaches back through the January commits that predate the record, so name the first fork commit (the first row of `docs/fork-divergence.tsv`) as shown. Then classify the new commits into a `verdicts-NN.tsv` there, and rebuild the docs:
+The default range, `upstream/dev..dev`, also reaches back through the January commits that predate the record, so name the first fork commit (the first row of `docs/fork-divergence.tsv`) as shown. Keep `--base` on that commit, the upstream code this fork split from: `upstream/dev` moves, and measuring against its tip attributes files to the wrong side. Then classify the new commits into a `verdicts-NN.tsv` there, and rebuild the docs:
 
 ```bash
 node scripts/fork-commit-bundle.mjs --assemble
