@@ -16,7 +16,7 @@ Admin console → **Library** → **Media server** (`/admin/library/server`).
 | **Public URL (optional)** | The address users' **browsers** should open for "Open in Emby/Jellyfin" buttons, when it differs from the server URL (reverse proxy, split DNS, container networking) |
 | **Server Display Name (optional)** | Overrides the server's own name everywhere in the UI |
 
-**Test Connection** verifies the key and shows the resolved **server name** with a "Connected" state. It uses the fields as they stand; the saved API key is only sent to the server URL it was saved for, so testing a different URL needs the key typed in again. (There is deliberately no version display — the connection test reports what the app uses.)
+**Test Connection** verifies the key and shows the resolved **server name** with a "Connected" state. It uses the fields as they stand; the saved API key is only sent to the server URL it was saved for, so testing a different URL needs the key typed in again. (There is deliberately no version display — the connection test reports what the app uses.) If the server reports itself as a different type than the one selected (for example a Jellyfin server while **Emby** is selected), the test also shows a warning with a **Switch to …** button; test again after switching. The warning never blocks saving. The type is read from the server's public `/System/Info/Public` reply, and only the detected type is shown.
 
 ## Security Settings
 

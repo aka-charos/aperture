@@ -342,8 +342,15 @@ export interface MediaServerProvider {
 
   /**
    * Delete a collection
+   * @param opts.clearRankSortNames - Also remove the "NN - Title" sort-name prefix the collection
+   *   wrote on its members. Only for a collection created with rankAndPin (Top Picks): any other
+   *   collection never wrote one, and a member's prefix may belong to another collection.
    */
-  deleteCollection(apiKey: string, collectionId: string): Promise<void>
+  deleteCollection(
+    apiKey: string,
+    collectionId: string,
+    opts?: { clearRankSortNames?: boolean }
+  ): Promise<void>
 
   /** The id of the collection (Box Set) with exactly this name, or null. */
   findCollectionByName(apiKey: string, name: string): Promise<string | null>

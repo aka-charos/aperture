@@ -39,7 +39,7 @@ import { useWatchingData } from './hooks'
 import { useUserRatings } from '../../hooks/useUserRatings'
 import { useWatchStatus } from '../../hooks/useWatchStatus'
 import { useViewMode } from '../../hooks/useViewMode'
-import { WatchingCard, WatchingListItem, AddSeriesDialog } from './components'
+import { WatchingCard, WatchingListItem, AddSeriesDialog, HomeRowHint } from './components'
 import { PageHeading } from '@/components/PageHeading'
 
 type FilterType = 'all' | 'airing' | 'ended' | 'upcoming'
@@ -234,6 +234,8 @@ export function WatchingPage() {
           </ToggleButton>
         </ToggleButtonGroup>
       </Box>
+
+      {series.length > 0 && <HomeRowHint />}
 
       {/* Stats & Controls */}
       {series.length > 0 && (
