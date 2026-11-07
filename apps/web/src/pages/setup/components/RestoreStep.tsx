@@ -28,6 +28,7 @@ import HistoryIcon from '@mui/icons-material/History'
 import AddIcon from '@mui/icons-material/Add'
 import { useTranslation } from 'react-i18next'
 import type { SetupWizardContext } from '../types'
+import { useBackupJobProgress, type JobFinishedReason, type JobProgress } from '../../settings/hooks/useBackupJobProgress'
 
 interface BackupInfo {
   filename: string
@@ -35,6 +36,7 @@ interface BackupInfo {
   sizeFormatted: string
   createdAt: string
   isCompressed: boolean
+  cutOff?: boolean
 }
 
 interface RestoreStepProps {
@@ -56,6 +58,46 @@ export function RestoreStep({ wizard }: RestoreStepProps) {
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false)
   const [restoreFilename, setRestoreFilename] = useState<string | null>(null)
   const [restoreConfirmText, setRestoreConfirmText] = useState('')
+
+  const handleRestoreFinished = useCallback(
+    (reason: JobFinishedReason, progress: JobProgress) => {
+      setRestoring(false)
+      if (reason !== 'completed') {
+        setError(progress.error || t('setup.restore.errRestore'))
+        return
+      }
+      setSuccess(t('setup.restore.successRestored'))
+      // Reload the page after a short delay to pick up the restored data
+      window.setTimeout(() => window.location.reload(), 3000)
+    },
+    [t]
+  )
+
+  const handleTrackingLost = useCallback(
+    (reason: 'authLost' | 'gone' | 'finishedUnseen') => {
+      setRestoring(false)
+      setError(
+        t(
+          reason === 'finishedUnseen'
+            ? 'settingsBackup.finishedWhileAway'
+            : reason === 'authLost'
+              ? 'settingsBackup.sessionExpired'
+              : 'settingsBackup.trackingLost'
+        )
+      )
+    },
+    [t]
+  )
+
+  const { activeJobId, jobProgress, contactLost, trackJob, resumeRestore } = useBackupJobProgress({
+    onFinished: handleRestoreFinished,
+    onLost: handleTrackingLost,
+  })
+
+  // A restore started before this page was reloaded.
+  useEffect(() => {
+    if (resumeRestore()) setRestoring(true)
+  }, [resumeRestore])
 
   const fetchBackups = useCallback(async () => {
     try {
@@ -98,6 +140,11 @@ export function RestoreStep({ wizard }: RestoreStepProps) {
         body: formData,
       })
 
+      // A proxy in front of the app refuses with a page of its own, not JSON.
+      if (!res.headers.get('content-type')?.includes('application/json')) {
+        throw new Error(t('setup.restore.uploadRefusedByProxy', { status: res.status }))
+      }
+
       const data = await res.json()
 
       if (!res.ok) {
@@ -130,9 +177,10 @@ export function RestoreStep({ wizard }: RestoreStepProps) {
       setError(null)
       setRestoreDialogOpen(false)
 
-      // `sync`: wait for the real outcome. Without it the route answers at once,
-      // and this page announced success and reloaded while the restore still ran.
-      const res = await fetch('/api/setup/backup/restore?sync=true', {
+      // The route answers at once and the outcome is polled. One long request would be
+      // cut by the least patient hop in front of it, which reads as a failure while
+      // the restore carries on (F-141).
+      const res = await fetch('/api/setup/backup/restore', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -148,21 +196,17 @@ export function RestoreStep({ wizard }: RestoreStepProps) {
         throw new Error(data.error || t('setup.restore.errRestore'))
       }
 
-      setSuccess(t('setup.restore.successRestored'))
-
-      // Reload the page after a short delay to pick up the restored data
-      setTimeout(() => {
-        window.location.reload()
-      }, 3000)
+      trackJob(data.jobId, data.progressToken)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('setup.restore.errRestore'))
-    } finally {
       setRestoring(false)
+    } finally {
       setRestoreFilename(null)
     }
   }
 
   const handleSkipRestore = () => {
+    if (restoring) return
     wizard.goToStep('mediaServer')
   }
 
@@ -188,6 +232,18 @@ export function RestoreStep({ wizard }: RestoreStepProps) {
       {success && (
         <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
           {success}
+        </Alert>
+      )}
+
+      {restoring && (
+        <Alert severity="info" icon={<CircularProgress size={18} />} sx={{ mb: 2 }}>
+          {jobProgress?.currentStep || t('setup.restore.restoring')}
+        </Alert>
+      )}
+
+      {activeJobId && contactLost && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {t('settingsBackup.contactLost')}
         </Alert>
       )}
 
@@ -267,7 +323,7 @@ export function RestoreStep({ wizard }: RestoreStepProps) {
                 disabled={uploading || restoring}
               >
                 {uploading ? t('setup.restore.uploading') : t('setup.restore.uploadBackupFile')}
-                <input type="file" hidden accept=".sql,.sql.gz" onChange={handleUploadBackup} />
+                <input type="file" hidden accept=".dump,.sql,.sql.gz" onChange={handleUploadBackup} />
               </Button>
             </Paper>
           </Box>
@@ -302,6 +358,9 @@ export function RestoreStep({ wizard }: RestoreStepProps) {
                             {backup.isCompressed && (
                               <Chip label={t('setup.restore.gzip')} size="small" variant="outlined" sx={{ height: 20 }} />
                             )}
+                            {backup.cutOff === true && (
+                              <Chip label={t('setup.restore.cutOff')} size="small" color="warning" sx={{ height: 20 }} />
+                            )}
                           </Box>
                         </TableCell>
                         <TableCell>{backup.sizeFormatted}</TableCell>
@@ -313,7 +372,7 @@ export function RestoreStep({ wizard }: RestoreStepProps) {
                               variant="outlined"
                               startIcon={<RestoreIcon />}
                               onClick={() => openRestoreDialog(backup.filename)}
-                              disabled={restoring}
+                              disabled={restoring || backup.cutOff === true}
                             >
                               {t('setup.restore.restoreButton')}
                             </Button>

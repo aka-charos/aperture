@@ -21,8 +21,9 @@ const DEFAULT_TTL_MS = 6 * 60 * 60 * 1000
 export const JOB_PROGRESS_TOKEN_HEADER = 'x-job-progress-token'
 
 function sign(payload: string): string {
-  // The secret the session cookie is signed with (server.ts), which lives in the
-  // environment and so survives the restore.
+  // SESSION_SECRET lives in the environment, so it survives the restore. Unset, this
+  // is env.ts's default and not the cookie's fallback in server.ts; nothing needs
+  // the two to match.
   const secret = process.env.SESSION_SECRET || getEnv().SESSION_SECRET
   return createHmac('sha256', secret).update(payload).digest('base64url')
 }

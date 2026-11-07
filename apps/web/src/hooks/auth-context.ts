@@ -45,6 +45,8 @@ export interface AuthContextType {
   user: User | null
   capabilities: Capabilities
   loading: boolean
+  /** A restore has the API refusing everything; `loading` stays true until it ends. */
+  databaseRestoring: boolean
   sessionError: string | null
   impersonation: ImpersonationState | null
   /**

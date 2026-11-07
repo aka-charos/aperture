@@ -1,7 +1,7 @@
 import React, { Suspense, lazy } from 'react'
-import { Box, CircularProgress } from '@mui/material'
+import { Box, CircularProgress, Typography } from '@mui/material'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { I18nextProvider } from 'react-i18next'
+import { I18nextProvider, useTranslation } from 'react-i18next'
 import i18n from './i18n/config'
 import { RtlProviders } from './RtlProviders'
 import { AuthProvider } from './hooks/AuthProvider'
@@ -113,15 +113,26 @@ const UserGuidePage = lazy(async () => ({
 
 /** The whole window while nothing can be drawn yet: auth, setup, a page outside Layout. */
 function FullPageLoading() {
+  const { databaseRestoring } = useAuth()
+  const { t } = useTranslation()
   return (
     <Box
       display="flex"
+      flexDirection="column"
+      gap={2}
       alignItems="center"
       justifyContent="center"
       minHeight="100dvh"
+      px={2}
+      textAlign="center"
       bgcolor="background.default"
     >
       <CircularProgress />
+      {databaseRestoring && (
+        <Typography variant="body2" color="text.secondary">
+          {t('common.databaseRestoring')}
+        </Typography>
+      )}
     </Box>
   )
 }

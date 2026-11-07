@@ -65,6 +65,7 @@ interface BackupInfo {
   sizeFormatted: string
   createdAt: string
   isCompressed: boolean
+  cutOff?: boolean
 }
 
 interface BackupConfig {
@@ -96,7 +97,6 @@ export function BackupSection() {
   
   // In-progress backup tracking
   const [inProgressBackup, setInProgressBackup] = useState<{ filename: string; sizeFormatted: string } | null>(null)
-  const backupSizePollRef = useRef<number | null>(null)
 
   // Config editing
   const [editingConfig, setEditingConfig] = useState(false)
@@ -109,6 +109,7 @@ export function BackupSection() {
   const [restoreConfirmText, setRestoreConfirmText] = useState('')
   const [skipPreRestoreBackup, setSkipPreRestoreBackup] = useState(false)
   const [restoreCompleted, setRestoreCompleted] = useState(false)
+  const [finishedUnseen, setFinishedUnseen] = useState(false)
 
   const handleJobFinished = useCallback(
     (reason: JobFinishedReason, progress: JobProgress) => {
@@ -117,10 +118,14 @@ export function BackupSection() {
       setInProgressBackup(null)
       window.setTimeout(() => {
         clearFinishedRef.current(progress.jobId)
-        setShowLogs(false)
+        // Not while a job started since is using them.
+        if (!activeJobIdRef.current) setShowLogs(false)
       }, FINISHED_PANEL_MS)
 
       if (reason === 'failed') {
+        // A failed restore changed nothing, so the session still works, and a page
+        // opened during it has no data yet. First, because this clears the error.
+        void fetchDataRef.current()
         setError(progress.error || t('settingsBackup.operationFailed'))
         return
       }
@@ -141,16 +146,21 @@ export function BackupSection() {
   )
 
   const handleTrackingLost = useCallback(
-    (reason: 'authLost' | 'gone') => {
+    (reason: 'authLost' | 'gone' | 'finishedUnseen') => {
       setCreatingBackup(false)
       setRestoringBackup(false)
       setInProgressBackup(null)
-      if (reason === 'authLost') setError(t('settingsBackup.sessionExpired'))
+      setShowLogs(false)
+      if (reason === 'finishedUnseen') {
+        setFinishedUnseen(true)
+        return
+      }
+      setError(t(reason === 'authLost' ? 'settingsBackup.sessionExpired' : 'settingsBackup.trackingLost'))
     },
     [t]
   )
 
-  const { activeJobId, jobProgress, elapsedMs, trackJob, stopTracking, clearFinished } = useBackupJobProgress({
+  const { activeJobId, jobProgress, elapsedMs, contactLost, trackJob, resumeRestore, stopTracking, clearFinished } = useBackupJobProgress({
     onFinished: handleJobFinished,
     onLost: handleTrackingLost,
   })
@@ -160,6 +170,9 @@ export function BackupSection() {
   // because after a restore this session may no longer be able to.
   const activeJobIdRef = useRef(activeJobId)
   activeJobIdRef.current = activeJobId
+  // Read rather than depended on: changing language must not reload the page's data.
+  const tRef = useRef(t)
+  tRef.current = t
 
   const fetchData = useCallback(async () => {
     try {
@@ -171,6 +184,12 @@ export function BackupSection() {
         fetch('/api/backup/list', { credentials: 'include' }),
         fetch('/api/jobs', { credentials: 'include' }),
       ])
+
+      // A restore's transaction is open. Its alert and reload follow when it ends.
+      if (configRes.status === 503 || backupsRes.status === 503) {
+        if (!activeJobIdRef.current) setError(tRef.current('settingsBackup.restoreRunningElsewhere'))
+        return
+      }
 
       if (!configRes.ok) {
         throw new Error('Failed to load backup configuration')
@@ -186,21 +205,16 @@ export function BackupSection() {
       setBackups(backupsData.backups || [])
       setRetentionCount(configData.retentionCount)
 
-      // Check for running backup/restore jobs and resume tracking
+      // A backup the job console or the schedule started. Restores are not in this
+      // list: the hook picks those up from the token it saved.
       if (jobsRes.ok) {
         const jobsData = await jobsRes.json()
         const backupJob = jobsData.jobs?.find(
-          (j: { name: string; currentJobId?: string }) =>
-            (j.name === 'backup-database' || j.name === 'restore-database') && j.currentJobId
+          (j: { name: string; currentJobId?: string }) => j.name === 'backup-database' && j.currentJobId
         )
         if (backupJob?.currentJobId && !activeJobIdRef.current) {
-          // No token when resuming after a reload; a session answers here.
           trackJob(backupJob.currentJobId)
-          if (backupJob.name === 'backup-database') {
-            setCreatingBackup(true)
-          } else {
-            setRestoringBackup(true)
-          }
+          setCreatingBackup(true)
           setShowLogs(true)
         }
       }
@@ -213,8 +227,12 @@ export function BackupSection() {
 
   useEffect(() => {
     fetchDataRef.current = fetchData
+    if (resumeRestore()) {
+      setRestoringBackup(true)
+      setShowLogs(true)
+    }
     fetchData()
-  }, [fetchData])
+  }, [fetchData, resumeRestore])
 
   // Name the in-progress backup from its own log line
   useEffect(() => {
@@ -236,41 +254,6 @@ export function BackupSection() {
       container.scrollTop = container.scrollHeight
     }
   }, [jobProgress, showLogs])
-
-  // Poll for in-progress backup file size
-  useEffect(() => {
-    if (inProgressBackup?.filename && creatingBackup) {
-      const pollSize = async () => {
-        try {
-          const res = await fetch('/api/backup/list', { credentials: 'include' })
-          if (res.ok) {
-            const data = await res.json()
-            const currentBackup = data.backups?.find(
-              (b: BackupInfo) => b.filename === inProgressBackup.filename
-            )
-            if (currentBackup) {
-              setInProgressBackup(prev => 
-                prev ? { ...prev, sizeFormatted: currentBackup.sizeFormatted } : null
-              )
-            }
-          }
-        } catch {
-          // Ignore errors during size polling
-        }
-      }
-
-      // Poll for size every 2 seconds
-      backupSizePollRef.current = window.setInterval(pollSize, 2000)
-      pollSize() // Poll immediately
-
-      return () => {
-        if (backupSizePollRef.current) {
-          clearInterval(backupSizePollRef.current)
-          backupSizePollRef.current = null
-        }
-      }
-    }
-  }, [inProgressBackup?.filename, creatingBackup])
 
   const handleCreateBackup = async () => {
     try {
@@ -381,6 +364,11 @@ export function BackupSection() {
         credentials: 'include',
         body: formData,
       })
+
+      // A proxy in front of the app refuses with a page of its own, not JSON.
+      if (!res.headers.get('content-type')?.includes('application/json')) {
+        throw new Error(t('settingsBackup.uploadRefusedByProxy', { status: res.status }))
+      }
 
       const data = await res.json()
 
@@ -531,6 +519,18 @@ export function BackupSection() {
           {success && (
             <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
               {success}
+            </Alert>
+          )}
+
+          {activeJobId && contactLost && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {t('settingsBackup.contactLost')}
+            </Alert>
+          )}
+
+          {finishedUnseen && (
+            <Alert severity="info" sx={{ mb: 2 }} onClose={() => setFinishedUnseen(false)}>
+              {t('settingsBackup.finishedWhileAway')}
             </Alert>
           )}
 
@@ -858,9 +858,15 @@ export function BackupSection() {
                     .map((backup) => (
                     <TableRow key={backup.filename} hover>
                       <TableCell>
-                        <Tooltip title={t('settingsBackup.tooltipBackupComplete')}>
-                          <CheckCircleIcon fontSize="small" color="success" />
-                        </Tooltip>
+                        {backup.cutOff === true ? (
+                          <Tooltip title={t('settingsBackup.tooltipCutOff')}>
+                            <ErrorIcon fontSize="small" color="warning" />
+                          </Tooltip>
+                        ) : (
+                          <Tooltip title={t('settingsBackup.tooltipBackupComplete')}>
+                            <CheckCircleIcon fontSize="small" color="success" />
+                          </Tooltip>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Box display="flex" alignItems="center" gap={1}>
@@ -879,7 +885,7 @@ export function BackupSection() {
                           <IconButton
                             size="small"
                             onClick={() => openRestoreDialog(backup.filename)}
-                            disabled={restoringBackup || creatingBackup}
+                            disabled={restoringBackup || creatingBackup || backup.cutOff === true}
                           >
                             <RestoreIcon fontSize="small" />
                           </IconButton>

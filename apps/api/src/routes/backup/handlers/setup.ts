@@ -12,12 +12,14 @@ import {
   listBackups,
   validateBackup,
   formatBytes,
+  isRestoreInProgress,
+  BACKUP_UPLOAD_MAX_BYTES,
 } from '@aperture/core'
 import { backupSchemas } from '../schemas.js'
 import { setupFenceClosingOnComplete } from '../../setup/fence.js'
-import * as fs from 'fs'
-import * as path from 'path'
-import { pipeline } from 'stream/promises'
+import { afterDatabaseRestored } from '../../../lib/afterRestore.js'
+import { createJobProgressToken } from '../../../lib/jobProgressToken.js'
+import { storeBackupUpload } from './upload.js'
 import { randomUUID } from 'crypto'
 
 export async function registerSetupHandlers(fastify: FastifyInstance) {
@@ -39,6 +41,7 @@ export async function registerSetupHandlers(fastify: FastifyInstance) {
             sizeFormatted: formatBytes(b.sizeBytes),
             createdAt: b.createdAt,
             isCompressed: b.isCompressed,
+            cutOff: b.cutOff,
           })),
           hasBackups: backups.length > 0,
           totalCount: backups.length,
@@ -59,46 +62,11 @@ export async function registerSetupHandlers(fastify: FastifyInstance) {
     { schema: backupSchemas.setupUploadBackup, onRequest: setupFenceClosingOnComplete },
     async (request, reply) => {
       try {
-        const data = await request.file()
-        if (!data) {
-          return reply.status(400).send({ error: 'No file uploaded' })
-        }
-
         const config = await getBackupConfig()
-
-        const originalFilename = data.filename || 'uploaded_backup.sql.gz'
-        if (!originalFilename.endsWith('.sql') && !originalFilename.endsWith('.sql.gz')) {
-          return reply.status(400).send({
-            error: 'Invalid file type. Only .sql and .sql.gz files are allowed',
-          })
-        }
-
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19)
-        const ext = originalFilename.endsWith('.sql.gz') ? '.sql.gz' : '.sql'
-        const filename = `aperture_uploaded_${timestamp}${ext}`
-        const filePath = path.join(config.backupPath, filename)
-
-        await fs.promises.mkdir(config.backupPath, { recursive: true })
-
-        const writeStream = fs.createWriteStream(filePath)
-        await pipeline(data.file, writeStream)
-
-        const stats = await fs.promises.stat(filePath)
-
-        const validation = await validateBackup(filename)
-        if (!validation.valid) {
-          await fs.promises.unlink(filePath)
-          return reply.status(400).send({
-            error: `Invalid backup file: ${validation.error}`,
-          })
-        }
-
-        return reply.send({
-          success: true,
-          filename,
-          sizeBytes: stats.size,
-          sizeFormatted: formatBytes(stats.size),
-          message: 'Backup file uploaded successfully',
+        return await storeBackupUpload(request, reply, {
+          backupRoot: config.backupPath,
+          maxBytes: BACKUP_UPLOAD_MAX_BYTES,
+          validate: validateBackup,
         })
       } catch (err) {
         fastify.log.error({ err }, 'Failed to upload backup for setup')
@@ -145,9 +113,15 @@ export async function registerSetupHandlers(fastify: FastifyInstance) {
           return reply.status(400).send({ error: validation.error || 'Invalid backup file' })
         }
 
+        // Nothing may wait between this and restoreBackup, which claims the restore
+        // before its first await.
+        if (isRestoreInProgress()) {
+          return reply.status(409).send({ error: 'Another restore is already running' })
+        }
+
         if (sync) {
           // Don't create pre-restore backup during setup (database is likely empty)
-          const result = await restoreBackup(filename, false, jobId)
+          const result = await restoreBackup(filename, false, jobId, { afterRestore: afterDatabaseRestored })
 
           if (!result.success) {
             return reply.status(500).send({
@@ -165,7 +139,7 @@ export async function registerSetupHandlers(fastify: FastifyInstance) {
           })
         } else {
           // Don't create pre-restore backup during setup (database is likely empty)
-          restoreBackup(filename, false, jobId).catch((err) => {
+          restoreBackup(filename, false, jobId, { afterRestore: afterDatabaseRestored }).catch((err) => {
             fastify.log.error({ err, jobId }, 'Background restore during setup failed')
           })
 
@@ -173,6 +147,9 @@ export async function registerSetupHandlers(fastify: FastifyInstance) {
             success: true,
             jobId,
             filename,
+            // No session exists during setup, and the restore's outcome is only ever
+            // read through this.
+            progressToken: createJobProgressToken(jobId),
             message: 'Restore started. Track progress with /api/jobs/progress/:jobId',
           })
         }

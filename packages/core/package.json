@@ -70,7 +70,7 @@
     "test:explanations": "node --import tsx --test src/recommender/shared/explanationParsing.test.ts src/recommender/shared/explanationPrompt.test.ts src/recommender/shared/slotPrompt.test.ts src/recommender/shared/explanationReuse.test.ts src/recommender/evidenceStrength.test.ts",
     "test:decisions": "node --import tsx --test src/lib/decisionModelRules.test.ts src/recommender/evidenceJudgment.test.ts src/recommender/evidenceBenchmarkPairs.test.ts src/recommender/evidenceLabelling.test.ts src/recommender/explanationCheck.test.ts",
     "test:migrations": "node --import tsx --test src/migrations.test.ts",
-    "test:backup": "node --import tsx --test src/backup/restore.test.ts",
+    "test:backup": "node --import tsx --test --test-force-exit src/backup/restore.test.ts src/backup/backupFiles.test.ts src/backup/backupService.test.ts",
     "test:schedule": "node --import tsx --test src/jobs/schedule.test.ts src/jobs/logWindow.test.ts",
     "test:discovery": "node --import tsx --test src/discover/scorer.test.ts src/discover/reconcile.test.ts src/discover/embeddings.test.ts src/discover/config.test.ts src/discover/merge.test.ts src/discover/blendDiagnostics.test.ts src/discover/genreStripOrder.test.ts src/discover/peopleBrowse.test.ts src/discover/genreStripPages.test.ts src/lib/asyncCache.test.ts src/seerr/batchStatus.test.ts src/justwatch/cache.test.ts src/justwatch/tmdbPosters.test.ts",
     "test:enrichment": "node --import tsx --test src/mdblist/rules.test.ts src/enrichment/needsEnrichment.test.ts src/enrichment/studioLogoMatch.test.ts src/media/studioImages.test.ts src/omdb/failures.test.ts src/omdb/ratings.test.ts",

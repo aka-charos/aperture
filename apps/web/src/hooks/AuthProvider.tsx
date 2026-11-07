@@ -5,6 +5,7 @@ import {
   syncUiLanguageFromServer,
 } from '@/i18n/syncUiLanguage'
 import { clearUserScopedCaches } from '@/lib/clientCaches'
+import { answerIsDatabaseRestoring, DATABASE_RESTORE_RETRY_MS } from '@/lib/databaseRestoring'
 import {
   AuthContext,
   type Capabilities,
@@ -30,6 +31,9 @@ function reloadInto(path: string): void {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [databaseRestoring, setDatabaseRestoring] = useState(false)
+  const checkAuthRef = useRef<() => Promise<void>>(async () => {})
+  const waitedForRestoreRef = useRef(false)
   const [sessionError, setSessionError] = useState<string | null>(null)
   const [impersonation, setImpersonation] = useState<ImpersonationState | null>(null)
   // Decided server-side and replaced wholesale on every auth check, so a
@@ -42,10 +46,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const checkAuth = useCallback(async () => {
+    let waiting = false
     try {
       const response = await fetch('/api/auth/check', {
         credentials: 'include',
       })
+
+      // Says nothing about this session, so it is no reason to show the sign-in
+      // page, where signing in could only fail. Ask again until it ends.
+      if (await answerIsDatabaseRestoring(response)) {
+        waiting = true
+        waitedForRestoreRef.current = true
+        setDatabaseRestoring(true)
+        window.setTimeout(() => void checkAuthRef.current(), DATABASE_RESTORE_RETRY_MS)
+        return
+      }
+
+      // Everything else this page asked for at load (the name, logo, edited strings)
+      // got the same 503 and was not asked again, so start from the top.
+      if (waitedForRestoreRef.current) {
+        waiting = true
+        window.location.reload()
+        return
+      }
+      setDatabaseRestoring(false)
 
       if (response.ok) {
         const data = await response.json()
@@ -69,13 +93,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCapabilities({})
       }
     } catch {
+      // The server restarting right after its restore is not a signed-out viewer.
+      if (waitedForRestoreRef.current) {
+        waiting = true
+        window.setTimeout(() => void checkAuthRef.current(), DATABASE_RESTORE_RETRY_MS)
+        return
+      }
+      setDatabaseRestoring(false)
       setUser(null)
       setImpersonation(null)
       setCapabilities({})
     } finally {
-      setLoading(false)
+      if (!waiting) setLoading(false)
     }
   }, [])
+  checkAuthRef.current = checkAuth
 
   /**
    * Re-read the decided capabilities without touching the session.
@@ -218,6 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         capabilities,
         loading,
+        databaseRestoring,
         sessionError,
         impersonation,
         login,

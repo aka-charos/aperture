@@ -7,6 +7,7 @@
       "hrMin": "{{hr}}h {{min}}m"
     },
     "appName": "{{appName}}",
+    "databaseRestoring": "The database is being restored. This page continues by itself when it finishes.",
     "save": "Save",
     "loading": "Loading…",
     "cancel": "Cancel",
@@ -2742,6 +2743,8 @@
     "chipGzip": "gzip",
     "now": "Now",
     "tooltipBackupComplete": "Backup complete",
+    "tooltipCutOff": "This upload was cut off at the old 10 MB limit, so it can't be restored. Upload it again and delete this copy.",
+    "uploadRefusedByProxy": "The upload was refused before it reached the app (HTTP {{status}}). A reverse proxy in front of the app may limit upload size.",
     "tooltipRestore": "Restore",
     "tooltipDownload": "Download",
     "tooltipDelete": "Delete",
@@ -2764,7 +2767,11 @@
     "restoreInProgressNotice": "A restore can take several minutes on a large database, and the app is unavailable to everyone until it finishes. Keep this page open. If it fails, the data stays as it was.",
     "restoreSignsYouOut": "The app is unavailable while the restore runs. Sessions come from the backup too, so you may need to sign in again afterwards. The restore also needs free disk space in the backup folder for the expanded data.",
     "skipPreRestoreBackup": "Skip the safety backup",
-    "skipPreRestoreBackupHelp": "On a large database the safety backup roughly doubles the wait. Skip it only if you already have a recent copy."
+    "skipPreRestoreBackupHelp": "On a large database the safety backup roughly doubles the wait. Skip it only if you already have a recent copy.",
+    "trackingLost": "This page lost track of the job because the server no longer has a record of it. The server may have restarted. Check the backup list and the server log to see how it ended.",
+    "restoreRunningElsewhere": "A database restore is running, so this page can't load until it finishes.",
+    "contactLost": "The server hasn't answered for over a minute, so this page can't tell how the job is going. It may still be running. This page keeps asking and will show how it ended.",
+    "finishedWhileAway": "A restore you started ended while you were away from this page, and the server no longer has its result. If you're asked to sign in again or your data has changed, it worked. Otherwise it failed and nothing was replaced, and the server log says why."
   },
   "settingsTmdb": {
     "title": "TMDb Integration",
@@ -5789,6 +5796,8 @@
       "errLoad": "Failed to load available backups",
       "errUpload": "Failed to upload backup",
       "errRestore": "Failed to restore backup",
+      "cutOff": "Cut off",
+      "uploadRefusedByProxy": "The upload was refused before it reached the app (HTTP {{status}}). A reverse proxy in front of the app may limit upload size.",
       "successUpload": "Backup uploaded: {{filename}} ({{size}})",
       "successRestored": "Database restored successfully! The page will reload in 3 seconds to complete the restore process.",
       "confirmWord": "RESTORE",

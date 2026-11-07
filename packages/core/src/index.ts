@@ -307,6 +307,7 @@ export {
 
 // Migrations
 export { runMigrations, getMigrationStatus, type MigrationResult } from './migrations.js'
+export { forgetOffsiteRecovery } from './analysis/offsite.js'
 
 // Media Server Providers
 export {
@@ -1059,6 +1060,14 @@ export {
   cancelBackupProcess,
   checkDatabaseClientCompatibility,
   isDatabaseRestoring,
+  isRestoreInProgress,
+  restoreInTransaction,
+  uploadedBackupFilename,
+  UPLOAD_TYPE_ERROR,
+  BACKUP_UPLOAD_MAX_BYTES,
+  backupUploadTooLargeMessage,
+  BackupUploadTooLargeError,
+  writeBackupUpload,
   type BackupConfig,
   type BackupInfo,
   type BackupResult,

@@ -315,6 +315,11 @@ function ensureRecovered(): Promise<void> {
   return recovered
 }
 
+/** A restore can bring back batches left 'preparing', so the next call looks again. */
+export function forgetOffsiteRecovery(): void {
+  recovered = null
+}
+
 async function recoverInterruptedBatches(): Promise<void> {
   const stale = await query<{ id: string }>(
     `UPDATE analysis_offsite_batches

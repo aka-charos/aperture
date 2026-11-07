@@ -3,8 +3,16 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { createChildLogger } from '../lib/logger.js'
 import { getDatabaseUrl } from '../config/env.js'
-import { BackupCancelledError, restoreInTransaction, writeArchive } from './restore.js'
-import { getBackupConfig, updateLastBackupInfo } from './backupConfig.js'
+import { isBackupFile, retentionMayDelete, wasCutOffAtUpload } from './backupFiles.js'
+import {
+  BackupCancelledError,
+  claimRestore,
+  releaseRestore,
+  removeAbandonedPartials,
+  restoreInTransaction,
+  writeArchive,
+} from './restore.js'
+import { getBackupConfig, updateLastBackupInfo, type BackupConfig } from './backupConfig.js'
 import {
   createJobProgress,
   setJobStep,
@@ -33,6 +41,8 @@ export function cancelBackupProcess(jobId: string): boolean {
 }
 
 export interface BackupInfo {
+  /** An upload the old size limit cut short: listed so it can be deleted, not restored. */
+  cutOff: boolean
   filename: string
   path: string
   sizeBytes: number
@@ -125,6 +135,7 @@ export async function createBackup(jobId?: string, options: { prune?: boolean } 
     const dbConfig = parseDatabaseUrl()
 
     await ensureBackupDir(config.backupPath)
+    await removeAbandonedPartials(config.backupPath)
 
     const filename = generateBackupFilename()
     const filePath = path.join(config.backupPath, filename)
@@ -252,6 +263,14 @@ export async function createBackup(jobId?: string, options: { prune?: boolean } 
   }
 }
 
+/** What `restoreBackup` calls out to, in the order it must call them. */
+export interface RestoreSteps {
+  getBackupConfig: () => Promise<Pick<BackupConfig, 'backupPath'>>
+  validateBackup: typeof validateBackup
+  createBackup: typeof createBackup
+  restoreInTransaction: typeof restoreInTransaction
+}
+
 /**
  * Restore database from a backup file
  * @param filename Backup file to restore
@@ -261,24 +280,43 @@ export async function createBackup(jobId?: string, options: { prune?: boolean } 
 export async function restoreBackup(
   filename: string,
   createPreRestoreBackup = true,
-  jobId?: string
+  jobId?: string,
+  options: {
+    /** What the running server does at boot, which a restored database also needs. */
+    afterRestore?: () => Promise<void>
+    /** Stand-ins for a test: the order of these steps is the point of this function. */
+    steps?: Partial<RestoreSteps>
+  } = {}
 ): Promise<RestoreResult> {
   const startTime = Date.now()
   const trackProgress = !!jobId
+  const steps: RestoreSteps = {
+    getBackupConfig,
+    validateBackup,
+    createBackup,
+    restoreInTransaction,
+    ...options.steps,
+  }
 
   // Create job progress if jobId provided
   if (trackProgress && jobId) {
     createJobProgress(jobId, 'restore-database', createPreRestoreBackup ? 5 : 4)
   }
 
+  // Before the first await, so a route checking `isRestoreInProgress` just before
+  // calling this cannot let two through.
+  const claimed = claimRestore()
+
   try {
+    if (!claimed) throw new Error('Another restore is already running')
+
     // Step 1: Validate
     if (trackProgress && jobId) {
       setJobStep(jobId, 0, 'Validating backup file')
       addLog(jobId, 'info', `🔍 Validating backup file: ${filename}`)
     }
 
-    const config = await getBackupConfig()
+    const config = await steps.getBackupConfig()
     const dbConfig = parseDatabaseUrl()
     const filePath = path.join(config.backupPath, filename)
 
@@ -290,7 +328,7 @@ export async function restoreBackup(
     }
 
     // Validate backup file
-    const validation = await validateBackup(filename)
+    const validation = await steps.validateBackup(filename)
     if (!validation.valid) {
       throw new Error(`Invalid backup file: ${validation.error}`)
     }
@@ -312,7 +350,7 @@ export async function restoreBackup(
         addLog(jobId, 'info', '🔒 Creating pre-restore safety backup...')
       }
 
-      const preBackupResult = await createBackup(undefined, { prune: false })
+      const preBackupResult = await steps.createBackup(undefined, { prune: false })
       if (preBackupResult.success) {
         preRestoreBackup = preBackupResult.filename
         logger.info({ preRestoreBackup }, 'Pre-restore backup created')
@@ -343,13 +381,19 @@ export async function restoreBackup(
       addLog(jobId, 'warn', '⚠️ This will overwrite existing data!')
     }
 
-    await restoreInTransaction(filePath, dbConfig, {
+    await steps.restoreInTransaction(filePath, dbConfig, {
       scratchRoot: config.backupPath,
       onApplying: () => {
         if (trackProgress && jobId) {
           addLog(jobId, 'info', '🔒 Applying in one transaction. Nothing changes unless all of it succeeds.')
         }
       },
+      afterCommit: options.afterRestore
+        ? async () => {
+            if (trackProgress && jobId) addLog(jobId, 'info', '🔧 Bringing the restored database up to date...')
+            await options.afterRestore!()
+          }
+        : undefined,
     })
 
     // Step 5: Finalize
@@ -392,6 +436,8 @@ export async function restoreBackup(
       error: errorMessage,
       duration,
     }
+  } finally {
+    if (claimed) releaseRestore()
   }
 }
 
@@ -411,10 +457,7 @@ export async function listBackups(): Promise<BackupInfo[]> {
     const backups: BackupInfo[] = []
 
     for (const file of files) {
-      // Only include backup files (supports both old .sql/.sql.gz and new .dump formats)
-      if (!file.startsWith('aperture_backup_') || (!file.endsWith('.sql') && !file.endsWith('.sql.gz') && !file.endsWith('.dump'))) {
-        continue
-      }
+      if (!isBackupFile(file)) continue
 
       const filePath = path.join(config.backupPath, file)
       const stats = await fs.promises.stat(filePath)
@@ -425,6 +468,7 @@ export async function listBackups(): Promise<BackupInfo[]> {
         sizeBytes: stats.size,
         createdAt: stats.mtime,
         isCompressed: file.endsWith('.gz') || file.endsWith('.dump'),
+        cutOff: wasCutOffAtUpload(file, stats.size),
       })
     }
 
@@ -473,7 +517,7 @@ export async function deleteBackup(filename: string): Promise<boolean> {
 export async function pruneOldBackups(): Promise<number> {
   try {
     const config = await getBackupConfig()
-    const backups = await listBackups()
+    const backups = (await listBackups()).filter((backup) => retentionMayDelete(backup.filename))
 
     if (backups.length <= config.retentionCount) {
       return 0
@@ -520,6 +564,10 @@ export async function validateBackup(filename: string): Promise<{ valid: boolean
     const stats = await fs.promises.stat(filePath)
     if (stats.size === 0) {
       return { valid: false, error: 'File is empty' }
+    }
+
+    if (wasCutOffAtUpload(filename, stats.size)) {
+      return { valid: false, error: 'This upload was cut off at the old 10 MB limit. Upload it again.' }
     }
 
     // Check file extension (supports old .sql/.sql.gz and new .dump formats)

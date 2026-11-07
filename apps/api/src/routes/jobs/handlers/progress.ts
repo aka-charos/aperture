@@ -8,10 +8,12 @@ import {
   getAllJobProgress,
   subscribeToJob,
   createChildLogger,
+  isDatabaseRestoring,
   type JobProgress,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 import { JOB_PROGRESS_TOKEN_HEADER, verifyJobProgressToken } from '../../../lib/jobProgressToken.js'
+import { DATABASE_RESTORING_ERROR } from '../../../lib/restoreGate.js'
 import { jobSchemas } from '../schemas.js'
 
 const logger = createChildLogger('jobs-progress')
@@ -26,6 +28,11 @@ async function requireAdminOrProgressToken(request: FastifyRequest, reply: Fasti
   const token = typeof header === 'string' ? header : undefined
   const { jobId } = request.params as { jobId: string }
   if (verifyJobProgressToken(token, jobId)) return
+  // The auth hook stood aside, so there is no session to judge yet: a 401 here
+  // would say the session had ended, which nobody knows.
+  if (isDatabaseRestoring()) {
+    return reply.status(503).send(DATABASE_RESTORING_ERROR)
+  }
   return requireAdmin(request, reply)
 }
 

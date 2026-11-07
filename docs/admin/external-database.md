@@ -251,6 +251,8 @@ Aperture's backup feature works with external databases. It uses `pg_dump` to cr
 
 The backups are stored in the `/backups` volume mount.
 
+Restoring from the admin panel leaves your extensions in place, so the Aperture user doesn't need to own them. It does need to own Aperture's tables, which it does if migrations created them, and every extension the backup uses must already be installed.
+
 ### Using Your Own Backup Solution
 
 For external databases, you may prefer to use your own backup strategy:
