@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
-import { useRequestGuard } from '../../../hooks/useRequestGuard'
 import { PAGE_SIZE } from '../constants'
-import { beginListRequest } from './listRequests'
+import { afterListPage, loadListPage } from './listRequests'
+import { useListRequests } from './useListRequests'
 import type { BrowsePerson } from '../types'
 import type { PeopleUrlState } from '../urlState'
 
@@ -60,57 +60,52 @@ export function useBrowsePeople({ tabIndex, initialTabIsPeople, initial }: UseBr
     peopleCountRef.current = 0
   }, [])
 
-  // A reply is applied only while its search and sort are still the list's (see listRequests.ts).
-  const requests = useRequestGuard(`${peopleSortBy}\n${peopleSearch}`)
+  // A reply is applied only while its request is current (listRequests.ts). The
+  // key changes whenever the fetch effect below starts a new list, the tab
+  // included: it returns early off the People tab and starts over on return.
+  const requests = useListRequests(
+    tabIndex === 2 ? `${peopleSortBy}\n${peopleSearch}` : null,
+    () => setPeopleLoadingMore(false)
+  )
 
   const fetchPeople = useCallback(
     async (page: number, append = false) => {
-      const ticket = beginListRequest(requests, append)
-      if (append) {
-        setPeopleLoadingMore(true)
-      } else {
-        setPeopleLoading(true)
-      }
+      if (append) setPeopleLoadingMore(true)
+      else setPeopleLoading(true)
 
-      try {
-        const params = new URLSearchParams({
-          page: String(page),
-          pageSize: String(PAGE_SIZE),
-          sortBy: peopleSortBy,
-        })
-        if (peopleSearch) params.set('search', peopleSearch)
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
+        sortBy: peopleSortBy,
+      })
+      if (peopleSearch) params.set('search', peopleSearch)
 
-        const response = await fetch(`/api/discover/people?${params}`, {
-          credentials: 'include',
-          signal: ticket.signal,
-        })
-        if (!ticket.isCurrent()) return
-        if (!response.ok) {
-          setPeopleError(t('browse.errors.loadPeople'))
-          return
-        }
+      const outcome = await loadListPage({
+        guard: requests,
+        url: `/api/discover/people?${params}`,
+        append,
+        read: (body) => {
+          const data = body as PeopleResponse
+          return { items: data.people, total: data.total }
+        },
+      })
+      // Superseded: the request that replaced it owns the list and its flags.
+      if (outcome.kind === 'stale') return
 
-        const data = (await response.json()) as PeopleResponse
-        if (!ticket.isCurrent()) return
-        if (append) {
-          setPeople((prev) => [...prev, ...data.people])
-        } else {
-          setPeople(data.people)
-        }
-        const loadedCount = append ? peopleCountRef.current + data.people.length : data.people.length
-        peopleCountRef.current = loadedCount
-        setPeopleTotal(data.total)
-        setPeopleHasMore(data.people.length === PAGE_SIZE && loadedCount < data.total)
+      if (outcome.kind === 'page') {
+        const { items, total } = outcome.page
+        if (append) setPeople((prev) => [...prev, ...items])
+        else setPeople(items)
+        const next = afterListPage(peopleCountRef.current, items.length, total, append, PAGE_SIZE)
+        peopleCountRef.current = next.loaded
+        setPeopleTotal(total)
+        setPeopleHasMore(next.hasMore)
         setPeopleError(null)
-      } catch {
-        if (ticket.isCurrent()) setPeopleError(t('browse.errors.connect'))
-      } finally {
-        // A stale request leaves the flags to the one that replaced it.
-        if (ticket.isCurrent()) {
-          setPeopleLoading(false)
-          setPeopleLoadingMore(false)
-        }
+      } else {
+        setPeopleError(t(outcome.kind === 'failed' ? 'browse.errors.loadPeople' : 'browse.errors.connect'))
       }
+      setPeopleLoading(false)
+      setPeopleLoadingMore(false)
     },
     [peopleSearch, peopleSortBy, requests, t]
   )

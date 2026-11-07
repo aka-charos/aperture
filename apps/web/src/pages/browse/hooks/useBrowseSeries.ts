@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useRequestGuard } from '../../../hooks/useRequestGuard'
 import { PAGE_SIZE, defaultSeriesFilters } from '../constants'
-import { beginListRequest } from './listRequests'
+import { afterListPage, loadListPage } from './listRequests'
+import { useListRequests } from './useListRequests'
 import type { ActiveFilterChip, ContentRating, CountryOption, FilterRanges, NetworkOption, Series } from '../types'
 import type { SeriesFilters, SortField, SortOrder } from '../components'
 import { buildSeriesActiveFilterChips } from '../utils/activeFilterChips'
@@ -141,50 +141,40 @@ export function useBrowseSeries({
   const markShowing = memory.markShowing
 
   // A reply is applied only while its query is still the list's (see listRequests.ts).
-  const requests = useRequestGuard(listQuery)
+  const requests = useListRequests(listQuery, () => setSeriesLoadingMore(false))
 
   const fetchSeries = useCallback(
     async (page: number, append = false) => {
-      const ticket = beginListRequest(requests, append)
-      if (append) {
-        setSeriesLoadingMore(true)
-      } else {
-        setSeriesLoading(true)
-      }
+      if (append) setSeriesLoadingMore(true)
+      else setSeriesLoading(true)
 
-      try {
-        const response = await fetch(`/api/series?${listQuery}&page=${page}`, {
-          credentials: 'include',
-          signal: ticket.signal,
-        })
-        if (!ticket.isCurrent()) return
-        if (!response.ok) {
-          setSeriesError(t('browse.errors.loadSeries'))
-          return
-        }
+      const outcome = await loadListPage({
+        guard: requests,
+        url: `/api/series?${listQuery}&page=${page}`,
+        append,
+        read: (body) => {
+          const data = body as SeriesResponse
+          return { items: data.series, total: data.total }
+        },
+      })
+      // Superseded: the request that replaced it owns the list and its flags.
+      if (outcome.kind === 'stale') return
 
-        const data = (await response.json()) as SeriesResponse
-        if (!ticket.isCurrent()) return
-        if (append) {
-          setSeries((prev) => [...prev, ...data.series])
-        } else {
-          setSeries(data.series)
-        }
-        const loadedCount = append ? seriesCountRef.current + data.series.length : data.series.length
-        seriesCountRef.current = loadedCount
-        setSeriesTotal(data.total)
-        setSeriesHasMore(data.series.length === PAGE_SIZE && loadedCount < data.total)
+      if (outcome.kind === 'page') {
+        const { items, total } = outcome.page
+        if (append) setSeries((prev) => [...prev, ...items])
+        else setSeries(items)
+        const next = afterListPage(seriesCountRef.current, items.length, total, append, PAGE_SIZE)
+        seriesCountRef.current = next.loaded
+        setSeriesTotal(total)
+        setSeriesHasMore(next.hasMore)
         setSeriesError(null)
         if (!append) markShowing(listQuery)
-      } catch {
-        if (ticket.isCurrent()) setSeriesError(t('browse.errors.connect'))
-      } finally {
-        // A stale request leaves the flags to the one that replaced it.
-        if (ticket.isCurrent()) {
-          setSeriesLoading(false)
-          setSeriesLoadingMore(false)
-        }
+      } else {
+        setSeriesError(t(outcome.kind === 'failed' ? 'browse.errors.loadSeries' : 'browse.errors.connect'))
       }
+      setSeriesLoading(false)
+      setSeriesLoadingMore(false)
     },
     [listQuery, markShowing, requests, t]
   )
@@ -249,10 +239,7 @@ export function useBrowseSeries({
       setSeriesHasMore(remembered.hasMore)
       seriesCountRef.current = remembered.items.length
       setSeriesError(null)
-      // The query change cancelled any request in flight, whose own cleanup no
-      // longer runs, so a "load more" it left pending is cleared here.
       setSeriesLoading(false)
-      setSeriesLoadingMore(false)
       return
     }
     resetSeries()
