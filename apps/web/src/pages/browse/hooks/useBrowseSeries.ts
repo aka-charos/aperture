@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useRequestGuard } from '../../../hooks/useRequestGuard'
 import { PAGE_SIZE, defaultSeriesFilters } from '../constants'
+import { beginListRequest } from './listRequests'
 import type { ActiveFilterChip, ContentRating, CountryOption, FilterRanges, NetworkOption, Series } from '../types'
 import type { SeriesFilters, SortField, SortOrder } from '../components'
 import { buildSeriesActiveFilterChips } from '../utils/activeFilterChips'
@@ -138,8 +140,12 @@ export function useBrowseSeries({
   })
   const markShowing = memory.markShowing
 
+  // A reply is applied only while its query is still the list's (see listRequests.ts).
+  const requests = useRequestGuard(listQuery)
+
   const fetchSeries = useCallback(
     async (page: number, append = false) => {
+      const ticket = beginListRequest(requests, append)
       if (append) {
         setSeriesLoadingMore(true)
       } else {
@@ -147,13 +153,18 @@ export function useBrowseSeries({
       }
 
       try {
-        const response = await fetch(`/api/series?${listQuery}&page=${page}`, { credentials: 'include' })
+        const response = await fetch(`/api/series?${listQuery}&page=${page}`, {
+          credentials: 'include',
+          signal: ticket.signal,
+        })
+        if (!ticket.isCurrent()) return
         if (!response.ok) {
           setSeriesError(t('browse.errors.loadSeries'))
           return
         }
 
         const data = (await response.json()) as SeriesResponse
+        if (!ticket.isCurrent()) return
         if (append) {
           setSeries((prev) => [...prev, ...data.series])
         } else {
@@ -166,13 +177,16 @@ export function useBrowseSeries({
         setSeriesError(null)
         if (!append) markShowing(listQuery)
       } catch {
-        setSeriesError(t('browse.errors.connect'))
+        if (ticket.isCurrent()) setSeriesError(t('browse.errors.connect'))
       } finally {
-        setSeriesLoading(false)
-        setSeriesLoadingMore(false)
+        // A stale request leaves the flags to the one that replaced it.
+        if (ticket.isCurrent()) {
+          setSeriesLoading(false)
+          setSeriesLoadingMore(false)
+        }
       }
     },
-    [listQuery, markShowing, t]
+    [listQuery, markShowing, requests, t]
   )
 
   const fetchSeriesMetadata = useCallback(async () => {
@@ -235,7 +249,10 @@ export function useBrowseSeries({
       setSeriesHasMore(remembered.hasMore)
       seriesCountRef.current = remembered.items.length
       setSeriesError(null)
+      // The query change cancelled any request in flight, whose own cleanup no
+      // longer runs, so a "load more" it left pending is cleared here.
       setSeriesLoading(false)
+      setSeriesLoadingMore(false)
       return
     }
     resetSeries()

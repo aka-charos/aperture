@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useRequestGuard } from '../../../hooks/useRequestGuard'
 import { PAGE_SIZE, defaultMovieFilters } from '../constants'
+import { beginListRequest } from './listRequests'
 import type {
   ActiveFilterChip,
   Collection,
@@ -160,19 +162,30 @@ export function useBrowseMovies({
   })
   const markShowing = memory.markShowing
 
+  // A reply is applied only while its query is still the list's (see
+  // listRequests.ts): a slow reply to an older search must not replace the
+  // newer one, and an old "load more" must not append to a new list.
+  const requests = useRequestGuard(listQuery)
+
   const fetchMovies = useCallback(
     async (page: number, append = false) => {
+      const ticket = beginListRequest(requests, append)
       if (append) setMoviesLoadingMore(true)
       else setMoviesLoading(true)
 
       try {
-        const response = await fetch(`/api/movies?${listQuery}&page=${page}`, { credentials: 'include' })
+        const response = await fetch(`/api/movies?${listQuery}&page=${page}`, {
+          credentials: 'include',
+          signal: ticket.signal,
+        })
+        if (!ticket.isCurrent()) return
         if (!response.ok) {
           setMoviesError(t('browse.errors.loadMovies'))
           return
         }
 
         const data = (await response.json()) as MoviesResponse
+        if (!ticket.isCurrent()) return
         if (append) setMovies((prev) => [...prev, ...data.movies])
         else setMovies(data.movies)
         const loadedCount = append ? movieCountRef.current + data.movies.length : data.movies.length
@@ -182,13 +195,16 @@ export function useBrowseMovies({
         setMoviesError(null)
         if (!append) markShowing(listQuery)
       } catch {
-        setMoviesError(t('browse.errors.connect'))
+        if (ticket.isCurrent()) setMoviesError(t('browse.errors.connect'))
       } finally {
-        setMoviesLoading(false)
-        setMoviesLoadingMore(false)
+        // A stale request leaves the flags to the one that replaced it.
+        if (ticket.isCurrent()) {
+          setMoviesLoading(false)
+          setMoviesLoadingMore(false)
+        }
       }
     },
-    [listQuery, markShowing, t]
+    [listQuery, markShowing, requests, t]
   )
 
   const fetchMovieMetadata = useCallback(async () => {
@@ -256,7 +272,10 @@ export function useBrowseMovies({
       setMovieHasMore(remembered.hasMore)
       movieCountRef.current = remembered.items.length
       setMoviesError(null)
+      // The query change cancelled any request in flight, whose own cleanup no
+      // longer runs, so a "load more" it left pending is cleared here.
       setMoviesLoading(false)
+      setMoviesLoadingMore(false)
       return
     }
     resetMovies()

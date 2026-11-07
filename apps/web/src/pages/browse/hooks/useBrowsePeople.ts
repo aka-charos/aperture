@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
+import { useRequestGuard } from '../../../hooks/useRequestGuard'
 import { PAGE_SIZE } from '../constants'
+import { beginListRequest } from './listRequests'
 import type { BrowsePerson } from '../types'
 import type { PeopleUrlState } from '../urlState'
 
@@ -58,8 +60,12 @@ export function useBrowsePeople({ tabIndex, initialTabIsPeople, initial }: UseBr
     peopleCountRef.current = 0
   }, [])
 
+  // A reply is applied only while its search and sort are still the list's (see listRequests.ts).
+  const requests = useRequestGuard(`${peopleSortBy}\n${peopleSearch}`)
+
   const fetchPeople = useCallback(
     async (page: number, append = false) => {
+      const ticket = beginListRequest(requests, append)
       if (append) {
         setPeopleLoadingMore(true)
       } else {
@@ -74,13 +80,18 @@ export function useBrowsePeople({ tabIndex, initialTabIsPeople, initial }: UseBr
         })
         if (peopleSearch) params.set('search', peopleSearch)
 
-        const response = await fetch(`/api/discover/people?${params}`, { credentials: 'include' })
+        const response = await fetch(`/api/discover/people?${params}`, {
+          credentials: 'include',
+          signal: ticket.signal,
+        })
+        if (!ticket.isCurrent()) return
         if (!response.ok) {
           setPeopleError(t('browse.errors.loadPeople'))
           return
         }
 
         const data = (await response.json()) as PeopleResponse
+        if (!ticket.isCurrent()) return
         if (append) {
           setPeople((prev) => [...prev, ...data.people])
         } else {
@@ -92,13 +103,16 @@ export function useBrowsePeople({ tabIndex, initialTabIsPeople, initial }: UseBr
         setPeopleHasMore(data.people.length === PAGE_SIZE && loadedCount < data.total)
         setPeopleError(null)
       } catch {
-        setPeopleError(t('browse.errors.connect'))
+        if (ticket.isCurrent()) setPeopleError(t('browse.errors.connect'))
       } finally {
-        setPeopleLoading(false)
-        setPeopleLoadingMore(false)
+        // A stale request leaves the flags to the one that replaced it.
+        if (ticket.isCurrent()) {
+          setPeopleLoading(false)
+          setPeopleLoadingMore(false)
+        }
       }
     },
-    [peopleSearch, peopleSortBy, t]
+    [peopleSearch, peopleSortBy, requests, t]
   )
 
   useEffect(() => {
