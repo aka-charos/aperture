@@ -17,6 +17,7 @@ import {
   formatSchedule,
   resolveScheduleDays,
   normalizeScheduleDays,
+  storedScheduleMinute,
   type JobConfig,
 } from './jobConfig.js'
 
@@ -183,5 +184,22 @@ describe('multi-day weekly schedules', () => {
     const stale = config({ scheduleType: 'weekly', scheduleDayOfWeek: 0, scheduleDaysOfWeek: [2] })
     assert.equal(scheduleToCron(stale), '0 4 * * 2')
     assert.match(formatSchedule(stale), /Tuesday/)
+  })
+})
+
+describe('storedScheduleMinute', () => {
+  test('an interval row saved without a minute goes back to its seed offset', () => {
+    assert.equal(storedScheduleMinute('sync-series', 'interval', null), 10)
+  })
+  test('a time of day saved without a minute stays on the hour, as the API documents', () => {
+    assert.equal(storedScheduleMinute('sync-series', 'daily', null), null)
+    assert.equal(storedScheduleMinute('sync-series', 'weekly', null), null)
+  })
+  test('a stored minute always wins, 0 included', () => {
+    assert.equal(storedScheduleMinute('sync-series', 'interval', 0), 0)
+    assert.equal(storedScheduleMinute('sync-series', 'daily', 45), 45)
+  })
+  test('a job with no seed has no offset to return to', () => {
+    assert.equal(storedScheduleMinute('not-a-job', 'interval', null), null)
   })
 })

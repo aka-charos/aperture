@@ -17,6 +17,10 @@
  * hold every sync behind them; and anything that reads it once.
  */
 
+import { createChildLogger } from '@aperture/core'
+
+const logger = createChildLogger('media-server-turns')
+
 export const MEDIA_SERVER_JOBS: ReadonlySet<string> = new Set([
   'sync-users',
   'sync-movies',
@@ -31,8 +35,21 @@ export const MEDIA_SERVER_JOBS: ReadonlySet<string> = new Set([
   'remove-legacy-libraries',
 ])
 
-/** How often a waiting job checks whether it was cancelled. */
+/** How often a waiting job checks whether it, or the holder, should give way. */
 export const TURN_CANCEL_POLL_MS = 1_000
+
+/**
+ * How long one job may keep the turn while others wait. Past it the turn
+ * passes on and the two run side by side, as every job did before turns:
+ * a stuck job (cancellation is cooperative, so Stop cannot end one that
+ * never polls) must not stop user sync and every other sync for good.
+ * Generous, because a full library sync of a large library is long; the
+ * cost of passing on early is only the old overlap.
+ */
+export const TURN_LEASE_MS = 90 * 60 * 1000
+
+/** Why a turn passed on before its holder released it. */
+export type TurnOverride = 'cancelled' | 'lease'
 
 interface Waiter {
   jobId: string
@@ -42,20 +59,37 @@ interface Waiter {
   drop: () => void
 }
 
-/** A one-at-a-time FIFO whose waiters can leave. */
+interface Holder {
+  jobId: string
+  cancelled: () => boolean
+  since: number
+}
+
+/**
+ * A one-at-a-time FIFO whose waiters can leave, and whose holder gives way
+ * when it is cancelled (it is only winding down) or has held the turn past
+ * the lease.
+ */
 export class TurnQueue {
-  private holder: string | null = null
+  private holder: Holder | null = null
   private readonly waiting: Waiter[] = []
 
-  constructor(private readonly pollMs = TURN_CANCEL_POLL_MS) {}
+  constructor(
+    private readonly options: {
+      pollMs?: number
+      leaseMs?: number
+      now?: () => number
+      /** Told when a turn passes on before its holder released it. */
+      onOverride?: (holderJobId: string, reason: TurnOverride) => void
+    } = {}
+  ) {}
 
-  /** Job ids waiting for a turn, in order. */
-  waitingJobIds(): string[] {
-    return this.waiting.map((w) => w.jobId)
+  private get pollMs(): number {
+    return this.options.pollMs ?? TURN_CANCEL_POLL_MS
   }
 
-  isWaiting(jobId: string): boolean {
-    return this.waiting.some((w) => w.jobId === jobId)
+  private now(): number {
+    return (this.options.now ?? Date.now)()
   }
 
   /**
@@ -70,7 +104,7 @@ export class TurnQueue {
     onWait?: () => void
   ): Promise<(() => void) | null> {
     if (this.holder === null) {
-      this.holder = jobId
+      this.take(jobId, cancelled)
       return Promise.resolve(this.releaseFor(jobId))
     }
     onWait?.()
@@ -80,7 +114,7 @@ export class TurnQueue {
         cancelled,
         grant: () => {
           clearInterval(poll)
-          this.holder = jobId
+          this.take(jobId, cancelled)
           resolve(this.releaseFor(jobId))
         },
         drop: () => {
@@ -88,23 +122,47 @@ export class TurnQueue {
           resolve(null)
         },
       }
-      // The poll only lets a cancelled job leave early; the hand-over below
-      // asks again, since a cancel can land between two polls.
+      // The poll lets a cancelled job leave early and checks the holder's
+      // lease; the hand-over asks about cancellation again, since a cancel
+      // can land between two polls.
       const poll = setInterval(() => {
-        if (!cancelled()) return
-        const at = this.waiting.indexOf(waiter)
-        if (at >= 0) this.waiting.splice(at, 1)
-        waiter.drop()
+        if (cancelled()) {
+          const at = this.waiting.indexOf(waiter)
+          if (at >= 0) this.waiting.splice(at, 1)
+          waiter.drop()
+          return
+        }
+        this.checkHolder()
       }, this.pollMs)
       this.waiting.push(waiter)
     })
+  }
+
+  private take(jobId: string, cancelled: () => boolean): void {
+    this.holder = { jobId, cancelled, since: this.now() }
+  }
+
+  /** Passes the turn on from a holder that was cancelled or has held it too long. */
+  private checkHolder(): void {
+    const holder = this.holder
+    if (!holder) return
+    const reason: TurnOverride | null = holder.cancelled()
+      ? 'cancelled'
+      : this.now() - holder.since >= (this.options.leaseMs ?? TURN_LEASE_MS)
+        ? 'lease'
+        : null
+    if (!reason) return
+    this.options.onOverride?.(holder.jobId, reason)
+    // Its own release becomes a no-op: it no longer holds the turn.
+    this.holder = null
+    this.handOver()
   }
 
   private releaseFor(jobId: string): () => void {
     let released = false
     return () => {
       // Once, and only by the job that holds the turn.
-      if (released || this.holder !== jobId) return
+      if (released || this.holder?.jobId !== jobId) return
       released = true
       this.holder = null
       this.handOver()
@@ -125,7 +183,15 @@ export class TurnQueue {
 }
 
 /** The one queue every media-server job shares, for this process. */
-export const mediaServerTurns = new TurnQueue()
+export const mediaServerTurns = new TurnQueue({
+  onOverride: (jobId, reason) =>
+    logger.warn(
+      { jobId, reason },
+      reason === 'lease'
+        ? `A media-server job has held its turn for over ${TURN_LEASE_MS / 60_000} minutes; the next one starts beside it`
+        : 'A cancelled media-server job is still winding down; the next one starts beside it'
+    ),
+})
 
 /** The step a waiting job shows. */
 export const WAITING_STEP = 'Waiting for another media-server job to finish'

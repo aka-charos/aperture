@@ -28,6 +28,18 @@ interface ScheduledJob {
 }
 const scheduledTasks: Map<string, ScheduledJob> = new Map()
 
+/** Whether initializeScheduler has registered the tasks (false at boot until it has). */
+let schedulerReady = false
+
+/**
+ * Until the scheduler has started, no task is registered yet, so a reader of
+ * getRegisteredSchedule would see nothing scheduled at all; it falls back to
+ * the saved schedule instead (the jobs list does).
+ */
+export function isSchedulerReady(): boolean {
+  return schedulerReady
+}
+
 // Job execution function - will be set by the jobs routes
 let jobExecutor: ((jobName: string) => Promise<void>) | null = null
 
@@ -144,6 +156,7 @@ export async function initializeScheduler(): Promise<void> {
       scheduled++
     }
 
+    schedulerReady = true
     logger.info(
       { scheduled, manual, disabled, total: configs.length },
       `📅 Scheduler initialized: ${scheduled} scheduled, ${manual} manual-only, ${disabled} disabled`
@@ -203,6 +216,7 @@ export function stopScheduler(): void {
   }
   
   scheduledTasks.clear()
+  schedulerReady = false
   logger.info('✅ Scheduler stopped')
 }
 

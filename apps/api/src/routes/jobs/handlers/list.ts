@@ -16,7 +16,7 @@ import {
   schedulerTimeZone,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
-import { getRegisteredSchedule } from '../../../lib/scheduler.js'
+import { getRegisteredSchedule, isSchedulerReady } from '../../../lib/scheduler.js'
 import { jobSchemas } from '../schemas.js'
 import { jobDefinitions } from '../definitions.js'
 import { activeJobs } from '../state.js'
@@ -47,8 +47,14 @@ export async function registerListHandlers(fastify: FastifyInstance) {
       // The next run is decided here, in the scheduler's zone, from the
       // schedule node-cron is actually running (not the saved row, which a
       // failed refresh can leave unapplied), so the page never works it out.
+      // Before the scheduler has started nothing is registered yet, and the
+      // saved schedule, which it is about to register, stands in.
+      const schedulerReady = isSchedulerReady()
       const registered = new Map(
-        jobDefinitions.map((def) => [def.name, getRegisteredSchedule(def.name)])
+        jobDefinitions.map((def) => [
+          def.name,
+          schedulerReady ? getRegisteredSchedule(def.name) : (configMap.get(def.name) ?? null),
+        ])
       )
       // The biweekly rule reads the last COMPLETED run, as the scheduler's
       // isScheduledRunDue does: one query for every running biweekly job.

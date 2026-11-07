@@ -5,9 +5,16 @@ import { jobDefinitions } from './definitions.js'
 
 const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms))
 
+/** A promise plus whether it has settled yet. */
+function watch<T>(promise: Promise<T>) {
+  const state = { done: false, promise }
+  promise.then(() => (state.done = true))
+  return state
+}
+
 describe('TurnQueue', () => {
   it('lets one job in at a time, in the order they asked', async () => {
-    const turns = new TurnQueue(10)
+    const turns = new TurnQueue({ pollMs: 10 })
     const order: string[] = []
     const run = async (id: string, ms: number) => {
       const release = await turns.acquire(id, () => false)
@@ -22,27 +29,28 @@ describe('TurnQueue', () => {
   })
 
   it('shows a waiting state only for a job that has to wait', async () => {
-    const turns = new TurnQueue(10)
+    const turns = new TurnQueue({ pollMs: 10 })
     const waited: string[] = []
     const first = await turns.acquire('a', () => false, () => waited.push('a'))
-    const second = turns.acquire('b', () => false, () => waited.push('b'))
+    const second = watch(turns.acquire('b', () => false, () => waited.push('b')))
     assert.deepEqual(waited, ['b'])
-    assert.equal(turns.isWaiting('b'), true)
+    await tick(30)
+    assert.equal(second.done, false, 'b waits while a holds the turn')
     first?.()
-    const release = await second
-    assert.equal(turns.isWaiting('b'), false)
+    const release = await second.promise
+    assert.ok(release)
     release?.()
   })
 
   it('a job cancelled while waiting leaves the queue at once and never starts', async () => {
-    const turns = new TurnQueue(10)
+    const turns = new TurnQueue({ pollMs: 10 })
     const first = await turns.acquire('a', () => false)
     let cancel = false
     const second = turns.acquire('b', () => cancel)
     const third = turns.acquire('c', () => false)
     cancel = true
+    // Leaves while a still holds the turn, without waiting for it.
     assert.equal(await second, null)
-    assert.deepEqual(turns.waitingJobIds(), ['c'])
     first?.()
     const release = await third
     assert.ok(release)
@@ -51,7 +59,7 @@ describe('TurnQueue', () => {
 
   it('a job cancelled between two polls never gets the turn', async () => {
     // A poll interval far longer than the test: only the hand-over can notice.
-    const turns = new TurnQueue(60_000)
+    const turns = new TurnQueue({ pollMs: 60_000 })
     const first = await turns.acquire('a', () => false)
     let cancel = false
     const second = turns.acquire('b', () => cancel)
@@ -65,22 +73,61 @@ describe('TurnQueue', () => {
   })
 
   it('a release counts once, and only from the holder', async () => {
-    const turns = new TurnQueue(10)
+    const turns = new TurnQueue({ pollMs: 10 })
     const first = await turns.acquire('a', () => false)
     const second = turns.acquire('b', () => false)
-    const third = turns.acquire('c', () => false)
+    const third = watch(turns.acquire('c', () => false))
     first?.()
     const b = await second
     first?.() // a second release from a job that no longer holds the turn
-    assert.equal(turns.isWaiting('c'), true, 'c must still be waiting while b holds the turn')
+    await tick(30)
+    assert.equal(third.done, false, 'c must still be waiting while b holds the turn')
     b?.()
-    const c = await third
+    const c = await third.promise
     assert.ok(c)
     c?.()
   })
 
+  it('a cancelled holder gives way: it is only winding down', async () => {
+    const overrides: string[] = []
+    const turns = new TurnQueue({ pollMs: 10, onOverride: (id, why) => overrides.push(`${id} ${why}`) })
+    let cancelA = false
+    const first = await turns.acquire('a', () => cancelA)
+    const second = turns.acquire('b', () => false)
+    cancelA = true
+    const b = await second
+    assert.ok(b)
+    assert.deepEqual(overrides, ['a cancelled'])
+    first?.() // a's late release must not free b's turn
+    const third = watch(turns.acquire('c', () => false))
+    await tick(30)
+    assert.equal(third.done, false, 'b still holds the turn')
+    b?.()
+    ;(await third.promise)?.()
+  })
+
+  it('a holder past the lease gives way, so one stuck job cannot stop the rest', async () => {
+    let clock = 0
+    const overrides: string[] = []
+    const turns = new TurnQueue({
+      pollMs: 10,
+      leaseMs: 1_000,
+      now: () => clock,
+      onOverride: (id, why) => overrides.push(`${id} ${why}`),
+    })
+    await turns.acquire('stuck', () => false) // never released
+    const next = watch(turns.acquire('b', () => false))
+    await tick(30)
+    assert.equal(next.done, false, 'within the lease, b waits')
+    clock = 1_000
+    const b = await next.promise
+    assert.ok(b)
+    assert.deepEqual(overrides, ['stuck lease'])
+    b?.()
+  })
+
   it('frees the turn when the holder releases with nobody waiting', async () => {
-    const turns = new TurnQueue(10)
+    const turns = new TurnQueue({ pollMs: 10 })
     ;(await turns.acquire('a', () => false))?.()
     const again = await turns.acquire('b', () => false)
     assert.ok(again)
@@ -116,7 +163,7 @@ function fakeJobs(turns: TurnQueue) {
 
 describe('runInTurn', () => {
   it('a job that goes straight in gets no queued record', async () => {
-    const jobs = fakeJobs(new TurnQueue(10))
+    const jobs = fakeJobs(new TurnQueue({ pollMs: 10 }))
     let ran = false
     await runInTurn('sync-movies', 'a', async () => void (ran = true), jobs.deps)
     assert.equal(ran, true)
@@ -124,7 +171,7 @@ describe('runInTurn', () => {
   })
 
   it('a waiting job is queued, then started when its turn comes', async () => {
-    const turns = new TurnQueue(10)
+    const turns = new TurnQueue({ pollMs: 10 })
     const jobs = fakeJobs(turns)
     const hold = await turns.acquire('holder', () => false)
     const runs: string[] = []
@@ -146,7 +193,7 @@ describe('runInTurn', () => {
   })
 
   it('a job cancelled while it waits never runs and frees its name', async () => {
-    const turns = new TurnQueue(60_000)
+    const turns = new TurnQueue({ pollMs: 60_000 })
     const jobs = fakeJobs(turns)
     const hold = await turns.acquire('holder', () => false)
     let ran = false
@@ -164,7 +211,7 @@ describe('runInTurn', () => {
   })
 
   it('a cancel landing after the hand-over still stops it, and frees the turn', async () => {
-    const turns = new TurnQueue(60_000)
+    const turns = new TurnQueue({ pollMs: 60_000 })
     const jobs = fakeJobs(turns)
     const hold = await turns.acquire('holder', () => false)
     let ran = false
@@ -182,7 +229,7 @@ describe('runInTurn', () => {
   })
 
   it('closes the queued record of a job that keeps none of its own', async () => {
-    const turns = new TurnQueue(10)
+    const turns = new TurnQueue({ pollMs: 10 })
     const jobs = fakeJobs(turns)
     const hold = await turns.acquire('holder', () => false)
     const waiting = runInTurn('sync-users', 'b', async () => {}, jobs.deps)
@@ -193,7 +240,7 @@ describe('runInTurn', () => {
   })
 
   it('a job that throws still releases the turn', async () => {
-    const turns = new TurnQueue(10)
+    const turns = new TurnQueue({ pollMs: 10 })
     const jobs = fakeJobs(turns)
     await assert.rejects(
       runInTurn('sync-movies', 'a', async () => {

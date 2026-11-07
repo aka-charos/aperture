@@ -1,5 +1,5 @@
 import { useIsPhone } from '@/hooks/useIsPhone'
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -79,6 +79,12 @@ export function SearchPage() {
   const [rankedBySemantic, setRankedBySemantic] = useState(false)
   // Semantic was asked for and failed; the title matches are shown instead.
   const [semanticFailed, setSemanticFailed] = useState(false)
+  // inert, not just pointer-events: a keyboard user must not open a
+  // provisional poster either (Enter on a card the re-rank is about to move).
+  const resultsGridRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (resultsGridRef.current) resultsGridRef.current.inert = provisional
+  }, [provisional, results])
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalResults, setTotalResults] = useState(0)
@@ -526,17 +532,15 @@ export function SearchPage() {
                 : ''}
           </Typography>
 
-          {/* Provisional title matches take no clicks: the semantic answer
-              reorders them, and a click could land on the poster moved there. */}
+          {/* Provisional title matches take no clicks or keys (inert, set
+              above): the semantic answer reorders them, and an activation
+              could land on the poster moved there. */}
           <Grid
+            ref={resultsGridRef}
             container
             spacing={2}
             aria-busy={provisional}
-            sx={{
-              opacity: provisional ? 0.55 : 1,
-              pointerEvents: provisional ? 'none' : undefined,
-              transition: 'opacity 150ms',
-            }}
+            sx={{ opacity: provisional ? 0.55 : 1, transition: 'opacity 150ms' }}
           >
             {results.map((result) => (
               <Grid item xs={6} sm={4} md={3} lg={2} key={`${result.type}-${result.id}`}>

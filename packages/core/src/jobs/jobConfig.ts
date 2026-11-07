@@ -236,15 +236,28 @@ const CONFIG_COLUMNS = `job_name, schedule_type, schedule_hour, schedule_minute,
             schedule_day_of_week, schedule_days_of_week, schedule_interval_hours,
             schedule_interval_minutes, max_items_per_run, is_enabled, updated_at`
 
+/**
+ * The minute a stored row runs at. Until now the schedule dialog saved every
+ * interval job with no minute, which ran it at :00 and threw away the seed's
+ * offset, so an INTERVAL row with none takes the seed's and goes back to its
+ * stagger. A time of day with no minute stays :00, as the API documents.
+ */
+export function storedScheduleMinute(
+  jobName: string,
+  scheduleType: string,
+  stored: number | null
+): number | null {
+  if (stored != null) return stored
+  if (scheduleType !== 'interval') return null
+  return JOB_SCHEDULE_DEFAULTS[jobName]?.minute ?? null
+}
+
 function rowToConfig(row: JobConfigRow): JobConfig {
   return {
     jobName: row.job_name,
     scheduleType: row.schedule_type as ScheduleType,
     scheduleHour: row.schedule_hour,
-    // Until now the schedule dialog saved every interval job with no minute,
-    // which ran it at :00 and threw away the seed's offset. A row with no
-    // minute takes the seed's, so those jobs go back to their stagger.
-    scheduleMinute: row.schedule_minute ?? JOB_SCHEDULE_DEFAULTS[row.job_name]?.minute ?? null,
+    scheduleMinute: storedScheduleMinute(row.job_name, row.schedule_type, row.schedule_minute),
     scheduleDayOfWeek: row.schedule_day_of_week,
     scheduleDaysOfWeek: row.schedule_days_of_week,
     scheduleIntervalHours: row.schedule_interval_hours,
@@ -547,15 +560,9 @@ export async function isScheduledRunDue(
   if (scheduleType !== 'biweekly') return { due: true, lastRunAt: null }
 
   try {
-    const lastRun = await queryOne<{ started_at: Date }>(
-      `SELECT started_at FROM job_runs
-        WHERE job_name = $1 AND status = 'completed'
-        ORDER BY started_at DESC
-        LIMIT 1`,
-      [jobName]
-    )
-
-    const lastRunAt = lastRun?.started_at ?? null
+    // The same reader the jobs list predicts the next run with, so the two
+    // can never disagree about which run counts.
+    const lastRunAt = (await getLastCompletedRunStarts([jobName])).get(jobName) ?? null
     return { due: isBiweeklyRunDue(lastRunAt, now), lastRunAt }
   } catch (err) {
     logger.warn({ err, jobName }, 'Could not read job history for biweekly check, running anyway')

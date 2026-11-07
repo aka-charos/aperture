@@ -261,7 +261,8 @@ const updateJobConfig = {
           { type: 'null' as const },
           { type: 'number' as const, minimum: 0, maximum: 59 },
         ],
-        description: 'Minute to run (0-59). Defaults to 0.',
+        description:
+          'Minute to run (0-59). Omitted: :00 for a time of day; an interval job keeps its default offset.',
       },
       scheduleDayOfWeek: {
         anyOf: [

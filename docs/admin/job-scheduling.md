@@ -50,7 +50,7 @@ A run that is still going when its next firing is due makes that firing skip, so
 
 The order within a night is deliberate: ratings refresh before the recommendation run, reconciling Seerr before the discovery run, and home rows after Top Picks. The jobs that read the media server start on different minutes, away from `sync-users` on :00 and :30, so they don't all ask your server at once. Effective schedules come from the `job_config` table, seeded with these defaults — once you change one, the table is what runs.
 
-Jobs that work the media server (the user, library, watch-history and favourites syncs, home-row sync, and the legacy library and Top Picks jobs) also take turns: one runs at a time, and the others wait. A waiting job shows **Queued** on its card and in the Schedule tab, and can be cancelled before it starts. A second **Run** of a queued job is refused, as for a running one.
+Jobs that work the media server (the user, library, watch-history and favourites syncs, home-row sync, and the legacy library and Top Picks jobs) also take turns: one runs at a time, and the others wait. A waiting job shows **Queued** on its card and in the Schedule tab, and can be cancelled before it starts. A second **Run** of a queued job is refused, as for a running one. If the job ahead has been cancelled, or has been running for over 90 minutes, the next one starts beside it rather than wait for good.
 
 The schedule dialog has a **Minute** field beside the time (and under the interval, for intervals of an hour or more). The 15- and 30-minute intervals always run on the quarter or half hour, so they have none.
 
