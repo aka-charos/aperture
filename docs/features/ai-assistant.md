@@ -99,6 +99,7 @@ A suggestion carousel has a **create-playlist** action: the titles it recommende
 - **Discovery turns use the internet** — when the answer needs web sources, the request involves external services; library-only questions stay local
 - **It doesn't guess watched state** — with "only unwatched" on, the filter is real: played titles and 5%+ progress are excluded
 - **Welcome-screen suggestion chips** refresh with your latest recommendation run — a one-click way in
+- **Stop really stops** — the stop button ends the answer there, and what was written so far is kept in the conversation. Leaving the conversation or closing the tab doesn't stop it: the answer keeps going and is waiting when you come back
 
 ---
 

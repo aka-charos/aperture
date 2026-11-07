@@ -122,6 +122,7 @@ function ChatThreadArea({
           historicalMessages={historicalMessages}
           pending={generating}
           suggestions={suggestions}
+          conversationId={conversationId}
         />
       </ThreadErrorBoundary>
     </AssistantRuntimeProvider>

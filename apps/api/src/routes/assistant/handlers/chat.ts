@@ -14,6 +14,7 @@ import {
   stepCountIs,
   createUIMessageStream,
   createUIMessageStreamResponse,
+  type StepResult,
   type UIMessage,
 } from 'ai'
 import { getChatModelInstance, getEmbeddingInvocation, withInferenceContext, getLibraryScopeForUser } from '@aperture/core'
@@ -24,7 +25,8 @@ import { buildToolCatalog, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
 import { toolsUnderLimits, turnStatedLimits } from '../tools/titleLimits.js'
 import { persistTurn, persistQuestion, type TurnPart } from '../helpers/persistTurn.js'
-import { markTurnStarted, markTurnFinished } from '../helpers/activeTurns.js'
+import { markTurnStarted, markTurnFinished, registerTurnStop } from '../helpers/activeTurns.js'
+import { STOPPED, untilStopped } from '../helpers/untilStopped.js'
 import type { ToolContext } from '../types.js'
 
 interface ChatBody {
@@ -185,12 +187,19 @@ export function registerChatHandler(fastify: FastifyInstance) {
         // AI_ERROR:<code>:<detail> string the frontend maps to localized copy.
         // Needed in BOTH places below: this one covers everything execute does,
         // the one on toUIMessageStream covers mid-stream model/provider failures.
+        // Ends this turn when the reader presses Stop (POST …/conversations/:id/stop).
+        // Not tied to the request closing: leaving the conversation or the tab
+        // must let the turn finish and be saved (helpers/activeTurns.ts).
+        const stop = new AbortController()
+        let releaseStop = () => {}
+
         const onStreamError = (error: unknown) => {
           fastify.log.error({ err: error }, 'Assistant stream error')
           // The turn is over however badly. Without this the conversation keeps
           // telling a returning reader that an answer is coming until the
           // staleness sweep gives up on it fifteen minutes later.
           if (conversationId) markTurnFinished(conversationId)
+          releaseStop()
           return assistantErrorText(error)
         }
 
@@ -298,6 +307,7 @@ export function registerChatHandler(fastify: FastifyInstance) {
             // turn active is what lets that reader be told an answer is coming.
             if (conversationId) {
               markTurnStarted(conversationId)
+              releaseStop = registerTurnStop(conversationId, user.id, stop)
               await persistQuestion({
                 conversationId,
                 userId: user.id,
@@ -355,6 +365,15 @@ export function registerChatHandler(fastify: FastifyInstance) {
             const system = [systemPrompt, systemAppend, discoveryAppend].filter(Boolean).join('\n\n')
             const modelMessages = convertToModelMessages(processedMessages)
 
+            // What the reader has been shown, kept as it streams so a stopped turn
+            // can be saved as far as it got: every finished step, plus the text of
+            // the step that was still being written.
+            const finishedSteps: StepResult<typeof tools>[] = []
+            let unfinishedText = ''
+            const trackText = ({ chunk }: { chunk: { type: string; text?: string } }) => {
+              if (chunk.type === 'text-delta' && chunk.text) unfinishedText += chunk.text
+            }
+
             // Stream the response using AI SDK v5
             // stopWhen allows the model to continue generating text after tool results
             const result = streamText({
@@ -364,6 +383,9 @@ export function registerChatHandler(fastify: FastifyInstance) {
               tools,
               toolChoice: 'auto',
               stopWhen: stepCountIs(MAX_STEPS),
+              // Stop ends the model call itself, not just the browser's reading of it.
+              abortSignal: stop.signal,
+              onChunk: trackText,
               // stepNumber is 0-indexed, so MAX_STEPS - 1 is the last step the
               // loop will run. Forcing toolChoice 'none' there turns "ran out of
               // budget mid-search" into "answered with whatever it found", which
@@ -388,6 +410,8 @@ export function registerChatHandler(fastify: FastifyInstance) {
                 return { toolChoice: 'none' }
               },
               onStepFinish: (step) => {
+                finishedSteps.push(step)
+                unfinishedText = ''
                 request.log.info(
                   {
                     // Tool NAMES and card counts, not Object.keys(step) — that
@@ -428,13 +452,17 @@ export function registerChatHandler(fastify: FastifyInstance) {
             // the last step wrote nothing, ask once more with the tools taken
             // away. Only the final step counts — an opener before a tool call is
             // not an answer, which is precisely the case that fails here.
-            const steps = await result.steps
+            // A Stop ends the wait at once (helpers/untilStopped.ts); the turn is
+            // then saved from the steps it finished and the text it was writing.
+            const awaitedSteps = await untilStopped(result.steps, stop.signal)
+            let stopped = awaitedSteps === STOPPED
+            const steps = awaitedSteps === STOPPED ? finishedSteps : awaitedSteps
             // Everything the answer is made of, in order. Rebuilt from the
             // steps rather than taken off the UI stream, because this has to
             // happen whether or not a browser is still attached — the whole
             // point of saving it here (see helpers/persistTurn.ts).
             const turnParts: TurnPart[] = []
-            const collect = (from: typeof steps) => {
+            const collect = (from: readonly StepResult<typeof tools>[]) => {
               for (const step of from) {
                 if (step.text?.trim()) turnParts.push({ type: 'text', text: step.text })
                 for (const call of step.toolResults ?? []) {
@@ -450,12 +478,13 @@ export function registerChatHandler(fastify: FastifyInstance) {
             }
             collect(steps)
 
-            if (!steps.at(-1)?.text?.trim()) {
+            if (!stopped && !steps.at(-1)?.text?.trim()) {
               request.log.warn(
                 { steps: steps.length, maxSteps: MAX_STEPS },
                 'Turn ended with no answer — asking again without tools'
               )
               emit('composing')
+              unfinishedText = ''
               const forced = streamText({
                 model: chatModel,
                 system,
@@ -469,18 +498,34 @@ export function registerChatHandler(fastify: FastifyInstance) {
                 // prose rather than a second attempt at searching.
                 tools,
                 toolChoice: 'none',
+                abortSignal: stop.signal,
+                onChunk: trackText,
               })
               writer.merge(forced.toUIMessageStream({ sendStart: false, onError: onStreamError }))
               // One retry, then let it go: the cards are still a useful answer,
               // and a third round trip on a turn that already took two minutes
               // spends the reader's time to say the same nothing twice.
-              if (!(await forced.text).trim()) {
-                request.log.warn(
-                  { model: typeof chatModel === 'string' ? chatModel : chatModel.modelId },
-                  'Forced answer came back empty too'
-                )
+              const forcedSteps = await untilStopped(forced.steps, stop.signal)
+              if (forcedSteps === STOPPED) {
+                stopped = true
+              } else {
+                if (!forcedSteps.map((step) => step.text ?? '').join('').trim()) {
+                  request.log.warn(
+                    { model: typeof chatModel === 'string' ? chatModel : chatModel.modelId },
+                    'Forced answer came back empty too'
+                  )
+                }
+                collect(forcedSteps)
               }
-              collect(await forced.steps)
+            }
+
+            if (stopped) {
+              // The text the reader watched arrive in the step that was cut off.
+              if (unfinishedText.trim()) turnParts.push({ type: 'text', text: unfinishedText })
+              request.log.info(
+                { conversationId, savedParts: turnParts.length },
+                'Turn stopped by the reader'
+              )
             }
 
             // Written here, from inside the request that produced it, rather
@@ -500,6 +545,7 @@ export function registerChatHandler(fastify: FastifyInstance) {
               // saved", and clearing first would hand them an empty turn.
               markTurnFinished(conversationId)
             }
+            releaseStop()
           },
           })
         )

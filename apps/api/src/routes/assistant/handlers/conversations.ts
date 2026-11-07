@@ -6,7 +6,7 @@ import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { requireCapability } from '../../../lib/permissions.js'
 import type { ConversationRow, MessageRow } from '../types.js'
-import { isTurnActive } from '../helpers/activeTurns.js'
+import { isTurnActive, stopTurn } from '../helpers/activeTurns.js'
 
 export function registerConversationHandlers(fastify: FastifyInstance) {
   /**
@@ -150,6 +150,22 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
       }
 
       return reply.status(204).send()
+    }
+  )
+
+  /**
+   * POST /api/assistant/conversations/:id/stop
+   * End the turn running in this conversation: its model calls stop, and what
+   * was written so far is saved (handlers/chat.ts). Only the conversation's
+   * own user can stop it; nothing running and someone else's turn both answer
+   * `{ stopped: false }`, so the reply says nothing about other accounts.
+   */
+  fastify.post<{ Params: { id: string } }>(
+    '/api/assistant/conversations/:id/stop',
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
+    async (request, reply) => {
+      const user = request.user as SessionUser
+      return reply.send({ stopped: stopTurn(request.params.id, user.id) })
     }
   )
 

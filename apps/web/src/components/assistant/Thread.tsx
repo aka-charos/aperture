@@ -45,6 +45,7 @@ import { ToolResultError } from './ToolResultError'
 import { useUnwatchedOnly, setUnwatchedOnly } from './unwatchedPreference'
 import { useStatusPhase, setStatusPhase } from './assistantStatus'
 import { NARROW_THREAD, COMPACT_THREAD, chatText, scaleChatTypography } from './density'
+import { requestTurnStop } from './stopTurn'
 
 /** Shared avatar geometry; it shrinks on a compact thread and goes on a narrow one. */
 const avatarSx = {
@@ -616,7 +617,7 @@ function LoadingIndicator() {
 }
 
 // Composer component
-function Composer() {
+function Composer({ conversationId }: { conversationId: string | null }) {
   const { t } = useTranslation()
   const theme = useTheme()
   const composerRuntime = useComposerRuntime()
@@ -712,6 +713,9 @@ function Composer() {
               <IconButton
                 type="button"
                 aria-label={t('assistant.tooltipStop')}
+                // The runtime's cancel only stops this browser reading the
+                // answer; this ends the server's work on it too (stopTurn.ts).
+                onClick={() => requestTurnStop(conversationId)}
                 sx={{
                   bgcolor: theme.palette.primary.main,
                   color: 'surface.onBrand',
@@ -1128,6 +1132,8 @@ interface ThreadProps {
    */
   pending?: boolean
   suggestions?: string[]
+  /** The conversation this thread shows, so Stop can end its turn on the server too. */
+  conversationId?: string | null
 }
 
 // Main Thread component
@@ -1179,7 +1185,12 @@ export function Thread(props: ThreadProps) {
   )
 }
 
-function ThreadBody({ historicalMessages = [], pending = false, suggestions = [] }: ThreadProps) {
+function ThreadBody({
+  historicalMessages = [],
+  pending = false,
+  suggestions = [],
+  conversationId = null,
+}: ThreadProps) {
   const visibleHistory = useVisibleHistory(historicalMessages)
   const hasHistoricalMessages = visibleHistory.length > 0
   const viewportRef = useRef<HTMLDivElement | null>(null)
@@ -1273,7 +1284,7 @@ function ThreadBody({ historicalMessages = [], pending = false, suggestions = []
       </Box>
 
       {/* Composer */}
-      <Composer />
+      <Composer conversationId={conversationId} />
     </ThreadPrimitive.Root>
   )
 }
