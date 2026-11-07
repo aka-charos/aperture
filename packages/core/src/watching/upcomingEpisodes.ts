@@ -513,7 +513,8 @@ export interface EpisodeStanding {
  * The standing of one exact episode per series. A show with no row for it is left
  * out, and reads as not held. `held` needs a path: a row alone can be the media
  * server's placeholder for a missing episode, which has no file to play. The
- * highest number held would not do either, since a season can have gaps.
+ * highest number held would not do either, since a season can have gaps. A file
+ * holding two episodes (`episode_number_end`) holds both numbers.
  */
 export async function getEpisodeStandings(
   userId: string,
@@ -524,16 +525,17 @@ export async function getEpisodeStandings(
 
   const wanted = [...episodes.entries()]
   const rows = await query<{ series_id: string; held: boolean; played: boolean }>(
-    `SELECT e.series_id, e.path IS NOT NULL AS held,
-            EXISTS (
+    `SELECT e.series_id, bool_or(e.path IS NOT NULL) AS held,
+            bool_or(EXISTS (
               SELECT 1 FROM watch_history wh
               WHERE wh.episode_id = e.id AND wh.user_id = $1 AND ${WATCH_HISTORY_PLAYED_SQL}
-            ) AS played
+            )) AS played
      FROM unnest($2::uuid[], $3::int[], $4::int[]) AS want(series_id, season_number, episode_number)
      JOIN episodes e
        ON e.series_id = want.series_id
       AND e.season_number = want.season_number
-      AND e.episode_number = want.episode_number`,
+      AND want.episode_number BETWEEN e.episode_number AND COALESCE(e.episode_number_end, e.episode_number)
+     GROUP BY e.series_id`,
     [
       userId,
       wanted.map(([seriesId]) => seriesId),
@@ -551,7 +553,8 @@ export async function getEpisodeStandings(
  * Per series, per season on the server: the highest episode number held and
  * the highest this viewer PLAYED (a favorited episode writes a watch_history
  * row too, and is not a watch). Feeds `wasCaughtUp`, and its keys are also the
- * seasons the server holds. Season 0 is included; callers decide about it.
+ * seasons the server holds. Season 0 is included; callers decide about it. A file
+ * holding two episodes counts as its last number.
  */
 export async function getSeasonProgress(
   userId: string,
@@ -567,8 +570,8 @@ export async function getSeasonProgress(
     played_last: number | null
   }>(
     `SELECT e.series_id, e.season_number,
-            MAX(e.episode_number) AS server_last,
-            MAX(e.episode_number) FILTER (WHERE wh.id IS NOT NULL) AS played_last
+            MAX(COALESCE(e.episode_number_end, e.episode_number)) AS server_last,
+            MAX(COALESCE(e.episode_number_end, e.episode_number)) FILTER (WHERE wh.id IS NOT NULL) AS played_last
      FROM episodes e
      LEFT JOIN watch_history wh
        ON wh.episode_id = e.id AND wh.user_id = $2 AND ${WATCH_HISTORY_PLAYED_SQL}

@@ -135,6 +135,8 @@ export interface EpisodeRow {
   id: string
   season_number: number
   episode_number: number
+  /** Last number a file holding several episodes covers; null = one episode */
+  episode_number_end: number | null
   title: string
   overview: string | null
   premiere_date: string | null

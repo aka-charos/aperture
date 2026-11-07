@@ -17,7 +17,7 @@ const realFetch = globalThis.fetch
 let restorePool: () => void
 let statements: { sql: string; params: unknown[] }[]
 let library: { tmdb_id: string; title: string; network: string | null }[]
-let held: { tmdb_id: string; season_number: number; held: number }[]
+let held: { tmdb_id: string; season_number: number; held: number; files?: number }[]
 let settings: Record<string, string>
 let resultRows: unknown[]
 let requestRows: unknown[]
@@ -29,7 +29,8 @@ function respond(sql: string, params: unknown[]): unknown[] {
     if (libraryReadFails) throw new Error('library read failed')
     return library
   }
-  if (/COUNT\(DISTINCT covered\.n\)/.test(sql)) return held
+  // One file per number unless a test says otherwise
+  if (/COUNT\(DISTINCT covered\.n\)/.test(sql)) return held.map((row) => ({ files: row.held, ...row }))
   if (/COUNT\(DISTINCT tmdb_id\)/.test(sql)) return [{ with_id: library.length, without_id: 2 }]
   if (/INSERT INTO gap_analysis_series_runs/.test(sql)) return [{ id: 'run-1' }]
   if (/SET status = 'completed'/.test(sql)) return [{ id: params[0] }]
@@ -151,6 +152,19 @@ test('a file holding two episodes counts as both', async () => {
   await runSeriesGapAnalysis()
   const sql = ran(/COUNT\(DISTINCT covered\.n\)/)[0].sql
   assert.match(sql, /generate_series\(\s*e\.episode_number,\s*GREATEST\(e\.episode_number, COALESCE\(e\.episode_number_end, e\.episode_number\)\)/)
+  assert.match(sql, /COUNT\(DISTINCT e\.episode_number\)::int AS files/)
+})
+
+test('a two-part file TMDb counts as one episode leaves the missing seasons listed', async () => {
+  library = [{ tmdb_id: '1', title: 'Two Parter', network: null }]
+  // Ten files in season 1, one tagged E01-E02: eleven numbers against TMDb's ten
+  held = [{ tmdb_id: '1', season_number: 1, held: 11, files: 10 }]
+  tmdbAnswers(() => threeSeasons)
+
+  const result = await runSeriesGapAnalysis()
+
+  assert.equal(result.missingSeasons, 2)
+  assert.equal(ran(/INSERT INTO gap_analysis_series_results/)[0].params[5], false, 'numbering not doubted')
 })
 
 test('closing interrupted scans never stops a boot', async () => {

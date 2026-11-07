@@ -25,7 +25,7 @@ import type { SyncSeriesResult, LibrarySeriesSyncResult, PreparedSeries, Prepare
 import { reconcileRemovedSeries } from './reconcile.js'
 import { processSeriesBatch } from './seriesBatch.js'
 import { buildRebindIndex, type TitleYearRow } from '../shared/titleYearRebind.js'
-import { processEpisodeBatch } from './episodeBatch.js'
+import { processEpisodeBatch, settleRekeyedEpisodes } from './episodeBatch.js'
 
 export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResult> {
   const jobId = existingJobId || randomUUID()
@@ -346,6 +346,9 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         `📂 Processing ${episodeCount} episodes from library${libraryId ? ` ${libraryId}` : ''} (streaming)...`
       )
 
+      // New media-server ids at numbers the library holds: settled once this
+      // library's listing is read in full (episodeBatch.ts settleRekeyedEpisodes).
+      const rekeyedEpisodes: PreparedEpisode[] = []
       let lastLogTime = Date.now()
       // Track base counts for this library (to accumulate across multiple libraries)
       const baseProcessed = processedEpisodes
@@ -416,6 +419,7 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
             const result = await processEpisodeBatch(batch, existingEpisodeIds, existingEpisodeKeys)
             batchAdded += result.added
             batchUpdated += result.updated
+            rekeyedEpisodes.push(...result.rekeyed)
           }
 
           return { added: batchAdded, updated: batchUpdated }
@@ -452,6 +456,19 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         'info',
         `✅ Library complete: ${streamResult.totalProcessed} episodes (${streamResult.totalAdded} new, ${streamResult.totalUpdated} updated)`
       )
+
+      const { rebound, widened } = await settleRekeyedEpisodes(rekeyedEpisodes, {
+        expected: libraryResult.expectedEpisodeCount,
+        fetched: libraryResult.fetchedEpisodeCount,
+        seen: libraryResult.seenEpisodeProviderIds,
+      })
+      if (rebound > 0 || widened > 0) {
+        addLog(
+          jobId,
+          'info',
+          `🔁 ${rebound} episode(s) moved onto a new media-server id, ${widened} widened by a second version (${libraryLabel})`
+        )
+      }
     }
 
     const { seriesRemoved, episodesRemoved } = await reconcileRemovedSeries(jobId, librarySyncResults)

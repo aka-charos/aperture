@@ -149,7 +149,9 @@ const watchingRoutes: FastifyPluginAsync = async (fastify) => {
               s.total_seasons, s.total_episodes, s.tmdb_id,
               s.tmdb_total_episodes, s.tmdb_total_seasons, s.tmdb_seasons, s.tmdb_status,
               h.episodes_watched, h.last_played_at,
-              (SELECT COUNT(*) FROM episodes e2 WHERE e2.series_id = s.id) AS episodes_on_server,
+              -- a file holding two episodes (episode_number_end) counts as both
+              (SELECT COALESCE(SUM(GREATEST(e2.episode_number, COALESCE(e2.episode_number_end, e2.episode_number)) - e2.episode_number + 1), 0)
+               FROM episodes e2 WHERE e2.series_id = s.id) AS episodes_on_server,
               (uws.id IS NOT NULL) AS in_watchlist,
               (h.series_id IS NOT NULL) AS in_history
        FROM series s

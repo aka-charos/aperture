@@ -22,7 +22,7 @@ import {
   getActiveSeriesGapRun,
   getFailedSeriesGapRun,
   getSeriesGapPrerequisites,
-  countEpisodesAddedSince,
+  countEpisodesChangedSince,
   getActiveSeriesRequests,
   listSeriesGapShows,
   readRequestedSeasons,
@@ -278,8 +278,8 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
         activeRun,
         failedRun,
         // Null while a scan runs or before one has finished: "not applicable", not 0.
-        episodesAddedSinceRun:
-          !scanning && run?.completedAt ? await countEpisodesAddedSince(run.completedAt) : null,
+        episodesChangedSinceRun:
+          !scanning && run?.completedAt ? await countEpisodesChangedSince(run.completedAt) : null,
       })
     }
   )

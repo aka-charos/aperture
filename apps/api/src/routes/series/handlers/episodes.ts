@@ -21,6 +21,14 @@ function hasEnded(mediaServerStatus: string | null, tmdbStatus: string | null): 
   return isEndedStatus(tmdbStatus || mediaServerStatus)
 }
 
+/** Episodes a season's files hold: a file holding two (`S05E01-E02`) counts as both. */
+function episodesHeld(rows: readonly EpisodeRow[]): number {
+  return rows.reduce(
+    (sum, ep) => sum + Math.max(ep.episode_number, ep.episode_number_end ?? ep.episode_number) - ep.episode_number + 1,
+    0
+  )
+}
+
 export function registerEpisodesHandler(fastify: FastifyInstance) {
   fastify.get<{ Params: { id: string } }>(
     '/api/series/:id/episodes',
@@ -43,7 +51,7 @@ export function registerEpisodesHandler(fastify: FastifyInstance) {
       // own played / in-progress state. The (user_id, episode_id) unique index
       // (migration 0045) guarantees at most one row per episode — no fan-out.
       const result = await query<EpisodeRow>(
-        `SELECT e.id, e.season_number, e.episode_number, e.title, e.overview,
+        `SELECT e.id, e.season_number, e.episode_number, e.episode_number_end, e.title, e.overview,
                 e.premiere_date, e.runtime_minutes, e.community_rating, e.poster_url,
                 COALESCE(wh.played, false) AS played,
                 COALESCE(wh.play_count, 0) AS play_count,
@@ -119,7 +127,7 @@ async function buildSeasonAvailability(
   const couldBeCapped =
     airedSeasons.length > 0 &&
     !hasEnded(seriesRow?.status ?? null, seriesRow?.tmdb_status ?? null) &&
-    airedSeasons.some((s) => (seasons[s.season_number]?.length ?? 0) < s.episode_count)
+    airedSeasons.some((s) => episodesHeld(seasons[s.season_number] ?? []) < s.episode_count)
   const upcoming = couldBeCapped
     ? await getUpcomingEpisodeForSeries(seriesId, seriesRow?.tmdb_id ?? null)
     : null
@@ -133,7 +141,7 @@ async function buildSeasonAvailability(
   return [...seasonNumbers]
     .sort((a, b) => a - b)
     .map((seasonNumber) => {
-      const onServer = seasons[seasonNumber]?.length ?? 0
+      const onServer = episodesHeld(seasons[seasonNumber] ?? [])
       const tmdbSeason = tmdbBySeason.get(seasonNumber)
       // Specials (season 0) and seasons TMDB doesn't know about: report what we
       // hold, but never claim anything is missing.

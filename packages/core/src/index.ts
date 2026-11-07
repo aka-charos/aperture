@@ -1480,7 +1480,7 @@ export {
   getFailedSeriesGapRun,
   closeInterruptedSeriesGapRuns,
   getSeriesGapPrerequisites,
-  countEpisodesAddedSince,
+  countEpisodesChangedSince,
   getActiveSeriesRequests,
   listSeriesGapShows,
   type SeriesGapRun,

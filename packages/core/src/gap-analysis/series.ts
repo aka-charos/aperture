@@ -150,9 +150,17 @@ export async function getSeriesGapPrerequisites(): Promise<{ showsWithTmdbId: nu
   return { showsWithTmdbId: row?.with_id ?? 0, showsWithoutTmdbId: row?.without_id ?? 0 }
 }
 
-/** How far the library has moved under a snapshot. */
-export async function countEpisodesAddedSince(when: Date): Promise<number> {
-  const row = await queryOne<{ c: number }>(`SELECT COUNT(*)::int AS c FROM episodes WHERE created_at > $1`, [when])
+/**
+ * How far the library has moved under a snapshot: episodes added, and episodes whose
+ * range changed (a file now holding two episodes, the first sync filling the column).
+ * Not `updated_at`, which every sync restamps.
+ */
+export async function countEpisodesChangedSince(when: Date): Promise<number> {
+  const row = await queryOne<{ c: number }>(
+    `SELECT COUNT(*)::int AS c FROM episodes
+     WHERE created_at > $1 OR episode_number_end_changed_at > $1`,
+    [when]
+  )
   return row?.c ?? 0
 }
 
@@ -181,11 +189,19 @@ async function loadLibraryShows(): Promise<LibraryShow[]> {
  * paths at all, and counting none would call the whole library missing.
  *
  * A double-length episode kept as one file is one row covering two numbers
- * (`episode_number_end`), so every number a row covers is counted, not the row.
+ * (`episode_number_end`), so `covered` counts every number a row covers. `files`
+ * counts one per starting number, which `compareShowSeasons` needs for its
+ * numbering doubt.
  */
-async function loadHeldEpisodes(): Promise<Map<number, Map<number, number>>> {
-  const result = await query<{ tmdb_id: string; season_number: number; held: number }>(
-    `SELECT s.tmdb_id, e.season_number, COUNT(DISTINCT covered.n)::int AS held
+interface HeldEpisodes {
+  covered: Map<number, number>
+  files: Map<number, number>
+}
+
+async function loadHeldEpisodes(): Promise<Map<number, HeldEpisodes>> {
+  const result = await query<{ tmdb_id: string; season_number: number; held: number; files: number }>(
+    `SELECT s.tmdb_id, e.season_number, COUNT(DISTINCT covered.n)::int AS held,
+            COUNT(DISTINCT e.episode_number)::int AS files
      FROM episodes e
      JOIN series s ON s.id = e.series_id
      CROSS JOIN LATERAL generate_series(
@@ -196,15 +212,16 @@ async function loadHeldEpisodes(): Promise<Map<number, Map<number, number>>> {
        AND (e.path IS NOT NULL OR NOT EXISTS (SELECT 1 FROM episodes WHERE path IS NOT NULL))
      GROUP BY s.tmdb_id, e.season_number`
   )
-  const held = new Map<number, Map<number, number>>()
+  const held = new Map<number, HeldEpisodes>()
   for (const row of result.rows) {
     const id = Number(row.tmdb_id)
-    let seasons = held.get(id)
-    if (!seasons) {
-      seasons = new Map()
-      held.set(id, seasons)
+    let show = held.get(id)
+    if (!show) {
+      show = { covered: new Map(), files: new Map() }
+      held.set(id, show)
     }
-    seasons.set(row.season_number, row.held)
+    show.covered.set(row.season_number, row.held)
+    show.files.set(row.season_number, row.files)
   }
   return held
 }
@@ -327,7 +344,8 @@ export async function runSeriesGapAnalysis(options: { jobId?: string } = {}): Pr
         const { seasons, numberingDiffers } = compareShowSeasons({
           seasons: answer.data.seasons ?? [],
           lastEpisode: answer.data.last_episode_to_air,
-          held: heldByShow.get(show.tmdbId) ?? new Map(),
+          held: heldByShow.get(show.tmdbId)?.covered ?? new Map(),
+          heldFiles: heldByShow.get(show.tmdbId)?.files,
         })
         if (numberingDiffers) {
           counts.numbering++

@@ -118,6 +118,28 @@ test('a library season fuller than TMDb says doubts the gaps', () => {
   assert.equal(numberingDiffers, true)
 })
 
+test('a two-part file TMDb lists as one episode does not make the season overfull', () => {
+  // Season 1: ten files, the first tagged E01-E02, so eleven numbers against TMDb's ten.
+  // Season 2 is really missing and must stay a finding.
+  const { seasons, numberingDiffers } = compareShowSeasons({
+    seasons: [season(1, 10), season(2, 10)],
+    held: held([[1, 11]]),
+    heldFiles: held([[1, 10]]),
+    now: NOW,
+  })
+  assert.equal(numberingDiffers, false)
+  assert.deepEqual(seasons.map((s) => s.holding), ['complete', 'missing'])
+
+  // More files than TMDb's count is still a doubt
+  const { numberingDiffers: doubted } = compareShowSeasons({
+    seasons: [season(1, 10), season(2, 10)],
+    held: held([[1, 12]]),
+    heldFiles: held([[1, 11]]),
+    now: NOW,
+  })
+  assert.equal(doubted, true)
+})
+
 test('odd numbering is no finding when nothing is missing', () => {
   const { numberingDiffers } = compareShowSeasons({
     seasons: [season(1, 10)],

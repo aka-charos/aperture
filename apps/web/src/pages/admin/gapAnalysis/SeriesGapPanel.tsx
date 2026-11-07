@@ -96,7 +96,7 @@ interface LatestResponse {
   run: SeriesGapRun | null
   activeRun: SeriesGapRun | null
   failedRun: SeriesGapRun | null
-  episodesAddedSinceRun: number | null
+  episodesChangedSinceRun: number | null
 }
 
 /**
@@ -553,7 +553,7 @@ export function SeriesGapPanel() {
     displayRun && displayRun.airedSeasons > 0
       ? Math.round((displayRun.ownedSeasons / displayRun.airedSeasons) * 100)
       : 0
-  const added = latest?.episodesAddedSinceRun ?? 0
+  const changed = latest?.episodesChangedSinceRun ?? 0
 
   return (
     <>
@@ -623,9 +623,9 @@ export function SeriesGapPanel() {
           </Button>
         </Box>
 
-        {!scanning && added > 0 && (
+        {!scanning && changed > 0 && (
           <Alert severity="warning" sx={{ mt: 2 }}>
-            {t('admin.gaps.series.staleEpisodes', { count: added, episodes: formatNumber(added) })}
+            {t('admin.gaps.series.staleEpisodes', { count: changed, episodes: formatNumber(changed) })}
           </Alert>
         )}
 

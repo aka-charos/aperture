@@ -66,11 +66,17 @@ export function airedEpisodes(
  * can really mean "your season 2 holds it". Two signs: the library holds a season
  * TMDb does not list, or a season with more episodes than TMDb gives it. Either one
  * only matters when the comparison found a gap, since it is the gap being doubted.
+ *
+ * `held` counts every number a file covers, so a two-part file tagged E01-E02 holds
+ * both. "More than TMDb gives it" counts files instead (`heldFiles`, one per starting
+ * number), because TMDb often lists that two-parter as one episode: counting its two
+ * numbers would call a whole season overfull and hide the show's real gaps.
  */
 export function compareShowSeasons(input: {
   seasons: readonly TmdbSeason[]
   lastEpisode?: TmdbLastEpisode | null
   held: ReadonlyMap<number, number>
+  heldFiles?: ReadonlyMap<number, number>
   now?: Date
 }): { seasons: ComparedSeason[]; numberingDiffers: boolean } {
   const regular = input.seasons.filter((s) => s.season_number > 0)
@@ -94,7 +100,8 @@ export function compareShowSeasons(input: {
 
   const hasGap = seasons.some((s) => s.holding !== 'complete')
   const heldUnlisted = [...input.held].some(([n, count]) => n > 0 && count > 0 && !listed.has(n))
-  const overfull = regular.some((s) => (input.held.get(s.season_number) ?? 0) > s.episode_count)
+  const files = input.heldFiles ?? input.held
+  const overfull = regular.some((s) => (files.get(s.season_number) ?? 0) > s.episode_count)
 
   return { seasons, numberingDiffers: hasGap && (heldUnlisted || overfull) }
 }
