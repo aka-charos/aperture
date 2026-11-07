@@ -6,6 +6,7 @@
 
 import { normalizeCountries } from '../../countries/canonical.js'
 import { withoutManagedTags } from '../managedTags.js'
+import { episodeNumberEnd } from '../episodeRange.js'
 import type { Movie, Series, Episode } from '../types.js'
 import type { JellyfinItem, JellyfinEpisode } from './types.js'
 import { mapVideoQuality } from '../videoQuality.js'
@@ -167,6 +168,7 @@ export function mapJellyfinItemToEpisode(item: JellyfinEpisode, baseUrl: string)
     seriesName: item.SeriesName,
     seasonNumber: item.ParentIndexNumber || 0,
     episodeNumber: item.IndexNumber || 0,
+    episodeNumberEnd: episodeNumberEnd(item.IndexNumber, item.IndexNumberEnd),
     name: item.Name,
     overview: item.Overview,
     premiereDate: item.PremiereDate,

@@ -179,12 +179,19 @@ async function loadLibraryShows(): Promise<LibraryShow[]> {
  * An episode with no file is a placeholder a media server can list for what it lacks,
  * so it is not held. If no episode anywhere has a path, the server is not reporting
  * paths at all, and counting none would call the whole library missing.
+ *
+ * A double-length episode kept as one file is one row covering two numbers
+ * (`episode_number_end`), so every number a row covers is counted, not the row.
  */
 async function loadHeldEpisodes(): Promise<Map<number, Map<number, number>>> {
   const result = await query<{ tmdb_id: string; season_number: number; held: number }>(
-    `SELECT s.tmdb_id, e.season_number, COUNT(DISTINCT e.episode_number)::int AS held
+    `SELECT s.tmdb_id, e.season_number, COUNT(DISTINCT covered.n)::int AS held
      FROM episodes e
      JOIN series s ON s.id = e.series_id
+     CROSS JOIN LATERAL generate_series(
+       e.episode_number,
+       GREATEST(e.episode_number, COALESCE(e.episode_number_end, e.episode_number))
+     ) AS covered(n)
      WHERE s.tmdb_id ~ '^[0-9]+$' AND e.season_number > 0
        AND (e.path IS NOT NULL OR NOT EXISTS (SELECT 1 FROM episodes WHERE path IS NOT NULL))
      GROUP BY s.tmdb_id, e.season_number`

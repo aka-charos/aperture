@@ -2,8 +2,30 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { clearRankSortName, setForcedSortName } from './sortName.js'
 import { mapWithConcurrency } from '../lib/concurrency.js'
-import { mapEmbyItemToMovie } from './emby/mappers.js'
-import type { EmbyItem } from './emby/types.js'
+import { mapEmbyItemToEpisode, mapEmbyItemToMovie } from './emby/mappers.js'
+import type { EmbyEpisode, EmbyItem } from './emby/types.js'
+import { mapJellyfinItemToEpisode } from './jellyfin/mappers.js'
+import type { JellyfinEpisode } from './jellyfin/types.js'
+import { episodeNumberEnd } from './episodeRange.js'
+
+test('episodeNumberEnd keeps only an end past the start', () => {
+  assert.equal(episodeNumberEnd(1, 2), 2)
+  assert.equal(episodeNumberEnd(1, 1), undefined, 'one episode')
+  assert.equal(episodeNumberEnd(3, 2), undefined, 'backwards')
+  assert.equal(episodeNumberEnd(1, undefined), undefined)
+  assert.equal(episodeNumberEnd(undefined, 2), undefined, 'no start, nothing to extend')
+  assert.equal(episodeNumberEnd(1, 2.5), undefined)
+})
+
+test('both servers map a multi-episode file to its range', () => {
+  const fields = { Id: 'e1', Name: 'A Little Kiss', SeriesId: 's', SeriesName: 'Mad Men', ParentIndexNumber: 5, IndexNumber: 1 }
+  const emby = mapEmbyItemToEpisode({ ...fields, IndexNumberEnd: 2 } as EmbyEpisode, 'http://emby')
+  const jellyfin = mapJellyfinItemToEpisode({ ...fields, IndexNumberEnd: 2 } as JellyfinEpisode, 'http://jf')
+  assert.equal(emby.episodeNumberEnd, 2)
+  assert.equal(jellyfin.episodeNumberEnd, 2)
+  assert.equal(mapEmbyItemToEpisode(fields as EmbyEpisode, 'http://emby').episodeNumberEnd, undefined)
+  assert.equal(mapJellyfinItemToEpisode(fields as JellyfinEpisode, 'http://jf').episodeNumberEnd, undefined)
+})
 
 test('setForcedSortName sets the name and locks SortName once', () => {
   const item: Record<string, unknown> = { Name: 'Heat', LockedFields: ['Name'] }

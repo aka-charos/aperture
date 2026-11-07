@@ -116,6 +116,7 @@ export interface JellyfinEpisode extends JellyfinItem {
   SeriesName: string
   ParentIndexNumber?: number // Season number
   IndexNumber?: number // Episode number
+  IndexNumberEnd?: number // Last episode number of a multi-episode file
 }
 
 export interface JellyfinItemsResponse {

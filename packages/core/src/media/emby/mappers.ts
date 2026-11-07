@@ -2,6 +2,7 @@ import type { EmbyItem, EmbySeries, EmbyEpisode } from './types.js'
 import type { Movie, Series, Episode } from '../types.js'
 import { normalizeCountries } from '../../countries/canonical.js'
 import { withoutManagedTags } from '../managedTags.js'
+import { episodeNumberEnd } from '../episodeRange.js'
 import {
   extractPeopleNames,
   mapEmbyActors,
@@ -109,6 +110,7 @@ export function mapEmbyItemToEpisode(item: EmbyEpisode, baseUrl: string): Episod
     seriesName: item.SeriesName,
     seasonNumber: item.ParentIndexNumber,
     episodeNumber: item.IndexNumber,
+    episodeNumberEnd: episodeNumberEnd(item.IndexNumber, item.IndexNumberEnd),
     name: item.Name,
     overview: item.Overview,
     premiereDate: item.PremiereDate,

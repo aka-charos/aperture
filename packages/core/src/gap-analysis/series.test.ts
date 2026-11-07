@@ -29,7 +29,7 @@ function respond(sql: string, params: unknown[]): unknown[] {
     if (libraryReadFails) throw new Error('library read failed')
     return library
   }
-  if (/COUNT\(DISTINCT e\.episode_number\)/.test(sql)) return held
+  if (/COUNT\(DISTINCT covered\.n\)/.test(sql)) return held
   if (/COUNT\(DISTINCT tmdb_id\)/.test(sql)) return [{ with_id: library.length, without_id: 2 }]
   if (/INSERT INTO gap_analysis_series_runs/.test(sql)) return [{ id: 'run-1' }]
   if (/SET status = 'completed'/.test(sql)) return [{ id: params[0] }]
@@ -142,8 +142,15 @@ test('only a show with a gap is stored, with Seerr per season, and a finished sc
 test('an episode with no file is not held, unless the server reports no paths at all', async () => {
   tmdbAnswers(() => threeSeasons)
   await runSeriesGapAnalysis()
-  const sql = ran(/COUNT\(DISTINCT e\.episode_number\)/)[0].sql
+  const sql = ran(/COUNT\(DISTINCT covered\.n\)/)[0].sql
   assert.match(sql, /e\.path IS NOT NULL OR NOT EXISTS \(SELECT 1 FROM episodes WHERE path IS NOT NULL\)/)
+})
+
+test('a file holding two episodes counts as both', async () => {
+  tmdbAnswers(() => threeSeasons)
+  await runSeriesGapAnalysis()
+  const sql = ran(/COUNT\(DISTINCT covered\.n\)/)[0].sql
+  assert.match(sql, /generate_series\(\s*e\.episode_number,\s*GREATEST\(e\.episode_number, COALESCE\(e\.episode_number_end, e\.episode_number\)\)/)
 })
 
 test('closing interrupted scans never stops a boot', async () => {

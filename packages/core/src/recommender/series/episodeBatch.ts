@@ -65,16 +65,19 @@ export async function processEpisodeBatch(
           path = data.path,
           media_sources = data.media_sources,
           poster_url = data.poster_url,
+          episode_number_end = data.episode_number_end,
           updated_at = NOW()
         FROM (
           SELECT * FROM unnest(
             $1::text[], $2::uuid[], $3::int[], $4::int[], $5::text[],
             $6::text[], $7::date[], $8::int[], $9::int[], $10::real[],
-            $11::jsonb[], $12::jsonb[], $13::jsonb[], $14::text[], $15::jsonb[], $16::text[]
+            $11::jsonb[], $12::jsonb[], $13::jsonb[], $14::text[], $15::jsonb[], $16::text[],
+            $17::int[]
           ) AS t(
             provider_item_id, series_id, season_number, episode_number, title,
             overview, premiere_date, year, runtime_minutes, community_rating,
-            directors, writers, guest_stars, path, media_sources, poster_url
+            directors, writers, guest_stars, path, media_sources, poster_url,
+            episode_number_end
           )
         ) AS data
         WHERE episodes.provider_item_id = data.provider_item_id`,
@@ -97,6 +100,7 @@ export async function processEpisodeBatch(
           toUpdate.map((pe) => pe.episode.path || null),
           toUpdate.map((pe) => JSON.stringify(pe.episode.mediaSources || [])),
           toUpdate.map((pe) => pe.posterUrl),
+          toUpdate.map((pe) => pe.episode.episodeNumberEnd ?? null),
         ]
       )
       updated = result.rowCount || toUpdate.length
@@ -115,22 +119,26 @@ export async function processEpisodeBatch(
         `INSERT INTO episodes (
           provider_item_id, series_id, season_number, episode_number, title,
           overview, premiere_date, year, runtime_minutes, community_rating,
-          directors, writers, guest_stars, path, media_sources, poster_url
+          directors, writers, guest_stars, path, media_sources, poster_url,
+          episode_number_end
         )
         SELECT
           t.provider_item_id, t.series_id, t.season_number, t.episode_number, t.title,
           t.overview, t.premiere_date, t.year, t.runtime_minutes, t.community_rating,
           COALESCE(ARRAY(SELECT jsonb_array_elements_text(t.directors)), '{}'),
           COALESCE(ARRAY(SELECT jsonb_array_elements_text(t.writers)), '{}'),
-          t.guest_stars, t.path, t.media_sources, t.poster_url
+          t.guest_stars, t.path, t.media_sources, t.poster_url,
+          t.episode_number_end
         FROM unnest(
           $1::text[], $2::uuid[], $3::int[], $4::int[], $5::text[],
           $6::text[], $7::date[], $8::int[], $9::int[], $10::real[],
-          $11::jsonb[], $12::jsonb[], $13::jsonb[], $14::text[], $15::jsonb[], $16::text[]
+          $11::jsonb[], $12::jsonb[], $13::jsonb[], $14::text[], $15::jsonb[], $16::text[],
+          $17::int[]
         ) AS t(
           provider_item_id, series_id, season_number, episode_number, title,
           overview, premiere_date, year, runtime_minutes, community_rating,
-          directors, writers, guest_stars, path, media_sources, poster_url
+          directors, writers, guest_stars, path, media_sources, poster_url,
+          episode_number_end
         )
         ON CONFLICT (series_id, season_number, episode_number) DO UPDATE SET
           provider_item_id = EXCLUDED.provider_item_id,
@@ -146,6 +154,7 @@ export async function processEpisodeBatch(
           path = EXCLUDED.path,
           media_sources = EXCLUDED.media_sources,
           poster_url = EXCLUDED.poster_url,
+          episode_number_end = EXCLUDED.episode_number_end,
           updated_at = NOW()
         RETURNING xmax`,
         [
@@ -167,6 +176,7 @@ export async function processEpisodeBatch(
           deduplicatedInserts.map((pe) => pe.episode.path || null),
           deduplicatedInserts.map((pe) => JSON.stringify(pe.episode.mediaSources || [])),
           deduplicatedInserts.map((pe) => pe.posterUrl),
+          deduplicatedInserts.map((pe) => pe.episode.episodeNumberEnd ?? null),
         ]
       )
       // xmax = 0 means true insert, xmax > 0 means it was an update due to conflict

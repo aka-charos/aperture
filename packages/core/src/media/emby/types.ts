@@ -192,6 +192,7 @@ export interface EmbyEpisode {
   SeasonName?: string
   ParentIndexNumber: number // Season number
   IndexNumber: number // Episode number
+  IndexNumberEnd?: number // Last episode number of a multi-episode file
   Overview?: string
   PremiereDate?: string
   ProductionYear?: number

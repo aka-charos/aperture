@@ -50,7 +50,7 @@ Only **TMDb** is required. **Seerr** is needed only for requesting. Seasons that
 Choose with the **Seasons** filter:
 
 - **Missing entirely** (the default): an aired season with no episode in the library, and not in Seerr
-- **Partly held**: an aired season with some of its episodes. For a season still airing, only the episodes aired so far count. A file holding two episodes counts as one, so this list can include seasons that are really complete
+- **Partly held**: an aired season with some of its episodes. For a season still airing, only the episodes aired so far count. A file holding two episodes (`S05E01-E02`) counts as both, once a TV sync has run since the update. A show a streaming service splits into "parts" that TMDb groups into seasons differently can still show here although it is complete
 - **Missing or partly held**: both of the above
 - **Numbering differs**: shows whose gaps can't be trusted, listed so you can check them. The library holds a season TMDb doesn't list, or one with more episodes than TMDb gives it, so "season 3 is missing" may only mean your season 2 holds it. These shows offer nothing to request and aren't counted in the figures
 
