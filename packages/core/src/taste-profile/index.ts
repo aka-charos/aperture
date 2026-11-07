@@ -730,15 +730,17 @@ export async function setFranchisePreference(
   // Clamp score to -1 to 1
   const clampedScore = Math.max(-1, Math.min(1, preferenceScore))
 
-  await query(
-    `INSERT INTO user_franchise_preferences 
-       (user_id, franchise_name, media_type, preference_score, is_user_set)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (user_id, franchise_name, media_type) 
-     DO UPDATE SET 
-       preference_score = $4,
-       is_user_set = $5`,
-    [userId, franchiseName, mediaType, clampedScore, isUserSet]
+  await withPreferenceWriteLock('franchise-preferences', userId, (client) =>
+    client.query(
+      `INSERT INTO user_franchise_preferences
+         (user_id, franchise_name, media_type, preference_score, is_user_set)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id, franchise_name, media_type)
+       DO UPDATE SET
+         preference_score = $4,
+         is_user_set = $5`,
+      [userId, franchiseName, mediaType, clampedScore, isUserSet]
+    )
   )
 
   logger.info({ userId, franchiseName, mediaType, preferenceScore: clampedScore }, 'Set franchise preference')
@@ -831,12 +833,15 @@ export const GENRE_ROW_CHANGED = `(
          )`
 
 /**
- * One account's auto-detected preference write, as one transaction behind a
- * per-account lock. A reset deletes and re-inserts: in one transaction a
- * failure part-way leaves the old list, and a recommendation run reading at
- * that moment sees the old list or the new one, never a half-written one. The
- * lock queues two writes for the same account (a rescan and a scheduled
- * rebuild) instead of letting two resets delete and insert across each other.
+ * One write to an account's genre weights or franchise preferences, as one
+ * transaction behind a per-account lock. EVERY writer to those two tables goes
+ * through here: the two detectors' bulk writes and the manual set and delete.
+ * A reset deletes and re-inserts: in one transaction a failure part-way leaves
+ * the old list, and a recommendation run reading at that moment sees the old
+ * list or the new one, never a half-written one. The lock queues writes for the
+ * same account (a rescan, a scheduled rebuild, a slider save) instead of letting
+ * them interleave. One 64-bit key per table and account (`hashtextextended`),
+ * so two accounts practically never share one.
  */
 async function withPreferenceWriteLock<T>(
   table: 'franchise-preferences' | 'genre-weights',
@@ -844,7 +849,7 @@ async function withPreferenceWriteLock<T>(
   write: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   return transaction(async (client) => {
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [table, userId])
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))', [`${table}:${userId}`])
     return write(client)
   })
 }
@@ -857,10 +862,12 @@ export async function deleteFranchisePreference(
   franchiseName: string,
   mediaType: MediaType | 'both'
 ): Promise<boolean> {
-  const result = await query(
-    `DELETE FROM user_franchise_preferences 
-     WHERE user_id = $1 AND franchise_name = $2 AND media_type = $3`,
-    [userId, franchiseName, mediaType]
+  const result = await withPreferenceWriteLock('franchise-preferences', userId, (client) =>
+    client.query(
+      `DELETE FROM user_franchise_preferences
+       WHERE user_id = $1 AND franchise_name = $2 AND media_type = $3`,
+      [userId, franchiseName, mediaType]
+    )
   )
   
   logger.info({ userId, franchiseName, mediaType }, 'Deleted franchise preference')
@@ -911,12 +918,14 @@ export async function setGenreWeight(
   // Clamp weight to 0 to 2
   const clampedWeight = Math.max(0, Math.min(2, weight))
 
-  await query(
-    `INSERT INTO user_genre_weights (user_id, genre, weight, is_user_set)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (user_id, genre) 
-     DO UPDATE SET weight = $3, is_user_set = $4`,
-    [userId, genre, clampedWeight, isUserSet]
+  await withPreferenceWriteLock('genre-weights', userId, (client) =>
+    client.query(
+      `INSERT INTO user_genre_weights (user_id, genre, weight, is_user_set)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, genre)
+       DO UPDATE SET weight = $3, is_user_set = $4`,
+      [userId, genre, clampedWeight, isUserSet]
+    )
   )
 
   logger.info({ userId, genre, weight: clampedWeight }, 'Set genre weight')
@@ -971,9 +980,8 @@ export async function deleteGenreWeight(
   userId: string,
   genre: string
 ): Promise<boolean> {
-  const result = await query(
-    `DELETE FROM user_genre_weights WHERE user_id = $1 AND genre = $2`,
-    [userId, genre]
+  const result = await withPreferenceWriteLock('genre-weights', userId, (client) =>
+    client.query(`DELETE FROM user_genre_weights WHERE user_id = $1 AND genre = $2`, [userId, genre])
   )
   
   logger.info({ userId, genre }, 'Deleted genre weight')
