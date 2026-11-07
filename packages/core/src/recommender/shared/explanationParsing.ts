@@ -262,7 +262,12 @@ function readEscape(text: string, index: number): { value: string; end: number }
   const simple = SIMPLE_ESCAPES[next]
   if (simple !== undefined) return { value: simple, end: index + 2 }
 
-  // Not a JSON escape at all — the model wrote a stray backslash. Keep both
+  // `\'` is not a JSON escape, but models (Ollama's especially) write it for
+  // an apostrophe, as in a JavaScript string: `don\'t`. It is what breaks the
+  // strict parse, and the reader should see the apostrophe, not the backslash.
+  if (next === "'") return { value: "'", end: index + 2 }
+
+  // Any other non-escape — the model wrote a stray backslash. Keep both
   // characters rather than silently eating one.
   return { value: `\\${next}`, end: index + 2 }
 }

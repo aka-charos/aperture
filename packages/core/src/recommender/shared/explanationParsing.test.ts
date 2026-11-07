@@ -228,6 +228,17 @@ test('salvage decodes escapes rather than leaking them', () => {
   assert.equal(byIndex.has(2), false)
 })
 
+test("a JavaScript-style \\' reads as an apostrophe; any other stray backslash is kept", () => {
+  // Invalid JSON (\' is not an escape), so strict parsing fails and salvage reads it.
+  const raw =
+    "{\"explanations\":[{\"index\":1,\"explanation\":\"You don\\'t need the first film to follow this one.\"},{\"index\":2,\"explanation\":\"Its C:\\d drive gag lands because you liked the director\\'s last comedy.\"}]}"
+  const { byIndex, mode } = parseExplanationResponse(raw)
+
+  assert.equal(mode, 'salvaged')
+  assert.equal(byIndex.get(1), "You don't need the first film to follow this one.")
+  assert.equal(byIndex.get(2), "Its C:\\d drive gag lands because you liked the director's last comedy.")
+})
+
 test('handles the reversed key order', () => {
   const raw =
     '{"explanations":[{"explanation":"Backwards but complete, and long enough to read as a finished thought.","index":4},{"explanation":"and this one is cut'
