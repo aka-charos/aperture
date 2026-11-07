@@ -71,6 +71,12 @@ jobs:
       - name: Security posture
         run: pnpm --filter @aperture/api test:security
 
+      # The assistant suite, including toolSchemas.test.ts: one tool whose
+      # input root is not a plain object makes OpenAI-style providers refuse
+      # every chat turn. Stubs the pool; needs no database.
+      - name: Assistant tools
+        run: pnpm --filter @aperture/api test:assistant
+
   docker-amd64:
     name: Build Docker Image (amd64)
     needs: [detect-changes, validate]

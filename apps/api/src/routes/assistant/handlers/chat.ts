@@ -15,13 +15,12 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   type UIMessage,
-  type ToolSet,
 } from 'ai'
 import { getChatModelInstance, getEmbeddingInvocation, withInferenceContext, getLibraryScopeForUser } from '@aperture/core'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { requireCapability } from '../../../lib/permissions.js'
 import { getMediaServerInfo, buildSystemPrompt, applyN8nPreProcess, classifyIntent, latestUserText, assistantErrorText, loadConversationHistory, withUnwatchedFilter, createStatusEmitter, withStatusEvents, withRequestContext, withLibraryScope } from '../helpers/index.js'
-import { createTools, createN8nTools, createEpisodeTools, createDiscoveryResolveTool, DISCOVERY_PROMPT } from '../tools/index.js'
+import { buildToolCatalog, DISCOVERY_PROMPT } from '../tools/index.js'
 import { withToolErrorHandling } from '../tools/utils.js'
 import { toolsUnderLimits, turnStatedLimits } from '../tools/titleLimits.js'
 import { persistTurn, persistQuestion, type TurnPart } from '../helpers/persistTurn.js'
@@ -291,8 +290,6 @@ export function registerChatHandler(fastify: FastifyInstance) {
             // Search role) so the assistant can stream its opening line before that
             // slow work runs; 'library' (the default) leaves the assistant untouched.
             // Fails open to library.
-            let discoveryTools: ToolSet = {}
-            let discoveryAppend = ''
 
             // The question goes in NOW, not with the answer at the end. A turn
             // runs for minutes, and a reader who came back to the conversation
@@ -316,49 +313,22 @@ export function registerChatHandler(fastify: FastifyInstance) {
             // and is stamped onto every card list so the UI can act on the request
             // later (naming a playlist after it) without re-reading the thread.
             const userRequest = latestUserText(processedMessages)
-            if (intent === 'discovery') {
-              discoveryTools = createDiscoveryResolveTool(toolContext, userRequest)
-              discoveryAppend = DISCOVERY_PROMPT
-            }
+            const isDiscovery = intent === 'discovery'
+            const discoveryAppend = isDiscovery ? DISCOVERY_PROMPT : ''
 
-            // Create tools with context, plus n8n search_web + discovery (when routed)
-            //
-            // Both async spreads decide for themselves whether they have
-            // anything to contribute — searchEpisodes returns {} when episode
-            // embeddings are switched off, so the model is never handed a tool
-            // whose table is empty.
-            const baseTools = {
-              ...createTools(toolContext),
-              ...(await createEpisodeTools(toolContext)),
-              ...(await createN8nTools()),
-            }
-            // On discovery turns, drop only the tools that directly duplicate what the
-            // discovery tool already produces — query-driven list builders that compete
-            // with the web "Recommendations" and tempt the model to bypass
-            // findCandidatesInLibrary entirely:
-            //   - findSimilarContent: same output as the embeddings "Also worth checking"
-            //   - searchContent / semanticSearch: alternative recommendation lists from the query
-            // Distinct-intent tools (getTopRated / getMyRecommendations / getUnwatched) stay
-            // available so the model can SUPPLEMENT the web picks with broader in-library
-            // coverage (e.g. getTopRated by genre). The prompt mandates calling
-            // findCandidatesInLibrary first so the reasoned web cards are always primary.
-            if (Object.keys(discoveryTools).length > 0) {
-              const DISCOVERY_SUPPRESSED_TOOLS = [
-                'findSimilarContent',
-                'searchContent',
-                'semanticSearch',
-              ]
-              for (const name of DISCOVERY_SUPPRESSED_TOOLS) {
-                delete (baseTools as Record<string, unknown>)[name]
-              }
-            }
+            // The whole catalog, assembled in one place (tools/index.ts) so the
+            // schema test checks exactly what is sent here. On a discovery turn
+            // it adds findCandidatesInLibrary and drops the tools it duplicates.
+            const allTools = await buildToolCatalog(
+              toolContext,
+              isDiscovery ? { userRequest } : null
+            )
             // Backstop: uncaught tool errors become { id, error } payloads instead
             // of aborting the stream with a masked "An error occurred". Wraps the
             // unwatched filter too, so a failure there can't abort the stream.
             // withStatusEvents wraps that so entering a tool is reported before any
             // of it runs; withRequestContext is outermost because it stamps the
             // finished result, once the filter has settled which cards remain.
-            const allTools = { ...baseTools, ...discoveryTools }
             // withLibraryScope is innermost and unconditional: it is a
             // permission, so no card may reach a later wrapper — or the model —
             // before it has been filtered.
