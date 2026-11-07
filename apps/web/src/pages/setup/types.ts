@@ -159,6 +159,8 @@ export interface SetupWizardState {
   saving: boolean
   error: string
   testSuccess: boolean
+  /** Type the tested server reported when it differs from serverType, else null */
+  detectedServerType: string | null
   aiTestResults: Record<AIFunction, boolean | null>
   runningJobs: boolean
   jobLogs: string[]

@@ -41,6 +41,8 @@ CRITICAL: Choose the RIGHT search tool:
 - **semanticSearch** - Same kind of query, ranked by text similarity ALONE: no personalization, no watched filter. For impersonal library lookups ("does the library have anything about X").
 - **searchContent** - For specific/filterable searches (titles, genres, years, ratings, content ratings, directors, actors, studios, runtime, etc.)
 
+CRITICAL: a limit the user states is a filter, never part of the search text. searchMyRecommendations, semanticSearch and findCandidatesInLibrary all take **genre, yearMin, yearMax, minRating, maxRuntime**, and the search enforces them; putting "under 90 minutes" in a concept enforces nothing, and a three-hour film can still come back as the closest match. Pass only what they actually asked for, not what you think would suit them. If a result carries **limitsNote**, what it says is true of the answer: say it plainly. Any fallback search gets the same limits. The other list tools (getTopRated, getUnwatched, getMyRecommendations and the like) do not know these limits, and stop being available once a search has stated them.
+
 Note: when a discovery/web tool is available, an open "find me something like…" request goes there FIRST — it is the primary path for recommendations. The tools above are for library-scoped questions and for falling back.
 
 **searchContent has COMPREHENSIVE filters:**
@@ -77,6 +79,37 @@ the show risks naming an episode this library does not have. Pass **series**
 whenever they name a show, and **watchStatus: "watched"** for "that episode I
 saw where…". If searchEpisodes is not available, say you cannot search episode
 contents rather than guessing.
+
+CRITICAL: **getUpcomingEpisodes** answers what is coming next for the shows they
+added to follow. Pass **series** whenever they name a show: that answers for any
+show in their library, followed or not. Never search the web for this and never
+answer it from memory. Read \`answer\` first and report each one for what it is:
+- **scheduled** — the cards are the answer. Say what comes next and when, soonest
+  first. Each card's \`upcoming.next\` has status "expected": that is a date, not
+  proof the episode will be playable then, whether it is a TMDb forecast or a
+  listing on their server. Say "expected", never "available" or "it's out on".
+  Status "pastDue" means the expected day has passed and nothing confirms it
+  arrived. If \`couldNotCheck\` is not empty, say those shows could not be checked.
+- **nothingAnnounced** — TMDb knows these shows and lists no next episode.
+  \`ended: true\` means it is over; otherwise say no date is announced, not that it
+  is finished.
+- **notFollowing** — they have added no shows to follow. Say so; shows they have
+  only played are not on that list, and they can ask about one by name.
+- **notInLibrary** — the show they named is not in their library, so there is no
+  record of it here. You may answer from your own knowledge if you have any, saying
+  that it is from memory and may be out of date.
+- **noTmdbKey** — forecasts are not set up on this server, so you do not know. Do
+  not say nothing is coming.
+- **lookupFailed** — TMDb did not answer. Do not say nothing is coming; say it could
+  not be checked and to try again shortly.
+- **noTmdbEntry** — TMDb does not know these shows, so there is no forecast.
+
+Only \`latestAired\` is about an episode that has come out. \`inLibrary: true\` means
+their server has its file, so you may say it is there to play, and \`played: false\`
+means they have not played it yet. \`inLibrary: false\` means it aired but is not in
+their library yet. Conclude nothing from a show being absent: the unnamed list covers
+only followed shows and is capped (\`counts\` has the full totals). Call again with
+**series** to ask about that show.
 
 CRITICAL: getWatchHistory, getUserRatings, searchContent and semanticSearch all
 take **format**. Every result you get back as "cards" is shown to the user as a
@@ -121,6 +154,8 @@ CRITICAL: Interpret temporal language:
 | "Shows still running" | searchContent(status: "Continuing", type: "series") | Status filter |
 | "what mind-bending sci-fi do I have?" | searchMyRecommendations(concept: "mind-bending sci-fi", type: "movies") | Their library, ranked for them |
 | "what mind-bending sci-fi is in the library?" | semanticSearch(concept: "mind-bending sci-fi", type: "movies") | Impersonal lookup |
+| "something tense I have that's under 90 minutes" | searchMyRecommendations(concept: "tense", maxRuntime: 90) | Mood + stated limit |
+| "bleak sci-fi from the 70s rated at least 7 in the library" | semanticSearch(concept: "bleak", genre: "Science Fiction", yearMin: 1970, yearMax: 1979, minRating: 7, type: "movies") | Mood + stated limits |
 | "Do I have Inception?" | searchContent(query: "Inception") | Exact title |
 | "Movies from 2020-2023" | searchContent(yearMin: 2020, yearMax: 2023, type: "movies") | Year range |
 | "Recent Tom Hanks movies" | searchContent(actor: "Tom Hanks", yearMin: 2022, sortBy: "year", sortOrder: "desc", type: "movies") | Recent + actor |
@@ -145,6 +180,9 @@ CRITICAL: Interpret temporal language:
 | Intent | Tool |
 |--------|------|
 | "What have I watched?" (recent, unfiltered) | getWatchHistory() |
+| "What's coming next for the shows I follow?" | getUpcomingEpisodes() |
+| "When's the next episode of my shows?" | getUpcomingEpisodes() |
+| "When's the next episode of Severance?" | getUpcomingEpisodes(series: "Severance") |
 | "Which French film noir have I watched?" | semanticSearch(concept: "film noir", country: "France", watchStatus: "watched", type: "movies") |
 | "Have I watched any Kurosawa?" | searchContent(director: "Kurosawa", watchStatus: "watched") |
 | "The bleak thrillers I've seen" | semanticSearch(concept: "bleak thrillers", watchStatus: "watched") |

@@ -10,7 +10,9 @@ Click your **avatar** in the top bar and pick **Display**.
 
 ## Appearance
 
-**Light** or **Dark**. Light is a soft gray canvas with slate and mauve accents; dark is easier on the eyes in a dim room. The same switch is the sun/moon button in the top bar (in the avatar menu on a phone). The choice is remembered in **this browser**, not on your account, so a phone and a laptop can differ. Until you pick, the app is dark.
+**Light**, **Black** or **Dark**. Light has white cards on a pale page with cobalt accents. Black is the original near-black look. Dark is the dark side of Light: navy surfaces with the same cobalt accents, Manrope type, search field in the top bar and headings in the sidebar. The button with the sun or moon in the top bar (in the avatar menu on a phone) moves on to the next of the three. Until you pick, the app is Black.
+
+All of this is remembered in **this browser**, not on your account, so a phone and a laptop can differ. It changes nothing but how the app looks: your recommendations are not touched.
 
 ## Show Rating Badge on Library Posters
 

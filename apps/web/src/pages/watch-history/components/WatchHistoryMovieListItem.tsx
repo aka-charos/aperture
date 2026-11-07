@@ -132,7 +132,7 @@ export function WatchHistoryMovieListItem({
                   top: { xs: 4, md: 8 },
                   left: { xs: 4, md: 8 },
                   backgroundColor: alpha(theme.palette.primary.main, 0.9),
-                  color: 'white',
+                  color: 'surface.onBrand',
                   fontWeight: 600,
                   fontSize: { xs: '0.6rem', md: '0.7rem' },
                   height: { xs: 18, md: 22 },

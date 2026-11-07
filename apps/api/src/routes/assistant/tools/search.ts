@@ -17,10 +17,23 @@ import { annotateWatchedItems } from '../helpers/unwatched.js'
 import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
 import { normalizeCountryQuery } from '../helpers/countryMatch.js'
 import { briefResult, FORMAT_PARAM_DESCRIPTION } from './utils.js'
+import { keepNewTitles, mergeNearestByRank } from './semanticOrder.js'
+import {
+  describeTitleLimits,
+  hasTitleLimits,
+  joinNotes,
+  noFitNote,
+  NO_LIMITS,
+  readTitleLimits,
+  TITLE_LIMIT_PARAMS,
+  titleLimitsSql,
+  watchStatusCondition,
+  type ResolvedLimits,
+} from './titleLimits.js'
+import { resolveTitleLimits } from './titleLimitsQuery.js'
 import type { ContentCarouselI18nKey } from '../schemas/contentCarousel.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
 
 function searchContentTitleKey(
   searchQuery: string | undefined,
@@ -92,50 +105,6 @@ function formatContentItem(
   }
 }
 
-export type WatchStatus = 'all' | 'watched' | 'unwatched'
-
-/**
- * SQL predicate restricting rows to titles the user has (or has not) watched.
- *
- * The exclusion half already existed in several places; the INCLUSION half is
- * what makes "which French film noir have I watched" answerable at all. Before
- * it, the only history tool was getWatchHistory — most-recent-N in play order,
- * with no filter of any kind — so the model had to infer membership by eye from
- * a sample, and reported confident false negatives when the sample missed.
- *
- * `column` is the id column of the row being filtered, always QUALIFIED
- * ('movies.id' when the table is unaliased, 'm.id'/'s.id' when it is): the
- * subquery is correlated on it, and a bare `id` would bind to `wh.id` or
- * `ep.id` inside it and match nothing. A watched SERIES means at least one of
- * its episodes was played.
- *
- * Written as a correlated [NOT] EXISTS, not [NOT] IN over the viewer's history.
- * On an ANN query the NOT IN form made the planner seq-scan movies under a
- * hashed subplan and nested-loop it against the index scan, discarding 570k
- * rows to fill LIMIT 15 for a viewer with about 3,500 played films.
- *
- * Played is the operative word, and this docstring used to claim the bare
- * version matched "every other watched check in the codebase" — it matched
- * none of them. Favoriting writes a watch_history row, so asking whether one
- * exists answered "watched" for anything the viewer had merely saved.
- */
-function watchStatusCondition(
-  status: Exclude<WatchStatus, 'all'>,
-  isMovie: boolean,
-  column: string,
-  paramIdx: number
-): string {
-  const subquery = isMovie
-    ? `SELECT 1 FROM watch_history wh
-       WHERE wh.user_id = $${paramIdx} AND wh.movie_id = ${column}
-         AND ${WATCH_HISTORY_PLAYED_SQL}`
-    : `SELECT 1 FROM watch_history wh
-       JOIN episodes ep ON ep.id = wh.episode_id
-       WHERE wh.user_id = $${paramIdx} AND ep.series_id = ${column}
-         AND ${WATCH_HISTORY_PLAYED_SQL}`
-  return `${status === 'watched' ? 'EXISTS' : 'NOT EXISTS'} (${subquery})`
-}
-
 export interface SimilarItemsResult {
   items: ContentItem[]
   foundTitle: string
@@ -153,11 +122,18 @@ export interface SimilarItemsResult {
 export async function findSimilarItems(
   ctx: ToolContext,
   title: string,
-  opts?: { type?: 'movies' | 'series'; excludeWatched?: boolean; limit?: number }
+  opts?: {
+    type?: 'movies' | 'series'
+    excludeWatched?: boolean
+    limit?: number
+    /** Filtered in the scan rather than after it, so a narrow limit still fills. */
+    limits?: ResolvedLimits
+  }
 ): Promise<SimilarItemsResult> {
   const type = opts?.type
   const excludeWatched = opts?.excludeWatched ?? false
   const limit = opts?.limit ?? 15
+  const limits = opts?.limits ?? NO_LIMITS
 
   /**
    * The watched exclusion and the viewer's library scope are post-filters on the
@@ -253,11 +229,12 @@ export async function findSimilarItems(
     const params: unknown[] = excludeWatched
       ? [movie.id, modelId, embeddingStr, ctx.userId, limit]
       : [movie.id, modelId, embeddingStr, limit]
+    const limitSql = titleLimitsSql(limits, 'movie', 'm', binderFor(params))
 
     const similar = await scopedAnnQuery<MovieResult & { provider_item_id?: string }>(
       `SELECT m.id, m.title, m.year, m.genres, m.overview, ${displayRatingSql('m')} AS community_rating, m.poster_url, m.provider_item_id, m.directors
        FROM ${movieEmbeddingTable} e JOIN movies m ON m.id = e.movie_id
-       WHERE e.movie_id != $1 AND e.model = $2 ${watchedFilter}
+       WHERE e.movie_id != $1 AND e.model = $2 ${watchedFilter} ${limitSql}
          AND ${libraryScopeSql(ctx.scope, 'm', binderFor(params))}
        ORDER BY e.embedding <=> $3::halfvec
        LIMIT ${excludeWatched ? '$5' : '$4'}`,
@@ -287,6 +264,7 @@ export async function findSimilarItems(
     const params: unknown[] = excludeWatched
       ? [series.id, modelId, embeddingStr, ctx.userId, limit]
       : [series.id, modelId, embeddingStr, limit]
+    const limitSql = titleLimitsSql(limits, 'series', 's', binderFor(params))
 
     const similar = await scopedAnnQuery<SeriesResult & { provider_item_id?: string }>(
       `SELECT s.id, s.title, s.year, s.genres, s.network, s.overview, ${displayRatingSql('s')} AS community_rating, s.poster_url, s.provider_item_id, s.directors
@@ -294,7 +272,7 @@ export async function findSimilarItems(
        JOIN series s ON s.id = se.series_id
        WHERE se.series_id != $1
          AND se.model = $2
-         ${watchedFilter}
+         ${watchedFilter} ${limitSql}
          AND ${libraryScopeSql(ctx.scope, 's', binderFor(params))}
        ORDER BY se.embedding <=> $3::halfvec
        LIMIT ${excludeWatched ? '$5' : '$4'}`,
@@ -692,6 +670,7 @@ export function createSearchTools(ctx: ToolContext) {
               'because the noir part is a style (not searchable as text) and the French ' +
               'part is a fact about the row. Country or nationality both work.'
           ),
+        ...TITLE_LIMIT_PARAMS,
         limit: z
           .number()
           .optional()
@@ -711,15 +690,18 @@ export function createSearchTools(ctx: ToolContext) {
         country,
         limit = 15,
         format = 'cards',
+        ...limitParams
       }) => {
         try {
           const safeLimit = Math.min(limit ?? 15, 50)
+          const resolved = await resolveTitleLimits(ctx.scope, readTitleLimits(limitParams), type)
 
           // Generate embedding for the search concept using AI SDK
           const queryEmbedding = await ctx.embedding.embedOne(concept)
           const embeddingStr = `[${queryEmbedding.join(',')}]`
 
-          const items: ContentItem[] = []
+          const movieItems: ContentItem[] = []
+          const seriesItems: ContentItem[] = []
           // ContentItem folds the year into `subtitle`; a brief line wants it back.
           const yearById = new Map<string, number | null>()
           const seenTitles = new Set<string>() // Deduplicate by title
@@ -730,8 +712,8 @@ export function createSearchTools(ctx: ToolContext) {
           // Get model ID for database query (stored in db as string identifier)
           const modelId = ctx.embedding.setId
 
-          // Watch status, country and the viewer's library scope are all
-          // post-filters on the ANN scan, so the scan has to keep walking past
+          // Watch status, country, the stated limits and the viewer's library
+          // scope are all post-filters on the ANN scan, so the scan has to keep walking past
           // the default 40 rows to have anything left after them (the ef_search
           // invariant). scopedAnnQuery does that with an iterative scan on
           // pgvector 0.8+: measured live, 12 ms through the index, against a
@@ -748,6 +730,10 @@ export function createSearchTools(ctx: ToolContext) {
             const clauses: string[] = []
             const extra: unknown[] = []
             let idx = 4
+            const bind = (value: unknown) => {
+              extra.push(value)
+              return `$${idx++}`
+            }
             if (filterWatch) {
               clauses.push(`AND ${watchStatusCondition(watchStatus, isMovie, `${alias}.id`, idx)}`)
               extra.push(ctx.userId)
@@ -758,12 +744,8 @@ export function createSearchTools(ctx: ToolContext) {
               extra.push(`%${countryFilter}%`)
               idx++
             }
-            clauses.push(
-              `AND ${libraryScopeSql(ctx.scope, alias, (value) => {
-                extra.push(value)
-                return `$${idx++}`
-              })}`
-            )
+            clauses.push(titleLimitsSql(resolved, isMovie ? 'movie' : 'series', alias, bind))
+            clauses.push(`AND ${libraryScopeSql(ctx.scope, alias, bind)}`)
             return { clause: clauses.join(' '), extra }
           }
 
@@ -784,15 +766,10 @@ export function createSearchTools(ctx: ToolContext) {
               [embeddingStr, modelId, safeLimit + 5, ...extra]
             )
 
-            for (const m of movieResults.rows) {
-              const titleKey = m.title.toLowerCase()
-              // Skip if this is the excluded title or a duplicate
-              if (excludeLower && titleKey.includes(excludeLower)) continue
-              if (seenTitles.has(titleKey)) continue
-              seenTitles.add(titleKey)
+            for (const m of keepNewTitles(movieResults.rows, seenTitles, excludeLower)) {
               const playLink = buildPlayLink(ctx.mediaServer, m.provider_item_id, 'movie')
               yearById.set(m.id, m.year)
-              items.push(formatContentItem(m, 'movie', playLink))
+              movieItems.push(formatContentItem(m, 'movie', playLink))
             }
           }
 
@@ -813,34 +790,49 @@ export function createSearchTools(ctx: ToolContext) {
               [embeddingStr, modelId, safeLimit + 5, ...extra]
             )
 
-            for (const s of seriesResults.rows) {
-              const titleKey = s.title.toLowerCase()
-              // Skip if this is the excluded title or a duplicate
-              if (excludeLower && titleKey.includes(excludeLower)) continue
-              if (seenTitles.has(titleKey)) continue
-              seenTitles.add(titleKey)
+            for (const s of keepNewTitles(seriesResults.rows, seenTitles, excludeLower)) {
               const playLink = buildPlayLink(ctx.mediaServer, s.provider_item_id, 'series')
               yearById.set(s.id, s.year)
-              items.push(formatContentItem(s, 'series', playLink))
+              seriesItems.push(formatContentItem(s, 'series', playLink))
             }
           }
 
-          // Sort combined results by rating (since we can't compare similarity scores across tables)
-          items.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
-
-          // Limit final results
-          const finalItems = items.slice(0, safeLimit)
+          // Each half is nearest first already. The two tables share a vector
+          // space, but their distance distributions are two populations, so a
+          // shared sort would give whichever sits higher every slot; they merge
+          // by rank within their media type instead.
+          const finalItems = mergeNearestByRank(movieItems, seriesItems, safeLimit)
           await annotateWatchedItems(ctx.userId, finalItems)
 
+          // Empty under a limit is a different answer from empty, and "try a
+          // different description" would send the reader the wrong way.
+          const emptiedByLimits = finalItems.length === 0 && hasTitleLimits(resolved.limits)
+          const limitsNote = joinNotes(
+            emptiedByLimits ? noFitNote(describeTitleLimits(resolved.limits)) : null,
+            resolved.ignoredGenreNote
+          )
+
           if (format === 'brief') {
-            return briefResult(
-              `semantic-${Date.now()}`,
-              finalItems.map((i) => ({
-                name: i.name,
-                year: yearById.get(i.id) ?? null,
-                note: i.watched === true ? 'watched' : null,
-              }))
-            )
+            return {
+              ...briefResult(
+                `semantic-${Date.now()}`,
+                finalItems.map((i) => ({
+                  name: i.name,
+                  year: yearById.get(i.id) ?? null,
+                  note: i.watched === true ? 'watched' : null,
+                }))
+              ),
+              ...(limitsNote ? { limitsNote } : {}),
+            }
+          }
+
+          if (emptiedByLimits) {
+            return {
+              id: `semantic-empty-${Date.now()}`,
+              items: [],
+              descriptionKey: 'carouselLimitsNoneFit',
+              limitsNote,
+            }
           }
 
           if (finalItems.length === 0) {
@@ -849,6 +841,7 @@ export function createSearchTools(ctx: ToolContext) {
               items: [],
               descriptionKey: 'carouselSemanticEmpty',
               descriptionParams: { concept },
+              ...(limitsNote ? { limitsNote } : {}),
             }
           }
 
@@ -859,6 +852,7 @@ export function createSearchTools(ctx: ToolContext) {
             descriptionKey: 'carouselSemanticDesc',
             descriptionParams: { count: finalItems.length },
             items: finalItems,
+            ...(limitsNote ? { limitsNote } : {}),
           }
         } catch (err) {
           console.error('[semanticSearch] Error:', err)

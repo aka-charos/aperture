@@ -6,6 +6,7 @@ import type { Series, Episode, PaginationOptions, PaginatedResult, WatchedEpisod
 import type { JellyfinItem, JellyfinEpisode } from './types.js'
 import { mapJellyfinItemToSeries, mapJellyfinItemToEpisode } from './mappers.js'
 import { logger, type JellyfinProviderBase } from './base.js'
+import { readJellyfinItem } from './itemUpdates.js'
 import { mergeWatchedEpisodes } from '../watchHistoryHelpers.js'
 
 const EPISODE_WATCH_FIELDS =
@@ -93,10 +94,7 @@ export async function getSeriesById(
   seriesId: string
 ): Promise<Series | null> {
   try {
-    const item = await provider.fetch<JellyfinItem>(
-      `/Items/${seriesId}?Fields=Overview,Genres,CommunityRating,CriticRating,Studios,People,ProviderIds,Tags,Status,ChildCount,RecursiveItemCount`,
-      apiKey
-    )
+    const item = await readJellyfinItem<JellyfinItem>(provider, apiKey, seriesId)
     return mapJellyfinItemToSeries(item, provider.baseUrl)
   } catch {
     return null
@@ -173,10 +171,7 @@ export async function getEpisodeById(
   episodeId: string
 ): Promise<Episode | null> {
   try {
-    const item = await provider.fetch<JellyfinEpisode>(
-      `/Items/${episodeId}?Fields=Overview,CommunityRating,Path,MediaSources,People,SeriesName`,
-      apiKey
-    )
+    const item = await readJellyfinItem<JellyfinEpisode>(provider, apiKey, episodeId)
     return mapJellyfinItemToEpisode(item, provider.baseUrl)
   } catch {
     return null

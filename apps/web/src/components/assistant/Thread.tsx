@@ -208,7 +208,7 @@ function UserMessage() {
             borderStartEndRadius: 0,
           }}
         >
-          <Typography variant="body1" sx={{ color: '#fff' }}>
+          <Typography variant="body1" sx={{ color: 'surface.onBrand' }}>
             <MessagePrimitive.Content />
           </Typography>
         </Paper>
@@ -691,7 +691,7 @@ function Composer() {
                 type="submit"
                 sx={{
                   bgcolor: theme.palette.primary.main,
-                  color: '#fff',
+                  color: 'surface.onBrand',
                   width: 40,
                   height: 40,
                   '&:hover': {
@@ -714,7 +714,7 @@ function Composer() {
                 aria-label={t('assistant.tooltipStop')}
                 sx={{
                   bgcolor: theme.palette.primary.main,
-                  color: '#fff',
+                  color: 'surface.onBrand',
                   width: 40,
                   height: 40,
                   '&:hover': {
@@ -783,7 +783,7 @@ function HistoricalUserMessage({ message }: { message: HistoricalMessage }) {
           borderStartEndRadius: 0,
         }}
       >
-        <Typography variant="body1" sx={{ color: '#fff' }}>
+        <Typography variant="body1" sx={{ color: 'surface.onBrand' }}>
           {message.content}
         </Typography>
       </Paper>

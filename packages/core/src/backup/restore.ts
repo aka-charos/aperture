@@ -17,7 +17,7 @@
  * EXCLUSIVE until commit, so every read of a table the dump replaces, `sessions`
  * included, WAITS until the restore finishes rather than failing. The auth hook
  * reads `sessions` on every request, so without `isDatabaseRestoring` a page left
- * open would fill the connection pool with waiting lookups. See F-182.
+ * open would fill the connection pool with waiting lookups. See F-187.
  *
  * The transaction also has to get those locks, and a running job can hold one for
  * a long time. Nothing can cancel a restore and the API answers 503 until it ends,

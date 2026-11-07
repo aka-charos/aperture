@@ -17,14 +17,14 @@ Admin console → **Appearance** → **Theme colours** (`/admin/appearance/color
 
 Only the **`main` shade** of each colour is yours — MUI derives the lighter and darker variants and contrast text, and the brand **gradients** (buttons, badges, highlights, header accents) are recomputed from your pair. Deliberately fixed: semantic colours (error/warning/success/info) and all backgrounds.
 
-## Light and Dark Appearances
+## Appearances
 
-The app has two appearances, and each viewer picks one for their browser (the sun/moon button in the top bar, or Settings → Display). The dark one is the default.
+Each viewer picks **Light**, **Black** or **Dark** for their browser (the sun or moon button in the top bar, or Settings → Display). Black is the default.
 
-- With the **default pair** (indigo and purple), the light appearance uses its own accents instead, a slate teal and a deep mauve chosen to read on its gray canvas.
-- **Save any other pair** and both appearances use it exactly as saved. Check that your colours read on both a dark and a light background; a colour bright enough for the dark canvas can be too pale on the light one.
+- With the **default pair** (indigo and purple), Black uses it as is, and Light and Dark use their own cobalt instead.
+- **Save any other pair** and all three use it exactly as saved. Check that your colours read on both a dark and a light background; a colour bright enough for a dark canvas can be too pale on the light one.
 
-**Reset to default** puts the default pair back, which also gives the light appearance its own accents again.
+**Reset to default** puts the default pair back, which also gives Light and Dark their own cobalt again.
 
 ---
 

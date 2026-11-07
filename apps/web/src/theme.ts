@@ -1,7 +1,21 @@
 import { createTheme, alpha, type Theme, type ThemeOptions, type Shadows, type TypographyVariantsOptions } from '@mui/material/styles'
 
-/** The two appearances. Dark is the original; light is the calm, bordered one. */
+/** MUI's two palette modes. Light and Dark are Studio's schemes; Black is `palette` below. */
 export type ColorMode = 'light' | 'dark'
+
+/**
+ * The three appearances a viewer chooses between. Black is the original
+ * near-black look; Light and Dark are the two sides of Studio (`STUDIO_SCHEMES`).
+ */
+export type Appearance = 'light' | 'black' | 'dark'
+export const APPEARANCES: readonly Appearance[] = ['light', 'black', 'dark']
+
+/**
+ * The look a built theme has, which a component that must differ asks through
+ * `theme.aperture.name` (a colour that differs is a token instead). 'graphite'
+ * is the former light mode, which nothing on screen uses; see `createGraphiteTheme`.
+ */
+export type AppliedTheme = 'black' | 'studio' | 'graphite'
 
 /**
  * Colours that are not part of MUI's palette shape but differ between the two
@@ -41,6 +55,13 @@ export interface SurfaceTokens {
    * mode is already light, and its plate is a base step, never white.
    */
   logoPlate: string
+  /**
+   * The label on a primary or secondary fill, poster badges included. White in
+   * Black; Dark's accents are pale and need dark type.
+   */
+  onBrand: string
+  /** The same for a success, warning, error or information fill. */
+  onStatus: string
 }
 
 /** The main sidebar's selected entry. */
@@ -65,6 +86,12 @@ export interface GradientTokens {
 }
 
 declare module '@mui/material/styles' {
+  interface Theme {
+    aperture: { name: AppliedTheme }
+  }
+  interface ThemeOptions {
+    aperture?: { name: AppliedTheme }
+  }
   interface Palette {
     surface: SurfaceTokens
     nav: NavTokens
@@ -163,7 +190,12 @@ export const palette = {
 }
 
 /**
- * The light mode, laid out the way a light palette guide lays out a site: two
+ * The FORMER light mode (Graphite), kept to borrow from when improving Studio's
+ * light. Nothing on screen uses it: only `createGraphiteTheme` reaches this.
+ * Everything below that says "the light mode" down to `buildLightOptions` means
+ * this one.
+ *
+ * It is laid out the way a light palette guide lays out a site: two
  * ACCENT colours for calls to action (near-black, and charcoal as the second
  * accent), the CONTRAST colours from dark to pale for text and state
  * (near-black ink, a dark grey for secondary text, green, a deeper grey),
@@ -336,9 +368,11 @@ const DARK_SURFACES: SurfaceTokens = {
   fillDeep: '#212121',
   placeholder: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
   logoPlate: 'rgba(255, 255, 255, 0.92)',
+  onBrand: '#ffffff',
+  onStatus: '#ffffff',
 }
 
-function lightSurfaces(s: LightScheme): SurfaceTokens {
+function lightSurfaces(s: LightScheme, onBrand: string): SurfaceTokens {
   return {
     raised: s.raised,
     raisedHover: s.raisedHover,
@@ -355,6 +389,8 @@ function lightSurfaces(s: LightScheme): SurfaceTokens {
     fillDeep: s.fillDeep,
     placeholder: `linear-gradient(135deg, ${s.placeholder[0]} 0%, ${s.placeholder[1]} 100%)`,
     logoPlate: s.raised,
+    onBrand,
+    onStatus: s.onAccent,
   }
 }
 
@@ -432,10 +468,6 @@ export function applyThemeColorOverrides(overrides: ThemeColorOverrides | null |
   )
 }
 
-function buildThemeOptions(mode: ColorMode): ThemeOptions {
-  return mode === 'light' ? buildLightOptions(LIGHT_SCHEME) : buildDarkOptions()
-}
-
 const SANS_FONT = '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
 
 /**
@@ -511,7 +543,7 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
       mode: 'light',
       ...brand,
       ...lightPalette,
-      surface: lightSurfaces(s),
+      surface: lightSurfaces(s, brand.primary.contrastText),
       nav: lightNav(s),
       // TEXT on a light surface, so darker than the dark mode's pair; sage for
       // series, the cool contrast colour on a warm page.
@@ -703,7 +735,7 @@ function buildLightOptions(s: LightScheme): ThemeOptions {
   }
 }
 
-function buildDarkOptions(): ThemeOptions {
+function buildBlackOptions(): ThemeOptions {
   return {
     palette: {
       mode: 'dark',
@@ -818,6 +850,353 @@ function buildDarkOptions(): ThemeOptions {
 }
 
 /**
+ * Studio: cobalt accents, Manrope type, and surfaces that separate by a border
+ * rather than a shadow. Its two schemes are the Light and Dark appearances. One
+ * scheme per appearance, so a colour is changed in one place.
+ *
+ * Unlike Graphite, Studio's light has white cards on a pale canvas, so the
+ * "nothing lighter than the page" rule in theme.test.ts stays Graphite's; the
+ * contrast rule holds for both.
+ */
+interface StudioScheme {
+  mode: ColorMode
+  /** Behind everything. */
+  canvas: string
+  /** Cards, panels, the sidebar and the app bar. */
+  sheet: string
+  /** Cards sitting inside a panel, skeletons. */
+  raised: string
+  raisedHover: string
+  /** Dividers, card outlines and progress tracks. */
+  line: string
+  /** Borders one step stronger than the line. */
+  lineStrong: string
+  ink: string
+  muted: string
+  /** Accent as TEXT and marks: primary.main. */
+  accent: string
+  accentLight: string
+  /** Accent as a FILL under white: contained buttons, the former gradients. */
+  action: string
+  actionHover: string
+  /** The label on a pale accent or status fill. */
+  onAccent: string
+  secondary: string
+  secondaryDark: string
+  success: string
+  error: string
+  warning: string
+  /** The series label, readable as text on this appearance's surfaces. */
+  series: string
+  tooltip: string
+  /** How heavy a floating surface's black shadow is. */
+  shadowDialog: number
+  shadowMenu: number
+}
+
+const STUDIO_SCHEMES: Record<ColorMode, StudioScheme> = {
+  dark: {
+    mode: 'dark',
+    canvas: '#0b101c',
+    sheet: '#131b2a',
+    raised: '#1b2538',
+    raisedHover: '#222d43',
+    line: '#28334a',
+    lineStrong: '#3a4763',
+    ink: '#f3f6ff',
+    muted: '#a2afc6',
+    accent: '#87a5ff',
+    accentLight: '#b1c4ff',
+    action: '#3f67f4',
+    actionHover: '#5379ff',
+    onAccent: '#0b101c',
+    secondary: '#b7d6ff',
+    secondaryDark: '#5379ff',
+    success: '#b4e477',
+    error: '#ff979c',
+    warning: '#f6ca78',
+    series: '#34d3a6',
+    tooltip: '#1b2538',
+    shadowDialog: 0.5,
+    shadowMenu: 0.35,
+  },
+  light: {
+    mode: 'light',
+    canvas: '#f1f4fa',
+    sheet: '#ffffff',
+    raised: '#e8edf7',
+    raisedHover: '#dee5f2',
+    line: '#d6dfed',
+    lineStrong: '#b9c5d9',
+    ink: '#14213b',
+    muted: '#53647f',
+    accent: '#254edb',
+    accentLight: '#5778ee',
+    action: '#294fe5',
+    actionHover: '#2343c7',
+    onAccent: '#ffffff',
+    secondary: '#315c91',
+    secondaryDark: '#244670',
+    success: '#49741b',
+    error: '#bd233b',
+    warning: '#895500',
+    series: '#0f6e66',
+    tooltip: '#14213b',
+    shadowDialog: 0.15,
+    shadowMenu: 0.12,
+  },
+}
+
+/**
+ * Studio's brand colours. An admin's pair replaces both accents here too, by
+ * the same rule as `lightBrand`: the default pair is what "no brand colour"
+ * looks like on the wire, and every theme answers it with its own.
+ */
+function studioBrand(s: StudioScheme) {
+  if (!brandPairIsDefault()) {
+    return {
+      primary: { ...palette.primary },
+      secondary: { ...palette.secondary },
+      action: palette.primary.main,
+      actionHover: palette.primary.dark,
+      onAction: palette.primary.contrastText,
+      gradient: gradientTokens(palette.primary, palette.secondary),
+    }
+  }
+  const flat = `linear-gradient(135deg, ${s.action} 0%, ${s.action} 100%)`
+  return {
+    primary: { main: s.accent, light: s.accentLight, dark: s.action, contrastText: s.onAccent },
+    secondary: { ...deriveShades(s.secondary), dark: s.secondaryDark, contrastText: s.onAccent },
+    action: s.action,
+    actionHover: s.actionHover,
+    onAction: '#ffffff',
+    // Studio's calls to action are one flat colour under white. Still written as
+    // gradients because a reader may set them as a background image.
+    gradient: { primaryToSecondary: flat, primary: flat, secondary: flat },
+  }
+}
+
+/** Manrope draws Latin, Cyrillic and Greek; anything else falls through to Inter. */
+const STUDIO_FONT = '"Manrope", "Inter", "Roboto", sans-serif'
+
+/**
+ * Every reading size is Black's (`typographyFor`, or MUI's default where that
+ * names none), and a test holds them equal: moving between appearances must not
+ * shrink the text. Studio differs in face, weight and spacing only. Buttons are
+ * the one exception, a step up from Black's, whose smaller size exists only
+ * because monospace sets wide.
+ */
+const STUDIO_TYPOGRAPHY: TypographyVariantsOptions = {
+  fontFamily: STUDIO_FONT,
+  fontFamilyMonospace: MONO_FONT,
+  h1: { fontSize: '2.5rem', fontWeight: 800, letterSpacing: '-0.045em' },
+  h2: { fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.04em' },
+  h3: { fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.035em' },
+  h4: { fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.25 },
+  h5: { fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.025em' },
+  h6: { fontSize: '1rem', fontWeight: 700, letterSpacing: '-0.02em' },
+  subtitle1: { fontWeight: 700 },
+  subtitle2: { fontWeight: 700 },
+  body1: { lineHeight: 1.6 },
+  body2: { lineHeight: 1.55 },
+  caption: { lineHeight: 1.5 },
+  button: { fontSize: '0.875rem', fontWeight: 700, textTransform: 'none' },
+  overline: { letterSpacing: '0.13em', fontWeight: 800 },
+}
+
+function studioSurfaces(s: StudioScheme, onBrand: string): SurfaceTokens {
+  return {
+    raised: s.raised,
+    raisedHover: s.raisedHover,
+    glass: alpha(s.sheet, 0.96),
+    // The canvas colour exactly, as in Graphite: a title page opened in a dialog
+    // fades its backdrop into heroFade, and any other tone here leaves a band.
+    glassStrong: s.canvas,
+    panel: alpha(s.sheet, 0.98),
+    hairline: s.line,
+    subtleBorder: s.lineStrong,
+    heroFade: s.canvas,
+    heroTextShadow: 'none',
+    fill: s.line,
+    fillDeep: s.raised,
+    placeholder: `linear-gradient(135deg, ${s.raised} 0%, ${s.canvas} 100%)`,
+    // Logos are mostly dark marks on transparency, so only the dark appearance
+    // needs a pale plate under them.
+    logoPlate: s.mode === 'dark' ? alpha(s.ink, 0.92) : s.raised,
+    onBrand,
+    onStatus: s.onAccent,
+  }
+}
+
+function buildStudioOptions(s: StudioScheme): ThemeOptions {
+  const brand = studioBrand(s)
+  const accent = brand.primary.main
+  return {
+    palette: {
+      mode: s.mode,
+      primary: brand.primary,
+      secondary: brand.secondary,
+      background: { default: s.canvas, paper: s.sheet },
+      text: { primary: s.ink, secondary: s.muted },
+      divider: s.line,
+      action: { hover: alpha(accent, 0.07), selected: alpha(accent, 0.13) },
+      success: { main: s.success, contrastText: s.onAccent },
+      error: { main: s.error, contrastText: s.onAccent },
+      warning: { main: s.warning, contrastText: s.onAccent },
+      info: { main: s.accent, contrastText: s.onAccent },
+      surface: studioSurfaces(s, brand.primary.contrastText),
+      nav: {
+        selectedBg: alpha(accent, 0.13),
+        selectedHoverBg: alpha(accent, 0.18),
+        selectedText: accent,
+        selectedIcon: accent,
+      },
+      mediaType: { movie: accent, series: s.series },
+      gradient: brand.gradient,
+    },
+    shape: { borderRadius: 6 },
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: { backgroundColor: s.canvas, scrollbarColor: `${s.line} ${s.canvas}` },
+          'body::-webkit-scrollbar, body *::-webkit-scrollbar': { width: 8, height: 8 },
+          'body::-webkit-scrollbar-thumb, body *::-webkit-scrollbar-thumb': {
+            borderRadius: 8,
+            backgroundColor: s.line,
+          },
+          'body::-webkit-scrollbar-track, body *::-webkit-scrollbar-track': { backgroundColor: s.canvas },
+          '::selection': { backgroundColor: alpha(accent, 0.25) },
+          ...MONO_ELEMENTS,
+        },
+      },
+      MuiPaper: {
+        styleOverrides: { root: { backgroundImage: 'none' }, outlined: { borderColor: s.line } },
+      },
+      MuiCard: {
+        styleOverrides: {
+          root: { backgroundImage: 'none', borderRadius: 8, border: `1px solid ${s.line}`, boxShadow: 'none' },
+        },
+      },
+      MuiCardContent: {
+        styleOverrides: { root: { padding: 20, '&:last-child': { paddingBottom: 20 } } },
+      },
+      MuiButton: {
+        defaultProps: { disableElevation: true },
+        styleOverrides: {
+          root: { borderRadius: 5, minHeight: 36, paddingInline: 14 },
+          // The app's dense rows use small buttons; 36px would change their height.
+          sizeSmall: { minHeight: 30, paddingInline: 10, fontSize: '0.8125rem' },
+          containedPrimary: {
+            backgroundColor: brand.action,
+            color: brand.onAction,
+            '&:hover': { backgroundColor: brand.actionHover },
+          },
+          outlined: {
+            borderColor: s.line,
+            '&:hover': { borderColor: accent, backgroundColor: alpha(accent, 0.06) },
+          },
+        },
+      },
+      MuiIconButton: { styleOverrides: { root: { borderRadius: 5 } } },
+      MuiToggleButton: {
+        styleOverrides: {
+          root: { textTransform: 'none', fontWeight: 700, borderColor: s.line, borderRadius: 4 },
+        },
+      },
+      MuiTab: {
+        styleOverrides: {
+          root: { textTransform: 'none', fontWeight: 700, minHeight: 46, fontSize: '0.875rem' },
+        },
+      },
+      MuiTabs: { styleOverrides: { indicator: { height: 2 } } },
+      MuiChip: {
+        styleOverrides: { root: { borderRadius: 4, fontWeight: 600 } },
+      },
+      MuiDrawer: {
+        styleOverrides: { paper: { backgroundColor: s.sheet, borderInlineEnd: `1px solid ${s.line}` } },
+      },
+      MuiAppBar: {
+        defaultProps: { color: 'inherit', elevation: 0 },
+        styleOverrides: {
+          root: {
+            backgroundColor: s.sheet,
+            color: s.ink,
+            backgroundImage: 'none',
+            borderBottom: `1px solid ${s.line}`,
+            boxShadow: 'none',
+          },
+        },
+      },
+      MuiListItemButton: {
+        styleOverrides: {
+          root: {
+            borderRadius: 5,
+            marginInline: 8,
+            '&.Mui-selected': {
+              backgroundColor: alpha(accent, 0.13),
+              color: accent,
+              '&:hover': { backgroundColor: alpha(accent, 0.18) },
+            },
+          },
+        },
+      },
+      MuiOutlinedInput: {
+        defaultProps: { notched: true },
+        styleOverrides: {
+          root: { borderRadius: 5, backgroundColor: alpha(s.canvas, 0.55) },
+          notchedOutline: { borderColor: s.line },
+        },
+      },
+      MuiInputLabel: { defaultProps: { shrink: true }, styleOverrides: { root: { color: s.muted } } },
+      MuiTableCell: {
+        styleOverrides: {
+          root: { borderBottomColor: s.line },
+          head: { color: s.muted, letterSpacing: '0.04em', fontWeight: 700 },
+        },
+      },
+      MuiTableRow: {
+        styleOverrides: {
+          root: { '&.MuiTableRow-hover:hover': { backgroundColor: alpha(accent, 0.04) } },
+        },
+      },
+      MuiDialog: {
+        styleOverrides: {
+          paper: {
+            borderRadius: 9,
+            backgroundImage: 'none',
+            border: `1px solid ${s.line}`,
+            boxShadow: `0 24px 90px ${alpha('#000', s.shadowDialog)}`,
+          },
+        },
+      },
+      MuiDialogTitle: { styleOverrides: { root: { fontWeight: 800, letterSpacing: '-0.025em' } } },
+      MuiMenu: {
+        styleOverrides: {
+          paper: {
+            border: `1px solid ${s.line}`,
+            boxShadow: `0 10px 40px ${alpha('#000', s.shadowMenu)}`,
+          },
+        },
+      },
+      MuiTooltip: {
+        styleOverrides: {
+          tooltip: { backgroundColor: s.tooltip, color: STUDIO_SCHEMES.dark.ink, fontSize: '0.75rem' },
+        },
+      },
+      MuiAlert: { styleOverrides: { root: { borderRadius: 5 } } },
+      MuiLinearProgress: {
+        styleOverrides: {
+          root: { backgroundColor: s.line, borderRadius: 2 },
+          bar: { borderRadius: 2 },
+        },
+      },
+      MuiSkeleton: { styleOverrides: { root: { backgroundColor: s.raised } } },
+      MuiLink: { styleOverrides: { root: { textUnderlineOffset: '3px' } } },
+    },
+  }
+}
+
+/**
  * Hero backdrops (a title's page, a person's, a studio's) sit under the page's
  * own text. In the dark mode the image is dimmed and fades into near-black under
  * light text; in the light mode it stays bright and washes into the sand canvas
@@ -849,20 +1228,26 @@ export function backdropFullFade(theme: Theme): string {
 /** The palette colours a component may borrow for decoration. */
 export type DecorativeTone = 'primary' | 'secondary' | 'info' | 'success' | 'warning' | 'error'
 
-/**
- * A palette colour used as DECORATION (the eye beside a watch count, the star
- * beside a rating, a red heart), not to say something. The dark mode keeps the
- * colour; the light mode draws it in the secondary text colour, so its icons and
- * actions read black and white. A colour that carries meaning (a failed job, a
- * live state) is asked for directly and kept in both modes. For an sx `color`.
- */
-export function decorativeColor(tone: DecorativeTone): (theme: Theme) => string {
-  return (theme) => (theme.palette.mode === 'light' ? theme.palette.text.secondary : theme.palette[tone].main)
+/** Graphite keeps to black and white. */
+function isGraphite(theme: Theme): boolean {
+  return theme.aperture.name === 'graphite'
 }
 
-/** The same rule for a Button's `color` prop: neutral in the light mode. */
+/**
+ * A palette colour used as DECORATION (the eye beside a watch count, the star
+ * beside a rating, a red heart), not to say something. Graphite draws it in the
+ * secondary text colour, so its icons and actions read black and white; every
+ * other appearance keeps the colour. A colour that carries meaning (a failed
+ * job, a live state) is asked for directly and kept in all of them. For an sx
+ * `color`.
+ */
+export function decorativeColor(tone: DecorativeTone): (theme: Theme) => string {
+  return (theme) => (isGraphite(theme) ? theme.palette.text.secondary : theme.palette[tone].main)
+}
+
+/** The same rule for a Button's `color` prop: neutral in Graphite. */
 export function decorativeButtonColor(theme: Theme, tone: DecorativeTone): DecorativeTone | 'inherit' {
-  return theme.palette.mode === 'light' ? 'inherit' : tone
+  return isGraphite(theme) ? 'inherit' : tone
 }
 
 /** Shown where a hero has no image at all. */
@@ -877,17 +1262,39 @@ export function stageGlow(theme: Theme): string {
 }
 
 /**
- * The colour the browser's own chrome is told for each mode (the phone address
- * bar, through `<meta name="theme-color">`): the light mode's sheet, which the
- * app bar is drawn in, and the dark mode's page background. Read from the theme's
- * own values so a palette change cannot leave the address bar behind.
+ * The colour the browser's own chrome is told for each appearance (the phone
+ * address bar, through `<meta name="theme-color">`): for Light and Dark their
+ * sheet, which the app bar is drawn in, and for Black its page background. Read
+ * from the theme's own values so a palette change cannot leave the address bar
+ * behind.
  */
-export function documentChromeColor(mode: ColorMode): string {
-  return mode === 'light' ? LIGHT_SCHEME.sheet : palette.background.default
+export function documentChromeColor(appearance: Appearance): string {
+  return appearance === 'black' ? palette.background.default : STUDIO_SCHEMES[appearance].sheet
 }
 
-export function createAppTheme(direction: 'ltr' | 'rtl', mode: ColorMode = 'dark', language = 'en'): Theme {
-  return createTheme({ ...buildThemeOptions(mode), typography: typographyFor(language), direction })
+export function createAppTheme(direction: 'ltr' | 'rtl', appearance: Appearance = 'black', language = 'en'): Theme {
+  if (appearance === 'black') {
+    return createTheme({ ...buildBlackOptions(), typography: typographyFor(language), direction, aperture: { name: 'black' } })
+  }
+  return createTheme({
+    ...buildStudioOptions(STUDIO_SCHEMES[appearance]),
+    typography: STUDIO_TYPOGRAPHY,
+    direction,
+    aperture: { name: 'studio' },
+  })
+}
+
+/**
+ * The former light mode, whole. No screen calls this: it stays buildable so its
+ * tests keep it honest while parts of it may yet be borrowed for Studio's light.
+ */
+export function createGraphiteTheme(direction: 'ltr' | 'rtl', language = 'en'): Theme {
+  return createTheme({
+    ...buildLightOptions(LIGHT_SCHEME),
+    typography: typographyFor(language),
+    direction,
+    aperture: { name: 'graphite' },
+  })
 }
 
 /** @deprecated Prefer `createAppTheme('ltr')` from RtlProviders; kept for Storybook or tests. */

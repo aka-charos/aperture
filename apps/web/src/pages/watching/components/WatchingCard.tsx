@@ -138,7 +138,7 @@ export function WatchingCard({ series, onRemove }: WatchingCardProps) {
                 sx={{
                   opacity: 0,
                   ...SHOW_WITHOUT_HOVER,
-                  color: '#fff',
+                  color: 'surface.onBrand',
                   bgcolor: alpha(theme.palette.primary.main, 0.95),
                   border: '1.5px solid rgba(255, 255, 255, 0.75)',
                   boxShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',

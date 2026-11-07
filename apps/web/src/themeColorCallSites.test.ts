@@ -46,7 +46,7 @@ const DARK_ONLY: Array<{ pattern: RegExp; what: string }> = [
  */
 const ALLOWED: Record<string, string> = {
   'theme.ts': 'defines the dark mode itself',
-  'components/SimilarityGraph/SimilarityGraph.tsx': 'draws inside a DarkStage in both modes',
+  'components/SimilarityGraph/SimilarityGraph.tsx': 'draws inside a DarkStage in every appearance',
 }
 
 function sourceFiles(dir: string): string[] {
@@ -113,6 +113,58 @@ test('page surfaces take their colours from the theme', () => {
   )
   const stale = Object.keys(ALLOWED).filter((rel) => !seenAllowed.has(rel))
   assert.deepEqual(stale, [], `Exemptions naming files that no longer exist: ${stale.join(', ')}`)
+})
+
+/**
+ * A label on a palette fill reads the label token, because white does not work
+ * on every theme's fills: Studio's dark accents and status colours are pale. A
+ * heuristic: it looks at the fill's own line and its neighbours, which is where
+ * the two sit when they are one element's style, so an overlay on artwork that
+ * only turns coloured on hover (white set further up) is not flagged.
+ */
+const PALETTE_FILL = /(bgcolor|backgroundColor|background)\s*:.*\b(primary|secondary|success|error|warning|info)\b['\]]*\.(main|dark)/
+const WHITE_LABEL = /(?<![a-zA-Z])color\s*:\s*['"`](white|#fff|#ffffff|common\.white)['"`]/
+
+/** Every palette fill labelled in hard white in a source text, as line numbers. */
+export function findWhiteOnPaletteFill(source: string): number[] {
+  const lines = source.split('\n')
+  const found: number[] = []
+  lines.forEach((line, i) => {
+    if (/^\s*(\/\/|\*)/.test(line) || !PALETTE_FILL.test(line)) return
+    // A hover fill written on one line carries its own label; its neighbours
+    // are the resting state's.
+    const near = line.includes("'&:") ? [line] : [lines[i - 1], line, lines[i + 1]]
+    if (near.some((text) => text !== undefined && WHITE_LABEL.test(text))) found.push(i + 1)
+  })
+  return found
+}
+
+test('the label scanner catches a white label on a fill and leaves overlays alone', () => {
+  assert.deepEqual(findWhiteOnPaletteFill("sx={{ bgcolor: 'primary.main', color: 'white' }}"), [1])
+  assert.deepEqual(findWhiteOnPaletteFill("bgcolor: alpha(theme.palette.success.main, 0.9),\ncolor: '#fff',"), [1])
+  assert.deepEqual(findWhiteOnPaletteFill("backgroundColor: 'primary.main',\ncolor: 'surface.onBrand',"), [])
+  assert.deepEqual(findWhiteOnPaletteFill("'&:hover': { backgroundColor: 'primary.main', color: 'white' },"), [1])
+  assert.deepEqual(findWhiteOnPaletteFill("color: 'common.white',\n'&:hover': { bgcolor: 'primary.main', color: 'surface.onBrand' },"), [])
+  // White set for the overlay's resting state, the fill only on hover.
+  assert.deepEqual(
+    findWhiteOnPaletteFill("backgroundColor: 'rgba(0, 0, 0, 0.6)',\ncolor: 'white',\n'&:hover': {\nbackgroundColor: 'error.main',"),
+    []
+  )
+})
+
+test('a label on a palette fill reads the token, never hard white', () => {
+  const offenders: string[] = []
+  for (const [root, label] of [
+    [SRC, ''],
+    [UI_SRC, '@aperture/ui/'],
+  ] as const) {
+    for (const file of sourceFiles(root)) {
+      for (const line of findWhiteOnPaletteFill(readFileSync(file, 'utf8'))) {
+        offenders.push(`${label}${relative(root, file).replace(/\\/g, '/')}:${line}`)
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], "White on a palette fill; use 'surface.onBrand' or 'surface.onStatus':\n" + offenders.join('\n'))
 })
 
 /**

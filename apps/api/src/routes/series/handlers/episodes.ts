@@ -6,7 +6,7 @@
  * episodes are actually on the media server).
  */
 import type { FastifyInstance } from 'fastify'
-import { getUpcomingEpisodeForSeries } from '@aperture/core/watching'
+import { getUpcomingEpisodeForSeries, isEndedStatus } from '@aperture/core/watching'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth } from '../../../plugins/auth.js'
 import { titleInScope } from '../../../lib/viewerScope.js'
@@ -18,8 +18,7 @@ import type { EpisodeRow, SeasonAvailability, TmdbSeasonSummary } from '../types
  * effectiveSeriesStatus in routes/watching — anything not ended counts as airing.
  */
 function hasEnded(mediaServerStatus: string | null, tmdbStatus: string | null): boolean {
-  const status = tmdbStatus || mediaServerStatus
-  return status === 'Ended' || status === 'Canceled'
+  return isEndedStatus(tmdbStatus || mediaServerStatus)
 }
 
 export function registerEpisodesHandler(fastify: FastifyInstance) {

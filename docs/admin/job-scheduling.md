@@ -7,7 +7,7 @@ Configure when background jobs run — per job, from the jobs console.
 Admin console → **Operations** → **Jobs** (`/admin/ops/jobs`):
 
 - **Gear / "Configure schedule"** on any job card opens its schedule dialog
-- The **Schedule tab** lists all 40 jobs — including the card-less ones (`sync-users`, `refresh-assistant-suggestions`, `backup-database`, `cleanup-auth-state`, `refresh-library-gaps`, `refresh-series-gaps`) — with an **Enabled toggle**, next run, last run, duration, and status
+- The **Schedule tab** lists all 41 jobs — including the card-less ones (`sync-users`, `refresh-assistant-suggestions`, `backup-database`, `cleanup-auth-state`, `refresh-library-gaps`, `refresh-series-gaps`) — with an **Enabled toggle**, next run, last run, duration, and status
 
 ## Schedule Types
 

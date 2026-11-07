@@ -80,30 +80,28 @@ async function visibleIds(
 }
 
 /**
- * Drop the cards the viewer may not open. Fails CLOSED: this is a permission,
- * so a lookup that throws removes every card rather than showing them all —
- * the opposite of the unwatched filter, which is a preference.
+ * Drop the cards the viewer may not open. Fails CLOSED: this is a permission, so
+ * a lookup that throws shows no card, the opposite of the unwatched filter, which
+ * is a preference. It throws rather than returning an empty list, which would
+ * read as "no results" under a result object still describing the cards it had:
+ * `withToolErrorHandling` turns the throw into an error the model and reader see.
  */
 export async function filterItemsToScope(scope: LibraryScope, items: ContentItem[]): Promise<ContentItem[]> {
   if (items.length === 0) return items
-  try {
-    const keys = items.map(cardKey)
-    const movieIds = keys.flatMap((key) => (key?.table === 'movies' ? [key.id] : []))
-    const seriesIds = keys.flatMap((key) => (key?.table === 'series' ? [key.id] : []))
-    const [movies, series] = await Promise.all([
-      visibleIds(scope, 'movies', movieIds),
-      visibleIds(scope, 'series', seriesIds),
-    ])
-    return items.filter((_, i) => {
-      const key = keys[i]
-      // Not a library title (a person, a web-only pick with no library id): the
-      // scope has nothing to say about it.
-      if (!key || !UUID.test(key.id)) return true
-      return key.table === 'movies' ? movies.has(key.id) : series.has(key.id)
-    })
-  } catch {
-    return []
-  }
+  const keys = items.map(cardKey)
+  const movieIds = keys.flatMap((key) => (key?.table === 'movies' ? [key.id] : []))
+  const seriesIds = keys.flatMap((key) => (key?.table === 'series' ? [key.id] : []))
+  const [movies, series] = await Promise.all([
+    visibleIds(scope, 'movies', movieIds),
+    visibleIds(scope, 'series', seriesIds),
+  ])
+  return items.filter((_, i) => {
+    const key = keys[i]
+    // Not a library title (a person, a web-only pick with no library id): the
+    // scope has nothing to say about it.
+    if (!key || !UUID.test(key.id)) return true
+    return key.table === 'movies' ? movies.has(key.id) : series.has(key.id)
+  })
 }
 
 export function withLibraryScope<T extends ToolSet>(tools: T, scope: LibraryScope): T {

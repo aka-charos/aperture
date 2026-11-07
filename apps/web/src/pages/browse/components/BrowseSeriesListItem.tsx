@@ -181,7 +181,7 @@ export function BrowseSeriesListItem({
                 top: 8,
                 right: 8,
                 backgroundColor: alpha(theme.palette.secondary.main, 0.9),
-                color: 'white',
+                color: 'surface.onBrand',
                 fontWeight: 600,
                 fontSize: '0.6rem',
                 height: 20,

@@ -9,6 +9,7 @@ import {
   normalizeAppLocale,
   type AppLocaleCode,
 } from '../lib/locales.js'
+import { describeDetection, detectMediaServerType } from '../media/detect.js'
 
 const logger = createChildLogger('system-settings')
 
@@ -365,18 +366,25 @@ export async function setMediaServerConfig(config: {
 }
 
 /**
- * Test media server connection with given credentials
+ * Result of testing a media server connection.
+ * detectedType / typeMismatch come from an unauthenticated probe of the server and are
+ * omitted when the server could not be classified.
  */
-export async function testMediaServerConnection(config: {
-  type: MediaServerType
-  baseUrl: string
-  apiKey: string
-}): Promise<{ success: boolean; serverName?: string; error?: string }> {
-  try {
-    // Validated here too, not just in the setter: this runs against a URL the
-    // caller supplies in the request body, before anything is persisted.
-    const baseUrl = validateServerUrl(config.baseUrl, 'Media server URL')
+export interface MediaServerConnectionTestResult {
+  success: boolean
+  serverName?: string
+  error?: string
+  /** What the server reports itself to be, when it could be determined. */
+  detectedType?: MediaServerType
+  /** True when detectedType differs from the type the admin selected. */
+  typeMismatch?: boolean
+}
 
+async function runAuthenticatedConnectionTest(
+  config: { type: MediaServerType; baseUrl: string; apiKey: string },
+  baseUrl: string
+): Promise<MediaServerConnectionTestResult> {
+  try {
     // Import dynamically to avoid circular dependencies
     const { createMediaServerProvider } = await import('../media/index.js')
     const provider = createMediaServerProvider(config.type, baseUrl)
@@ -393,6 +401,37 @@ export async function testMediaServerConnection(config: {
     )
     return { success: false, error }
   }
+}
+
+/**
+ * Test media server connection with given credentials
+ */
+export async function testMediaServerConnection(config: {
+  type: MediaServerType
+  baseUrl: string
+  apiKey: string
+}): Promise<MediaServerConnectionTestResult> {
+  // Validated here too, not just in the setter: this runs against a URL the
+  // caller supplies in the request body, before anything is persisted. The type
+  // probe only ever sees a URL that passed, so it honours the same rules.
+  let baseUrl: string
+  try {
+    baseUrl = validateServerUrl(config.baseUrl, 'Media server URL')
+  } catch (err) {
+    // The URL itself is not logged: it may be exactly the one that embeds credentials
+    logger.warn({ err, type: config.type }, 'Media server connection test failed: invalid URL')
+    return { success: false, error: err instanceof Error ? err.message : 'Invalid server URL' }
+  }
+
+  // The type probe is independent of the authenticated test (and never throws), so run
+  // them together: a wrong type is reported even when the key is also wrong, and an
+  // unreachable host does not pay the probe timeout before the real test starts.
+  const [detected, result] = await Promise.all([
+    detectMediaServerType(baseUrl),
+    runAuthenticatedConnectionTest(config, baseUrl),
+  ])
+
+  return { ...result, ...describeDetection(detected, config.type) }
 }
 
 /**

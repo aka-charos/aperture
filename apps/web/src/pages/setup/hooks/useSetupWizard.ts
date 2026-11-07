@@ -78,6 +78,8 @@ export function useSetupWizard(): SetupWizardContext {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [testSuccess, setTestSuccess] = useState(false)
+  // Set when the tested server identifies itself as a different type than the one selected
+  const [detectedServerType, setDetectedServerType] = useState<string | null>(null)
   const [runningJobs, setRunningJobs] = useState(false)
   const [jobLogs, setJobLogs] = useState<string[]>([])
   const [jobsProgress, setJobsProgress] = useState<JobProgress[]>([])
@@ -312,6 +314,7 @@ export function useSetupWizard(): SetupWizardContext {
     setServerUrl(server.address)
     setServerName(server.name)
     setTestSuccess(false)
+    setDetectedServerType(null)
     setError('')
   }, [])
 
@@ -319,6 +322,7 @@ export function useSetupWizard(): SetupWizardContext {
     setTesting(true)
     setError('')
     setTestSuccess(false)
+    setDetectedServerType(null)
 
     try {
       const response = await fetch('/api/setup/media-server/test', {
@@ -332,6 +336,8 @@ export function useSetupWizard(): SetupWizardContext {
       })
 
       const data = await response.json()
+
+      setDetectedServerType(data.typeMismatch && data.detectedType ? data.detectedType : null)
 
       if (data.success) {
         setTestSuccess(true)
@@ -1010,6 +1016,7 @@ export function useSetupWizard(): SetupWizardContext {
     saving,
     error,
     testSuccess,
+    detectedServerType,
     aiTestResults,
     runningJobs,
     jobLogs,
@@ -1024,14 +1031,17 @@ export function useSetupWizard(): SetupWizardContext {
     setServerType: (type: string) => {
       setServerType(type)
       setTestSuccess(false)
+      setDetectedServerType(null)
     },
     setServerUrl: (url: string) => {
       setServerUrl(url)
       setTestSuccess(false)
+      setDetectedServerType(null)
     },
     setServerApiKey: (key: string) => {
       setServerApiKey(key)
       setTestSuccess(false)
+      setDetectedServerType(null)
     },
     setShowApiKey,
     handleTestMediaServer,

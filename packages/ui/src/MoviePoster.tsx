@@ -11,7 +11,7 @@ import { usePosterDisplaySettings } from './posterDisplaySettings.js'
 import { useLocalizedOverview, type TitleRef } from './localizedText.js'
 import { WatchedBadge } from './poster-overlays/WatchedBadge.js'
 import { EpisodeProgressBadge } from './poster-overlays/EpisodeProgressBadge.js'
-import { neutralFillDeep } from './themeFills.js'
+import { neutralFillDeep, onBrandFill } from './themeFills.js'
 
 const StarIcon = Star as unknown as React.ComponentType<{ fontSize?: string }>
 const AddToQueueIcon = AddToQueue as unknown as React.ComponentType<{ fontSize?: 'small' | 'medium' | 'large' }>
@@ -457,6 +457,7 @@ export function MoviePoster({
                   transition: 'all 0.2s ease',
                   '&:hover': {
                     backgroundColor: alpha(theme.palette.secondary.main, 0.9),
+                    color: onBrandFill(theme),
                     transform: 'scale(1.1)',
                   },
                 }}
@@ -573,7 +574,7 @@ export function MoviePoster({
                 fontSize: '0.7rem',
                 height: 24,
                 backgroundColor: alpha(theme.palette.secondary.main, 0.9),
-                color: 'white',
+                color: onBrandFill(theme),
                 zIndex: 3,
                 '& .MuiChip-label': {
                   px: 1,

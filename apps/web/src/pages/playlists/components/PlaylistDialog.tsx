@@ -80,7 +80,7 @@ function AIButton({
             color: 'primary.main',
             '&:hover': {
               bgcolor: 'primary.main',
-              color: 'white',
+              color: 'surface.onBrand',
             },
             '&.Mui-disabled': {
               bgcolor: alpha(theme.palette.action.disabled, 0.1),

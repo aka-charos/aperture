@@ -12,6 +12,7 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  ListSubheader,
   Toolbar,
   Typography,
   useTheme,
@@ -114,18 +115,20 @@ type NavItem = {
   badge?: 'socialInbox'
   /** What a tour step names to point at this entry (components/tour/tours.ts). */
   tourAnchor?: string
+  /** Studio heads the sidebar's groups; this entry opens one. Always listed, so its heading always shows. */
+  opensGroup?: 'forYou' | 'yourLibrary' | 'activity'
 }
 
 // Base user-facing navigation items (some may be conditionally hidden)
 const baseUserMenuItems: NavItem[] = [
-  { textKey: 'nav.dashboard', icon: <HomeIcon />, path: '/', feature: null, tourAnchor: 'nav-home' },
+  { textKey: 'nav.dashboard', icon: <HomeIcon />, path: '/', feature: null, tourAnchor: 'nav-home', opensGroup: 'forYou' },
   { textKey: 'nav.assistant', icon: <SmartToyIcon />, path: '/assistant', feature: null, capability: 'assistant', tourAnchor: 'nav-assistant' },
   { textKey: 'nav.recommendations', icon: <AutoAwesomeIcon />, path: '/recommendations', feature: null, tourAnchor: 'nav-recommendations' },
   // `social` is decided data (has at least one visible connection), not a
   // permission; the filter below treats it like any other capability.
   { textKey: 'nav.watchThis', icon: <RecommendIcon />, path: '/watch-this', feature: null, capability: 'social', badge: 'socialInbox' },
   { textKey: 'nav.showsYouWatch', icon: <AddToQueueIcon />, path: '/watching', feature: 'watching' },
-  { textKey: 'nav.topPicks', icon: <WhatshotIcon />, path: '/top-picks', feature: null },
+  { textKey: 'nav.topPicks', icon: <WhatshotIcon />, path: '/top-picks', feature: null, opensGroup: 'yourLibrary' },
   { textKey: 'nav.playlists', icon: <PlaylistPlayIcon />, path: '/playlists', feature: null },
   { textKey: 'nav.collections', icon: <CollectionsBookmarkIcon />, path: '/collections', feature: null, capability: 'collections' },
   { textKey: 'nav.explore', icon: <HubOutlinedIcon />, path: '/explore', feature: null },
@@ -133,7 +136,7 @@ const baseUserMenuItems: NavItem[] = [
   { textKey: 'nav.discover', icon: <ExploreIcon />, path: '/discovery', feature: null, capability: 'discover' },
   { textKey: 'nav.myRequests', icon: <PlaylistAddCheckIcon />, path: '/my-requests', feature: null },
   { textKey: 'nav.browse', icon: <VideoLibraryIcon />, path: '/browse', feature: null },
-  { textKey: 'nav.watchHistory', icon: <HistoryIcon />, path: '/history', feature: null },
+  { textKey: 'nav.watchHistory', icon: <HistoryIcon />, path: '/history', feature: null, opensGroup: 'activity' },
   { textKey: 'nav.watchStats', icon: <InsightsIcon />, path: '/stats', feature: null },
 ]
 
@@ -238,7 +241,9 @@ function AppShell() {
    * not against the flyout, which is the point: revealing the labels never
    * moves the content under the pointer.
    */
+  const studio = theme.aperture.name === 'studio'
   const drawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH
+  const wordmarkFont = studio ? theme.typography.fontFamily : '"Open Sans", sans-serif'
   const showLabels = !collapsed || flyout
 
   /**
@@ -450,8 +455,8 @@ function AppShell() {
             />
             <Typography
               sx={{
-                fontFamily: '"Open Sans", sans-serif',
-                fontWeight: 600,
+                fontFamily: wordmarkFont,
+                fontWeight: studio ? 800 : 600,
                 fontSize: '1.5rem',
                 color: 'text.primary',
                 letterSpacing: '-0.01em',
@@ -466,7 +471,26 @@ function AppShell() {
       {/* User Navigation */}
       <List>
         {userMenuItems.map((item) => (
-          <ListItem key={item.path} disablePadding>
+          <React.Fragment key={item.path}>
+          {/* On the rail too, wordless: appearing only with the labels, the
+              headings pushed every row down under the pointer as the flyout opened. */}
+          {studio && item.opensGroup && (
+            <ListSubheader
+              disableSticky
+              aria-hidden={!labels}
+              sx={{
+                bgcolor: 'transparent',
+                typography: 'overline',
+                lineHeight: 2.5,
+                height: 30,
+                px: 3,
+                mt: item.opensGroup === 'forYou' ? 0 : 1.5,
+              }}
+            >
+              {labels && t(`nav.group.${item.opensGroup}`)}
+            </ListSubheader>
+          )}
+          <ListItem disablePadding>
             <Tooltip title={labels ? '' : t(item.textKey)} placement="right" arrow>
               <ListItemButton
                 data-tour={item.tourAnchor}
@@ -481,7 +505,11 @@ function AppShell() {
                 }
                 sx={{
                   justifyContent: labels ? 'flex-start' : 'center',
-                  px: labels ? 3 : 2,
+                  px: labels && !studio ? 3 : 2,
+                  // The same with and without a label, so opening the rail's
+                  // flyout leaves each row under the pointer.
+                  minHeight: studio ? 41 : 44,
+                  ...(studio && { py: 0.75 }),
                   '&.Mui-selected': {
                     bgcolor: 'nav.selectedBg',
                     color: 'nav.selectedText',
@@ -496,8 +524,8 @@ function AppShell() {
                 <ListItemIcon
                   sx={{
                     color: isPathActive(item.path) ? 'nav.selectedIcon' : 'text.secondary',
-                    minWidth: labels ? 40 : 0,
-                    mr: labels ? 1 : 0,
+                    minWidth: labels ? (studio ? 28 : 40) : 0,
+                    mr: labels ? (studio ? 0.5 : 1) : 0,
                   }}
                 >
                   {/* On the icon, so the count shows on the collapsed rail too. */}
@@ -518,13 +546,15 @@ function AppShell() {
                   <ListItemText
                     primary={t(item.textKey)}
                     primaryTypographyProps={{
-                      fontWeight: isPathActive(item.path) ? 600 : 400,
+                      fontSize: '0.8125rem',
+                      fontWeight: studio || isPathActive(item.path) ? 600 : 400,
                     }}
                   />
                 )}
               </ListItemButton>
             </Tooltip>
           </ListItem>
+          </React.Fragment>
         ))}
       </List>
 
@@ -691,8 +721,8 @@ function AppShell() {
                 // where you are.
                 display: { xs: user?.isAdmin ? 'none' : 'block', sm: 'block' },
                 minWidth: 0,
-                fontFamily: '"Open Sans", sans-serif',
-                fontWeight: 600,
+                fontFamily: wordmarkFont,
+                fontWeight: studio ? 800 : 600,
                 fontSize: '1.1rem',
                 color: 'text.primary',
                 letterSpacing: '-0.01em',
@@ -733,7 +763,7 @@ function AppShell() {
           {/* Help for the screen you are on: its user guide pages in a drawer. */}
           <UserHelpButton />
 
-          {/* Light or dark, for this browser. Not on a phone, where the bar
+          {/* Light, Black or Dark, for this browser. Not on a phone, where the bar
               has no room for it; the user menu carries it there instead. */}
           <Box sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
             <ColorModeButton />

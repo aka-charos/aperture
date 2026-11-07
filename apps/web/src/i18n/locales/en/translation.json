@@ -59,7 +59,12 @@
     "sharedWithMeBadge_other": "{{count}} new recommendations",
     "userMenu": "Account menu",
     "openMenu": "Open menu",
-    "nextFromHere": "Next from here"
+    "nextFromHere": "Next from here",
+    "group": {
+      "forYou": "For you",
+      "yourLibrary": "Your library",
+      "activity": "Activity"
+    }
   },
   "admin": {
     "title": "Administration",
@@ -1980,6 +1985,8 @@
     "favoriteRemoved": "Removed from your favorites",
     "favoriteFailed": "Couldn't update favorites. Please try again.",
     "favoriteNotInLibrary": "That title isn't in your library, so it can't be favorited.",
+    "ratingFailed": "Couldn't save your rating. Please try again.",
+    "watchingFailed": "Couldn't update your Watching list. Please try again.",
     "directedBy": "Dir. {{name}}",
     "createdBy": "Created by {{name}}",
     "movie": "Movie",
@@ -2061,10 +2068,32 @@
     "carouselSemanticEmpty": "No content found matching \"{{concept}}\". Try a different description.",
     "carouselSemanticDesc": "The {{count}} nearest titles in your library",
     "carouselSemanticError": "Search failed: {{message}}",
+    "carouselLimitsNoneFit": "Nothing was found that fits the limits in your request.",
+    "carouselLimitsDropped": "Web picks left out for not fitting the limits in your request: {{dropped}}",
     "carouselEpisodesTitle": "Episodes closest to \"{{concept}}\"",
     "carouselEpisodesDesc": "The {{count}} nearest episodes in your library",
     "carouselEpisodesEmpty": "No episodes found matching \"{{concept}}\". Try describing what happens in it.",
     "carouselEpisodesError": "Episode search failed: {{message}}",
+    "carouselUpcomingTitle": "Coming up in the shows you follow",
+    "carouselUpcomingSeriesTitle": "What's next for \"{{series}}\"",
+    "carouselUpcomingDesc_one": "The next episode of {{count}} show. The date is expected, not a promise it will be ready to play.",
+    "carouselUpcomingDesc_other": "The next episode of {{count}} shows. Dates are expected, not a promise they will be ready to play.",
+    "carouselUpcomingDescPartial_one": "The next episode of {{count}} show. The date is expected, not a promise it will be ready to play. {{unchecked}} more could not be checked.",
+    "carouselUpcomingDescPartial_other": "The next episode of {{count}} shows. Dates are expected, not a promise they will be ready to play. {{unchecked}} more could not be checked.",
+    "carouselUpcomingNothing_one": "No next episode is announced for this show.",
+    "carouselUpcomingNothing_other": "No next episode is announced for the {{count}} shows checked.",
+    "carouselUpcomingNothingPartial_one": "No next episode is announced for {{count}} show. {{unchecked}} more could not be checked.",
+    "carouselUpcomingNothingPartial_other": "No next episode is announced for {{count}} shows. {{unchecked}} more could not be checked.",
+    "carouselUpcomingNotFollowing": "You have not added any shows to follow yet. Shows you have only played are not included, but you can ask about one by name.",
+    "carouselUpcomingNotInLibrary": "\"{{series}}\" is not in your library, so there is nothing to check here.",
+    "carouselUpcomingNoTmdbKey": "Upcoming episodes cannot be forecast because TMDb is not set up on this server, so this does not mean nothing is coming.",
+    "carouselUpcomingLookupFailed": "TMDb did not answer for {{unchecked}} of these shows, so this does not mean nothing is coming. Try again shortly.",
+    "carouselUpcomingNoTmdbEntry": "TMDb has no entry for {{unchecked}} of these shows, so there is no forecast for them.",
+    "upcomingExpected": "Expected {{date}}",
+    "upcomingPastDue": "Was expected {{date}}",
+    "upcomingLatestInLibrary": "Latest {{code}}, aired {{date}}: in your library",
+    "upcomingLatestUnplayed": "Latest {{code}}, aired {{date}}: in your library, not played yet",
+    "upcomingLatestNotInLibrary": "Latest {{code}}, aired {{date}}: not in your library yet",
     "carouselSimilarTitle": "Similar to \"{{title}}\"",
     "carouselSimilarLookupNotFound": "\"{{title}}\" not found in your library.",
     "carouselSimilarNoEmbedding": "\"{{title}}\" doesn't have embeddings generated yet. Run the embedding job first.",
@@ -4295,7 +4324,7 @@
   "settingsThemeColors": {
     "title": "Brand colors",
     "subtitle": "The two accent colors used throughout the app — buttons, highlights, gradients, and badges. Other colors (errors, warnings, success) stay fixed.",
-    "lightModeNote": "The light appearance answers the default pair with its own near-black and charcoal. Save any other pair and both appearances use it as saved.",
+    "lightModeNote": "Light and Dark answer the default pair with their own cobalt, and Black uses it as is. Save any other pair and all three use it as saved.",
     "primaryLabel": "Primary",
     "secondaryLabel": "Secondary",
     "invalidHex": "Enter a color like #6366f1",
@@ -4727,6 +4756,7 @@
       "stillWorking": "Still working…",
       "searchingLibrary": "Searching your library…",
       "episodes": "Looking through episodes…",
+      "upcoming": "Checking what's coming up…",
       "findingSimilar": "Finding similar titles…",
       "personalPicks": "Pulling up your picks…",
       "ranking": "Ranking the standouts…",
@@ -5729,7 +5759,11 @@
     "noEpisodeData": "No episode data available",
     "checkBackSoon": "Check back soon",
     "seriesComplete": "Series Complete",
-    "episodesTotal": "{{count}} episodes"
+    "episodesTotal": "{{count}} episodes",
+    "homeRowDynamicTitle": "Show these on your Emby Home screen",
+    "homeRowDynamicBody": "Your tracked series are favorited on Emby. To get a Home row for them, add a Home row with Dynamic Content: choose your TV Series libraries, sort by Date last content added (Descending), set Playstate to Unplayed, and turn Favorite on.",
+    "homeRowFavoritesTabTitle": "Find these on your Jellyfin Favorites tab",
+    "homeRowFavoritesTabBody": "Your tracked series are favorited on Jellyfin. Jellyfin's Home screen can't show a filtered row, so open the Favorites tab on the Jellyfin home page, or use the Favorites filter inside a TV library."
   },
   "setup": {
     "step": {
@@ -7174,7 +7208,9 @@
     "switchToLight": "Switch to the light appearance",
     "switchToDark": "Switch to the dark appearance",
     "cardTitle": "Appearance",
-    "cardDescription": "Light is a flat gray page with near-black type and buttons; dark is easier on the eyes in a dim room. Remembered in this browser."
+    "cardDescription": "Light and Dark have cobalt accents; Black is the original near-black. Remembered in this browser.",
+    "black": "Black",
+    "switchToBlack": "Switch to the black appearance"
   },
   "inlineEdit": {
     "turnOn": "Edit text on screen",
@@ -7209,5 +7245,9 @@
       "unavailable": "Your server is not sending newsletters at the moment.",
       "error": "Could not save your choice."
     }
+  },
+  "mediaServerTypeMismatch": {
+    "message": "This server identifies itself as {{detected}}, but {{appName}} is set to {{selected}}. Features that differ between the two servers will not behave correctly.",
+    "useDetected": "Switch to {{detected}}"
   }
 }

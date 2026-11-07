@@ -298,7 +298,7 @@ export function JobCard({
                   '&:hover': {
                     bgcolor: 'error.dark',
                     borderColor: 'error.dark',
-                    color: 'white',
+                    color: 'surface.onStatus',
                   },
                 }}
               >

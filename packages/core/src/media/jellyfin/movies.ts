@@ -6,6 +6,7 @@ import type { Movie, PaginationOptions, PaginatedResult, WatchedItem } from '../
 import type { JellyfinItem, JellyfinItemsResponse } from './types.js'
 import { mapJellyfinItemToMovie } from './mappers.js'
 import { logger, type JellyfinProviderBase } from './base.js'
+import { readJellyfinItem } from './itemUpdates.js'
 import { mergeWatchedItems } from '../watchHistoryHelpers.js'
 
 const MOVIE_WATCH_FIELDS = 'UserData,ProviderIds,RunTimeTicks'
@@ -86,10 +87,7 @@ export async function getMovieById(
   movieId: string
 ): Promise<Movie | null> {
   try {
-    const item = await provider.fetch<JellyfinItem>(
-      `/Items/${movieId}?Fields=Overview,Genres,CommunityRating,CriticRating,Path,MediaSources,Studios,People,ProviderIds,Tags`,
-      apiKey
-    )
+    const item = await readJellyfinItem<JellyfinItem>(provider, apiKey, movieId)
     return mapJellyfinItemToMovie(item, provider.baseUrl)
   } catch {
     return null

@@ -1,15 +1,15 @@
 import { useTranslation } from 'react-i18next'
 import { ToggleButton, ToggleButtonGroup } from '@mui/material'
 import ContrastIcon from '@mui/icons-material/Contrast'
-import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
-import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
-import { parseColorMode, setColorMode, useColorMode } from '@/lib/colorMode'
+import { AppearanceIcon } from '@/components/ColorModeButton'
+import { parseAppearance, setAppearance, useAppearance } from '@/lib/colorMode'
+import { APPEARANCES } from '@/theme'
 import { SettingsCard } from './SettingsCard'
 
-/** Light or dark, for this browser (see lib/colorMode.ts for why not the account). */
+/** Light, Black or Dark, for this browser (see lib/colorMode.ts for why not the account). */
 export function AppearanceCard() {
   const { t } = useTranslation()
-  const mode = useColorMode()
+  const appearance = useAppearance()
 
   return (
     <SettingsCard
@@ -20,22 +20,27 @@ export function AppearanceCard() {
       <ToggleButtonGroup
         exclusive
         size="small"
-        value={mode}
+        value={appearance}
         aria-label={t('colorMode.label')}
+        // Three labels do not fit one row on a phone, and a joined group's buttons
+        // lose their shared border when they wrap, so each keeps its own.
+        sx={{
+          flexWrap: 'wrap',
+          gap: 0.5,
+          '&& .MuiToggleButtonGroup-grouped': { m: 0, border: 1, borderColor: 'divider', borderRadius: 1 },
+        }}
         onChange={(_, value) => {
           // Pressing the side already on returns null; that is not a choice.
-          const next = parseColorMode(value)
-          if (next) setColorMode(next)
+          const next = parseAppearance(value)
+          if (next) setAppearance(next)
         }}
       >
-        <ToggleButton value="light" sx={{ gap: 0.75, px: 1.75 }}>
-          <LightModeOutlinedIcon fontSize="small" />
-          {t('colorMode.light')}
-        </ToggleButton>
-        <ToggleButton value="dark" sx={{ gap: 0.75, px: 1.75 }}>
-          <DarkModeOutlinedIcon fontSize="small" />
-          {t('colorMode.dark')}
-        </ToggleButton>
+        {APPEARANCES.map((option) => (
+          <ToggleButton key={option} value={option} sx={{ gap: 0.75, px: 1.75 }}>
+            <AppearanceIcon appearance={option} />
+            {t(`colorMode.${option}`)}
+          </ToggleButton>
+        ))}
       </ToggleButtonGroup>
     </SettingsCard>
   )

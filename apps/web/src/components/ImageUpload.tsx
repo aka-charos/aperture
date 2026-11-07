@@ -296,6 +296,7 @@ export function ImageUpload({
                 color: 'white',
                 '&:hover': {
                   backgroundColor: 'error.main',
+                  color: 'surface.onStatus',
                 },
               }}
               size="small"

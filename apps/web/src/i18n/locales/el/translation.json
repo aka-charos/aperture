@@ -1428,7 +1428,8 @@
       "discoveryReasons": "Γράφω γιατί ταιριάζει ο καθένας…",
       "discoveryAssembling": "Συνθέτω τη λίστα σας…",
       "episodes": "Κοιτάζω τα επεισόδια…",
-      "analysis": "Διαβάζω την ανάλυση"
+      "analysis": "Διαβάζω την ανάλυση",
+      "upcoming": "Checking what's coming up…"
     },
     "tooltipOpenFullPage": "Άνοιγμα σε πλήρη σελίδα",
     "scrollToAnswer": "Πίσω στην απάντηση",
@@ -2506,7 +2507,11 @@
     "episodesTotal": "{{count}} επεισόδια",
     "removeConfirmTitle": "Να αφαιρεθεί από τη λίστα σας;",
     "removeConfirmBody": "Το «{{title}}» θα αφαιρεθεί από τη λίστα σας. Επειδή η λίστα συγχρονίζεται με τα αγαπημένα του media server σας, θα αφαιρεθεί και από τα αγαπημένα σας στο Emby/Jellyfin.",
-    "removeConfirmAction": "Αφαίρεση"
+    "removeConfirmAction": "Αφαίρεση",
+    "homeRowDynamicTitle": "Show these on your Emby Home screen",
+    "homeRowDynamicBody": "Your tracked series are favorited on Emby. To get a Home row for them, add a Home row with Dynamic Content: choose your TV Series libraries, sort by Date last content added (Descending), set Playstate to Unplayed, and turn Favorite on.",
+    "homeRowFavoritesTabTitle": "Find these on your Jellyfin Favorites tab",
+    "homeRowFavoritesTabBody": "Your tracked series are favorited on Jellyfin. Jellyfin's Home screen can't show a filtered row, so open the Favorites tab on the Jellyfin home page, or use the Favorites filter inside a TV library."
   },
   "settingsBackup": {
     "title": "Δημιουργία & Επαναφορά Αντιγράφων Ασφαλείας",
@@ -3148,7 +3153,12 @@
     "watchThis": "Δείτε το",
     "userMenu": "Μενού λογαριασμού",
     "nextFromHere": "Τι να δω μετά",
-    "openMenu": "Άνοιγμα μενού"
+    "openMenu": "Άνοιγμα μενού",
+    "group": {
+      "forYou": "Για εσάς",
+      "yourLibrary": "Η βιβλιοθήκη σας",
+      "activity": "Δραστηριότητα"
+    }
   },
   "settingsMdblist": {
     "title": "Ενσωμάτωση MDBList",
@@ -4011,7 +4021,31 @@
     "analysisSpoilerReveal": "This part places the film in its tradition and may reveal how it ends — tap to read",
     "analysisNotYet": "No analysis has been written for this title yet. Open its page to generate one.",
     "analysisDeclined": "An analysis was attempted, but there was not enough published writing about this title to work from.",
-    "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it."
+    "analysisNotInLibrary": "“{{title}}” is not in the library, so there is no stored analysis for it.",
+    "ratingFailed": "Η βαθμολογία σας δεν αποθηκεύτηκε. Δοκιμάστε ξανά.",
+    "watchingFailed": "Η λίστα με τις σειρές που βλέπετε δεν ενημερώθηκε. Δοκιμάστε ξανά.",
+    "carouselUpcomingTitle": "Coming up in the shows you follow",
+    "carouselUpcomingSeriesTitle": "What's next for \"{{series}}\"",
+    "carouselUpcomingDesc_one": "The next episode of {{count}} show. The date is expected, not a promise it will be ready to play.",
+    "carouselUpcomingDesc_other": "The next episode of {{count}} shows. Dates are expected, not a promise they will be ready to play.",
+    "carouselUpcomingDescPartial_one": "The next episode of {{count}} show. The date is expected, not a promise it will be ready to play. {{unchecked}} more could not be checked.",
+    "carouselUpcomingDescPartial_other": "The next episode of {{count}} shows. Dates are expected, not a promise they will be ready to play. {{unchecked}} more could not be checked.",
+    "carouselUpcomingNothing_one": "No next episode is announced for this show.",
+    "carouselUpcomingNothing_other": "No next episode is announced for the {{count}} shows checked.",
+    "carouselUpcomingNothingPartial_one": "No next episode is announced for {{count}} show. {{unchecked}} more could not be checked.",
+    "carouselUpcomingNothingPartial_other": "No next episode is announced for {{count}} shows. {{unchecked}} more could not be checked.",
+    "carouselUpcomingNotFollowing": "You have not added any shows to follow yet. Shows you have only played are not included, but you can ask about one by name.",
+    "carouselUpcomingNotInLibrary": "\"{{series}}\" is not in your library, so there is nothing to check here.",
+    "carouselUpcomingNoTmdbKey": "Upcoming episodes cannot be forecast because TMDb is not set up on this server, so this does not mean nothing is coming.",
+    "carouselUpcomingLookupFailed": "TMDb did not answer for {{unchecked}} of these shows, so this does not mean nothing is coming. Try again shortly.",
+    "carouselUpcomingNoTmdbEntry": "TMDb has no entry for {{unchecked}} of these shows, so there is no forecast for them.",
+    "upcomingExpected": "Expected {{date}}",
+    "upcomingPastDue": "Was expected {{date}}",
+    "upcomingLatestInLibrary": "Latest {{code}}, aired {{date}}: in your library",
+    "upcomingLatestUnplayed": "Latest {{code}}, aired {{date}}: in your library, not played yet",
+    "upcomingLatestNotInLibrary": "Latest {{code}}, aired {{date}}: not in your library yet",
+    "carouselLimitsNoneFit": "Δεν βρέθηκε κάτι που να ταιριάζει στους περιορισμούς του αιτήματός σας.",
+    "carouselLimitsDropped": "Προτάσεις από τον ιστό που έμειναν εκτός επειδή δεν ταιριάζουν στους περιορισμούς του αιτήματός σας: {{dropped}}"
   },
   "dashboard": {
     "greetingMorning": "Καλημέρα",
@@ -5455,7 +5489,7 @@
     "fetchFailed": "Failed to load the brand colors",
     "saveFailed": "Failed to save the brand colors",
     "unknownError": "Something went wrong",
-    "lightModeNote": "The light appearance answers the default pair with its own near-black and charcoal. Save any other pair and both appearances use it as saved."
+    "lightModeNote": "Light and Dark answer the default pair with their own cobalt, and Black uses it as is. Save any other pair and all three use it as saved."
   },
   "settingsLldap": {
     "title": "LLDAP Email Import",
@@ -7217,7 +7251,9 @@
     "switchToLight": "Αλλαγή σε φωτεινή εμφάνιση",
     "switchToDark": "Αλλαγή σε σκοτεινή εμφάνιση",
     "cardTitle": "Εμφάνιση",
-    "cardDescription": "Η φωτεινή είναι μια επίπεδη γκρι σελίδα με σχεδόν μαύρα γράμματα και κουμπιά· η σκοτεινή ξεκουράζει τα μάτια σε χαμηλό φωτισμό. Αποθηκεύεται σε αυτόν τον browser."
+    "cardDescription": "Η φωτεινή και η σκοτεινή έχουν τόνους μπλε του κοβαλτίου· η μαύρη είναι η αρχική, σχεδόν μαύρη. Αποθηκεύεται σε αυτόν τον browser.",
+    "black": "Μαύρη",
+    "switchToBlack": "Αλλαγή σε μαύρη εμφάνιση"
   },
   "newsletters": {
     "subscription": {
@@ -7252,5 +7288,9 @@
     "sameAsEnglish": "Ίδιο με τα Αγγλικά",
     "allLanguages": "Όλες οι γλώσσες",
     "saveShortcut": "Ctrl+Enter για αποθήκευση"
+  },
+  "mediaServerTypeMismatch": {
+    "message": "This server identifies itself as {{detected}}, but {{appName}} is set to {{selected}}. Features that differ between the two servers will not behave correctly.",
+    "useDetected": "Switch to {{detected}}"
   }
 }

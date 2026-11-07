@@ -8,7 +8,16 @@ import { query } from '../../../lib/db.js'
 import { readTwinSharedIds, resolveTwinSharedTitles } from '../../../lib/twinShared.js'
 import { enrichCardReasons } from '../discovery/enrichReasons.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
-import { formatContentItem, pickSource, searchScoredPool } from './scoredPool.js'
+import { formatContentItem, hasCompletedRun, pickSource, searchScoredPool } from './scoredPool.js'
+import {
+  describeTitleLimits,
+  hasTitleLimits,
+  joinNotes,
+  noFitNote,
+  readTitleLimits,
+  TITLE_LIMIT_PARAMS,
+} from './titleLimits.js'
+import { resolveTitleLimits } from './titleLimitsQuery.js'
 import type { ContentItem } from '../schemas/index.js'
 import type { ToolContext, MovieResult, SeriesResult } from '../types.js'
 import { WATCH_HISTORY_PLAYED_SQL, displayRatingSql } from '@aperture/core'
@@ -174,6 +183,7 @@ export function createRecommendationTools(ctx: ToolContext) {
               'The theme, mood or description to search for, e.g. "slow-burn arthouse" or "heist films with an ensemble cast"'
             ),
           type: z.enum(['movies', 'series', 'both']).optional().default('both'),
+          ...TITLE_LIMIT_PARAMS,
           limit: z
             .number()
             .optional()
@@ -181,18 +191,36 @@ export function createRecommendationTools(ctx: ToolContext) {
             .describe('Number of results (default 12, max 30)'),
         })
       ),
-      execute: async ({ concept, type = 'both', limit = 12 }) => {
+      execute: async ({ concept, type = 'both', limit = 12, ...limitParams }) => {
+        const resolved = await resolveTitleLimits(ctx.scope, readTitleLimits(limitParams), type)
         const items = await searchScoredPool(ctx, {
           concept,
           type,
           limit: Math.min(limit ?? 12, 30),
+          limits: resolved,
+          // Always: this tool promises never to return what they have seen, and
+          // "that I haven't seen" is a limit a model need not remember to pass.
+          unwatchedOnly: true,
           caller: 'searchMyRecommendations',
         })
 
         if (items.length === 0) {
           // No completed run yet, or nothing near the request survived the
-          // join. The model falls back to semanticSearch from here.
-          return { id: `taste-search-empty-${Date.now()}`, items: [] }
+          // join. The model falls back to semanticSearch from here, with the
+          // same limits when there were any. A viewer with no run yet is not told
+          // their limits were the reason.
+          const emptiedByLimits =
+            hasTitleLimits(resolved.limits) && (await hasCompletedRun(ctx.userId, type))
+          const limitsNote = joinNotes(
+            emptiedByLimits ? noFitNote(describeTitleLimits(resolved.limits)) : null,
+            resolved.ignoredGenreNote
+          )
+          return {
+            id: `taste-search-empty-${Date.now()}`,
+            items: [],
+            ...(emptiedByLimits ? { descriptionKey: 'carouselLimitsNoneFit' } : {}),
+            ...(limitsNote ? { limitsNote } : {}),
+          }
         }
 
         // Every card gets a "why it fits", the same way the discovery path
@@ -211,6 +239,7 @@ export function createRecommendationTools(ctx: ToolContext) {
           // given every card its own "why", which is what the vertical list is for.
           layout: 'list' as const,
           items: explained,
+          ...(resolved.ignoredGenreNote ? { limitsNote: resolved.ignoredGenreNote } : {}),
         }
       },
     }),

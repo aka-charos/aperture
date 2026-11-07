@@ -318,8 +318,12 @@ export class JellyfinProvider extends JellyfinProviderBase implements MediaServe
     return updateCollectionOverview(this, apiKey, collectionId, overview)
   }
 
-  async deleteCollection(apiKey: string, collectionId: string): Promise<void> {
-    return deleteCollection(this, apiKey, collectionId)
+  async deleteCollection(
+    apiKey: string,
+    collectionId: string,
+    opts?: { clearRankSortNames?: boolean }
+  ): Promise<void> {
+    return deleteCollection(this, apiKey, collectionId, opts)
   }
 
   async findCollectionByName(apiKey: string, name: string): Promise<string | null> {

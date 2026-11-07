@@ -132,7 +132,7 @@ export function WatchHistorySeriesListItem({
                   top: { xs: 4, md: 8 },
                   left: { xs: 4, md: 8 },
                   backgroundColor: alpha(theme.palette.success.main, 0.9),
-                  color: 'white',
+                  color: 'surface.onStatus',
                   fontWeight: 600,
                   fontSize: { xs: '0.55rem', md: '0.65rem' },
                   height: { xs: 18, md: 22 },

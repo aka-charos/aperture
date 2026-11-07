@@ -66,6 +66,8 @@ aperture/
 
 The apps consume the compiled `dist/` of `core` and `ui`, so a change to an export there needs a package build before the apps typecheck. The web bundle never imports `@aperture/core`: anything the browser needs to know is decided on the server and sent in the response.
 
+The first download is only the app shell: each page is its own chunk, loaded when opened, and every language but English is fetched when chosen. The build pre-compresses the bundle (Brotli and gzip) and the API serves those files directly, with no compression layer over its own responses. Files under `/assets/` are named after their content, so they are cached for a year.
+
 ---
 
 ## Tech Stack

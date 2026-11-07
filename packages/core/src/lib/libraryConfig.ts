@@ -196,6 +196,13 @@ export async function syncLibraryConfigsFromProvider(
       continue
     }
 
+    // An empty id would collide on the UNIQUE provider_library_id key and merge libraries
+    if (!lib.id) {
+      logger.warn({ name: lib.name }, 'Skipping library without an id')
+      skipped++
+      continue
+    }
+
     const existing = await queryOne<LibraryConfigRow>(
       'SELECT * FROM library_config WHERE provider_library_id = $1',
       [lib.id]

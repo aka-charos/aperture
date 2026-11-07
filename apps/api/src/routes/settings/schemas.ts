@@ -20,7 +20,7 @@ const aiFunctionEnum = [...AI_FUNCTIONS]
 export const mediaServerInfoSchema = {
   tags: ['settings'],
   summary: 'Get media server info',
-  description: 'Get public media server information for frontend use (play buttons, deep links). Available to all authenticated users. Returns server type, base URL, and server name.',
+  description: 'Get public media server information for frontend use (play buttons, deep links). Available to all authenticated users. Returns server type, base URL, server name, and a capabilities map describing features that differ between Emby and Jellyfin (e.g. dynamicHomeRows).',
 }
 
 export const mediaServerConfigSchema = {

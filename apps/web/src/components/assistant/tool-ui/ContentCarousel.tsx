@@ -12,7 +12,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Box, Typography, IconButton, Button, Snackbar, Alert, useTheme } from '@mui/material'
+import { Box, Typography, IconButton, Button, Portal, Snackbar, Alert, useTheme } from '@mui/material'
 import { alpha } from '@mui/material/styles'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
@@ -406,21 +406,25 @@ export function ContentCarousel({ data, hideTitle = false }: ContentCarouselProp
         onCreated={(name) => notify(t('playlists.createdInLibrary', { name }), 'success')}
       />
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
+      {/* Out of the thread: its container query makes it the box a `fixed` child is
+          placed against, so a message here would scroll away with the conversation. */}
+      <Portal>
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
           onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{ width: '100%' }}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+          <Alert
+            onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+            severity={snackbar.severity}
+            variant="filled"
+            sx={{ width: '100%' }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Portal>
     </Box>
   )
 }

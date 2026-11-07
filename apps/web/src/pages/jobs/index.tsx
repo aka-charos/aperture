@@ -253,7 +253,7 @@ export function JobsPage() {
             size="small"
             sx={{
               bgcolor: 'primary.main',
-              color: 'white',
+              color: 'surface.onBrand',
               fontWeight: 600,
               animation: 'pulse 2s infinite',
               '@keyframes pulse': {
@@ -344,7 +344,7 @@ export function JobsPage() {
                     height: 20,
                     minWidth: 20,
                     bgcolor: 'primary.main',
-                    color: 'white',
+                    color: 'surface.onBrand',
                     fontSize: '0.75rem',
                     '& .MuiChip-label': { px: 0.75 },
                   }}
@@ -367,7 +367,7 @@ export function JobsPage() {
                     height: 20,
                     minWidth: 20,
                     bgcolor: 'primary.main',
-                    color: 'white',
+                    color: 'surface.onBrand',
                     fontSize: '0.75rem',
                     '& .MuiChip-label': { px: 0.75 },
                   }}
@@ -390,7 +390,7 @@ export function JobsPage() {
                     height: 20,
                     minWidth: 20,
                     bgcolor: 'primary.main',
-                    color: 'white',
+                    color: 'surface.onBrand',
                     fontSize: '0.75rem',
                     '& .MuiChip-label': { px: 0.75 },
                   }}

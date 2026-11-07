@@ -8,7 +8,7 @@ import { prefixer } from 'stylis'
 import { useTranslation } from 'react-i18next'
 import { isRtlLocale } from './i18n/localeDirection'
 import { useAppTheme } from './lib/useAppTheme'
-import { useColorMode } from './lib/colorMode'
+import { useAppearance } from './lib/colorMode'
 
 const cacheLtr = createCache({ key: 'mui', prepend: true })
 const cacheRtl = createCache({
@@ -32,7 +32,7 @@ export function RtlProviders({ children }: { children: ReactNode }) {
     }
   }, [i18n])
 
-  const theme = useAppTheme(dir, useColorMode(), language)
+  const theme = useAppTheme(dir, useAppearance(), language)
   const cache = dir === 'rtl' ? cacheRtl : cacheLtr
 
   return (

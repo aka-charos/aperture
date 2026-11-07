@@ -51,6 +51,7 @@ const EXEMPT: Record<string, string> = {
   'assistant/discovery/tasteBrief.ts': 'own history, for the taste brief',
   'assistant/jobs/refreshSuggestions.ts': 'own history and own picks, for suggestion chips',
   'assistant/helpers/unwatched.ts': 'answers "watched?" for ids it is handed; lists nothing',
+  'assistant/tools/titleLimits.ts': 'predicates only; every query running them applies the scope',
   // Assistant tools returning cards: every card is filtered by withLibraryScope,
   // which wraps every tool. None of these returns titles outside a card list —
   // the tools that do (brief results, franchise lists, filmographies) put the
