@@ -36,7 +36,10 @@ export const TURN_CANCEL_POLL_MS = 1_000
 
 interface Waiter {
   jobId: string
+  cancelled: () => boolean
   grant: () => void
+  /** Leaves the queue without the turn (cancelled). */
+  drop: () => void
 }
 
 /** A one-at-a-time FIFO whose waiters can leave. */
@@ -74,18 +77,24 @@ export class TurnQueue {
     return new Promise((resolve) => {
       const waiter: Waiter = {
         jobId,
+        cancelled,
         grant: () => {
           clearInterval(poll)
           this.holder = jobId
           resolve(this.releaseFor(jobId))
         },
+        drop: () => {
+          clearInterval(poll)
+          resolve(null)
+        },
       }
+      // The poll only lets a cancelled job leave early; the hand-over below
+      // asks again, since a cancel can land between two polls.
       const poll = setInterval(() => {
         if (!cancelled()) return
-        clearInterval(poll)
         const at = this.waiting.indexOf(waiter)
         if (at >= 0) this.waiting.splice(at, 1)
-        resolve(null)
+        waiter.drop()
       }, this.pollMs)
       this.waiting.push(waiter)
     })
@@ -98,10 +107,84 @@ export class TurnQueue {
       if (released || this.holder !== jobId) return
       released = true
       this.holder = null
-      this.waiting.shift()?.grant()
+      this.handOver()
+    }
+  }
+
+  /** The turn goes to the first waiter still wanting it; cancelled ones leave. */
+  private handOver(): void {
+    for (let next = this.waiting.shift(); next; next = this.waiting.shift()) {
+      if (next.cancelled()) {
+        next.drop()
+        continue
+      }
+      next.grant()
+      return
     }
   }
 }
 
 /** The one queue every media-server job shares, for this process. */
 export const mediaServerTurns = new TurnQueue()
+
+/** The step a waiting job shows. */
+export const WAITING_STEP = 'Waiting for another media-server job to finish'
+
+/** What runInTurn needs from the job system, passed in so it can be tested without one. */
+export interface TurnDeps<R extends { status: string }> {
+  turns: TurnQueue
+  isCancelled: (jobId: string) => boolean
+  /** Record for a job that must wait (shows Queued, cancellable). */
+  createQueued: (jobId: string, name: string, step: string) => R
+  /** The job's turn came: no longer Queued. */
+  startQueued: (jobId: string) => void
+  /** The live record for a job, to tell whether the job replaced ours. */
+  current: (jobId: string) => R | undefined
+  complete: (jobId: string) => void
+  /** Frees the job's name in activeJobs. */
+  releaseSlot: (name: string, jobId: string) => void
+  log: (message: string) => void
+}
+
+/**
+ * Runs a media-server job when its turn comes. A job that has to wait gets a
+ * progress record first, so it shows as Queued and can be cancelled before it
+ * starts; one cancelled while waiting never runs and frees its name.
+ */
+export async function runInTurn<R extends { status: string }>(
+  name: string,
+  jobId: string,
+  run: () => Promise<void>,
+  deps: TurnDeps<R>
+): Promise<void> {
+  // An object, so the record set inside the callback is seen after it.
+  const waiting: { record?: R } = {}
+  const release = await deps.turns.acquire(
+    jobId,
+    () => deps.isCancelled(jobId),
+    () => {
+      waiting.record = deps.createQueued(jobId, name, WAITING_STEP)
+      deps.log(`⏳ ${name} waits for another media-server job`)
+    }
+  )
+  // A cancel can also land after the hand-over and before this line.
+  if (!release || deps.isCancelled(jobId)) {
+    release?.()
+    // cancelJob already recorded the run; it never started.
+    deps.log(`🛑 ${name} cancelled before its turn`)
+    deps.releaseSlot(name, jobId)
+    return
+  }
+  if (waiting.record) deps.startQueued(jobId)
+  try {
+    await run()
+  } finally {
+    release()
+    // A job whose function keeps no progress record of its own would leave
+    // the waiting record running for ever; close it.
+    const record = deps.current(jobId)
+    if (waiting.record && record === waiting.record && record.status === 'running') {
+      deps.complete(jobId)
+    }
+  }
+}

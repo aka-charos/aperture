@@ -54,6 +54,11 @@ export function JobCard({
 }: JobCardProps) {
   const { t } = useTranslation()
   const isRunning = job.status === 'running' || progress?.status === 'running'
+  // The live record says Queued as soon as the turn comes; the list's copy
+  // is only as fresh as its last poll.
+  const queued =
+    isRunning &&
+    (progress?.status === 'running' ? progress.queued === true : job.progress?.queued === true)
   const jobColor = JOB_COLORS[job.name] || '#666'
   const showResult =
     !isRunning &&
@@ -197,7 +202,7 @@ export function JobCard({
                   }}
                 />
               )}
-              {isRunning && job.progress?.queued && (
+              {queued && (
                 <Tooltip title={t('admin.jobsPage.ui.queuedTooltip')}>
                   <Chip label={t('admin.jobsPage.ui.queued')} size="small" variant="outlined" />
                 </Tooltip>

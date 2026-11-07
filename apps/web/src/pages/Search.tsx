@@ -34,6 +34,7 @@ import { useWatchStatus } from '../hooks/useWatchStatus'
 import { useWatching } from '../hooks/useWatching'
 import { PageHeading } from '@/components/PageHeading'
 import { genreLabel } from '@/lib/genreLabel'
+import { runSearchPasses, type ReadResult } from './searchPasses'
 
 interface SearchResult {
   id: string
@@ -70,8 +71,14 @@ export function SearchPage() {
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
-  // Title matches are on screen and the semantic answer is still coming.
-  const [refining, setRefining] = useState(false)
+  // Title matches are on screen and the semantic answer is still coming: the
+  // grid is dimmed and takes no clicks, since that answer reorders it.
+  const [provisional, setProvisional] = useState(false)
+  // Which pass the results on screen came from, so the caption never calls
+  // title matches semantic.
+  const [rankedBySemantic, setRankedBySemantic] = useState(false)
+  // Semantic was asked for and failed; the title matches are shown instead.
+  const [semanticFailed, setSemanticFailed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalResults, setTotalResults] = useState(0)
@@ -114,22 +121,21 @@ export function SearchPage() {
   // Perform search. Every run takes its own signal and is aborted when the
   // query or a filter moves on, so a slow answer for earlier text (a semantic
   // one above all) can never land over the results for what is in the box.
-  //
-  // With semantic on, the plain title search goes out beside it and is shown
-  // as soon as it answers; the semantic answer replaces it when it arrives.
-  // Embedding the query is the slow step, and the title matches need none.
+  // With semantic on, the order of the two passes is searchPasses.ts's.
   const performSearch = useCallback(
     async (signal: AbortSignal) => {
       if (!query || query.trim().length < 2) {
         setResults([])
         setTotalResults(0)
         setLoading(false)
-        setRefining(false)
+        setProvisional(false)
+        setSemanticFailed(false)
         return
       }
 
       setLoading(true)
-      setRefining(useSemantic)
+      setProvisional(false)
+      setSemanticFailed(false)
       setError(null)
 
       const params = new URLSearchParams({
@@ -148,7 +154,7 @@ export function SearchPage() {
 
       type Answer = { results: SearchResult[]; total: number }
       // 'failed' is an answer that came back refused; 'unreachable' never came.
-      const read = async (values: URLSearchParams): Promise<Answer | 'failed' | 'unreachable'> => {
+      const read = async (values: URLSearchParams): Promise<ReadResult<Answer>> => {
         try {
           const response = await fetch(`/api/search?${values}`, { credentials: 'include', signal })
           return response.ok ? ((await response.json()) as Answer) : 'failed'
@@ -156,34 +162,29 @@ export function SearchPage() {
           return 'unreachable'
         }
       }
-      const show = (answer: Answer) => {
-        setResults(answer.results)
-        setTotalResults(answer.total)
-        setError(null)
-      }
 
-      const semantic = useSemantic
-        ? read(new URLSearchParams([...params, ['semantic', 'true']]))
-        : null
-      const basic = await read(params)
-      if (signal.aborted) return
-      if (typeof basic !== 'string') {
-        show(basic)
-        setLoading(false)
+      const outcome = await runSearchPasses<Answer>({
+        readTitle: () => read(params),
+        readSemantic: useSemantic
+          ? () => read(new URLSearchParams([...params, ['semantic', 'true']]))
+          : null,
+        aborted: () => signal.aborted,
+        show: (answer, ranking, isProvisional) => {
+          setResults(answer.results)
+          setTotalResults(answer.total)
+          setRankedBySemantic(ranking === 'semantic')
+          setProvisional(isProvisional)
+          setLoading(false)
+          setError(null)
+        },
+      })
+      if (outcome.status === 'aborted') return
+      if (outcome.status !== 'shown') {
+        setError(t(outcome.status === 'failed' ? 'search.errors.searchFailed' : 'search.errors.connect'))
       }
-
-      const enhanced = semantic ? await semantic : null
-      if (signal.aborted) return
-      if (enhanced && typeof enhanced !== 'string') {
-        show(enhanced)
-      } else if (typeof basic === 'string') {
-        // Nothing answered: say which way it failed.
-        const failure = enhanced ?? basic
-        setError(t(failure === 'failed' ? 'search.errors.searchFailed' : 'search.errors.connect'))
-      }
-      // A semantic failure after the title matches arrived keeps those on screen.
+      setSemanticFailed(outcome.status === 'shown' && outcome.semanticFailed)
+      setProvisional(false)
       setLoading(false)
-      setRefining(false)
     },
     [query, type, genre, collection, network, minRtScore, useSemantic, yearRange, filters, t]
   )
@@ -274,7 +275,7 @@ export function SearchPage() {
                 <SearchIcon />
               </InputAdornment>
             ),
-            endAdornment: (loading || refining) && (
+            endAdornment: (loading || provisional) && (
               <InputAdornment position="end">
                 <CircularProgress size={20} />
               </InputAdornment>
@@ -481,6 +482,11 @@ export function SearchPage() {
           {error}
         </Alert>
       )}
+      {semanticFailed && !error && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          {t('search.semanticFailed')}
+        </Alert>
+      )}
 
       {/* Results */}
       {!query && (
@@ -495,7 +501,7 @@ export function SearchPage() {
         </Box>
       )}
 
-      {query && !loading && !refining && !error && results.length === 0 && (
+      {query && !loading && !provisional && !error && results.length === 0 && (
         <Box textAlign="center" py={8}>
           <Typography variant="h6" color="text.secondary">
             {t('search.noResults', { query })}
@@ -513,10 +519,25 @@ export function SearchPage() {
               count: totalResults,
               query,
             })}
-            {useSemantic ? t('search.semanticSuffix') : ''}
+            {rankedBySemantic
+              ? t('search.semanticSuffix')
+              : provisional
+                ? t('search.semanticPendingSuffix')
+                : ''}
           </Typography>
 
-          <Grid container spacing={2}>
+          {/* Provisional title matches take no clicks: the semantic answer
+              reorders them, and a click could land on the poster moved there. */}
+          <Grid
+            container
+            spacing={2}
+            aria-busy={provisional}
+            sx={{
+              opacity: provisional ? 0.55 : 1,
+              pointerEvents: provisional ? 'none' : undefined,
+              transition: 'opacity 150ms',
+            }}
+          >
             {results.map((result) => (
               <Grid item xs={6} sm={4} md={3} lg={2} key={`${result.type}-${result.id}`}>
                 <MoviePoster

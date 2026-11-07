@@ -2225,7 +2225,9 @@
     "noResultsHint": "Try adjusting your filters or search terms",
     "foundResults_one": "Found {{count}} result for \"{{query}}\"",
     "foundResults_other": "Found {{count}} results for \"{{query}}\"",
-    "semanticSuffix": " (with AI-powered semantic matching)"
+    "semanticSuffix": " (with AI-powered semantic matching)",
+    "semanticPendingSuffix": " (title matches; AI matching is on its way)",
+    "semanticFailed": "AI matching is not available right now, so these are title matches only."
   },
   "filterPopper": {
     "filters": "Filters",

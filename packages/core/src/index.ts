@@ -463,6 +463,8 @@ export {
 // Job Progress
 export {
   createJobProgress,
+  createQueuedJobProgress,
+  startQueuedJob,
   setJobStep,
   updateJobProgress,
   addLog,

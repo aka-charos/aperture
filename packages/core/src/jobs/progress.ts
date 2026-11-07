@@ -22,6 +22,13 @@ export interface JobProgress {
   logs: LogEntry[]
   error?: string
   result?: Record<string, unknown>
+  /**
+   * Waiting for its turn behind another job (createQueuedJobProgress), so the
+   * console can say Queued from the live record. Absent means not queued.
+   */
+  queued?: boolean
+  /** When the job joined the queue; set only on a record that waited. */
+  queuedAt?: Date
 }
 
 export interface LogEntry {
@@ -80,6 +87,10 @@ const STORED_LOG_LIMIT = 300
  * Create a new job progress tracker
  */
 export function createJobProgress(jobId: string, jobName: string, totalSteps: number): JobProgress {
+  // A job that waited its turn already has a record (createQueuedJobProgress);
+  // its log, with how long it waited, carries over into the run's own.
+  const previous = activeJobs.get(jobId)
+  const carried = previous?.queuedAt ? previous.logs : []
   const progress: JobProgress = {
     jobId,
     jobName,
@@ -92,16 +103,55 @@ export function createJobProgress(jobId: string, jobName: string, totalSteps: nu
     overallProgress: 0,
     itemsProcessed: 0,
     itemsTotal: 0,
-    logs: [],
+    logs: carried,
   }
 
   activeJobs.set(jobId, progress)
   emitProgress(jobId, progress)
-  
+
   logger.info({ jobId, jobName }, `Job started: ${jobName}`)
   addLog(jobId, 'info', `🚀 Starting job: ${jobName}`)
 
   return progress
+}
+
+/**
+ * A record for a job that must wait its turn before it starts: it shows as
+ * Queued (`queued`) and can be cancelled while it waits. The job's own
+ * createJobProgress later replaces it and keeps its log.
+ */
+export function createQueuedJobProgress(jobId: string, jobName: string, waitingStep: string): JobProgress {
+  const now = new Date()
+  const progress: JobProgress = {
+    jobId,
+    jobName,
+    status: 'running',
+    startedAt: now,
+    currentStep: waitingStep,
+    currentStepIndex: 0,
+    totalSteps: 1,
+    stepProgress: 0,
+    overallProgress: 0,
+    itemsProcessed: 0,
+    itemsTotal: 0,
+    logs: [],
+    queued: true,
+    queuedAt: now,
+  }
+  activeJobs.set(jobId, progress)
+  logger.info({ jobId, jobName }, `Job queued: ${jobName}`)
+  addLog(jobId, 'info', `⏳ Queued: ${waitingStep}`)
+  return progress
+}
+
+/** The queued job got its turn: no longer Queued, and the log says how long it waited. */
+export function startQueuedJob(jobId: string): void {
+  const progress = activeJobs.get(jobId)
+  if (!progress?.queued || !progress.queuedAt) return
+  progress.queued = false
+  const seconds = Math.round((Date.now() - progress.queuedAt.getTime()) / 1000)
+  const waited = seconds < 120 ? `${seconds}s` : `${Math.round(seconds / 60)} min`
+  addLog(jobId, 'info', `▶️ Its turn came after waiting ${waited}`)
 }
 
 /**

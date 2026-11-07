@@ -1,5 +1,7 @@
 export {
   createJobProgress,
+  createQueuedJobProgress,
+  startQueuedJob,
   setJobStep,
   updateJobProgress,
   addLog,

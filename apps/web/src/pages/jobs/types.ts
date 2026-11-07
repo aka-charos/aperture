@@ -60,6 +60,8 @@ export interface JobProgress {
   logs: LogEntry[]
   error?: string
   result?: Record<string, unknown>
+  /** Waiting its turn behind another media-server job (set on the live record). */
+  queued?: boolean
 }
 
 export interface JobLastRun {
