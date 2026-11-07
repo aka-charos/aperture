@@ -6,6 +6,11 @@
 
 import { MediaServerHttpError } from '../httpError.js'
 import { createChildLogger } from '../../lib/logger.js'
+import {
+  MediaServerTimeoutError,
+  requestMediaServer,
+  type MediaServerReply,
+} from '../serverRequest.js'
 
 export const logger = createChildLogger('jellyfin-provider')
 
@@ -37,22 +42,14 @@ export class JellyfinProviderBase {
       ...((options.headers as Record<string, string>) || {}),
     }
 
-    // Add 60 second timeout with AbortController (increased from 30s for large libraries)
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 60000)
-
     const startTime = Date.now()
-    let response: Response
+    let response: MediaServerReply
     try {
-      response = await fetch(url, {
-        ...options,
-        headers,
-        signal: controller.signal,
-      })
+      // 60 seconds for the whole answer, body included (large libraries).
+      response = await requestMediaServer(this.baseUrl, url, { ...options, headers }, 60_000)
     } catch (err) {
-      clearTimeout(timeoutId)
       const duration = Date.now() - startTime
-      if (err instanceof Error && err.name === 'AbortError') {
+      if (err instanceof MediaServerTimeoutError) {
         logger.error({ url, duration }, '⏱️ Jellyfin API request timed out after 60 seconds')
         throw new Error(
           `Connection to Jellyfin timed out after 60 seconds. Please check that your media server URL (${this.baseUrl}) is accessible from the Aperture container.`
@@ -62,19 +59,16 @@ export class JellyfinProviderBase {
       throw new Error(
         `Failed to connect to Jellyfin at ${this.baseUrl}. Please verify the URL is correct and the server is running.`
       )
-    } finally {
-      clearTimeout(timeoutId)
     }
     const duration = Date.now() - startTime
+    const { text } = response
 
     if (!response.ok) {
-      const text = await response.text()
       logger.error({ status: response.status, url, body: text, duration }, '❌ Jellyfin API error')
       throw new MediaServerHttpError('Jellyfin', response.status, response.statusText, text)
     }
 
     // Some endpoints return empty response
-    const text = await response.text()
     if (!text) {
       logger.debug({ url, duration, empty: true }, '✅ Jellyfin API Response (empty)')
       return {} as T

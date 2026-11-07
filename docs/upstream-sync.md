@@ -47,6 +47,7 @@ From upstream's work towards v1.0.0, 2026-11-03 to 2026-11-05 (49 commits):
 - **One idea kept:** keying the once-per-build chunk reload on the entry's URL, from `9cac3a0f`; its cancelling of `vite:preloadError` was rejected ([F-174](aperture-forensics.md#f-174)).
 - **Solved separately:** an instance reached by an address other than `APP_BASE_URL`, the ground `26150c86` covers ([F-176](aperture-forensics.md#f-176)).
 - **Measured and not ported:** the recommendation-query rewrite in `5d76c020` ([F-180](aperture-forensics.md#f-180)).
+- **Adapted, from 1.0.1:** the media-server request deadline that covers the body, and the per-server request cap, from `e44278d2`; the schedule minute kept on save, spread default minutes, and the next run decided in the scheduler's zone, from `7ecb45e3` and `e44278d2` ([F-191](aperture-forensics.md#f-191)). Its Emby refresh queue and incremental STRM writing (`e44278d2`, `1f84b741`, `be7a5fdc`) and output checks (`270a5b9d`, `7ce960d2`) serve legacy library output and were not taken.
 
 ## Why not merge
 

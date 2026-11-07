@@ -90,9 +90,11 @@ export function JobConfigDialog({
   runLimit = null,
   onSave,
 }: JobConfigDialogProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [scheduleType, setScheduleType] = useState<ScheduleType>('daily')
   const [hour, setHour] = useState<number>(3)
+  // Text, so a half-typed or cleared field is not silently read as :00.
+  const [minuteText, setMinuteText] = useState<string>('0')
   // Weekly holds a set; biweekly holds exactly one. They are separate pieces of
   // state so that switching frequency back and forth does not quietly discard
   // the other's selection.
@@ -146,6 +148,7 @@ export function JobConfigDialog({
     if (open && !initialized && currentSchedule) {
       setScheduleType(currentSchedule.type)
       setHour(currentSchedule.hour ?? 3)
+      setMinuteText(String(currentSchedule.minute ?? 0))
       setDayOfWeek(currentSchedule.dayOfWeek ?? 0)
       // A schedule saved before multi-day existed carries only the scalar.
       setDaysOfWeek(
@@ -177,6 +180,22 @@ export function JobConfigDialog({
   const showsDayOfWeek = scheduleType === 'weekly' || scheduleType === 'biweekly'
   const showsDaySet = scheduleType === 'weekly'
   const showsTimeOfDay = showsDayOfWeek || scheduleType === 'daily'
+  // The 15- and 30-minute intervals run on the quarter and half hour
+  // whatever the minute says, so they get no minute field.
+  const subHour = scheduleType === 'interval' && intervalMinutesTotal < 60
+  const showsMinute = isEnabled && (showsTimeOfDay || (scheduleType === 'interval' && !subHour))
+
+  // Every save used to send minute 0 (or none for an interval job), which put
+  // a job seeded at :10 or 05:45 back on the hour the first time anyone opened
+  // this dialog. The minute is now shown, edited and sent back as it is.
+  const parsedMinute = useMemo((): number | undefined => {
+    const text = minuteText.trim()
+    if (!/^\d{1,2}$/.test(text)) return undefined
+    const value = Number(text)
+    return value <= 59 ? value : undefined
+  }, [minuteText])
+  const minuteInvalid = showsMinute && parsedMinute === undefined
+  const minute = parsedMinute ?? currentSchedule?.minute ?? 0
 
   // The cap as it will be saved: null for blank, a number when valid, and
   // undefined when the text is not an acceptable value (Save is then disabled).
@@ -197,19 +216,15 @@ export function JobConfigDialog({
     setError(null)
 
     try {
-      const subHour = scheduleType === 'interval' && intervalMinutesTotal < 60
       const payload: JobConfigSaveParams = { scheduleType, isEnabled }
       if (runLimit && parsedRunLimit !== undefined) {
         payload.maxItemsPerRun = parsedRunLimit
       }
 
-      if (scheduleType === 'interval' || scheduleType === 'manual') {
-        payload.scheduleHour = null
-        payload.scheduleMinute = null
-      } else {
-        payload.scheduleHour = hour
-        payload.scheduleMinute = 0
-      }
+      payload.scheduleHour = scheduleType === 'interval' || scheduleType === 'manual' ? null : hour
+      // No minute for manual or the sub-hour intervals: the server then reads
+      // the job's seed minute, which is what it falls back to anyway.
+      payload.scheduleMinute = scheduleType === 'manual' || subHour ? null : minute
 
       if (showsDaySet) {
         // The scalar rides along at the earliest day so an older API build (or
@@ -248,7 +263,13 @@ export function JobConfigDialog({
     if (manualOnly) return t('admin.jobsPage.ui.configPreviewManualOnly')
     if (!isEnabled) return t('admin.jobsPage.ui.configPreviewDisabled')
 
-    const timeLabel = hours.find((h) => h.value === hour)?.label ?? ''
+    // Formatted as a wall time (UTC here only so no zone shifts it); the
+    // schedule itself is read in the server's zone, which the dialog states.
+    const timeLabel = new Intl.DateTimeFormat(i18n.language, {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: 'UTC',
+    }).format(Date.UTC(2000, 0, 1, hour, minute))
     switch (scheduleType) {
       case 'daily':
         return t('admin.jobsPage.ui.configPreviewDaily', { time: timeLabel })
@@ -266,17 +287,48 @@ export function JobConfigDialog({
         const dayLabel = weekdays.find((d) => d.value === dayOfWeek)?.label ?? ''
         return t('admin.jobsPage.ui.configPreviewBiweekly', { day: dayLabel, time: timeLabel })
       }
-      case 'interval':
-        return (
+      case 'interval': {
+        const interval =
           intervalOptions.find((i) => i.value === intervalMinutesTotal)?.label ||
           t('admin.jobsPage.ui.intervalFallback')
-        )
+        return subHour
+          ? interval
+          : t('admin.jobsPage.ui.configPreviewIntervalAt', {
+              interval,
+              minute: String(minute).padStart(2, '0'),
+            })
+      }
       case 'manual':
         return t('admin.jobsPage.ui.configPreviewManualRuns')
       default:
         return ''
     }
   }
+
+  const minuteField = showsMinute && (
+    <FormControl fullWidth>
+      <FormLabel sx={{ mb: 1, fontWeight: 500 }}>{t('admin.jobsPage.ui.configMinute')}</FormLabel>
+      <TextField
+        value={minuteText}
+        onChange={(e) => setMinuteText(e.target.value)}
+        size="small"
+        error={minuteInvalid}
+        helperText={
+          minuteInvalid
+            ? t('admin.jobsPage.ui.configMinuteInvalid')
+            : t('admin.jobsPage.ui.configMinuteHint')
+        }
+        slotProps={{
+          htmlInput: { inputMode: 'numeric', 'aria-label': t('admin.jobsPage.ui.configMinute') },
+        }}
+      />
+      {currentSchedule?.timeZone && (
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+          {t('admin.jobsPage.ui.configTimeZone', { timeZone: currentSchedule.timeZone })}
+        </Typography>
+      )}
+    </FormControl>
+  )
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -363,6 +415,8 @@ export function JobConfigDialog({
             </FormControl>
           )}
 
+          {showsTimeOfDay && minuteField}
+
           {isEnabled && showsDaySet && (
             <FormControl fullWidth>
               <FormLabel sx={{ mb: 1, fontWeight: 500 }}>
@@ -433,6 +487,8 @@ export function JobConfigDialog({
             </FormControl>
           )}
 
+          {scheduleType === 'interval' && minuteField}
+
           {runLimit && (
             <FormControl fullWidth>
               <FormLabel sx={{ mb: 1, fontWeight: 500 }}>
@@ -502,7 +558,7 @@ export function JobConfigDialog({
         <Button
           variant="contained"
           onClick={handleSave}
-          disabled={saving || runLimitInvalid}
+          disabled={saving || runLimitInvalid || minuteInvalid}
           startIcon={saving ? <CircularProgress size={16} /> : null}
         >
           {saving ? t('admin.common.saving') : t('common.save')}

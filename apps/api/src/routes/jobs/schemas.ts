@@ -52,6 +52,13 @@ export const jobComponentSchemas = {
           maxItemsPerRun: { type: 'integer' as const, nullable: true, description: "Configured items per run; null means the job's default" },
           isEnabled: { type: 'boolean' as const, description: 'Whether schedule is enabled' },
           formatted: { type: 'string' as const, description: 'Human-readable schedule description' },
+          nextRunAt: {
+            type: 'string' as const,
+            format: 'date-time',
+            nullable: true,
+            description: 'When the scheduler next runs the job, in its own time zone; null for manual or switched off',
+          },
+          timeZone: { type: 'string' as const, description: 'The time zone the schedule is read in (the container TZ)' },
         },
       },
       progress: {

@@ -11,6 +11,9 @@ import {
   getLastJobRuns,
   isLegacyLibraryOutputEnabled,
   legacyJobBlockedReason,
+  isScheduledRunDue,
+  nextScheduledRun,
+  schedulerTimeZone,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 import { jobSchemas } from '../schemas.js'
@@ -37,6 +40,8 @@ export async function registerListHandlers(fastify: FastifyInstance) {
       // Read once for the whole list. The console greys a card on the decided
       // reason rather than holding its own list of which jobs are legacy.
       const legacyOutputEnabled = await isLegacyLibraryOutputEnabled()
+      const now = new Date()
+      const timeZone = schedulerTimeZone()
 
       const jobs = await Promise.all(
         jobDefinitions.map(async (def) => {
@@ -44,6 +49,13 @@ export async function registerListHandlers(fastify: FastifyInstance) {
           const progress = activeJobId ? getJobProgress(activeJobId) : null
           const config = configMap.get(def.name) || (await getJobConfig(def.name))
           const lastRun = lastRunsMap.get(def.name)
+          // Decided here, in the scheduler's zone and with its biweekly rule
+          // (the last COMPLETED run), so the page never works it out itself.
+          const lastCompletedAt =
+            config.scheduleType === 'biweekly'
+              ? (await isScheduledRunDue(def.name, 'biweekly', now)).lastRunAt
+              : null
+          const nextRunAt = nextScheduledRun(config, { now, timeZone, lastCompletedAt })
 
           return {
             ...def,
@@ -75,6 +87,8 @@ export async function registerListHandlers(fastify: FastifyInstance) {
                   maxItemsPerRun: config.maxItemsPerRun,
                   isEnabled: config.isEnabled,
                   formatted: formatSchedule(config),
+                  nextRunAt: nextRunAt?.toISOString() ?? null,
+                  timeZone,
                 }
               : null,
             lastRun: lastRun

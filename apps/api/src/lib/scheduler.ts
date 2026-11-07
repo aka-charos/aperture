@@ -12,6 +12,7 @@ import {
   scheduleToCron,
   formatSchedule,
   isScheduledRunDue,
+  schedulerTimeZone,
   type JobConfig,
 } from '@aperture/core'
 
@@ -90,7 +91,8 @@ function scheduleJob(config: JobConfig): void {
       logger.error({ err, job: config.jobName }, `❌ Scheduled job failed: ${config.jobName}`)
     }
   }, {
-    timezone: process.env.TZ || 'America/New_York',
+    // The same zone the jobs list works the next run out in.
+    timezone: schedulerTimeZone(),
     scheduled: true,
   })
 

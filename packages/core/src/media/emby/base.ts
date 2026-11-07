@@ -4,6 +4,11 @@
 
 import { createChildLogger } from '../../lib/logger.js'
 import {
+  MediaServerTimeoutError,
+  requestMediaServer,
+  type MediaServerReply,
+} from '../serverRequest.js'
+import {
   EMBY_FETCH_TIMEOUT_MS,
   embyConnectionError,
   embyHttpError,
@@ -40,21 +45,18 @@ export class EmbyProviderBase {
 
     logger.debug({ method: options.method || 'GET', url }, '📡 Emby API Request')
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), EMBY_FETCH_TIMEOUT_MS)
-
     const startTime = Date.now()
-    let response: Response
+    let response: MediaServerReply
     try {
-      response = await fetch(url, {
-        ...options,
-        headers,
-        signal: controller.signal,
-      })
+      response = await requestMediaServer(
+        this.baseUrl,
+        url,
+        { ...options, headers },
+        EMBY_FETCH_TIMEOUT_MS
+      )
     } catch (err) {
-      clearTimeout(timeoutId)
       const duration = Date.now() - startTime
-      if (err instanceof Error && err.name === 'AbortError') {
+      if (err instanceof MediaServerTimeoutError) {
         logger.error(
           { url, duration },
           `⏱️ Emby API request timed out after ${EMBY_FETCH_TIMEOUT_MS / 1000} seconds`
@@ -63,18 +65,15 @@ export class EmbyProviderBase {
       }
       logger.error({ url, duration, err }, '❌ Emby API network error')
       throw embyConnectionError(this.baseUrl)
-    } finally {
-      clearTimeout(timeoutId)
     }
     const duration = Date.now() - startTime
+    const { text } = response
 
     if (!response.ok) {
-      const text = await response.text()
       logger.error({ status: response.status, url, body: text, duration }, '❌ Emby API error')
       throw embyHttpError(response.status, response.statusText, text)
     }
 
-    const text = await response.text()
     if (!text) {
       logger.debug({ url, duration, empty: true }, '✅ Emby API Response (empty)')
       return {} as T

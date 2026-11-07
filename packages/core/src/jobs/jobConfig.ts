@@ -153,21 +153,25 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
     dayOfWeek?: number
   }
 > = {
-  // === EVERY 30 MINUTES ===
+  // The jobs that read the media server keep off :00 and :30, where sync-users
+  // (every 30 minutes) fires, and off each other's minutes, so a busy hour
+  // never starts them all at once.
+
+  // === EVERY 30 MINUTES (:00 and :30; cron's */30 takes no offset) ===
   'sync-users': { scheduleType: 'interval', hour: 0, minute: 0, intervalMinutes: 30 },
 
-  // === EVERY HOUR (staggered by 15 mins) ===
-  'sync-series-watch-history': { scheduleType: 'interval', hour: 0, minute: 0, intervalHours: 1 },
-  'sync-watching-favorites': { scheduleType: 'interval', hour: 0, minute: 30, intervalHours: 1 },
+  // === EVERY HOUR ===
+  'sync-series-watch-history': { scheduleType: 'interval', hour: 0, minute: 5, intervalHours: 1 },
+  'sync-watching-favorites': { scheduleType: 'interval', hour: 0, minute: 50, intervalHours: 1 },
 
   // === EVERY 2 HOURS ===
-  'sync-movie-watch-history': { scheduleType: 'interval', hour: 0, minute: 0, intervalHours: 2 },
+  'sync-movie-watch-history': { scheduleType: 'interval', hour: 0, minute: 25, intervalHours: 2 },
 
-  // === EVERY 3 HOURS (staggered by 10 mins) ===
-  'sync-movies': { scheduleType: 'interval', hour: 0, minute: 0, intervalHours: 3 },
+  // === EVERY 3 HOURS ===
+  'sync-movies': { scheduleType: 'interval', hour: 0, minute: 40, intervalHours: 3 },
   'sync-series': { scheduleType: 'interval', hour: 0, minute: 10, intervalHours: 3 },
   'sync-movie-libraries': { scheduleType: 'interval', hour: 0, minute: 20, intervalHours: 3 },
-  'sync-series-libraries': { scheduleType: 'interval', hour: 0, minute: 30, intervalHours: 3 },
+  'sync-series-libraries': { scheduleType: 'interval', hour: 0, minute: 35, intervalHours: 3 },
 
   // === EVERY 6 HOURS (staggered by 10 mins) ===
   'enrich-metadata': { scheduleType: 'interval', hour: 0, minute: 0, intervalHours: 6 },
@@ -237,7 +241,10 @@ function rowToConfig(row: JobConfigRow): JobConfig {
     jobName: row.job_name,
     scheduleType: row.schedule_type as ScheduleType,
     scheduleHour: row.schedule_hour,
-    scheduleMinute: row.schedule_minute,
+    // Until now the schedule dialog saved every interval job with no minute,
+    // which ran it at :00 and threw away the seed's offset. A row with no
+    // minute takes the seed's, so those jobs go back to their stagger.
+    scheduleMinute: row.schedule_minute ?? JOB_SCHEDULE_DEFAULTS[row.job_name]?.minute ?? null,
     scheduleDayOfWeek: row.schedule_day_of_week,
     scheduleDaysOfWeek: row.schedule_days_of_week,
     scheduleIntervalHours: row.schedule_interval_hours,

@@ -20,6 +20,13 @@ export interface JobSchedule {
   maxItemsPerRun?: number | null
   isEnabled: boolean
   formatted: string
+  /**
+   * When the scheduler next runs the job, decided server-side in its own time
+   * zone. Null for manual or switched off; absent on older API builds.
+   */
+  nextRunAt?: string | null
+  /** The zone the schedule's times are read in (the container's TZ). */
+  timeZone?: string
 }
 
 /**
