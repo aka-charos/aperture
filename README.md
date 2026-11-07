@@ -67,8 +67,8 @@ What arrived unchanged is under [Inherited from upstream](#inherited-from-upstre
 | **AI roles & providers**   | Model picker with prices, tool-calling and reasoning badges from live catalogs; real capability detection for OpenRouter and local servers; one provider key shared across roles; provider errors logged in the provider's own words.                                                                                                                                                            |
 | **Embeddings**             | A 2560-wide table, a stored-sets panel showing what switching would cost, mean-centred vectors, retrieval modes where a model supports one, and a canonical text that stopped embedding nationality six times.                                                                                                                                                                                   |
 | **Recommender**            | MMR diversity, availability-adjusted genre preference, completion-weighted series, match insights on every scored title, explanations written from real data and reused when nothing the model was shown has changed, an explanations-only rerun, one-click rewrite of a single pick's explanation, and interest slots backed by a tag on the title rather than by how near it sits to a phrase. |
-| **Assistant**              | Intent routing with a grounded web search (Google, Tavily and fastCRW), a taste-profile section on every discovery answer shown as tabs of card grids, dock and full page, live status, turns saved by the server, episode search and stored analyses.                                                                                                                                           |
-| **Discovery & requests**   | Candidates embedded and ranked by taste, a tuning panel with measured influence, requests filed as the person who made them, and in-app approve/decline.                                                                                                                                                                                                                                         |
+| **Assistant**              | Intent routing with a grounded web search (Google, Tavily and fastCRW), a taste-profile section on every discovery answer shown as tabs of card grids, dock and full page, live status, turns saved by the server, episode search, stored analyses, what is coming next for followed shows, and limits a request states (genre, years, rating, runtime) kept on every section.                   |
+| **Discovery & requests**   | Candidates embedded and ranked by taste, a tuning panel with measured influence, requests filed as the person who made them, in-app approve/decline, and gap analysis of missing TV seasons by network.                                                                                                                                                                                          |
 | **Watch stats & history**  | Every figure opens the titles behind it; heatmap and taste-vs-crowd sections; whole-history search; a Watcher Identity written from played titles and rewritten by the recommendation run whenever the taste profile moves.                                                                                                                                                                      |
 | **Browse, search, detail** | A searchable country filter that matches a title's country of origin, a Browse selection that lives in the URL so Back restores it, search that ignores accents and punctuation and matches original titles, detail pages that state each fact once, and collections written to Emby as Box Sets.                                                                                                |
 | **Dashboard & Watching**   | Titles open in the detail dialog over the page, shows that aired recently appear for viewers who were caught up, upcoming episodes only inside a two-month horizon, bigger posters, and posters that end on a whole poster.                                                                                                                                                                      |
@@ -83,16 +83,16 @@ What arrived unchanged is under [Inherited from upstream](#inherited-from-upstre
 
 **Fixed** — defects in code inherited from upstream. The worst of them:
 
-| Area                        | What was broken                                                                                                                                                                                                                                                              |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Security**                | Any request carrying `x-internal-request: true` passed admin checks on about 163 endpoints, including the one returning the media-server API key. Session tokens were stored verbatim, API keys carried full admin authority, and an image proxy answered without a session. |
-| **Library access**          | Every viewer saw every enabled library whatever their media-server account could open, and a pick from a hidden library was playable through their own generated library.                                                                                                    |
-| **Lost data**               | Pressing Regenerate deleted the viewer's Watcher Identities, excluded libraries and algorithm settings. A run with no picks could delete generated libraries from disk, and restoring an uploaded backup always failed.                                                      |
-| **Watched vs favourited**   | Favouriting a title counted as watching it in about fifteen places, from Home's tiles and Watch Stats to the assistant.                                                                                                                                                      |
-| **Recommender**             | Disliked titles still pulled the taste profile toward them, "% Match" could pass 100%, a 20% diversity setting acted as a hard sort by genre, and favourites were recommended back.                                                                                          |
-| **Discovery & requests**    | Discover's taste term never ran, so popularity decided half the ranking, and every request was filed as the admin and auto-approved.                                                                                                                                         |
-| **Enrichment & embeddings** | Adding an OMDb key later did nothing, OMDb's quota errors retired titles as "not found", a failed MDBList batch was stamped "no data" for good, and enriched keywords never reached the embeddings.                                                                          |
-| **Assistant & search**      | Leaving a chat mid-turn lost the exchange, a resumed conversation never saved new turns, and searching a title with a colon returned an error shown as "No results".                                                                                                         |
+| Area                        | What was broken                                                                                                                                                                                                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Security**                | Any request carrying `x-internal-request: true` passed admin checks on about 163 endpoints, including the one returning the media-server API key. Session tokens were stored verbatim, API keys carried full admin authority, and an image proxy answered without a session.          |
+| **Library access**          | Every viewer saw every enabled library whatever their media-server account could open, and a pick from a hidden library was playable through their own generated library.                                                                                                             |
+| **Lost data**               | Pressing Regenerate deleted the viewer's Watcher Identities, excluded libraries and algorithm settings. A run with no picks could delete generated libraries from disk, restoring an uploaded backup always failed, and a restore that failed part-way left a half-replaced database. |
+| **Watched vs favourited**   | Favouriting a title counted as watching it in about fifteen places, from Home's tiles and Watch Stats to the assistant.                                                                                                                                                               |
+| **Recommender**             | Disliked titles still pulled the taste profile toward them, "% Match" could pass 100%, a 20% diversity setting acted as a hard sort by genre, and favourites were recommended back.                                                                                                   |
+| **Discovery & requests**    | Discover's taste term never ran, so popularity decided half the ranking, and every request was filed as the admin and auto-approved.                                                                                                                                                  |
+| **Enrichment & embeddings** | Adding an OMDb key later did nothing, OMDb's quota errors retired titles as "not found", a failed MDBList batch was stamped "no data" for good, and enriched keywords never reached the embeddings.                                                                                   |
+| **Assistant & search**      | Leaving a chat mid-turn lost the exchange, a resumed conversation never saved new turns, and searching a title with a colon returned an error shown as "No results".                                                                                                                  |
 
 ---
 
@@ -254,8 +254,10 @@ Upstream had the chat assistant: a dialog with library tools for search, history
 - Available as a **dockable side panel** and a full **`/assistant`** page as well as the dialog. The server saves each turn itself, and a conversation renders in the order it was written.
 - **Live phase status** ("searching the web", "checking your library") in place of a static spinner, and cards that stream in rather than waiting for the slow part.
 - New tools for episode search, stored title analyses, franchises and a library-scoped personalized search over the pool the recommender already scored.
+- **What is coming next** for the shows you follow, or any show you name, from the same lookups as Shows You Watch, without a web search. A date is only ever "expected", and "nothing announced" is kept apart from a lookup that failed.
+- **Limits you state are kept.** Genre, years, minimum rating and maximum runtime hold on every section of an answer, web picks included, and a section the limits emptied says so.
 - **National cinema is searchable** (country, not language — languages are populated for under 1% of a real library), with ~120 demonyms mapped to the stored country names.
-- Rich cards with synopsis, grounded reason, director, favourite and watched state, laid out in a responsive grid; when an answer has several sections they are tabs. A cut synopsis ends in "More ›", which opens the title in place without leaving the conversation.
+- Rich cards with synopsis, grounded reason, director, favourite and watched state, laid out in a responsive grid; when an answer has several sections they are tabs. A cut synopsis ends in "More ›", which opens the title in place without leaving the conversation. A single-title card can rate the title and add a series to Watching, and compacts in a narrow chat.
 - **fastCRW as a third web-search source** beside Google and Tavily, and Gemini is asked to search in English whatever language the request is in.
 - **Build a playlist or collection from chat picks**, carrying the request that produced them.
 - Optional **unwatched-only** mode, and suggestion chips drawn from your newest completed run.
@@ -275,6 +277,8 @@ Upstream had the discovery engine for content you do not own, requests through *
 - The taste brief personalises **which candidates win, never which searches run** — the profile is structurally unable to reach a search call.
 - **Franchise page** (new) for every TMDB collection — what you own, what is missing and what is announced — with a request button only where a request would actually do something.
 - **Gap analysis** lists the missing films inline, closest to complete first, each row linking to its franchise page.
+  - A **TV shows** tab (new) compares each aired season on TMDb with the episodes the library holds, filters by network, and requests seasons one at a time or by selection. A show numbered differently in the library and on TMDb is set aside rather than reported short.
+  - A scan replaces the list only by finishing, so a failure, a cancel or TMDb going quiet leaves the last list up with a note saying why.
 - **Missing episodes and seasons** surfaced on series pages and Shows You Watch, with per-season requests.
 
 ### Title analysis — new
@@ -432,6 +436,7 @@ Upstream had sessions, API keys and per-user feature switches.
 
 - **Access is its own switch.** Turning it off ends sign-in, sessions and API keys at once and stops every piece of per-user work, while leaving each feature switch as it was — so letting someone back in restores their setup. Features can be set up before access is granted, and an admin cannot switch off their own access.
 - **Library access follows the media server.** Each viewer sees only the libraries their Emby/Jellyfin account can open (and that are enabled here), within their parental-rating limit — in browse, search, similar titles, the Explore graph, detail pages, the assistant and their generated libraries. A title outside that scope answers exactly like one that does not exist.
+- **The connection test says whether the server is Emby or Jellyfin** and warns when the chosen type is wrong. Where the two really differ, the interface reads a capability rather than the server's name.
 - **Feature permissions** — Discover, requests, Collections, the assistant, email notifications, watch-history management — are decided on the server from the session, and the sidebar shows only what the server says the viewer can use.
 - **Scoped API keys** — `read`, `write` and `admin`. New keys are read-only; a scope can narrow what the account behind a key may do, never widen it.
 - **Every permission change is recorded** — who changed what, including switches that moved because another one did.
@@ -477,6 +482,7 @@ Defects in code inherited from upstream, grouped by area. Each line is something
   - Recommendations and generated libraries ignored that too, so a pick from a hidden library was playable through the viewer's own generated library.
   - The parental rating applied on only three surfaces, and the series pipeline compared ages against rating values.
 - The AI settings page, the per-provider credential routes, the n8n route and the setup snapshot sent saved API keys and header values to the browser, and structured settings (SMTP and other integration passwords included) were printed in the log on every save. Three Test buttons would send a saved admin credential to whatever server address was typed into the form.
+- The Shows You Watch list was cached in the browser for a day with no owner, and signing out did not clear it, so the next person to sign in on that browser saw the previous person's shows.
 - An account deleted from the media server kept working: sign-in, API keys and background jobs all carried on, and nothing listed it.
 - The public info endpoint handed the internal media-server address to non-admins, and `/robots.txt` answered with the app shell, which crawlers read as permission to index everything.
 
@@ -485,6 +491,9 @@ Defects in code inherited from upstream, grouped by area. Each line is something
 - Pressing Regenerate deleted the viewer's whole preferences row — both Watcher Identities, excluded libraries and algorithm settings — and a movie full reset deleted every series run as well.
 - A recommendation run that could produce no picks was recorded as completed, which blanked the page and let the library writer delete generated libraries from disk.
 - Restoring a database from an uploaded backup always failed.
+- A restore replaced the database outside a transaction and carried on when its safety backup failed, so a failure part-way left a half-replaced database with no copy to go back to. A backup upload over the size limit was saved cut off and reported as fine.
+- A library sync could delete titles and episodes, with their ratings and watch history, when the media server's paging skipped an item but still reported the full count.
+- Gap analysis deleted the last good list before scanning, so a failed or cancelled scan left nothing.
 - Leaving a chat mid-turn lost both the question and the answer, and a resumed conversation never saved new turns.
 - A playlist's description never reached the media server, and a channel's free-text preferences were stored but never used.
 - Adding a custom interest had never worked: every add was rejected and the page hid the failure.
@@ -525,6 +534,7 @@ Defects in code inherited from upstream, grouped by area. Each line is something
 - Ratings froze on the day a title was first enriched, so recent films were systematically overrated.
 - A MDBList batch that failed was stamped as "no data", and the stamp never expired, so titles enriched in a failing pass kept no streaming providers or MDBList scores (on one library, nearly every show). A failed request now stamps nothing, and every title is asked again after 30 days, since where a title streams changes.
 - Production countries were stored in three vocabularies at once, so country filters missed titles.
+- On Jellyfin, every library id came back empty, reading an item by id and updating sort names failed on a request Jellyfin refuses from an API key, and video quality was never read, so Browse's resolution filter was empty.
 - The embeddings job reported "API key is missing" while settings showed the key, OpenAI-compatible embeddings failed on their first batch, and Hugging Face was offered for embeddings it cannot produce.
 - AI playlist naming failed without a role-specific key, and asked for so few tokens that reasoning models came back empty.
 - OpenRouter and OpenAI-compatible providers could not be chosen for Chat, deleting a custom model always failed, and the cost estimator showed $0.00 for every OpenRouter setup.
@@ -534,12 +544,15 @@ Defects in code inherited from upstream, grouped by area. Each line is something
 
 - Library search returned an error — shown as "No results" — for any title containing a colon or ampersand, and ranked "Terminal" above "Terminator 2".
 - Library semantic search was silently off unless the embeddings ran on OpenAI.
+- The assistant's semantic search sorted by rating before cutting the list, so a close match was dropped for being rated low, under cards saying "closest to".
 - Assistant lookups compared English titles only, hiding about 30% of films, and its writer, director and tag filters matched nothing.
 - A turn could end with no answer at all, or stop mid-sentence; play links were detected by the English word "play", which broke them in 13 of 14 locales.
 
 ### Jobs and admin
 
 - A cancelled job freed its slot while still running, so a second run started beside it. The Schedule tab's enable switch reset a job to "daily at midnight", and a refused start showed nothing.
+- The server refused every source-library switch, because it expected an id the media server never uses, and the page showed no error. The libraries Aperture reads could not be changed after setup.
+- An image from a stalled media server held its browser connection open with no time limit.
 - Orphaned schedule rows from old job renames failed every night with "Unknown job".
 - The database purge could not run on any instance created after migration 0078.
 - One failing MDBList job wrote an alert per request, and resolved alerts could never be cleared.
