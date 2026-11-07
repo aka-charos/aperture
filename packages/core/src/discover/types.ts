@@ -116,6 +116,8 @@ export interface DiscoveryRequest {
   discoveryCandidateId: string | null
   /** discovery = Discovery page; gap_analysis = admin Gap Analysis */
   source: DiscoveryRequestSource
+  /** Series only: the seasons asked for. Null or absent = the whole show. */
+  seasons?: number[] | null
   createdAt: Date
   updatedAt: Date
   /** Joined for the admin scope; absent when the row was fetched another way. */

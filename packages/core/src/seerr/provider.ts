@@ -8,6 +8,8 @@
 import { AsyncCache, concurrencyLimit } from '../lib/asyncCache.js'
 import { createChildLogger } from '../lib/logger.js'
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
+import type { SeerrStatus } from '../tmdb/collectionParts.js'
+import { seerrSeasonStatuses } from './seasonStatus.js'
 import type {
   SeerrConfig,
   SeerrSearchResult,
@@ -593,7 +595,8 @@ export async function getRequest(requestId: number): Promise<SeerrRequestRespons
  * Get request status
  */
 export async function getRequestStatus(requestId: number): Promise<{
-  status: 'pending' | 'approved' | 'declined'
+  /** `completed`: everything this request asked for has arrived. */
+  status: 'pending' | 'approved' | 'declined' | 'completed'
   mediaStatus: 'unknown' | 'pending' | 'processing' | 'partially_available' | 'available'
 } | null> {
   const request = await getRequest(requestId)
@@ -602,10 +605,13 @@ export async function getRequestStatus(requestId: number): Promise<{
     return null
   }
 
-  const requestStatusMap: Record<number, 'pending' | 'approved' | 'declined'> = {
+  // 5 is the only word for a season request's arrival when other seasons are still
+  // missing: the show's media status stays partly available.
+  const requestStatusMap: Record<number, 'pending' | 'approved' | 'declined' | 'completed'> = {
     1: 'pending',
     2: 'approved',
     3: 'declined',
+    5: 'completed',
   }
 
   const mediaStatusMap: Record<number, 'unknown' | 'pending' | 'processing' | 'partially_available' | 'available'> = {
@@ -728,6 +734,30 @@ export async function batchGetMediaStatus(
     }
   }
 
+  return results
+}
+
+/**
+ * Each show's standing in Seerr per season, for a job: it asks for every answer, in
+ * the job queue, and shares nothing with a person's cache. A show with no entry went
+ * unanswered, which never means "not requested"; an empty map is Seerr answering
+ * that it knows nothing about that show's seasons.
+ */
+export async function batchGetSeasonStatuses(
+  tmdbIds: number[]
+): Promise<Map<number, Map<number, SeerrStatus>>> {
+  const results = new Map<number, Map<number, SeerrStatus>>()
+  const config = await getSeerrConfig()
+  if (!config) return results
+
+  await Promise.all(
+    tmdbIds.map(async (tmdbId) => {
+      const details = await limitJobStatusCall(() =>
+        getTVDetails(tmdbId, { config, timeoutMs: BACKGROUND_STATUS_CALL_TIMEOUT_MS })
+      )
+      if (details) results.set(tmdbId, seerrSeasonStatuses(details.mediaInfo))
+    })
+  )
   return results
 }
 

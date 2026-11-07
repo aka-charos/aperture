@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto'
 import {
   getLatestCompletedGapRun,
   getActiveRunningGapRun,
+  getFailedGapRun,
   getGapCollectionSummaries,
   getGapCollectionParts,
   listGapResults,
@@ -17,13 +18,24 @@ import {
   updateDiscoveryRequestStatus,
   hasExistingRequest,
   resolveSeerrUserIdForProfile,
+  getLatestCompletedSeriesGapRun,
+  getActiveSeriesGapRun,
+  getFailedSeriesGapRun,
+  getSeriesGapPrerequisites,
+  countEpisodesAddedSince,
+  getActiveSeriesRequests,
+  listSeriesGapShows,
+  readRequestedSeasons,
+  seasonsStillToRequest,
 } from '@aperture/core'
 import { requireAdmin, type SessionUser } from '../../plugins/auth.js'
 import { query, queryOne } from '../../lib/db.js'
 import { runJob } from '../jobs/executor.js'
-import { claimJob } from '../jobs/state.js'
+import { activeJobs, claimJob } from '../jobs/state.js'
 
 const BLOCKING_STATUSES = new Set(['pending', 'submitted', 'approved'])
+const MOVIE_GAPS_JOB = 'refresh-library-gaps'
+const SERIES_GAPS_JOB = 'refresh-series-gaps'
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -77,21 +89,27 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
       )
       const collectionMovieCount = parseInt(moviesWithCollection?.c ?? '0', 10)
 
-      const activeRun = await getActiveRunningGapRun()
+      // The job slot is the truth about a scan: a `running` row with no job behind it
+      // is from a process that died, and must not read as a scan in progress. Boot
+      // closes such a row; this GET writes nothing, since read-only callers reach it.
+      const scanning = activeJobs.has(MOVIE_GAPS_JOB)
+      const activeRun = scanning ? await getActiveRunningGapRun() : null
       const latest = await getLatestCompletedGapRun()
+      const failedRun = scanning ? null : await getFailedGapRun()
 
-      // Summaries for whichever run the page is showing. A run streams every
-      // released part of a collection in one insert batch, so a running run's
-      // counts are already whole per collection; withholding them left the
-      // live listing with gaps and no totals to set them against.
-      const displayRun = activeRun ?? latest
+      // Summaries for whichever run the page is showing: the last finished one, kept up
+      // until a new scan finishes, or a first scan as it goes. A run streams every
+      // released part of a collection in one insert batch, so a running run's counts are
+      // already whole per collection; withholding them left that live listing with gaps
+      // and no totals to set them against.
+      const displayRun = latest ?? activeRun
       const collectionSummaries = displayRun ? await getGapCollectionSummaries(displayRun.id) : []
 
       // A snapshot goes stale when the library moves under it, not after a
       // fixed number of days — so say how far it has moved. Null while a scan
       // is running or before one has finished, which is "not applicable", not 0.
       let moviesAddedSinceRun: number | null = null
-      if (!activeRun && latest?.completedAt) {
+      if (!scanning && latest?.completedAt) {
         const added = await queryOne<{ c: string }>(
           `SELECT COUNT(*)::text AS c FROM movies WHERE created_at > $1`,
           [latest.completedAt]
@@ -104,8 +122,10 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
           tmdbConfigured: !!(tmdbKey && tmdbKey.trim() !== ''),
           moviesWithCollectionCount: collectionMovieCount,
         },
+        scanning,
         run: latest,
         activeRun,
+        failedRun,
         collectionSummaries,
         moviesAddedSinceRun,
       })
@@ -178,8 +198,11 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
           .send({ error: 'Query parameter ids is required (comma-separated TMDb collection ids)' })
       }
 
-      const latest = await getLatestCompletedGapRun()
-      if (!latest) {
+      // The run the page is listing, as /latest decides it.
+      const run =
+        (await getLatestCompletedGapRun()) ??
+        (activeJobs.has(MOVIE_GAPS_JOB) ? await getActiveRunningGapRun() : null)
+      if (!run) {
         return reply.status(404).send({ error: 'No completed gap analysis run' })
       }
 
@@ -188,7 +211,7 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
         .map((s) => parseInt(s.trim(), 10))
         .filter((n) => Number.isFinite(n))
 
-      const map = await getGapCollectionParts(latest.id, ids)
+      const map = await getGapCollectionParts(run.id, ids)
       const collections: Record<string, { collectionId: number; collectionName: string; collectionPosterPath: string | null; parts: unknown[] }> = {}
       for (const [id, payload] of map) {
         collections[String(id)] = payload
@@ -201,7 +224,7 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
    * POST /api/admin/gap-analysis/refresh
    */
   fastify.post('/api/admin/gap-analysis/refresh', { preHandler: requireAdmin }, async (_request, reply) => {
-    const name = 'refresh-library-gaps'
+    const name = MOVIE_GAPS_JOB
     const jobId = randomUUID()
     const claim = claimJob(name, jobId)
     if (!claim.ok) {
@@ -226,11 +249,99 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
   })
 
   /**
+   * GET /api/admin/gap-analysis/series/latest
+   * TV: whether a scan is running, the snapshot to show, and how far the library has moved since.
+   */
+  fastify.get(
+    '/api/admin/gap-analysis/series/latest',
+    { preHandler: requireAdmin },
+    async (_request, reply) => {
+      // The job slot is the truth about a scan: a `running` row with no job behind it
+      // is from a process that died, and must not lock the Run button. Boot closes it.
+      const scanning = activeJobs.has(SERIES_GAPS_JOB)
+
+      const [tmdbKey, library, run, activeRun, failedRun] = await Promise.all([
+        getSystemSetting('tmdb_api_key'),
+        getSeriesGapPrerequisites(),
+        getLatestCompletedSeriesGapRun(),
+        scanning ? getActiveSeriesGapRun() : null,
+        scanning ? null : getFailedSeriesGapRun(),
+      ])
+
+      return reply.send({
+        prerequisites: {
+          tmdbConfigured: !!tmdbKey?.trim(),
+          showsWithTmdbId: library.showsWithTmdbId,
+        },
+        scanning,
+        run,
+        activeRun,
+        failedRun,
+        // Null while a scan runs or before one has finished: "not applicable", not 0.
+        episodesAddedSinceRun:
+          !scanning && run?.completedAt ? await countEpisodesAddedSince(run.completedAt) : null,
+      })
+    }
+  )
+
+  /**
+   * GET /api/admin/gap-analysis/series/results
+   * Shows with a season gap, paged by show, each season's standing decided (pure SQL).
+   */
+  fastify.get<{ Querystring: { runId?: string; page?: string; pageSize?: string } }>(
+    '/api/admin/gap-analysis/series/results',
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      const runId = request.query.runId || (await getLatestCompletedSeriesGapRun())?.id
+      if (!runId) return reply.status(404).send({ error: 'No TV gap analysis run found' })
+      const page = request.query.page ? parseInt(request.query.page, 10) : 1
+      const pageSize = request.query.pageSize ? parseInt(request.query.pageSize, 10) : 100
+      return reply.send(
+        await listSeriesGapShows({
+          runId,
+          page: Number.isFinite(page) ? page : 1,
+          pageSize: Number.isFinite(pageSize) ? pageSize : 100,
+        })
+      )
+    }
+  )
+
+  /**
+   * POST /api/admin/gap-analysis/series/refresh
+   */
+  fastify.post(
+    '/api/admin/gap-analysis/series/refresh',
+    { preHandler: requireAdmin },
+    async (_request, reply) => {
+      const jobId = randomUUID()
+      const claim = claimJob(SERIES_GAPS_JOB, jobId)
+      if (!claim.ok) {
+        return reply.status(409).send({
+          error: claim.cancelling
+            ? 'TV gap analysis was cancelled and is still winding down'
+            : 'TV gap analysis is already running',
+          jobId: claim.jobId,
+        })
+      }
+
+      runJob(SERIES_GAPS_JOB, jobId).catch((err) => {
+        fastify.log.error({ err, jobId }, 'refresh-series-gaps failed')
+      })
+
+      return reply.send({ message: 'TV gap analysis started', jobId, jobName: SERIES_GAPS_JOB, status: 'running' })
+    }
+  )
+
+  /**
    * POST /api/admin/gap-analysis/request
+   *
+   * A series item may name `seasons`, and then one show can be requested more than
+   * once: what blocks it is an in-flight request for those seasons, not any request
+   * for the show. Without `seasons` it means the whole show, as it always did.
    */
   fastify.post<{
     Body: {
-      items: { tmdbId: number; mediaType: 'movie' | 'series'; title: string }[]
+      items: { tmdbId: number; mediaType: 'movie' | 'series'; title: string; seasons?: number[] }[]
       seerrOptions?: {
         rootFolder?: string
         profileId?: number
@@ -282,10 +393,26 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
         continue
       }
 
-      const existing = await hasExistingRequest(user.id, item.tmdbId, item.mediaType)
-      if (existing && BLOCKING_STATUSES.has(existing.status)) {
-        skipped++
-        continue
+      let seasons: number[] | undefined
+      if (item.seasons !== undefined) {
+        const named = item.mediaType === 'series' ? readRequestedSeasons(item.seasons) : null
+        if (!named) {
+          failed++
+          errors.push({ tmdbId: item.tmdbId, title: item.title, message: 'Invalid seasons' })
+          continue
+        }
+        const active = (await getActiveSeriesRequests([item.tmdbId])).get(item.tmdbId) ?? []
+        seasons = seasonsStillToRequest(named, active)
+        if (seasons.length === 0) {
+          skipped++
+          continue
+        }
+      } else {
+        const existing = await hasExistingRequest(user.id, item.tmdbId, item.mediaType)
+        if (existing && BLOCKING_STATUSES.has(existing.status)) {
+          skipped++
+          continue
+        }
       }
 
       try {
@@ -295,11 +422,13 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
           item.tmdbId,
           item.title,
           undefined,
-          'gap_analysis'
+          'gap_analysis',
+          seasons
         )
 
         const seerrMediaType = item.mediaType === 'movie' ? 'movie' : 'tv'
         const result = await createSeerrRequest(item.tmdbId, seerrMediaType, {
+          ...(seasons ? { seasons } : {}),
           ...(seerrUserId != null ? { userId: seerrUserId } : {}),
           ...(seerrOptions?.rootFolder !== undefined ? { rootFolder: seerrOptions.rootFolder } : {}),
           ...(seerrOptions?.profileId !== undefined ? { profileId: seerrOptions.profileId } : {}),

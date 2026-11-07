@@ -64,14 +64,16 @@ export interface ReconcileResult {
  * Map a live Seerr response onto our status vocabulary.
  *
  * Media availability wins over request state: an 'approved' request whose media
- * has finished importing is 'available', and that is the more useful fact. Kept
- * pure and exported so the precedence is testable without a Seerr instance.
+ * has finished importing is 'available', and that is the more useful fact. A
+ * completed request is too: a request for some seasons finishes while the show as a
+ * whole stays partly available. Kept pure and exported so the precedence is testable
+ * without a Seerr instance.
  */
 export function resolveRequestStatus(
   current: DiscoveryRequestStatus,
-  live: { status: 'pending' | 'approved' | 'declined'; mediaStatus: string }
+  live: { status: 'pending' | 'approved' | 'declined' | 'completed'; mediaStatus: string }
 ): DiscoveryRequestStatus {
-  if (live.mediaStatus === 'available') return 'available'
+  if (live.mediaStatus === 'available' || live.status === 'completed') return 'available'
   if (live.status === 'declined') return 'declined'
   if (live.status === 'approved') return 'approved'
   // Seerr still says pending. Don't walk a request backwards from whatever we

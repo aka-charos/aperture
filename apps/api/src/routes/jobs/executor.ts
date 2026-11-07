@@ -47,6 +47,7 @@ import {
   sendNotificationEmails,
   createChildLogger,
   runLibraryGapAnalysis,
+  runSeriesGapAnalysis,
   rebuildAllTasteProfiles,
   refreshCenteredEmbeddings,
   getEmbeddingSetsReport,
@@ -962,22 +963,44 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
       case 'refresh-library-gaps': {
         createJobProgress(jobId, 'refresh-library-gaps', 4)
         const result = await runLibraryGapAnalysis({ jobId })
-        completeJob(jobId, {
-          runId: result.runId,
-          collectionsScanned: result.collectionsScanned,
-          totalParts: result.totalParts,
-          ownedParts: result.ownedParts,
-          missingCount: result.missingCount,
-        })
-        logger.info(
-          {
-            job: name,
-            jobId,
+        // A cancelled scan kept nothing, and cancelJob already wrote its job_runs row.
+        if (!result.cancelled) {
+          completeJob(jobId, {
             runId: result.runId,
+            collectionsScanned: result.collectionsScanned,
+            totalParts: result.totalParts,
+            ownedParts: result.ownedParts,
             missingCount: result.missingCount,
-          },
-          `✅ Library gap analysis complete`
-        )
+          })
+          logger.info(
+            {
+              job: name,
+              jobId,
+              runId: result.runId,
+              missingCount: result.missingCount,
+            },
+            `✅ Library gap analysis complete`
+          )
+        }
+        break
+      }
+      case 'refresh-series-gaps': {
+        createJobProgress(jobId, 'refresh-series-gaps', 3)
+        const result = await runSeriesGapAnalysis({ jobId })
+        // A cancelled scan kept nothing, and cancelJob already wrote its job_runs row.
+        if (!result.cancelled) {
+          completeJob(jobId, {
+            runId: result.runId,
+            showsScanned: result.showsScanned,
+            showsListed: result.showsListed,
+            missingSeasons: result.missingSeasons,
+            partialSeasons: result.partialSeasons,
+          })
+          logger.info(
+            { job: name, jobId, runId: result.runId, missingSeasons: result.missingSeasons },
+            `✅ TV gap analysis complete`
+          )
+        }
         break
       }
       case 'generate-discovery-suggestions': {

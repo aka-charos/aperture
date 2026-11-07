@@ -4,14 +4,25 @@
  * Architecture: the scan job persists ALL released collection parts with their status
  * (in_library, seerr_status) into gap_analysis_results. Display-time functions read
  * pure SQL — zero Seerr or TMDb HTTP calls on page load.
+ *
+ * A snapshot is replaced only by a finished one, so a failed or cancelled scan leaves
+ * the last good list up. How a run is closed is shared with the TV scan (`scanRuns.ts`).
  */
 
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
-import { fetchCollectionDataAndCache } from '../tmdb/collection-cache.js'
+import { getCachedCollectionDataBatch, upsertCollectionCache } from '../tmdb/collection-cache.js'
+import { lookupCollectionData } from '../tmdb/collections.js'
 import type { CollectionData } from '../tmdb/types.js'
-import { setJobStep, addLog, updateJobProgress } from '../jobs/progress.js'
+import { setJobStep, addLog, updateJobProgress, isJobCancelled } from '../jobs/progress.js'
 import { batchGetMediaStatus, isSeerrConfigured } from '../seerr/provider.js'
+import {
+  scanFailureReason,
+  scanRunStore,
+  tmdbSilenceGuard,
+  unreadableAllowed,
+  type ScanFailureReason,
+} from './scanRuns.js'
 import {
   deriveSeerrStatus,
   isReleasedReleaseDate,
@@ -26,6 +37,8 @@ const logger = createChildLogger('gap-analysis')
 
 const CHUNK_SIZE = 10
 const CHUNK_DELAY_MS = 200
+
+const runs = scanRunStore({ runs: 'gap_analysis_runs', results: 'gap_analysis_results' })
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,6 +64,8 @@ export interface GapAnalysisRun {
   id: string
   status: GapAnalysisRunStatus
   errorMessage: string | null
+  /** Decided here so the page can word the failures it knows in the viewer's language. */
+  failureReason: ScanFailureReason | null
   collectionsScanned: number
   totalParts: number
   ownedParts: number
@@ -142,6 +157,7 @@ function rowToGapRun(row: GapRunRow): GapAnalysisRun {
     id: row.id,
     status: row.status,
     errorMessage: row.error_message,
+    failureReason: scanFailureReason(row.error_message),
     collectionsScanned: row.collections_scanned,
     totalParts: row.total_parts,
     ownedParts: row.owned_parts,
@@ -170,6 +186,17 @@ export async function getActiveRunningGapRun(): Promise<GapAnalysisRun | null> {
   return row ? rowToGapRun(row) : null
 }
 
+/** The scan that failed since the last good one, so the page can say so. */
+export async function getFailedGapRun(): Promise<GapAnalysisRun | null> {
+  const row = await runs.latestFailed<GapRunRow>()
+  return row ? rowToGapRun(row) : null
+}
+
+/** At boot and after a restore, never from a read; see `closeInterrupted` in `scanRuns.ts`. */
+export async function closeInterruptedGapRuns(): Promise<void> {
+  await runs.closeInterrupted()
+}
+
 async function insertRunningGapRun(): Promise<string> {
   const row = await queryOne<{ id: string }>(
     `INSERT INTO gap_analysis_runs (
@@ -180,32 +207,6 @@ async function insertRunningGapRun(): Promise<string> {
   )
   if (!row) throw new Error('Failed to insert running gap_analysis_runs')
   return row.id
-}
-
-async function insertEmptyRun(): Promise<string> {
-  const row = await queryOne<{ id: string }>(
-    `INSERT INTO gap_analysis_runs (
-      status, started_at, completed_at,
-      collections_scanned, total_parts, owned_parts, missing_count, error_message
-    ) VALUES ('completed', NOW(), NOW(), 0, 0, 0, 0, NULL)
-    RETURNING id`
-  )
-  if (!row) throw new Error('Failed to insert empty gap run')
-  return row.id
-}
-
-async function failGapRun(runId: string, message: string): Promise<void> {
-  await query(`DELETE FROM gap_analysis_results WHERE run_id = $1`, [runId])
-  await query(
-    `UPDATE gap_analysis_runs
-     SET status = 'failed', completed_at = NOW(), error_message = $2
-     WHERE id = $1`,
-    [runId, message]
-  )
-}
-
-async function clearPreviousGapAnalysisRuns(): Promise<void> {
-  await query(`DELETE FROM gap_analysis_runs`)
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +245,8 @@ export async function getMovieTmdbIdsWithActiveDiscoveryRequest(): Promise<Set<n
 // ---------------------------------------------------------------------------
 
 export async function runLibraryGapAnalysis(options: { jobId?: string } = {}): Promise<{
-  runId: string
+  runId: string | null
+  cancelled: boolean
   collectionsScanned: number
   totalParts: number
   ownedParts: number
@@ -259,8 +261,10 @@ export async function runLibraryGapAnalysis(options: { jobId?: string } = {}): P
   }
 
   try {
-    await clearPreviousGapAnalysisRuns()
-    log('Cleared previous gap analysis runs')
+    await runs.clearLeftovers()
+    // First, so that a scan failing at any later step leaves a record of why.
+    runId = await insertRunningGapRun()
+    log(`Created gap run ${runId} (streaming results)`)
 
     if (jobId) setJobStep(jobId, 0, 'Collecting collection IDs from library', 1)
 
@@ -268,9 +272,9 @@ export async function runLibraryGapAnalysis(options: { jobId?: string } = {}): P
     log(`Found ${collectionIds.length} distinct collection IDs in library`)
 
     if (collectionIds.length === 0) {
-      const id = await insertEmptyRun()
+      await runs.finishAndReplace(runId)
       log('No collections to scan')
-      return { runId: id, collectionsScanned: 0, totalParts: 0, ownedParts: 0, missingCount: 0 }
+      return { runId, cancelled: false, collectionsScanned: 0, totalParts: 0, ownedParts: 0, missingCount: 0 }
     }
 
     if (jobId) {
@@ -286,27 +290,60 @@ export async function runLibraryGapAnalysis(options: { jobId?: string } = {}): P
       setJobStep(jobId, 2, `Fetching ${collectionIds.length} collections from TMDb`, collectionIds.length)
     }
 
-    runId = await insertRunningGapRun()
-    log(`Created gap run ${runId} (streaming results)`)
-
     const collectionsData = new Map<number, CollectionData>()
     let totalParts = 0
     let ownedParts = 0
     let missingParts = 0
     let scannedCollections = 0
+    let readFromStored = 0
+    let unreadable = 0
+    const silence = tmdbSilenceGuard()
     const seerrOk = await isSeerrConfigured()
 
     for (let i = 0; i < collectionIds.length; i += CHUNK_SIZE) {
+      if (jobId && isJobCancelled(jobId)) {
+        await runs.discard(runId)
+        log('Cancelled; the previous results stay in place')
+        return {
+          runId: null,
+          cancelled: true,
+          collectionsScanned: scannedCollections,
+          totalParts,
+          ownedParts,
+          missingCount: missingParts,
+        }
+      }
+
       const chunk = collectionIds.slice(i, i + CHUNK_SIZE)
       const batchEnd = Math.min(i + CHUNK_SIZE, collectionIds.length)
       log(`Fetching collections ${i + 1}-${batchEnd} / ${collectionIds.length}`)
 
+      let answeredInBatch = 0
+      const failedIds: number[] = []
       const promises = chunk.map(async (id) => {
-        const data = await fetchCollectionDataAndCache(id, jobId ? { onLog: () => {} } : {})
-        if (data) collectionsData.set(id, data)
+        const answer = await lookupCollectionData(id)
+        if (answer.status === 'failed') {
+          failedIds.push(id)
+          return
+        }
+        answeredInBatch++
+        if (answer.status === 'ok') {
+          await upsertCollectionCache(answer.data)
+          collectionsData.set(id, answer.data)
+        }
       })
       await Promise.all(promises)
-      scannedCollections += chunk.length
+      silence.afterBatch(answeredInBatch)
+
+      // A stored part list stands in for a failed request: it may miss the newest sequel,
+      // where leaving the franchise out would lose every gap it has. Only what has neither
+      // counts against the scan, and only what was read counts as scanned.
+      const stored = failedIds.length > 0 ? await getCachedCollectionDataBatch(failedIds) : new Map<number, CollectionData>()
+      for (const [id, data] of stored) collectionsData.set(id, data)
+      readFromStored += stored.size
+      unreadable += failedIds.length - stored.size
+      scannedCollections += chunk.length - (failedIds.length - stored.size)
+      if (unreadable > unreadableAllowed(collectionIds.length)) throw silence.tooLittleRead()
 
       // Gather all released parts from this chunk
       type PartRow = {
@@ -398,26 +435,31 @@ export async function runLibraryGapAnalysis(options: { jobId?: string } = {}): P
       if (i + CHUNK_SIZE < collectionIds.length) await sleep(CHUNK_DELAY_MS)
     }
 
+    silence.atEnd()
+
     log(`Diff complete: ${totalParts} parts, ${ownedParts} in library, ${missingParts} missing`)
+    if (readFromStored > 0) log(`TMDb: ${readFromStored} collection(s) did not answer; used the stored part list`)
+    if (unreadable > 0) log(`TMDb: ${unreadable} collection(s) did not answer and have no stored part list; left out`)
 
     if (jobId) {
       setJobStep(jobId, 3, 'Finalizing snapshot', 1)
       updateJobProgress(jobId, 1, 1)
     }
 
-    await query(
-      `UPDATE gap_analysis_runs SET
-         status = 'completed', completed_at = NOW(),
-         collections_scanned = $1, total_parts = $2, owned_parts = $3, missing_count = $4
-       WHERE id = $5`,
-      [scannedCollections, totalParts, ownedParts, missingParts, runId]
-    )
+    await runs.finishAndReplace(runId)
 
     log(`Completed gap run ${runId}`)
-    return { runId, collectionsScanned: scannedCollections, totalParts, ownedParts, missingCount: missingParts }
+    return {
+      runId,
+      cancelled: false,
+      collectionsScanned: scannedCollections,
+      totalParts,
+      ownedParts,
+      missingCount: missingParts,
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
-    if (runId) await failGapRun(runId, msg)
+    if (runId) await runs.fail(runId, msg)
     throw err
   }
 }

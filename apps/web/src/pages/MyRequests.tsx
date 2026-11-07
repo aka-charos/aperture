@@ -48,7 +48,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useIsPhone } from '@/hooks/useIsPhone'
 
 type SeerrLive = {
-  status: 'pending' | 'approved' | 'declined'
+  status: 'pending' | 'approved' | 'declined' | 'completed'
   mediaStatus: 'unknown' | 'pending' | 'processing' | 'partially_available' | 'available'
 } | null
 
@@ -64,6 +64,8 @@ interface DiscoveryRequestRow {
   statusMessage: string | null
   discoveryCandidateId: string | null
   source?: 'discovery' | 'gap_analysis'
+  /** Series only: the seasons asked for. Null or absent = the whole show. */
+  seasons?: number[] | null
   createdAt: string
   updatedAt: string
   seerrLive: SeerrLive
@@ -76,7 +78,7 @@ interface DiscoveryRequestRow {
 function getRequestStatusKey(row: DiscoveryRequestRow): string | null {
   const live = row.seerrLive
   if (live) {
-    if (live.mediaStatus === 'available') return 'available'
+    if (live.mediaStatus === 'available' || live.status === 'completed') return 'available'
     if (live.status === 'declined') return 'declined'
     if (live.status === 'pending') return 'pendingApproval'
     if (live.mediaStatus === 'processing' || live.mediaStatus === 'partially_available') {
@@ -274,6 +276,10 @@ function MyRequestsContent() {
   // minimum width.
   const requesterName = (r: DiscoveryRequestRow) =>
     r.requestedByDisplayName || r.requestedByUsername || t('myRequests.unknownUser')
+  const seasonsLabel = (r: DiscoveryRequestRow) =>
+    r.seasons?.length
+      ? t('myRequests.seasons', { count: r.seasons.length, list: r.seasons.join(', ') })
+      : null
   const typeChip = (r: DiscoveryRequestRow) => (
     <Chip
       size="small"
@@ -484,6 +490,7 @@ function MyRequestsContent() {
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block">
                   {[
+                    seasonsLabel(r),
                     requestedDate(r),
                     showRequesterColumn ? requesterName(r) : null,
                     r.seerrRequestId != null
@@ -527,6 +534,11 @@ function MyRequestsContent() {
                   <TableRow key={r.id} hover>
                     <TableCell>
                       <Typography fontWeight={600}>{r.title}</Typography>
+                      {seasonsLabel(r) && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {seasonsLabel(r)}
+                        </Typography>
+                      )}
                       {r.seerrRequestId != null && (
                         <Typography variant="caption" color="text.secondary" display="block">
                           {t('myRequests.seerrRequest', { id: r.seerrRequestId })}

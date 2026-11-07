@@ -14,6 +14,8 @@ import {
   detectInterruptedEnrichmentRuns,
   forgetOffsiteRecovery,
   recoverInterruptedNewsletterSends,
+  closeInterruptedSeriesGapRuns,
+  closeInterruptedGapRuns,
   runMigrations,
 } from '@aperture/core'
 import { getDatabaseUrl, getEnv } from '../config/env.js'
@@ -22,8 +24,18 @@ import { refreshLogMaskingState } from '../config/logMasking.js'
 import { refreshProxyTrust } from '../config/proxyTrust.js'
 import { createChildLogger } from './logger.js'
 import { refreshAllSchedules } from './scheduler.js'
+import { activeJobs } from '../routes/jobs/state.js'
 
 const logger = createChildLogger('after-restore')
+
+/**
+ * A restore does not stop a running job, so a scan may hold its slot here, and a row it
+ * inserted since the commit is alive. An orphan left beside it is closed by the next
+ * scan or boot, and cannot read as a scan meanwhile: reads ask the slot.
+ */
+export async function closeGapRunsUnlessScanning(jobName: string, close: () => Promise<void>): Promise<void> {
+  if (!activeJobs.has(jobName)) await close()
+}
 
 /** The same folder index.ts migrates from; `src/lib` and `dist/lib` sit at one depth. */
 export const MIGRATIONS_DIR = path.resolve(
@@ -44,6 +56,14 @@ export async function afterDatabaseRestored(): Promise<void> {
   const repairs: Array<[string, () => Promise<void>]> = [
     ['interrupted enrichment runs', detectInterruptedEnrichmentRuns],
     ['interrupted newsletter sends', recoverInterruptedNewsletterSends],
+    [
+      'interrupted TV gap scans',
+      () => closeGapRunsUnlessScanning('refresh-series-gaps', closeInterruptedSeriesGapRuns),
+    ],
+    [
+      'interrupted movie gap scans',
+      () => closeGapRunsUnlessScanning('refresh-library-gaps', closeInterruptedGapRuns),
+    ],
     ['job schedules', refreshAllSchedules],
     // Read once into memory by buildServer. Left alone, the trusted proxies in force
     // would be the old database's while the page showed the restored list.

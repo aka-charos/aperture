@@ -1445,6 +1445,8 @@ export {
   runLibraryGapAnalysis,
   getLatestCompletedGapRun,
   getActiveRunningGapRun,
+  getFailedGapRun,
+  closeInterruptedGapRuns,
   getDistinctMovieCollectionIds,
   getLibraryMovieTmdbIdSet,
   getMovieTmdbIdsWithActiveDiscoveryRequest,
@@ -1463,6 +1465,28 @@ export {
   type GapResultsSortBy,
   type GapResultsSortDir,
 } from './gap-analysis/index.js'
+
+// Gap analysis (aired TV seasons vs the episodes the library holds)
+export {
+  runSeriesGapAnalysis,
+  getLatestCompletedSeriesGapRun,
+  getActiveSeriesGapRun,
+  getFailedSeriesGapRun,
+  closeInterruptedSeriesGapRuns,
+  getSeriesGapPrerequisites,
+  countEpisodesAddedSince,
+  getActiveSeriesRequests,
+  listSeriesGapShows,
+  type SeriesGapRun,
+  type SeriesGapScanResult,
+} from './gap-analysis/series.js'
+export {
+  readRequestedSeasons,
+  seasonsStillToRequest,
+  type SeriesGapShow,
+  type SeriesGapSeason,
+  type SeasonStanding,
+} from './gap-analysis/seriesRules.js'
 
 // Taste Profile System
 export {

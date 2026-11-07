@@ -206,6 +206,7 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
   'full-reset-movie-recommendations': { scheduleType: 'manual', hour: 0, minute: 0 },
   'full-reset-series-recommendations': { scheduleType: 'manual', hour: 0, minute: 0 },
   'refresh-library-gaps': { scheduleType: 'manual', hour: 0, minute: 0 },
+  'refresh-series-gaps': { scheduleType: 'manual', hour: 0, minute: 0 },
   // Deliberately manual: each profile already carries its own
   // refresh_interval_days, so this exists for the one-off sweep after an
   // algorithm change, not as an ongoing schedule.

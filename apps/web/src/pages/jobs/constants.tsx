@@ -74,6 +74,7 @@ export const JOB_ICONS: Record<string, React.ReactNode> = {
   'refresh-ratings': <StarHalfIcon />,
   'sync-home-sections': <HomeIcon />,
   'remove-legacy-libraries': <DeleteSweepIcon />,
+  'refresh-series-gaps': <FactCheckIcon />,
 }
 
 export const JOB_COLORS: Record<string, string> = {
@@ -112,6 +113,7 @@ export const JOB_COLORS: Record<string, string> = {
   'refresh-ratings': '#f97316',
   'sync-home-sections': '#eab308',
   'remove-legacy-libraries': '#78716c',
+  'refresh-series-gaps': '#0ea5e9',
 }
 
 

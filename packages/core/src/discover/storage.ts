@@ -927,7 +927,9 @@ export async function createDiscoveryRequest(
   tmdbId: number,
   title: string,
   discoveryCandidateId?: string,
-  source: DiscoveryRequestSource = 'discovery'
+  source: DiscoveryRequestSource = 'discovery',
+  /** Series only, when asking for particular seasons. Absent = the whole show. */
+  seasons?: number[]
 ): Promise<string> {
   // Validate that the discovery candidate exists before linking
   // (candidates may be cleaned up during refresh, but we still want to allow the request)
@@ -946,10 +948,10 @@ export async function createDiscoveryRequest(
 
   const result = await queryOne<{ id: string }>(
     `INSERT INTO discovery_requests (
-      user_id, media_type, tmdb_id, title, discovery_candidate_id, status, source
-    ) VALUES ($1, $2, $3, $4, $5, 'pending', $6)
+      user_id, media_type, tmdb_id, title, discovery_candidate_id, status, source, seasons
+    ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)
     RETURNING id`,
-    [userId, mediaType, tmdbId, title, validCandidateId, source]
+    [userId, mediaType, tmdbId, title, validCandidateId, source, seasons ?? null]
   )
 
   if (!result) {
@@ -1110,6 +1112,7 @@ export async function getDiscoveryRequests(
     status_message: string | null
     discovery_candidate_id: string | null
     source: DiscoveryRequestSource
+    seasons: number[] | null
     created_at: Date
     updated_at: Date
     requested_by_username: string | null
@@ -1128,6 +1131,7 @@ export async function getDiscoveryRequests(
     statusMessage: row.status_message,
     discoveryCandidateId: row.discovery_candidate_id,
     source: row.source ?? 'discovery',
+    seasons: row.seasons,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     requestedByUsername: row.requested_by_username,
@@ -1158,8 +1162,10 @@ export async function hasExistingRequest(
     created_at: Date
     updated_at: Date
   }>(
-    `SELECT * FROM discovery_requests 
-     WHERE user_id = $1 AND tmdb_id = $2 AND media_type = $3
+    // A request naming seasons says nothing about the rest of the show, and Seerr
+    // drops any season already requested from a later whole-show request.
+    `SELECT * FROM discovery_requests
+     WHERE user_id = $1 AND tmdb_id = $2 AND media_type = $3 AND seasons IS NULL
      ORDER BY created_at DESC
      LIMIT 1`,
     [userId, tmdbId, mediaType]

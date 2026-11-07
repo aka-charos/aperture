@@ -4,7 +4,7 @@ Background jobs power everything periodic in Aperture — syncing, embeddings, r
 
 ## Where It Lives
 
-Admin console → **Operations** → **Jobs** (`/admin/ops/jobs`). Tabs: **Movies / TV Series / Global** job cards (34 jobs), plus a **Schedule** tab listing every job, including the five that have no card (`sync-users`, `refresh-assistant-suggestions`, `backup-database`, `cleanup-auth-state`, `refresh-library-gaps`), with enable toggles.
+Admin console → **Operations** → **Jobs** (`/admin/ops/jobs`). Tabs: **Movies / TV Series / Global** job cards (34 jobs), plus a **Schedule** tab listing every job, including the six that have no card (`sync-users`, `refresh-assistant-suggestions`, `backup-database`, `cleanup-auth-state`, `refresh-library-gaps`, `refresh-series-gaps`), with enable toggles.
 
 A **Running Jobs** widget in the app bar shows what's active from anywhere; each row in it opens that job's card with its log. The admin search (⌘⇧K / Ctrl+Shift+K) finds every job by name.
 

@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Link as RouterLink } from 'react-router-dom'
+import { Link as RouterLink, useSearchParams } from 'react-router-dom'
 import {
   Alert,
   AppBar,
   Box,
   Button,
   Checkbox,
-  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -23,6 +22,8 @@ import {
   Select,
   Skeleton,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Toolbar,
   Typography,
@@ -46,6 +47,9 @@ import { useOpenMedia } from '@/hooks/useOpenMedia'
 import { adminPathFor } from './nav/registry'
 import { jobConsoleLink } from '../jobs/registry'
 import { GapCollectionRow } from './gapAnalysis/GapCollectionRow'
+import { SeriesGapPanel } from './gapAnalysis/SeriesGapPanel'
+import { describeScanFailure } from './gapAnalysis/scanFailure'
+import { PosterStatusChip, SnapshotStat } from './gapAnalysis/shared'
 import {
   buildGapListings,
   compareByRelease,
@@ -85,6 +89,8 @@ type GapRequestItem = { tmdbId: number; mediaType: 'movie'; title: string }
 interface GapRun {
   id: string
   status: string
+  errorMessage: string | null
+  failureReason: 'interrupted' | 'tmdbSilent' | 'tmdbPartial' | null
   collectionsScanned: number
   totalParts: number
   ownedParts: number
@@ -95,8 +101,10 @@ interface GapRun {
 
 interface LatestResponse {
   prerequisites: { tmdbConfigured: boolean; moviesWithCollectionCount: number }
+  scanning: boolean
   run: GapRun | null
   activeRun: GapRun | null
+  failedRun: GapRun | null
   collectionSummaries?: GapCollectionSummary[]
   moviesAddedSinceRun?: number | null
 }
@@ -155,44 +163,6 @@ function seerrChipLabel(status: PartSeerrStatus, t: TFunction): string {
   }
 }
 
-function PartStatusChip({ icon, label, color }: { icon: ReactElement; label: string; color: string }) {
-  return (
-    <Chip
-      icon={icon}
-      label={label}
-      size="small"
-      sx={{
-        position: 'absolute',
-        bottom: 8,
-        left: 8,
-        zIndex: 3,
-        fontWeight: 600,
-        fontSize: '0.7rem',
-        height: 24,
-        bgcolor: alpha(color, 0.9),
-        color: 'common.white',
-        '& .MuiChip-icon': { color: 'common.white' },
-      }}
-    />
-  )
-}
-
-function SnapshotStat({ value, label, detail }: { value: string; label: string; detail?: string }) {
-  return (
-    <Box sx={{ px: 1.5, py: 1.25, borderRadius: 1.5, bgcolor: 'action.hover', minWidth: 0 }}>
-      <Typography variant="h5" fontWeight={700} lineHeight={1.2}>
-        {value}
-      </Typography>
-      <Typography variant="body2">{label}</Typography>
-      {detail && (
-        <Typography variant="caption" color="text.secondary" display="block" noWrap>
-          {detail}
-        </Typography>
-      )}
-    </Box>
-  )
-}
-
 function ListSkeleton() {
   return (
     <Stack spacing={1}>
@@ -204,11 +174,46 @@ function ListSkeleton() {
 }
 
 export function GapAnalysisPage() {
-  // An owned film opens its library page in a dialog, so the admin keeps the
-  // collection they were reading instead of being routed away from it.
+  const { t } = useTranslation()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const showTv = searchParams.get('type') === 'tv'
+
+  // A tab mounts when first opened and then stays, hidden, so moving between them keeps
+  // its filters, its selection and the polling of a scan in progress.
+  const opened = useRef({ movies: !showTv, tv: showTv })
+  opened.current[showTv ? 'tv' : 'movies'] = true
+
+  // An owned title opens its library page in a dialog, so the admin keeps the
+  // collection or show they were reading instead of being routed away from it.
   return (
     <MediaDetailModalProvider>
-      <GapAnalysisContent />
+      <Box sx={{ maxWidth: 1400, mx: 'auto', p: { xs: 2, md: 3 }, pb: 10 }}>
+        <PageHeading
+          title={t('admin.gaps.pageTitle')}
+          description={t('admin.gaps.pageSubtitle')}
+          icon={<FactCheckIcon color="primary" />}
+          sx={{ mb: 2 }}
+        />
+        <Tabs
+          value={showTv ? 'tv' : 'movies'}
+          // Replaced, not pushed: a pushed query change would close an open title dialog.
+          onChange={(_e, value) => setSearchParams(value === 'tv' ? { type: 'tv' } : {}, { replace: true })}
+          sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab value="movies" label={t('admin.gaps.tabMovies')} />
+          <Tab value="tv" label={t('admin.gaps.tabTv')} />
+        </Tabs>
+        {opened.current.movies && (
+          <Box sx={{ display: showTv ? 'none' : 'block' }}>
+            <GapAnalysisContent />
+          </Box>
+        )}
+        {opened.current.tv && (
+          <Box sx={{ display: showTv ? 'block' : 'none' }}>
+            <SeriesGapPanel />
+          </Box>
+        )}
+      </Box>
     </MediaDetailModalProvider>
   )
 }
@@ -221,6 +226,8 @@ function GapAnalysisContent() {
   const [error, setError] = useState<string | null>(null)
   const [run, setRun] = useState<GapRun | null>(null)
   const [activeRun, setActiveRun] = useState<GapRun | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const [failedRun, setFailedRun] = useState<GapRun | null>(null)
   const [jobProgress, setJobProgress] = useState<JobProgressState | null>(null)
   const [summaries, setSummaries] = useState<GapCollectionSummary[]>([])
   const [prereq, setPrereq] = useState<LatestResponse['prerequisites'] | null>(null)
@@ -254,17 +261,18 @@ function GapAnalysisContent() {
   const [detailData, setDetailData] = useState<TmdbExternalDetailPayload | null>(null)
   const [detailPart, setDetailPart] = useState<Pick<GapCollectionPart, 'tmdbId' | 'title' | 'inLibrary' | 'seerrStatus'> | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const resultsRequest = useRef(0)
 
   const formatNumber = useCallback((n: number) => n.toLocaleString(i18n.language), [i18n.language])
 
-  /** Returns the id of the run the page should show — the running one if any. */
-  const loadLatest = useCallback(async (): Promise<string | null> => {
+  /** `includeSeerr` is for the first load; a poll has no reason to ask again. */
+  const loadLatest = useCallback(async (includeSeerr = true): Promise<LatestResponse | null> => {
     // Deliberately does not clear `error`: this reload follows a request, and
     // clearing here wiped the request's own failure message before it rendered.
     try {
       const [latestRes, seerrRes] = await Promise.all([
         fetch('/api/admin/gap-analysis/latest', { credentials: 'include' }),
-        fetch('/api/seerr/config', { credentials: 'include' }),
+        includeSeerr ? fetch('/api/seerr/config', { credentials: 'include' }) : null,
       ])
       if (!latestRes.ok) {
         const d = await latestRes.json().catch(() => ({}))
@@ -274,16 +282,18 @@ function GapAnalysisContent() {
       setPrereq(data.prerequisites)
       setRun(data.run ?? null)
       setActiveRun(data.activeRun ?? null)
+      setScanning(data.scanning === true)
+      setFailedRun(data.failedRun ?? null)
       setSummaries(data.collectionSummaries ?? [])
       setMoviesAddedSinceRun(data.moviesAddedSinceRun ?? null)
 
-      if (seerrRes.ok) {
+      if (seerrRes?.ok) {
         const sc = await seerrRes.json()
         setSeerrOk(!!(sc.configured && sc.enabled && sc.hasApiKey))
-      } else {
+      } else if (seerrRes) {
         setSeerrOk(false)
       }
-      return data.activeRun?.id ?? data.run?.id ?? null
+      return data
     } catch (e) {
       setError(e instanceof Error ? e.message : t('admin.gaps.errorFailedToLoad'))
       return null
@@ -298,6 +308,8 @@ function GapAnalysisContent() {
    */
   const loadResults = useCallback(
     async (runId: string) => {
+      // Only the newest load may land: an older run's list arriving late would replace it.
+      const request = ++resultsRequest.current
       try {
         const all: GapRow[] = []
         let page = 1
@@ -316,22 +328,50 @@ function GapAnalysisContent() {
           if (chunk.length === 0) break
           page++
         } while (all.length < total && page <= MAX_RESULT_PAGES)
-        setRows(all)
+        if (request === resultsRequest.current) setRows(all)
       } catch (e) {
         // Keep whatever was already listed rather than blanking it.
         setError(e instanceof Error ? e.message : t('admin.gaps.errorLoadGapAnalysis'))
       } finally {
-        setResultsRunId(runId)
+        if (request === resultsRequest.current) setResultsRunId(runId)
       }
     },
     [t]
   )
 
+  /** After a request, which changes what is open without changing the run. */
+  const reloadList = useCallback(async () => {
+    const latest = await loadLatest(false)
+    const displayed = latest?.run?.id ?? latest?.activeRun?.id
+    if (displayed) await loadResults(displayed)
+  }, [loadLatest, loadResults])
+
   useEffect(() => {
     void loadLatest()
   }, [loadLatest])
 
-  const displayRunId = activeRun?.id ?? run?.id ?? null
+  // A scan this page did not start (the schedule, the jobs console, or before the page
+  // was opened) has no job id to poll, so it is followed by its state. Also what unlocks
+  // Run analysis when the process dies mid-scan: after a restart the job slot is empty.
+  useEffect(() => {
+    if (!scanning || refreshing) return
+    let busy = false
+    const timer = setInterval(() => {
+      if (busy) return
+      busy = true
+      void loadLatest(false).finally(() => {
+        busy = false
+      })
+    }, LIVE_LIST_REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [scanning, refreshing, loadLatest])
+
+  // The last finished snapshot stays up until a new scan finishes; only a first scan,
+  // with nothing to keep showing, is listed as it goes.
+  const displayRun = run ?? activeRun
+  const displayRunId = displayRun?.id ?? null
+  // Fetched again only when the listing changed, not on every poll of a long scan.
+  const resultsKey = displayRun ? `${displayRun.id}:${displayRun.totalParts}:${displayRun.completedAt ?? ''}` : null
 
   useEffect(() => {
     if (displayRunId) {
@@ -340,7 +380,7 @@ function GapAnalysisContent() {
       setRows([])
       setResultsRunId(null)
     }
-  }, [displayRunId, loadResults])
+  }, [displayRunId, resultsKey, loadResults])
 
   useEffect(() => {
     setCollectionPartsById({})
@@ -547,11 +587,10 @@ function GapAnalysisContent() {
         setConfirmOpen(false)
         setRequesting(false)
         setPendingBulkAfterOptions(null)
-        const displayed = await loadLatest()
-        if (displayed) await loadResults(displayed)
+        await reloadList()
       }
     },
-    [loadLatest, loadResults, t]
+    [reloadList, t]
   )
 
   const handleSeerrOptionsConfirm = (opts: SeerrRequestOptions) => {
@@ -613,15 +652,20 @@ function GapAnalysisContent() {
             stopPolling()
             setRefreshing(false)
             setJobProgress(null)
-            if (status === 'failed') setError(t('admin.gaps.errorRefreshFailed'))
-            const displayed = await loadLatest()
-            if (displayed) await loadResults(displayed)
+            const latest = await loadLatest(false)
+            // A failed run says why itself; this is for a scan that failed before making one.
+            if (status === 'failed' && !latest?.failedRun) setError(t('admin.gaps.errorRefreshFailed'))
             return
           }
           if (Date.now() - lastListRefresh >= LIVE_LIST_REFRESH_MS) {
             lastListRefresh = Date.now()
-            const displayed = await loadLatest()
-            if (displayed) await loadResults(displayed)
+            const latest = await loadLatest(false)
+            // The slot emptied with no final status to read: the process restarted under us.
+            if (latest && latest.scanning !== true) {
+              stopPolling()
+              setRefreshing(false)
+              setJobProgress(null)
+            }
           }
         } catch {
           stopPolling()
@@ -665,7 +709,7 @@ function GapAnalysisContent() {
     }
   }
 
-  const snapshotRun = activeRun ?? run
+  const snapshotRun = displayRun
   const coveragePct =
     snapshotRun && snapshotRun.totalParts > 0
       ? Math.round((snapshotRun.ownedParts / snapshotRun.totalParts) * 100)
@@ -712,17 +756,17 @@ function GapAnalysisContent() {
           onClick={() => openPart(part)}
         >
           {variant === 'owned' && (
-            <PartStatusChip icon={<CheckCircleIcon />} label={t('admin.gaps.inLibrary')} color={theme.palette.success.main} />
+            <PosterStatusChip icon={<CheckCircleIcon />} label={t('admin.gaps.inLibrary')} color={theme.palette.success.main} />
           )}
           {variant === 'seerr' && (
-            <PartStatusChip
+            <PosterStatusChip
               icon={<HourglassEmptyIcon />}
               label={seerrChipLabel(part.seerrStatus, t)}
               color={theme.palette.info.main}
             />
           )}
           {variant === 'requested' && (
-            <PartStatusChip icon={<HourglassEmptyIcon />} label={t('admin.gaps.requested')} color={theme.palette.secondary.main} />
+            <PosterStatusChip icon={<HourglassEmptyIcon />} label={t('admin.gaps.requested')} color={theme.palette.secondary.main} />
           )}
           {variant === 'missing' && (
             <>
@@ -779,8 +823,8 @@ function GapAnalysisContent() {
   const renderExpanded = (listing: GapCollectionListing<GapRow>) => {
     const parts = partsFor(listing)
     const stillLoading = parts == null && partsLoading.has(listing.collectionId)
-    // Without the full part list (it failed, or a scan is still running) the
-    // missing films alone are still worth showing.
+    // Without the full part list (it failed to load) the missing films alone are
+    // still worth showing.
     const display: DisplayPart[] =
       parts ??
       listing.missing.map((m) => ({
@@ -836,17 +880,15 @@ function GapAnalysisContent() {
   const uniqueMissingFilms = openGapIds.size
 
   return (
-    <Box sx={{ maxWidth: 1400, mx: 'auto', p: { xs: 2, md: 3 }, pb: 10 }}>
-      <PageHeading
-        title={t('admin.gaps.pageTitle')}
-        description={t('admin.gaps.pageSubtitle')}
-        icon={<FactCheckIcon color="primary" />}
-        sx={{ mb: 3 }}
-      />
-
+    <>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+      {failedRun && !scanning && !refreshing && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {t('admin.gaps.scanFailed', { detail: describeScanFailure(t, failedRun) })}
         </Alert>
       )}
 
@@ -911,20 +953,24 @@ function GapAnalysisContent() {
               <Box sx={{ minWidth: 0 }}>
                 <Typography fontWeight={600}>{t('admin.gaps.analysisSnapshot')}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {activeRun ? t('admin.gaps.scanInProgress') : run ? describeRun(run) : t('admin.gaps.noRunYet')}
+                  {scanning
+                    ? t(run ? 'admin.gaps.scanInProgressKeeping' : 'admin.gaps.scanInProgress')
+                    : run
+                      ? describeRun(run)
+                      : t('admin.gaps.noRunYet')}
                 </Typography>
               </Box>
               <Button
                 variant="contained"
                 onClick={() => void runRefresh()}
-                disabled={refreshing || activeRun != null || tmdbMissing}
+                disabled={refreshing || scanning || tmdbMissing}
                 startIcon={refreshing ? <CircularProgress size={16} color="inherit" /> : undefined}
               >
                 {t('admin.gaps.runAnalysis')}
               </Button>
             </Box>
 
-            {moviesAddedSinceRun != null && moviesAddedSinceRun > 0 && !activeRun && (
+            {moviesAddedSinceRun != null && moviesAddedSinceRun > 0 && !scanning && (
               <Alert severity="warning" sx={{ mt: 2 }}>
                 {t('admin.gaps.staleMovies', { count: moviesAddedSinceRun, movies: formatNumber(moviesAddedSinceRun) })}
               </Alert>
@@ -1059,7 +1105,12 @@ function GapAnalysisContent() {
               {!listReady ? (
                 <ListSkeleton />
               ) : listings.length === 0 ? (
-                <Alert severity="success">{t('admin.gaps.noGaps')}</Alert>
+                // A first scan listing nothing yet has not found the library complete.
+                run ? (
+                  <Alert severity="success">{t('admin.gaps.noGaps')}</Alert>
+                ) : (
+                  <Alert severity="info">{t('admin.gaps.scanInProgress')}</Alert>
+                )
               ) : filtered.length === 0 ? (
                 <Alert severity="info">{t('admin.gaps.noMatches')}</Alert>
               ) : (
@@ -1212,6 +1263,6 @@ function GapAnalysisContent() {
           )}
         </DialogActions>
       </Dialog>
-    </Box>
+    </>
   )
 }

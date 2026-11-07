@@ -7,7 +7,7 @@ Configure when background jobs run — per job, from the jobs console.
 Admin console → **Operations** → **Jobs** (`/admin/ops/jobs`):
 
 - **Gear / "Configure schedule"** on any job card opens its schedule dialog
-- The **Schedule tab** lists all 39 jobs — including the card-less ones (`sync-users`, `refresh-assistant-suggestions`, `backup-database`, `cleanup-auth-state`, `refresh-library-gaps`) — with an **Enabled toggle**, next run, last run, duration, and status
+- The **Schedule tab** lists all 40 jobs — including the card-less ones (`sync-users`, `refresh-assistant-suggestions`, `backup-database`, `cleanup-auth-state`, `refresh-library-gaps`, `refresh-series-gaps`) — with an **Enabled toggle**, next run, last run, duration, and status
 
 ## Schedule Types
 
@@ -45,7 +45,7 @@ A run that is still going when its next firing is due makes that firing skip, so
 | Every 6 h | `enrich-metadata` (:00), `generate-movie-embeddings` (:10), `generate-series-embeddings` (:20), `sync-trakt-ratings` (:30) |
 | Daily | `backup-database` 02:00, `refresh-ratings` 02:30, `sync-lldap-emails` 03:15, `cleanup-auth-state` 03:30, `reconcile-discovery-requests` 04:30, `refresh-top-picks` 05:00, `enrich-studio-logos` 05:30, `sync-home-sections` 05:45, `generate-discovery-suggestions` 06:00, `enrich-mdblist` 07:00 |
 | Weekly, Sunday | `refresh-assistant-suggestions`, `refresh-ai-pricing` and `auto-request-top-picks` 00:00; `generate-movie-recommendations` and `generate-series-recommendations` 04:00 |
-| Manual only | `full-reset-movie-recommendations`, `full-reset-series-recommendations`, `refresh-library-gaps`, `rebuild-taste-profiles`, `refresh-embedding-centering`, `refresh-recommendation-explanations`, `check-recommendation-explanations`, `evaluate-recommender`, `remove-legacy-libraries` |
+| Manual only | `full-reset-movie-recommendations`, `full-reset-series-recommendations`, `refresh-library-gaps`, `refresh-series-gaps`, `rebuild-taste-profiles`, `refresh-embedding-centering`, `refresh-recommendation-explanations`, `check-recommendation-explanations`, `evaluate-recommender`, `remove-legacy-libraries` |
 | Manual by default, schedulable | `generate-title-analysis`, `translate-title-synopses`, `translate-title-analyses` (each one costs model calls, so a cadence is opted into) |
 
 The order within a night is deliberate: ratings refresh before the recommendation run, reconciling Seerr before the discovery run, and home rows after Top Picks. Effective schedules come from the `job_config` table, seeded with these defaults — once you change one, the table is what runs.

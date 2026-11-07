@@ -604,9 +604,9 @@ Everything runs as a named job with live progress, a log, cancellation and run h
 | `generate-movie-recommendations`, `generate-series-recommendations`             | 04:00   |
 | `refresh-assistant-suggestions`, `refresh-ai-pricing`, `auto-request-top-picks` | 00:00   |
 
-**Manual by default** (`generate-title-analysis`, the two translation jobs and `refresh-library-gaps` can be given a schedule; the rest are manual only)
+**Manual by default** (`generate-title-analysis`, the two translation jobs, `refresh-library-gaps` and `refresh-series-gaps` can be given a schedule; the rest are manual only)
 
-`full-reset-movie-recommendations` · `full-reset-series-recommendations` · `rebuild-taste-profiles` · `refresh-recommendation-explanations` · `check-recommendation-explanations` · `refresh-embedding-centering` · `evaluate-recommender` · `generate-title-analysis` · `translate-title-synopses` · `translate-title-analyses` · `remove-legacy-libraries` · `refresh-library-gaps`
+`full-reset-movie-recommendations` · `full-reset-series-recommendations` · `rebuild-taste-profiles` · `refresh-recommendation-explanations` · `check-recommendation-explanations` · `refresh-embedding-centering` · `evaluate-recommender` · `generate-title-analysis` · `translate-title-synopses` · `translate-title-analyses` · `remove-legacy-libraries` · `refresh-library-gaps` · `refresh-series-gaps`
 
 > Jobs at the same cadence are staggered by minute offset to avoid contention. `reconcile-discovery-requests` runs ahead of the discovery run so a title declined in Seerr can return the same night, and `sync-home-sections` runs after Top Picks refresh so the home row reads that morning's list. Anything that spends money on model calls polls for cancellation between calls, not just between users. With [legacy library output](#legacy-library-output--now-a-switch) off, `sync-movie-libraries`, `sync-series-libraries` and `refresh-top-picks` still run but write nothing, and their cards say so.
 
