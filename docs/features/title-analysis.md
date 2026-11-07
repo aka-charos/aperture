@@ -18,7 +18,7 @@ The feature must be configured by an administrator (a dedicated AI model role an
 
 ## Reading an analysis
 
-The section is **collapsed by default**. Closed, it shows a short summary — how many sections it has and roughly how long it takes to read — with a pill for each section name; click the header (or a pill) to open it. Inside:
+When a title has an analysis, the section **opens by default** on its first section, usually *Context*; a title without one shows just the header. Click the header to close it; closed, it shows a short summary — how many sections it has and roughly how long it takes to read — with a pill for each section name, and clicking the header (or a pill) opens it again. Inside:
 
 - **One section per tab**, so you read one part at a time and move on with the button at the bottom, or choose **Read all** for the whole piece in one scroll. An analysis without section labels shows as a single page. The sections, in reading order: *Context* (where the work comes from and the tradition it belongs to), *Form and Style*, *Narrative Structure* (series only), *Making* (how it was made and what its makers said they intended), and *Critical Reception* (what critics valued and faulted, and what it went on to influence). Analyses written before prompt version 9 may still show the older *Lineage and Influence*, *Stated Intent*, *Production Context* and *Critical Debate* labels until they are rewritten. The essay's paragraphs are indexed as they are written, so a heading only appears when there is substance under it.
 - If your admin has synopsis translation on with film analyses included, the analysis appears in the language you're reading Aperture in, marked **Machine-translated**, with **Show original** one click away.
@@ -27,7 +27,7 @@ The section is **collapsed by default**. Closed, it shows a short summary — ho
 
 ### Spoiler stance
 
-The analysis is written to answer **pre-viewing questions** — how it was made, what it tries to do, where it sits — rather than what happens in it. It is collapsed by default for the same reason. No disclaimer is perfect, so treat any critical essay as one that may brush against the ending.
+The analysis is written to answer **pre-viewing questions** — how it was made, what it tries to do, where it sits — rather than what happens in it, and only one section shows at a time. No disclaimer is perfect, so treat any critical essay as one that may brush against the ending.
 
 ---
 
