@@ -758,6 +758,8 @@
         "configManualOnlyOption": "Manual only",
         "configTime": "Time",
         "configMinute": "Minute",
+        "queued": "Queued",
+        "queuedTooltip": "Waiting for another job that works the media server to finish. Jobs like this take turns so the server is not asked for everything at once.",
         "configMinuteHint": "Minutes past the hour, 0 to 59.",
         "configMinuteInvalid": "Enter a minute from 0 to 59.",
         "configTimeZone": "Times are in the server's time zone: {{timeZone}}",

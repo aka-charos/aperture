@@ -71,6 +71,10 @@ export const jobComponentSchemas = {
           currentStep: { type: 'string' as const, nullable: true, description: 'Current step description' },
           itemsProcessed: { type: 'integer' as const, description: 'Items processed so far' },
           itemsTotal: { type: 'integer' as const, description: 'Total items to process' },
+          queued: {
+            type: 'boolean' as const,
+            description: 'Waiting for another media-server job to finish before it starts',
+          },
         },
       },
       lastRun: {

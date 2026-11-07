@@ -35,6 +35,7 @@ import {
   completeJob,
   failJob,
   isJobCancelled,
+  getJobProgress,
   updateJobProgress,
   generateTitleAnalyses,
   generateTitleTranslations,
@@ -59,10 +60,12 @@ import {
   checkRecommendationExplanations,
   withInferenceContext,
   refreshQualityRatingsSafely,
+  type JobProgress,
 } from '@aperture/core'
 import { syncAllTraktRatings } from '../trakt/index.js'
 import { refreshAssistantSuggestions } from '../assistant/jobs/refreshSuggestions.js'
 import { releaseJob } from './state.js'
+import { MEDIA_SERVER_JOBS, mediaServerTurns } from './mediaServerTurns.js'
 import { jobDefinitions } from './definitions.js'
 import { resolveRunLimit } from './runLimit.js'
 
@@ -93,7 +96,50 @@ export async function runJob(
   jobId: string,
   trigger: JobTrigger = 'manual'
 ): Promise<void> {
-  return withInferenceContext({ feature: `job:${name}` }, () => executeJob(name, jobId, trigger))
+  return withInferenceContext({ feature: `job:${name}` }, () =>
+    MEDIA_SERVER_JOBS.has(name)
+      ? executeInTurn(name, jobId, trigger)
+      : executeJob(name, jobId, trigger)
+  )
+}
+
+/** The step a job shows while it waits; also how the list knows it is queued. */
+const WAITING_STEP = 'Waiting for another media-server job to finish'
+
+/**
+ * Runs a media-server job when its turn comes (mediaServerTurns.ts). A job
+ * that has to wait gets a progress record first, so it shows as queued and can
+ * be cancelled before it starts.
+ */
+async function executeInTurn(name: string, jobId: string, trigger: JobTrigger): Promise<void> {
+  // An object, so the record set inside the callback is seen after it.
+  const waiting: { record?: JobProgress } = {}
+  const release = await mediaServerTurns.acquire(
+    jobId,
+    () => isJobCancelled(jobId),
+    () => {
+      waiting.record = createJobProgress(jobId, name, 1)
+      setJobStep(jobId, 0, WAITING_STEP)
+      logger.info({ job: name, jobId }, `⏳ ${name} waits for another media-server job`)
+    }
+  )
+  if (!release) {
+    // Cancelled while queued: cancelJob already recorded the run; it never started.
+    logger.info({ job: name, jobId }, `🛑 ${name} cancelled before its turn`)
+    releaseJob(name, jobId)
+    return
+  }
+  try {
+    await executeJob(name, jobId, trigger)
+  } finally {
+    release()
+    // A job whose function keeps no progress record of its own would leave
+    // the waiting record running for ever; close it.
+    const record = getJobProgress(jobId)
+    if (waiting.record && record === waiting.record && record.status === 'running') {
+      completeJob(jobId)
+    }
+  }
 }
 
 async function executeJob(name: string, jobId: string, trigger: JobTrigger): Promise<void> {

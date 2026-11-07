@@ -17,6 +17,7 @@ import {
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 import { getRegisteredSchedule } from '../../../lib/scheduler.js'
+import { mediaServerTurns } from '../mediaServerTurns.js'
 import { jobSchemas } from '../schemas.js'
 import { jobDefinitions } from '../definitions.js'
 import { activeJobs } from '../state.js'
@@ -91,6 +92,8 @@ export async function registerListHandlers(fastify: FastifyInstance) {
                   currentStep: progress.currentStep,
                   itemsProcessed: progress.itemsProcessed,
                   itemsTotal: progress.itemsTotal,
+                  // Decided here: waiting for another media-server job's turn.
+                  queued: activeJobId ? mediaServerTurns.isWaiting(activeJobId) : false,
                 }
               : null,
             schedule: config

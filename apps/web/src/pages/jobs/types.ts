@@ -98,6 +98,8 @@ export interface Job {
     currentStep: string
     itemsProcessed: number
     itemsTotal: number
+    /** Waiting its turn behind another media-server job, decided by the API. */
+    queued?: boolean
   }
   schedule?: JobSchedule | null
   lastRun?: JobLastRun | null

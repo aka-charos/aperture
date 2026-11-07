@@ -197,6 +197,11 @@ export function JobCard({
                   }}
                 />
               )}
+              {isRunning && job.progress?.queued && (
+                <Tooltip title={t('admin.jobsPage.ui.queuedTooltip')}>
+                  <Chip label={t('admin.jobsPage.ui.queued')} size="small" variant="outlined" />
+                </Tooltip>
+              )}
             </Stack>
             <Typography variant="body2" color="text.secondary" mb={1}>
               {job.description}

@@ -70,6 +70,8 @@ export function SearchPage() {
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
+  // Title matches are on screen and the semantic answer is still coming.
+  const [refining, setRefining] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalResults, setTotalResults] = useState(0)
@@ -109,53 +111,91 @@ export function SearchPage() {
     fetchFilters()
   }, [])
 
-  // Perform search
-  const performSearch = useCallback(async () => {
-    if (!query || query.trim().length < 2) {
-      setResults([])
-      setTotalResults(0)
-      return
-    }
+  // Perform search. Every run takes its own signal and is aborted when the
+  // query or a filter moves on, so a slow answer for earlier text (a semantic
+  // one above all) can never land over the results for what is in the box.
+  //
+  // With semantic on, the plain title search goes out beside it and is shown
+  // as soon as it answers; the semantic answer replaces it when it arrives.
+  // Embedding the query is the slow step, and the title matches need none.
+  const performSearch = useCallback(
+    async (signal: AbortSignal) => {
+      if (!query || query.trim().length < 2) {
+        setResults([])
+        setTotalResults(0)
+        setLoading(false)
+        setRefining(false)
+        return
+      }
 
-    setLoading(true)
-    setError(null)
+      setLoading(true)
+      setRefining(useSemantic)
+      setError(null)
 
-    try {
       const params = new URLSearchParams({
         q: query,
         limit: String(pageSize),
       })
-
       if (type !== 'all') params.set('type', type)
       if (genre) params.set('genre', genre)
       if (collection) params.set('collection', collection)
       if (network) params.set('network', network)
       if (minRtScore > 0) params.set('minRtScore', String(minRtScore))
-      if (useSemantic) params.set('semantic', 'true')
       if (filters?.yearRange) {
         if (yearRange[0] > filters.yearRange.min) params.set('yearMin', String(yearRange[0]))
         if (yearRange[1] < filters.yearRange.max) params.set('yearMax', String(yearRange[1]))
       }
 
-      const response = await fetch(`/api/search?${params}`, { credentials: 'include' })
-      if (response.ok) {
-        const data = await response.json()
-        setResults(data.results)
-        setTotalResults(data.total)
-      } else {
-        setError(t('search.errors.searchFailed'))
+      type Answer = { results: SearchResult[]; total: number }
+      // 'failed' is an answer that came back refused; 'unreachable' never came.
+      const read = async (values: URLSearchParams): Promise<Answer | 'failed' | 'unreachable'> => {
+        try {
+          const response = await fetch(`/api/search?${values}`, { credentials: 'include', signal })
+          return response.ok ? ((await response.json()) as Answer) : 'failed'
+        } catch {
+          return 'unreachable'
+        }
       }
-    } catch {
-      setError(t('search.errors.connect'))
-    } finally {
+      const show = (answer: Answer) => {
+        setResults(answer.results)
+        setTotalResults(answer.total)
+        setError(null)
+      }
+
+      const semantic = useSemantic
+        ? read(new URLSearchParams([...params, ['semantic', 'true']]))
+        : null
+      const basic = await read(params)
+      if (signal.aborted) return
+      if (typeof basic !== 'string') {
+        show(basic)
+        setLoading(false)
+      }
+
+      const enhanced = semantic ? await semantic : null
+      if (signal.aborted) return
+      if (enhanced && typeof enhanced !== 'string') {
+        show(enhanced)
+      } else if (typeof basic === 'string') {
+        // Nothing answered: say which way it failed.
+        const failure = enhanced ?? basic
+        setError(t(failure === 'failed' ? 'search.errors.searchFailed' : 'search.errors.connect'))
+      }
+      // A semantic failure after the title matches arrived keeps those on screen.
       setLoading(false)
-    }
-  }, [query, type, genre, collection, network, minRtScore, useSemantic, yearRange, filters, t])
+      setRefining(false)
+    },
+    [query, type, genre, collection, network, minRtScore, useSemantic, yearRange, filters, t]
+  )
 
   // Debounced search
   useEffect(() => {
-    const debounce = setTimeout(performSearch, query ? 300 : 0)
-    return () => clearTimeout(debounce)
+    const controller = new AbortController()
+    const debounce = setTimeout(() => void performSearch(controller.signal), query ? 300 : 0)
+    return () => {
+      clearTimeout(debounce)
+      controller.abort()
+    }
   }, [performSearch, query])
 
   // Update URL params
@@ -234,7 +274,7 @@ export function SearchPage() {
                 <SearchIcon />
               </InputAdornment>
             ),
-            endAdornment: loading && (
+            endAdornment: (loading || refining) && (
               <InputAdornment position="end">
                 <CircularProgress size={20} />
               </InputAdornment>
@@ -455,7 +495,7 @@ export function SearchPage() {
         </Box>
       )}
 
-      {query && !loading && results.length === 0 && (
+      {query && !loading && !refining && !error && results.length === 0 && (
         <Box textAlign="center" py={8}>
           <Typography variant="h6" color="text.secondary">
             {t('search.noResults', { query })}

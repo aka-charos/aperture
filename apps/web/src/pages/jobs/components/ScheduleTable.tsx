@@ -187,7 +187,7 @@ export function ScheduleTable({
                     {isRunning ? (
                       <Chip
                         size="small"
-                        label={t('admin.jobsPage.ui.statusRunning')}
+                        label={t(job.progress?.queued ? 'admin.jobsPage.ui.queued' : 'admin.jobsPage.ui.statusRunning')}
                         sx={{
                           bgcolor: 'primary.main',
                           color: 'surface.onBrand',
@@ -408,7 +408,7 @@ export function ScheduleTable({
                   {isRunning ? (
                     <Chip
                       size="small"
-                      label={t('admin.jobsPage.ui.statusRunning')}
+                      label={t(job.progress?.queued ? 'admin.jobsPage.ui.queued' : 'admin.jobsPage.ui.statusRunning')}
                       sx={{
                         bgcolor: 'primary.main',
                         color: 'surface.onBrand',
