@@ -522,6 +522,23 @@ export function formatSchedule(config: JobConfig): string {
  * run the job, because skipping on a database hiccup would be indistinguishable
  * from the schedule silently breaking.
  */
+/**
+ * When each named job's last COMPLETED run started: what isScheduledRunDue
+ * reads per job, in one query for a list. A job with no completed run is
+ * absent. Throws on a database failure; a caller showing the answer decides
+ * what to say without it.
+ */
+export async function getLastCompletedRunStarts(jobNames: string[]): Promise<Map<string, Date>> {
+  if (jobNames.length === 0) return new Map()
+  const result = await query<{ job_name: string; started_at: Date }>(
+    `SELECT job_name, MAX(started_at) AS started_at FROM job_runs
+      WHERE job_name = ANY($1::text[]) AND status = 'completed'
+      GROUP BY job_name`,
+    [jobNames]
+  )
+  return new Map(result.rows.map((row) => [row.job_name, row.started_at]))
+}
+
 export async function isScheduledRunDue(
   jobName: string,
   scheduleType: ScheduleType,

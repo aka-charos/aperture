@@ -27,6 +27,13 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import type { ScheduleType, JobSchedule, JobRunLimit } from '../types'
 import { formatJobName } from '../constants'
 import type { UpdateJobConfigParams } from '../hooks/useJobsData'
+import {
+  formatTimeOfDay,
+  isSubHourInterval,
+  parseMinute,
+  scheduleTakesMinute,
+  scheduleTimingPayload,
+} from '../scheduleForm'
 
 type JobConfigSaveParams = UpdateJobConfigParams & {
   scheduleType: ScheduleType
@@ -109,20 +116,15 @@ export function JobConfigDialog({
   const [error, setError] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
 
+  // The same formatter as the preview, so the picker and the summary under it
+  // show the time one way.
   const hours = useMemo(
     () =>
       Array.from({ length: 24 }, (_, i) => ({
         value: i,
-        label:
-          i === 0
-            ? t('admin.jobsPage.ui.hour12am')
-            : i < 12
-              ? t('admin.jobsPage.ui.hourAm', { hour: i })
-              : i === 12
-                ? t('admin.jobsPage.ui.hour12pm')
-                : t('admin.jobsPage.ui.hourPm', { hour: i - 12 }),
+        label: formatTimeOfDay(i18n.language, i, 0),
       })),
-    [t]
+    [i18n.language]
   )
 
   const weekdays = useMemo(
@@ -182,18 +184,11 @@ export function JobConfigDialog({
   const showsTimeOfDay = showsDayOfWeek || scheduleType === 'daily'
   // The 15- and 30-minute intervals run on the quarter and half hour
   // whatever the minute says, so they get no minute field.
-  const subHour = scheduleType === 'interval' && intervalMinutesTotal < 60
-  const showsMinute = isEnabled && (showsTimeOfDay || (scheduleType === 'interval' && !subHour))
+  const subHour = isSubHourInterval(scheduleType, intervalMinutesTotal)
+  const showsMinute = isEnabled && scheduleTakesMinute(scheduleType, intervalMinutesTotal)
 
-  // Every save used to send minute 0 (or none for an interval job), which put
-  // a job seeded at :10 or 05:45 back on the hour the first time anyone opened
-  // this dialog. The minute is now shown, edited and sent back as it is.
-  const parsedMinute = useMemo((): number | undefined => {
-    const text = minuteText.trim()
-    if (!/^\d{1,2}$/.test(text)) return undefined
-    const value = Number(text)
-    return value <= 59 ? value : undefined
-  }, [minuteText])
+  // Shown, edited and sent back as it is (scheduleForm.ts says why).
+  const parsedMinute = useMemo(() => parseMinute(minuteText), [minuteText])
   const minuteInvalid = showsMinute && parsedMinute === undefined
   const minute = parsedMinute ?? currentSchedule?.minute ?? 0
 
@@ -221,10 +216,15 @@ export function JobConfigDialog({
         payload.maxItemsPerRun = parsedRunLimit
       }
 
-      payload.scheduleHour = scheduleType === 'interval' || scheduleType === 'manual' ? null : hour
-      // No minute for manual or the sub-hour intervals: the server then reads
-      // the job's seed minute, which is what it falls back to anyway.
-      payload.scheduleMinute = scheduleType === 'manual' || subHour ? null : minute
+      Object.assign(
+        payload,
+        scheduleTimingPayload({
+          type: scheduleType,
+          hour,
+          minute,
+          intervalMinutes: intervalMinutesTotal,
+        })
+      )
 
       if (showsDaySet) {
         // The scalar rides along at the earliest day so an older API build (or
@@ -242,14 +242,6 @@ export function JobConfigDialog({
         payload.scheduleDayOfWeek = null
       }
 
-      if (scheduleType === 'interval') {
-        if (subHour) {
-          payload.scheduleIntervalMinutes = intervalMinutesTotal
-        } else {
-          payload.scheduleIntervalHours = intervalMinutesTotal / 60
-        }
-      }
-
       await onSave(payload)
       onClose()
     } catch (err) {
@@ -263,13 +255,7 @@ export function JobConfigDialog({
     if (manualOnly) return t('admin.jobsPage.ui.configPreviewManualOnly')
     if (!isEnabled) return t('admin.jobsPage.ui.configPreviewDisabled')
 
-    // Formatted as a wall time (UTC here only so no zone shifts it); the
-    // schedule itself is read in the server's zone, which the dialog states.
-    const timeLabel = new Intl.DateTimeFormat(i18n.language, {
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZone: 'UTC',
-    }).format(Date.UTC(2000, 0, 1, hour, minute))
+    const timeLabel = formatTimeOfDay(i18n.language, hour, minute)
     switch (scheduleType) {
       case 'daily':
         return t('admin.jobsPage.ui.configPreviewDaily', { time: timeLabel })

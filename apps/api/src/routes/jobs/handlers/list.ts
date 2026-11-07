@@ -11,11 +11,12 @@ import {
   getLastJobRuns,
   isLegacyLibraryOutputEnabled,
   legacyJobBlockedReason,
-  isScheduledRunDue,
+  getLastCompletedRunStarts,
   nextScheduledRun,
   schedulerTimeZone,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
+import { getRegisteredSchedule } from '../../../lib/scheduler.js'
 import { jobSchemas } from '../schemas.js'
 import { jobDefinitions } from '../definitions.js'
 import { activeJobs } from '../state.js'
@@ -43,19 +44,36 @@ export async function registerListHandlers(fastify: FastifyInstance) {
       const now = new Date()
       const timeZone = schedulerTimeZone()
 
+      // The next run is decided here, in the scheduler's zone, from the
+      // schedule node-cron is actually running (not the saved row, which a
+      // failed refresh can leave unapplied), so the page never works it out.
+      const registered = new Map(
+        jobDefinitions.map((def) => [def.name, getRegisteredSchedule(def.name)])
+      )
+      // The biweekly rule reads the last COMPLETED run, as the scheduler's
+      // isScheduledRunDue does: one query for every running biweekly job.
+      // Unreadable, it counts as no run, the scheduler's own fail-open.
+      const biweekly = [...registered]
+        .filter(([, schedule]) => schedule?.scheduleType === 'biweekly')
+        .map(([name]) => name)
+      const lastCompleted = await getLastCompletedRunStarts(biweekly).catch(
+        () => new Map<string, Date>()
+      )
+
       const jobs = await Promise.all(
         jobDefinitions.map(async (def) => {
           const activeJobId = activeJobs.get(def.name)
           const progress = activeJobId ? getJobProgress(activeJobId) : null
           const config = configMap.get(def.name) || (await getJobConfig(def.name))
           const lastRun = lastRunsMap.get(def.name)
-          // Decided here, in the scheduler's zone and with its biweekly rule
-          // (the last COMPLETED run), so the page never works it out itself.
-          const lastCompletedAt =
-            config.scheduleType === 'biweekly'
-              ? (await isScheduledRunDue(def.name, 'biweekly', now)).lastRunAt
-              : null
-          const nextRunAt = nextScheduledRun(config, { now, timeZone, lastCompletedAt })
+          const running = registered.get(def.name)
+          const nextRunAt = running
+            ? nextScheduledRun(running, {
+                now,
+                timeZone,
+                lastCompletedAt: lastCompleted.get(def.name) ?? null,
+              })
+            : null
 
           return {
             ...def,

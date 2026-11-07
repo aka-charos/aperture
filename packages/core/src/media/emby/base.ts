@@ -4,13 +4,16 @@
 
 import { createChildLogger } from '../../lib/logger.js'
 import {
+  MediaServerIncompleteResponseError,
   MediaServerTimeoutError,
   requestMediaServer,
   type MediaServerReply,
 } from '../serverRequest.js'
 import {
   EMBY_FETCH_TIMEOUT_MS,
+  embyBusyError,
   embyConnectionError,
+  embyIncompleteResponseError,
   embyHttpError,
   embyTimeoutError,
   parseEmbyResponseBody,
@@ -57,11 +60,16 @@ export class EmbyProviderBase {
     } catch (err) {
       const duration = Date.now() - startTime
       if (err instanceof MediaServerTimeoutError) {
-        logger.error(
-          { url, duration },
-          `⏱️ Emby API request timed out after ${EMBY_FETCH_TIMEOUT_MS / 1000} seconds`
-        )
+        logger.error({ url, duration, stage: err.stage }, `⏱️ Emby API request: ${err.message}`)
+        if (err.stage === 'queue') throw embyBusyError()
+        if (err.stage === 'body') throw embyIncompleteResponseError()
         throw embyTimeoutError(this.baseUrl)
+      }
+      // The server answered, so this is not a connection problem: saying
+      // "check the URL" would send the admin after settings that are fine.
+      if (err instanceof MediaServerIncompleteResponseError) {
+        logger.error({ url, duration, status: err.status, err: err.cause }, '❌ Emby API response broke off')
+        throw embyIncompleteResponseError()
       }
       logger.error({ url, duration, err }, '❌ Emby API network error')
       throw embyConnectionError(this.baseUrl)

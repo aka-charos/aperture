@@ -23,6 +23,8 @@ interface ScheduledJob {
   task: ScheduledTask
   cronExpression: string
   schedule: string // Human-readable
+  /** The config the task was built from, so readers see what actually runs. */
+  config: JobConfig
 }
 const scheduledTasks: Map<string, ScheduledJob> = new Map()
 
@@ -100,8 +102,19 @@ function scheduleJob(config: JobConfig): void {
     task,
     cronExpression,
     schedule: humanSchedule,
+    config,
   })
   logger.info({ job: config.jobName, cron: cronExpression, schedule: humanSchedule }, `📅 Job scheduled: ${config.jobName} (${humanSchedule})`)
+}
+
+/**
+ * The schedule node-cron is actually running for a job, or null when it runs
+ * none (manual, switched off, an invalid expression, or a refresh that failed).
+ * The jobs list works the next run out from this, not from the saved row, so
+ * it never promises a firing the scheduler does not have.
+ */
+export function getRegisteredSchedule(jobName: string): JobConfig | null {
+  return scheduledTasks.get(jobName)?.config ?? null
 }
 
 /**

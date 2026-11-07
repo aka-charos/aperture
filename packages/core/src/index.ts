@@ -494,6 +494,7 @@ export {
   normalizeScheduleDays,
   isBiweeklyRunDue,
   isScheduledRunDue,
+  getLastCompletedRunStarts,
   BIWEEKLY_MIN_DAYS,
   nextScheduledRun,
   schedulerTimeZone,

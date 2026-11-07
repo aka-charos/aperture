@@ -7,12 +7,19 @@
 import { MediaServerHttpError } from '../httpError.js'
 import { createChildLogger } from '../../lib/logger.js'
 import {
+  MediaServerIncompleteResponseError,
   MediaServerTimeoutError,
   requestMediaServer,
   type MediaServerReply,
 } from '../serverRequest.js'
 
 export const logger = createChildLogger('jellyfin-provider')
+
+function jellyfinIncompleteResponseError(): Error {
+  return new Error(
+    'Jellyfin answered but stopped partway through its response. The server is reachable; it may be overloaded.'
+  )
+}
 
 export class JellyfinProviderBase {
   readonly type = 'jellyfin' as const
@@ -45,15 +52,27 @@ export class JellyfinProviderBase {
     const startTime = Date.now()
     let response: MediaServerReply
     try {
-      // 60 seconds for the whole answer, body included (large libraries).
+      // 60 seconds for a slot, for the answer to start, and of silence in the
+      // body (a large library's listing may stream longer than that).
       response = await requestMediaServer(this.baseUrl, url, { ...options, headers }, 60_000)
     } catch (err) {
       const duration = Date.now() - startTime
       if (err instanceof MediaServerTimeoutError) {
-        logger.error({ url, duration }, '⏱️ Jellyfin API request timed out after 60 seconds')
+        logger.error({ url, duration, stage: err.stage }, `⏱️ Jellyfin API request: ${err.message}`)
+        if (err.stage === 'queue') {
+          throw new Error(
+            "Jellyfin is busy: Aperture's requests to it did not finish within 60 seconds, so this one was not sent."
+          )
+        }
+        if (err.stage === 'body') throw jellyfinIncompleteResponseError()
         throw new Error(
           `Connection to Jellyfin timed out after 60 seconds. Please check that your media server URL (${this.baseUrl}) is accessible from the Aperture container.`
         )
+      }
+      // The server answered, so this is not a connection problem.
+      if (err instanceof MediaServerIncompleteResponseError) {
+        logger.error({ url, duration, status: err.status, err: err.cause }, '❌ Jellyfin API response broke off')
+        throw jellyfinIncompleteResponseError()
       }
       logger.error({ url, duration, err }, '❌ Jellyfin API network error')
       throw new Error(

@@ -30,6 +30,7 @@ export {
   normalizeScheduleDays,
   isBiweeklyRunDue,
   isScheduledRunDue,
+  getLastCompletedRunStarts,
   BIWEEKLY_MIN_DAYS,
   type JobConfig,
   type ScheduleType,

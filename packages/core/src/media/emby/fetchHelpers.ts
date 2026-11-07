@@ -12,6 +12,20 @@ export function embyTimeoutError(baseUrl: string): Error {
   )
 }
 
+/** Every request slot stayed taken for the whole wait. */
+export function embyBusyError(): Error {
+  return new Error(
+    `Emby is busy: Aperture's requests to it did not finish within ${EMBY_FETCH_TIMEOUT_MS / 1000} seconds, so this one was not sent.`
+  )
+}
+
+/** Emby answered, then stopped sending (or broke off) partway through. */
+export function embyIncompleteResponseError(): Error {
+  return new Error(
+    'Emby answered but stopped partway through its response. The server is reachable; it may be overloaded.'
+  )
+}
+
 export function embyConnectionError(baseUrl: string): Error {
   return new Error(
     `Failed to connect to Emby at ${baseUrl}. Please verify the URL is correct and the server is running.`

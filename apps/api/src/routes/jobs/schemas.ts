@@ -56,7 +56,8 @@ export const jobComponentSchemas = {
             type: 'string' as const,
             format: 'date-time',
             nullable: true,
-            description: 'When the scheduler next runs the job, in its own time zone; null for manual or switched off',
+            description:
+              'When the scheduler next runs the job, from the schedule it is actually running, in its own time zone; null when it runs none (manual, switched off, or not applied)',
           },
           timeZone: { type: 'string' as const, description: 'The time zone the schedule is read in (the container TZ)' },
         },
