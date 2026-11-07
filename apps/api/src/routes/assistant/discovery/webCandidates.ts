@@ -32,6 +32,7 @@ import {
   recordWebSearchCall,
   classifyQuotaError,
   markSlotExhausted,
+  parseModelJson,
   type WebSearchKeySlot,
   type WebSearchUsageTokens,
 } from '@aperture/core'
@@ -206,16 +207,19 @@ function refineCandidates(candidates: DiscoveryCandidate[]): DiscoveryCandidate[
 /**
  * Tolerant fallback parse: pull the first JSON array out of a model's free-text
  * answer and coerce each entry into a candidate. Used only when generateObject
- * fails outright (a chat model that can't emit structured output).
+ * fails outright (a chat model that can't emit structured output). Parsed
+ * through `parseModelJson`, because those models (local ones especially) write
+ * `Mann\'s best`, and a bare `JSON.parse` dropped every pick for one apostrophe.
+ * Exported for its test.
  */
-function parseCandidatesJson(text: string): DiscoveryCandidate[] {
+export function parseCandidatesJson(text: string): DiscoveryCandidate[] {
   const start = text.indexOf('[')
   const end = text.lastIndexOf(']')
   if (start === -1 || end === -1 || end <= start) return []
 
   let raw: unknown
   try {
-    raw = JSON.parse(text.slice(start, end + 1))
+    raw = parseModelJson(text.slice(start, end + 1))
   } catch {
     return []
   }

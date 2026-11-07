@@ -548,6 +548,9 @@ export {
 // AI error descriptions -- compact enough to log, unlike the raw APICallError
 export { describeAiError, type AiErrorDescription } from './lib/aiErrors.js'
 
+// JSON a model wrote by hand: strict parse, then one retry with `\'` repaired
+export { parseModelJson, repairModelJsonEscapes } from './lib/modelJson.js'
+
 export {
   WATCH_DATE_BANDS,
   availableWatchDateBands,
