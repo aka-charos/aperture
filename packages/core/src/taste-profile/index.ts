@@ -5,7 +5,7 @@
  * similarity graphs, explore, and discovery features.
  */
 
-import { query, queryOne, transaction } from '../lib/db.js'
+import { query, queryOne, transaction, type PoolClient } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
 import type {
   TasteProfile,
@@ -762,47 +762,91 @@ export async function bulkUpdateFranchisePreferences(
   clearFirst: boolean = false,
   targetMediaType?: MediaType
 ): Promise<number> {
-  // In reset mode, clear franchises for the target media type only
-  // This ensures excluded libraries don't leave orphan preferences
-  if (clearFirst && targetMediaType) {
-    await query(
-      `DELETE FROM user_franchise_preferences WHERE user_id = $1 AND media_type = $2`,
-      [userId, targetMediaType]
-    )
-    logger.debug({ userId, targetMediaType }, 'Cleared franchise preferences for media type')
-  } else if (clearFirst) {
-    // Fallback: clear all if no targetMediaType specified (legacy behavior)
-    await query(`DELETE FROM user_franchise_preferences WHERE user_id = $1`, [userId])
-    logger.debug({ userId }, 'Cleared all franchise preferences for reset')
-  }
+  if (franchises.length === 0 && !clearFirst) return 0
 
-  let updated = 0
+  return withPreferenceWriteLock('franchise-preferences', userId, async (client) => {
+    // In reset mode, clear franchises for the target media type only
+    // This ensures excluded libraries don't leave orphan preferences
+    if (clearFirst && targetMediaType) {
+      await client.query(
+        `DELETE FROM user_franchise_preferences WHERE user_id = $1 AND media_type = $2`,
+        [userId, targetMediaType]
+      )
+      logger.debug({ userId, targetMediaType }, 'Cleared franchise preferences for media type')
+    } else if (clearFirst) {
+      // Fallback: clear all if no targetMediaType specified (legacy behavior)
+      await client.query(`DELETE FROM user_franchise_preferences WHERE user_id = $1`, [userId])
+      logger.debug({ userId }, 'Cleared all franchise preferences for reset')
+    }
 
-  for (const franchise of franchises) {
-    // Only update auto-detected preferences, don't overwrite user-set ones
-    const result = await query(
-      `INSERT INTO user_franchise_preferences 
-         (user_id, franchise_name, media_type, preference_score, is_user_set, items_watched, total_engagement)
-       VALUES ($1, $2, $3, $4, false, $5, $6)
-       ON CONFLICT (user_id, franchise_name, media_type) 
-       DO UPDATE SET 
-         preference_score = CASE WHEN user_franchise_preferences.is_user_set THEN user_franchise_preferences.preference_score ELSE $4 END,
-         items_watched = $5,
-         total_engagement = $6
-       WHERE NOT user_franchise_preferences.is_user_set OR user_franchise_preferences.items_watched != $5`,
-      [
-        userId,
-        franchise.franchiseName,
-        franchise.mediaType,
-        franchise.preferenceScore,
-        franchise.itemsWatched,
-        franchise.totalEngagement,
-      ]
-    )
-    if (result.rowCount && result.rowCount > 0) updated++
-  }
+    let updated = 0
 
-  return updated
+    for (const franchise of franchises) {
+      // A hand-set score is kept; its counts still follow the history. A row
+      // that would come out the same is not written (FRANCHISE_ROW_CHANGED).
+      const result = await client.query(
+        `INSERT INTO user_franchise_preferences
+           (user_id, franchise_name, media_type, preference_score, is_user_set, items_watched, total_engagement)
+         VALUES ($1, $2, $3, $4, false, $5, $6)
+         ON CONFLICT (user_id, franchise_name, media_type)
+         DO UPDATE SET
+           preference_score = CASE WHEN user_franchise_preferences.is_user_set
+             THEN user_franchise_preferences.preference_score ELSE EXCLUDED.preference_score END,
+           items_watched = EXCLUDED.items_watched,
+           total_engagement = EXCLUDED.total_engagement
+         WHERE ${FRANCHISE_ROW_CHANGED}`,
+        [
+          userId,
+          franchise.franchiseName,
+          franchise.mediaType,
+          franchise.preferenceScore,
+          franchise.itemsWatched,
+          franchise.totalEngagement,
+        ]
+      )
+      if (result.rowCount && result.rowCount > 0) updated++
+    }
+
+    return updated
+  })
+}
+
+/**
+ * When an auto-detected franchise upsert changes its row. Both tables have a
+ * trigger that restamps `updated_at` on ANY update, and the scheduled run's
+ * activity gate reads that stamp, so a write that changes nothing must not
+ * happen (CLAUDE.md, "Writing to an activity-gate table").
+ */
+export const FRANCHISE_ROW_CHANGED = `(
+           (NOT user_franchise_preferences.is_user_set
+             AND user_franchise_preferences.preference_score IS DISTINCT FROM EXCLUDED.preference_score)
+           OR user_franchise_preferences.items_watched IS DISTINCT FROM EXCLUDED.items_watched
+           OR user_franchise_preferences.total_engagement IS DISTINCT FROM EXCLUDED.total_engagement
+         )`
+
+/** When an auto-detected genre weight upsert changes its row; hand-set weights never. */
+export const GENRE_ROW_CHANGED = `(
+           NOT user_genre_weights.is_user_set
+           AND user_genre_weights.weight IS DISTINCT FROM EXCLUDED.weight
+         )`
+
+/**
+ * One account's auto-detected preference write, as one transaction behind a
+ * per-account lock. A reset deletes and re-inserts: in one transaction a
+ * failure part-way leaves the old list, and a recommendation run reading at
+ * that moment sees the old list or the new one, never a half-written one. The
+ * lock queues two writes for the same account (a rescan and a scheduled
+ * rebuild) instead of letting two resets delete and insert across each other.
+ */
+async function withPreferenceWriteLock<T>(
+  table: 'franchise-preferences' | 'genre-weights',
+  userId: string,
+  write: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  return transaction(async (client) => {
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [table, userId])
+    return write(client)
+  })
 }
 
 /**
@@ -891,32 +935,33 @@ export async function bulkUpdateGenreWeights(
   genres: Array<{ genre: string; weight: number }>,
   clearFirst: boolean = false
 ): Promise<number> {
-  // In reset mode, clear ALL genres (including user-set) to start fresh
-  // This ensures excluded libraries don't leave orphan preferences
-  if (clearFirst) {
-    await query(
-      `DELETE FROM user_genre_weights WHERE user_id = $1`,
-      [userId]
-    )
-    logger.debug({ userId }, 'Cleared all genre weights for reset')
-  }
+  if (genres.length === 0 && !clearFirst) return 0
 
-  let updated = 0
+  return withPreferenceWriteLock('genre-weights', userId, async (client) => {
+    // In reset mode, clear ALL genres (including user-set) to start fresh
+    // This ensures excluded libraries don't leave orphan preferences
+    if (clearFirst) {
+      await client.query(`DELETE FROM user_genre_weights WHERE user_id = $1`, [userId])
+      logger.debug({ userId }, 'Cleared all genre weights for reset')
+    }
 
-  for (const { genre, weight } of genres) {
-    const clampedWeight = Math.max(0, Math.min(2, weight))
-    const result = await query(
-      `INSERT INTO user_genre_weights (user_id, genre, weight, is_user_set)
-       VALUES ($1, $2, $3, false)
-       ON CONFLICT (user_id, genre) 
-       DO UPDATE SET weight = $3
-       WHERE NOT user_genre_weights.is_user_set`,
-      [userId, genre, clampedWeight]
-    )
-    if (result.rowCount && result.rowCount > 0) updated++
-  }
+    let updated = 0
 
-  return updated
+    for (const { genre, weight } of genres) {
+      const clampedWeight = Math.max(0, Math.min(2, weight))
+      const result = await client.query(
+        `INSERT INTO user_genre_weights (user_id, genre, weight, is_user_set)
+         VALUES ($1, $2, $3, false)
+         ON CONFLICT (user_id, genre)
+         DO UPDATE SET weight = EXCLUDED.weight
+         WHERE ${GENRE_ROW_CHANGED}`,
+        [userId, genre, clampedWeight]
+      )
+      if (result.rowCount && result.rowCount > 0) updated++
+    }
+
+    return updated
+  })
 }
 
 /**

@@ -971,8 +971,10 @@ export async function generateSeriesRecommendationsForUser(
         // The legacy builder reads the raw column, so this centroid is raw.
         profileSpace = 'raw'
         await storeNewTasteProfile(user.id, 'series', tasteProfile, currentModelId || undefined, 'raw')
-        // Also detect franchises
-        await detectAndUpdateFranchises(user.id, 'series')
+        // Also detect franchises. 'merge', never the default 'reset': a reset
+        // deletes franchises the viewer set by hand, which only the viewer's
+        // own "Reset All" may do. No stored profile, so default thresholds.
+        await detectAndUpdateFranchises(user.id, 'series', { mode: 'merge' })
         logger.info({ userId: user.id }, '💾 Stored new taste profile and detected franchises')
       }
     } else {

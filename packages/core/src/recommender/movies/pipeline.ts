@@ -310,8 +310,10 @@ export async function generateRecommendationsForUser(
         // column currently holds.
         profileSpace = 'raw'
         await storeNewTasteProfile(user.id, 'movie', tasteProfile, currentModelId || undefined, 'raw')
-        // Also detect franchises
-        await detectAndUpdateFranchises(user.id, 'movie')
+        // Also detect franchises. 'merge', never the default 'reset': a reset
+        // deletes franchises the viewer set by hand, which only the viewer's
+        // own "Reset All" may do. No stored profile, so default thresholds.
+        await detectAndUpdateFranchises(user.id, 'movie', { mode: 'merge' })
         logger.info({ userId: user.id }, '💾 Stored new taste profile and detected franchises')
       }
     } else {
