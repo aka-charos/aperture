@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { setForcedSortName } from './sortName.js'
+import { clearRankSortName, setForcedSortName } from './sortName.js'
 import { mapWithConcurrency } from '../lib/concurrency.js'
 import { mapEmbyItemToMovie } from './emby/mappers.js'
 import type { EmbyItem } from './emby/types.js'
@@ -60,4 +60,43 @@ test('Emby movie mapper still reports video quality through the shared mapper', 
   assert.equal(movie.videoCodec, 'hevc')
   assert.equal(movie.audioCodec, 'eac3')
   assert.equal(movie.container, 'mkv')
+})
+
+test('clearRankSortName removes only an exact "NN - <name>" and its SortName lock', () => {
+  const ours: Record<string, unknown> = {
+    Name: 'Heat',
+    ForcedSortName: '03 - Heat',
+    LockedFields: ['SortName', 'Name'],
+  }
+  assert.equal(clearRankSortName(ours), true)
+  assert.equal(ours.ForcedSortName, undefined)
+  assert.deepEqual(ours.LockedFields, ['Name'])
+
+  // The viewer's own forced name, a prefix on another name, and an untouched item are all left
+  for (const item of [
+    { Name: 'Heat', ForcedSortName: '12 - Favourites', LockedFields: ['SortName'] },
+    { Name: 'Heat', ForcedSortName: '03 - Ronin' },
+    { Name: 'Heat', ForcedSortName: 'Heat, The' },
+    { Name: 'Heat' },
+  ] as Array<Record<string, unknown>>) {
+    const before = structuredClone(item)
+    assert.equal(clearRankSortName(item), false)
+    assert.deepEqual(item, before)
+  }
+})
+
+test('mapWithConcurrency starts no new item after a failure and throws the first error', async () => {
+  const started: number[] = []
+  await assert.rejects(
+    mapWithConcurrency([0, 1, 2, 3, 4, 5, 6, 7], 2, async (n) => {
+      started.push(n)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      if (n === 1) throw new Error('boom')
+      return n
+    }),
+    /boom/
+  )
+
+  // Only the calls already in flight when item 1 failed ran; the queue was not drained
+  assert.ok(started.length <= 4, `started ${started.join(',')}`)
 })

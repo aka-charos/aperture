@@ -621,7 +621,9 @@ async function removeTopPicksContainers(
       const collectionId = await provider.findCollectionByName(apiKey, name)
       if (collectionId) {
         const items = await provider.getCollectionItems(apiKey, collectionId)
-        await consider('collection', name, collectionId, items, () => provider.deleteCollection(apiKey, collectionId))
+        await consider('collection', name, collectionId, items, () =>
+          provider.deleteCollection(apiKey, collectionId, { clearRankSortNames: true })
+        )
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

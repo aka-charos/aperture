@@ -2,7 +2,15 @@ import assert from 'node:assert/strict'
 import { beforeEach, test } from 'node:test'
 import type { JellyfinProviderBase } from './base.js'
 import { getLibraries } from './libraries.js'
-import { clearAdminUserCache, updateJellyfinItem, updateJellyfinItemSafely } from './itemUpdates.js'
+import {
+  clearAdminUserCache,
+  readJellyfinItem,
+  updateJellyfinItem,
+  updateJellyfinItemSafely,
+} from './itemUpdates.js'
+import { getMovieById } from './movies.js'
+import { getEpisodeById, getSeriesById } from './series.js'
+import { getPersonDetails } from './persons.js'
 import { createOrUpdateCollection, deleteCollection } from './collections.js'
 import { mapJellyfinItemToMovie } from './mappers.js'
 import { mapVideoQuality } from '../videoQuality.js'
@@ -240,7 +248,7 @@ test('a sort name the user set themselves is never cleared', async () => {
   assert.equal(calls.some((c) => c.method === 'POST' && c.endpoint === '/Items/m3'), false)
 })
 
-test('deleting a collection clears the rank prefixes of its members', async () => {
+test('deleting a ranked collection clears the rank prefixes of its members', async () => {
   const items: Record<string, Record<string, unknown>> = {
     m1: { Id: 'm1', Name: 'Heat', ForcedSortName: '01 - Heat', LockedFields: ['SortName'] },
     m3: { Id: 'm3', Name: 'Collateral', ForcedSortName: '02 - Collateral', LockedFields: ['SortName'] },
@@ -255,7 +263,7 @@ test('deleting a collection clears the rank prefixes of its members', async () =
     throw new Error(`unexpected ${c.method} ${c.endpoint}`)
   })
 
-  await deleteCollection(provider, 'key', 'c1')
+  await deleteCollection(provider, 'key', 'c1', { clearRankSortNames: true })
 
   const posted = (id: string) => calls.find((c) => c.method === 'POST' && c.endpoint === `/Items/${id}`)?.body
   assert.equal(posted('m1')?.ForcedSortName, undefined)
@@ -304,4 +312,155 @@ test('Jellyfin movie mapper now fills in video quality', () => {
   assert.equal(movie.videoCodec, 'h264')
   assert.equal(movie.audioCodec, 'ac3')
   assert.equal(movie.container, 'mkv')
+})
+
+// ---------------------------------------------------------------------------------------------
+// Collections that never wrote a rank prefix must not remove one
+// ---------------------------------------------------------------------------------------------
+
+test('a rankAndPin:false collection writes no sort name and clears none (existing collection)', async () => {
+  const items: Record<string, Record<string, unknown>> = {
+    m1: { Id: 'm1', Name: 'Heat' },
+    m2: { Id: 'm2', Name: 'Ronin' },
+    // Ranked "02 - Collateral" by Top Picks and also a member of this channel collection
+    m3: { Id: 'm3', Name: 'Collateral', ForcedSortName: '02 - Collateral', LockedFields: ['SortName'] },
+  }
+  const { provider, calls } = fakeProvider(existingCollectionRoute(items))
+
+  await createOrUpdateCollection(provider, 'key', 'Top Picks', ['m1', 'm2'], { rankAndPin: false })
+
+  // Nothing is written to any item, and no member is even read
+  assert.equal(calls.some((c) => c.method === 'POST' && c.endpoint.startsWith('/Items/')), false)
+  assert.equal(calls.some((c) => c.endpoint.startsWith('/Users/u-admin/Items/')), false)
+})
+
+test('deleting a collection without the option leaves every member alone', async () => {
+  const { provider, calls } = fakeProvider((c) => {
+    if (c.endpoint === '/Items/c1' && c.method === 'DELETE') return null
+    throw new Error(`unexpected ${c.method} ${c.endpoint}`)
+  })
+
+  await deleteCollection(provider, 'key', 'c1')
+
+  assert.deepEqual(calls.map((c) => `${c.method} ${c.endpoint}`), ['DELETE /Items/c1'])
+})
+
+test('an item ranked by Top Picks keeps its prefix when a channel collection drops it', async () => {
+  const topPicks: Record<string, unknown> = {
+    Id: 'm3',
+    Name: 'Collateral',
+    ForcedSortName: '02 - Collateral',
+    LockedFields: ['SortName'],
+  }
+  const { provider, calls } = fakeProvider(existingCollectionRoute({ m1: { Id: 'm1', Name: 'Heat' }, m3: topPicks }))
+
+  // The channel used to hold m1 and m3 and now holds only m1
+  await createOrUpdateCollection(provider, 'key', 'Top Picks', ['m1'], { rankAndPin: false })
+
+  assert.equal(calls.some((c) => c.method === 'POST' && c.endpoint === '/Items/m3'), false)
+})
+
+// ---------------------------------------------------------------------------------------------
+// The collection description reaches Jellyfin
+// ---------------------------------------------------------------------------------------------
+
+test('the collection overview is written through an administrator read, never GET /Items/{id}', async () => {
+  const { provider, calls } = fakeProvider((c) => {
+    if (c.endpoint === '/Users') return users
+    if (c.endpoint.startsWith('/Items?') && c.method === 'GET') return { Items: [] }
+    if (c.endpoint.startsWith('/Collections?') && c.method === 'POST') return { Id: 'c1' }
+    if (c.endpoint === '/Users/u-admin/Items/c1') return { Id: 'c1', Name: 'My Channel' }
+    if (c.endpoint === '/Items/c1' && c.method === 'POST') return null
+    throw new Error(`unexpected ${c.method} ${c.endpoint}`)
+  })
+
+  await createOrUpdateCollection(provider, 'key', 'My Channel', ['m1'], {
+    rankAndPin: false,
+    overview: 'Films to watch together',
+  })
+
+  assert.equal(calls.some((c) => c.method === 'GET' && c.endpoint === '/Items/c1'), false)
+  const post = calls.find((c) => c.method === 'POST' && c.endpoint === '/Items/c1')
+  assert.deepEqual(post?.body, { Id: 'c1', Name: 'My Channel', Overview: 'Films to watch together' })
+})
+
+// ---------------------------------------------------------------------------------------------
+// Every by-id read goes through the same administrator read
+// ---------------------------------------------------------------------------------------------
+
+function itemReadRoute(item: Record<string, unknown>): Route {
+  return (c) => {
+    if (c.endpoint === '/Users') return users
+    if (c.endpoint === `/Users/u-admin/Items/${item.Id}`) return structuredClone(item)
+    throw new Error(`unexpected ${c.method} ${c.endpoint}`)
+  }
+}
+
+test('getMovieById, getSeriesById and getEpisodeById read as an administrator', async () => {
+  const movie = fakeProvider(itemReadRoute({ Id: 'm1', Name: 'Heat' }))
+  assert.equal((await getMovieById(movie.provider, 'key', 'm1'))?.name, 'Heat')
+
+  const series = fakeProvider(itemReadRoute({ Id: 's1', Name: 'The Wire' }))
+  assert.equal((await getSeriesById(series.provider, 'key', 's1'))?.name, 'The Wire')
+
+  const episode = fakeProvider(itemReadRoute({ Id: 'e1', Name: 'The Target', ParentIndexNumber: 1, IndexNumber: 1 }))
+  assert.equal((await getEpisodeById(episode.provider, 'key', 'e1'))?.name, 'The Target')
+
+  for (const { calls } of [movie, series, episode]) {
+    assert.equal(calls.some((c) => /^\/Items\/\w+/.test(c.endpoint)), false)
+  }
+})
+
+test('getPersonDetails reads a stored person id as an administrator, with no name-search fallback', async () => {
+  const { provider, calls } = fakeProvider(itemReadRoute({ Id: 'p1', Name: 'Michael Mann', Overview: 'Director' }))
+
+  const person = await getPersonDetails(provider, 'key', { name: 'Michael Mann', personId: 'p1' })
+
+  assert.ok(person)
+  assert.equal(calls.some((c) => c.endpoint.startsWith('/Persons')), false)
+})
+
+// ---------------------------------------------------------------------------------------------
+// A stale administrator list heals itself
+// ---------------------------------------------------------------------------------------------
+
+test('a deleted administrator in the cache is replaced by one re-read of the list', async () => {
+  let usersNow = [users[2]] // u-admin
+  const route: Route = (c) => {
+    if (c.endpoint === '/Users') return usersNow
+    if (c.endpoint === '/Users/u-admin/Items/x') {
+      if (usersNow[0].Id !== 'u-admin') throw new Error('HTTP 404')
+      return { Id: 'x' }
+    }
+    if (c.endpoint === '/Users/u-new/Items/x') return { Id: 'x' }
+    throw new Error(`unexpected ${c.method} ${c.endpoint}`)
+  }
+  const first = fakeProvider(route)
+  await readJellyfinItem(first.provider, 'key', 'x') // caches [u-admin]
+
+  // u-admin is deleted; the server now has u-new
+  usersNow = [{ ...users[2], Id: 'u-new', Name: 'new' }]
+  const second = fakeProvider(route)
+  const item = await readJellyfinItem<{ Id: string }>(second.provider, 'key', 'x')
+
+  assert.equal(item.Id, 'x')
+  assert.equal(second.calls.filter((c) => c.endpoint === '/Users').length, 1)
+})
+
+test('an item no administrator can read fails once, without looping on the list', async () => {
+  const { provider, calls } = fakeProvider((c) => {
+    if (c.endpoint === '/Users') return [users[2]]
+    throw new Error('HTTP 404')
+  })
+  await readJellyfinItem(provider, 'key', 'x').then(
+    () => assert.fail('expected a rejection'),
+    (err: Error) => assert.match(err.message, /404/)
+  )
+  await readJellyfinItem(provider, 'key', 'y').then(
+    () => assert.fail('expected a rejection'),
+    () => undefined
+  )
+
+  // The cached list is re-read once on the second failure and found unchanged: no retry storm
+  assert.ok(calls.filter((c) => c.endpoint === '/Users').length <= 2)
 })

@@ -1,7 +1,8 @@
 /**
  * Run an async function over items with a bounded number in flight.
- * Results keep the input order. If fn rejects, the first rejection is thrown
- * once the in-flight calls settle; callers that must not fail should catch inside fn.
+ * Results keep the input order. After the first rejection no further item is started; the
+ * calls already in flight are awaited, then that first error is thrown. Callers that must not
+ * fail should catch inside fn.
  */
 export async function mapWithConcurrency<T, R>(
   items: readonly T[],
@@ -10,15 +11,25 @@ export async function mapWithConcurrency<T, R>(
 ): Promise<R[]> {
   const results = new Array<R>(items.length)
   let next = 0
+  let failed = false
+  let firstError: unknown
 
   async function worker(): Promise<void> {
-    while (next < items.length) {
+    while (!failed && next < items.length) {
       const index = next++
-      results[index] = await fn(items[index], index)
+      try {
+        results[index] = await fn(items[index], index)
+      } catch (err) {
+        if (!failed) {
+          failed = true
+          firstError = err
+        }
+      }
     }
   }
 
   const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker)
   await Promise.all(workers)
+  if (failed) throw firstError
   return results
 }

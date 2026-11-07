@@ -80,7 +80,7 @@
     "test:pacing": "node --import tsx --test src/lib/callPacing.test.ts",
     "test:watch-date": "node --import tsx --test src/lib/watchDateBands.test.ts",
     "test:ratings": "node --import tsx --test src/ratings/imdbDataset.test.ts src/ratings/unifiedRating.test.ts src/ratings/ratingCallSites.test.ts src/ratings/displayRating.test.ts src/recommender/movies/scoring.test.ts src/recommender/shared/ratingScore.test.ts",
-    "test:media": "node --import tsx --test src/media/detect.test.ts src/media/jellyfin/jellyfin.test.ts src/media/shared.test.ts",
+    "test:media": "node --import tsx --test src/media/detect.test.ts src/media/jellyfin/jellyfin.test.ts src/media/shared.test.ts src/media/emby/emby.test.ts",
     "lint": "eslint src",
     "clean": "rm -rf dist",
     "test:evaluation": "node --import tsx --test src/evaluation/holdout.test.ts src/evaluation/metrics.test.ts src/evaluation/csv.test.ts",

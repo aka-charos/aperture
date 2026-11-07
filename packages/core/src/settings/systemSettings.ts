@@ -418,6 +418,8 @@ export async function testMediaServerConnection(config: {
   try {
     baseUrl = validateServerUrl(config.baseUrl, 'Media server URL')
   } catch (err) {
+    // The URL itself is not logged: it may be exactly the one that embeds credentials
+    logger.warn({ err, type: config.type }, 'Media server connection test failed: invalid URL')
     return { success: false, error: err instanceof Error ? err.message : 'Invalid server URL' }
   }
 

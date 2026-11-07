@@ -24,9 +24,10 @@ interface AdminCacheEntry {
 }
 
 // Keyed by server URL and not by provider instance: callers build a fresh provider per operation.
+// An API key sees the same administrators whichever key it is, so the key is not part of it.
 const adminCache = new Map<string, AdminCacheEntry>()
 
-/** Forget cached administrators (used by tests and after a failed lookup). */
+/** Forget cached administrators (used by tests). */
 export function clearAdminUserCache(): void {
   adminCache.clear()
 }
@@ -34,9 +35,9 @@ export function clearAdminUserCache(): void {
 async function getAdminCandidates(
   provider: JellyfinProviderBase,
   apiKey: string
-): Promise<AdminCacheEntry> {
+): Promise<{ entry: AdminCacheEntry; fresh: boolean }> {
   const cached = adminCache.get(provider.baseUrl)
-  if (cached && cached.expiresAt > Date.now()) return cached
+  if (cached && cached.expiresAt > Date.now()) return { entry: cached, fresh: false }
 
   const users = await provider.fetch<JellyfinUser[]>('/Users', apiKey)
   const admins = users.filter((u) => u.Policy.IsAdministrator && !u.Policy.IsDisabled)
@@ -53,16 +54,15 @@ async function getAdminCandidates(
 
   const entry: AdminCacheEntry = { ids, expiresAt: Date.now() + ADMIN_CACHE_TTL_MS }
   adminCache.set(provider.baseUrl, entry)
-  return entry
+  return { entry, fresh: true }
 }
 
-/** Read an item as the first administrator who can see it. */
-async function readItemAsAdmin(
+async function readFromCandidates<T>(
   provider: JellyfinProviderBase,
   apiKey: string,
-  itemId: string
-): Promise<Record<string, unknown>> {
-  const entry = await getAdminCandidates(provider, apiKey)
+  itemId: string,
+  entry: AdminCacheEntry
+): Promise<T> {
   const order = entry.preferred
     ? [entry.preferred, ...entry.ids.filter((id) => id !== entry.preferred)]
     : entry.ids
@@ -70,10 +70,7 @@ async function readItemAsAdmin(
   let lastError: unknown
   for (const userId of order) {
     try {
-      const item = await provider.fetch<Record<string, unknown>>(
-        `/Users/${userId}/Items/${itemId}`,
-        apiKey
-      )
+      const item = await provider.fetch<T>(`/Users/${userId}/Items/${itemId}`, apiKey)
       entry.preferred = userId
       return item
     } catch (err) {
@@ -82,6 +79,33 @@ async function readItemAsAdmin(
   }
 
   throw lastError
+}
+
+/**
+ * Read ONE item the way Jellyfin allows an API key to: `GET /Items/{id}` resolves the calling
+ * user from the request and an API key has none, so the read goes through an enabled
+ * administrator, the first who can see the item. Every by-id read in this provider uses it.
+ *
+ * If every cached administrator fails, the cached list may be stale (an account deleted,
+ * disabled or demoted), so the list is read again once and the read retried only when it
+ * changed. The user route returns the item with all its fields; there is no `Fields` filter.
+ */
+export async function readJellyfinItem<T = Record<string, unknown>>(
+  provider: JellyfinProviderBase,
+  apiKey: string,
+  itemId: string
+): Promise<T> {
+  const { entry, fresh } = await getAdminCandidates(provider, apiKey)
+  try {
+    return await readFromCandidates<T>(provider, apiKey, itemId, entry)
+  } catch (err) {
+    if (fresh) throw err
+
+    adminCache.delete(provider.baseUrl)
+    const renewed = await getAdminCandidates(provider, apiKey)
+    if (renewed.entry.ids.join() === entry.ids.join()) throw err
+    return readFromCandidates<T>(provider, apiKey, itemId, renewed.entry)
+  }
 }
 
 /**
@@ -94,7 +118,7 @@ export async function updateJellyfinItem(
   itemId: string,
   mutate: (item: Record<string, unknown>) => void | boolean
 ): Promise<void> {
-  const item = await readItemAsAdmin(provider, apiKey, itemId)
+  const item = await readJellyfinItem(provider, apiKey, itemId)
   if (mutate(item) === false) return
 
   await provider.fetch(`/Items/${itemId}`, apiKey, {

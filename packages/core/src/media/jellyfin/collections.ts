@@ -9,14 +9,11 @@ import type { CollectionCreateResult } from '../types.js'
 import type { JellyfinItemsResponse } from './types.js'
 import type { JellyfinProviderBase } from './base.js'
 import { updateJellyfinItemSafely } from './itemUpdates.js'
-import { setForcedSortName } from '../sortName.js'
+import { clearRankSortName, setForcedSortName } from '../sortName.js'
 import { mapWithConcurrency } from '../../lib/concurrency.js'
 
 /** Parallel item updates against the server; kept low so a slow server is not flooded. */
 const SORT_UPDATE_CONCURRENCY = 4
-
-/** Matches the 'NN - ' rank prefix Aperture puts in front of an item's name. */
-const RANK_PREFIX = /^(\d{2,}) - /
 
 /**
  * Create or update a collection (Box Set)
@@ -78,13 +75,17 @@ export async function createOrUpdateCollection(
       })
     }
 
-    // Items that left the ranking keep no rank prefix on the user's real library entry
-    const keep = new Set(itemIds)
-    await clearRankSortNames(
-      provider,
-      apiKey,
-      previousIds.filter((id) => !keep.has(id))
-    )
+    // Items that left the ranking keep no rank prefix on the user's real library entry. Only a
+    // collection that writes prefixes may undo them: a rankAndPin: false collection (channels)
+    // never wrote one, and the item's prefix may belong to Top Picks.
+    if (rankAndPin) {
+      const keep = new Set(itemIds)
+      await clearRankSortNames(
+        provider,
+        apiKey,
+        previousIds.filter((id) => !keep.has(id))
+      )
+    }
   } else {
     // Create new collection
     const createParams = new URLSearchParams({
@@ -125,9 +126,9 @@ export async function createOrUpdateCollection(
 /**
  * Write a collection's description into the Box Set's Overview.
  *
- * Collections are server-wide, so unlike a playlist this needs no user context — `/Items/{id}`
- * is both the fetch and the post path. Non-fatal: a collection with a stale description is far
- * better than a failed generate.
+ * Jellyfin's `GET /Items/{id}` needs a user and an API key has none, so the read goes through an
+ * administrator (`updateJellyfinItemSafely`); the post is `POST /Items/{id}`. Non-fatal: a
+ * collection with a stale description is far better than a failed generate.
  */
 export async function updateCollectionOverview(
   provider: JellyfinProviderBase,
@@ -135,18 +136,15 @@ export async function updateCollectionOverview(
   collectionId: string,
   overview: string
 ): Promise<void> {
-  try {
-    const item = await provider.fetch<Record<string, unknown>>(`/Items/${collectionId}`, apiKey)
-    item.Overview = overview
-
-    await provider.fetch(`/Items/${collectionId}`, apiKey, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(item),
-    })
-  } catch {
-    console.warn(`Failed to set overview for collection ${collectionId}`)
-  }
+  await updateJellyfinItemSafely(
+    provider,
+    apiKey,
+    collectionId,
+    (item) => {
+      item.Overview = overview
+    },
+    { operation: 'updateCollectionOverview' }
+  )
 }
 
 /**
@@ -154,14 +152,20 @@ export async function updateCollectionOverview(
  * @param provider - Jellyfin provider instance
  * @param apiKey - API key for authentication
  * @param collectionId - Collection ID to delete
+ * @param opts.clearRankSortNames - Also remove the rank prefix the collection wrote on its
+ *   members. Only for a collection created with rankAndPin (Top Picks); anything else never
+ *   wrote one, and a member's prefix may belong to another collection.
  */
 export async function deleteCollection(
   provider: JellyfinProviderBase,
   apiKey: string,
-  collectionId: string
+  collectionId: string,
+  opts?: { clearRankSortNames?: boolean }
 ): Promise<void> {
   // Read the members first: once the collection is gone they can no longer be listed
-  const memberIds = await getCollectionItems(provider, apiKey, collectionId).catch(() => [])
+  const memberIds = opts?.clearRankSortNames
+    ? await getCollectionItems(provider, apiKey, collectionId).catch(() => [])
+    : []
 
   await provider.fetch(`/Items/${collectionId}`, apiKey, { method: 'DELETE' })
 
@@ -309,9 +313,8 @@ async function setItemRankSortNames(
 }
 
 /**
- * Undo setItemRankSortNames for items that are no longer ranked.
- * Only touches an item whose forced sort name is exactly "NN - <its name>", i.e. one this
- * module wrote, so a sort name the user set themselves is never cleared.
+ * Undo setItemRankSortNames for items that are no longer ranked (the rule is `clearRankSortName`,
+ * shared with Emby: only an exact "NN - <its name>" is cleared).
  */
 async function clearRankSortNames(
   provider: JellyfinProviderBase,
@@ -323,16 +326,7 @@ async function clearRankSortNames(
       provider,
       apiKey,
       itemId,
-      (item) => {
-        const forced = item.ForcedSortName
-        const match = typeof forced === 'string' ? RANK_PREFIX.exec(forced) : null
-        if (!match || forced !== `${match[1]} - ${item.Name}`) return false
-
-        delete item.ForcedSortName
-        if (Array.isArray(item.LockedFields)) {
-          item.LockedFields = item.LockedFields.filter((field) => field !== 'SortName')
-        }
-      },
+      (item) => (clearRankSortName(item) ? undefined : false),
       { operation: 'clearRankSortName' }
     )
   )
