@@ -32,6 +32,10 @@ export const ContentDetailSchema = z.object({
   episodesWatched: z.number().optional().describe('Episodes watched'),
   lastWatched: z.string().nullable().optional().describe('Last watched date'),
   actions: z.array(ActionSchema).describe('Action buttons'),
+  closeMatchFor: z
+    .string()
+    .optional()
+    .describe('Present when no title matched literally: the title asked for, which this one only resembles'),
 })
 
 export type ContentDetail = z.infer<typeof ContentDetailSchema>

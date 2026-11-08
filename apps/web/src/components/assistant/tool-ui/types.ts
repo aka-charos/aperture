@@ -216,6 +216,8 @@ export interface StudiosData {
 export interface ContentDetailData {
   id: string
   type: 'movie' | 'series'
+  /** Found by a close spelling of this title, not a literal match (the model is told to confirm it). */
+  closeMatchFor?: string
   contentId: string
   name: string
   year?: number | null

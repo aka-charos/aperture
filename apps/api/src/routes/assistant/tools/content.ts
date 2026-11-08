@@ -8,21 +8,50 @@ import { queryOne } from '../../../lib/db.js'
 import type { ToolContext } from '../types.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
+import {
+  closeTitleSql,
+  containsPattern,
+  queryKeySql,
+  titleRelevanceSql,
+  LITERAL_MATCH_RELEVANCE,
+} from '../helpers/titleSearch.js'
 import type { ContentDetail } from '../schemas/index.js'
-import { WATCH_HISTORY_PLAYED_SQL, displayRatingSql } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, displayRatingSql, libraryScopeSql } from '@aperture/core'
+
+/**
+ * The best row of one table for a named title: exact, without its article,
+ * contained, then close (helpers/titleSearch.ts), within the viewer's scope.
+ * Ties on the tier go to the localized title (titleMatchRankSql).
+ */
+function titleLookupSql(table: 'movies' | 'series', columns: string, scope: ToolContext['scope'], values: unknown[]): string {
+  const key = queryKeySql('$2')
+  return `SELECT ${columns}, ${titleRelevanceSql('$1', key)} AS relevance
+           FROM ${table}
+           WHERE (${anyTitleMatchesSql('$1')} OR ${closeTitleSql(key)})
+             AND ${libraryScopeSql(scope, table, (value) => {
+               values.push(value)
+               return `$${values.length}`
+             })}
+           ORDER BY relevance DESC, ${titleMatchRankSql('$2')} LIMIT 1`
+}
 
 export function createContentTools(ctx: ToolContext) {
   return {
     getContentDetails: tool({
       description:
-        'Get comprehensive details about a specific movie or TV series including play link, cast, and more.',
+        'Get comprehensive details about a specific movie or TV series including play link, cast, and more. ' +
+        'The title may be written as the user wrote it: a missing "The" or a small typo still finds it. ' +
+        'When the answer carries closeMatchFor, it was found by a close spelling: say which title it is, and ask if unsure.',
       inputSchema: nullSafe(z.object({
-        title: z.string().describe('The title to get details for'),
+        title: z.string().describe('The title to get details for, as the user wrote it'),
       })),
-      execute: async ({ title }): Promise<ContentDetail | { id: string; error: string }> => {
+      execute: async ({ title: rawTitle }): Promise<ContentDetail | { id: string; error: string }> => {
         try {
-          // Try movie first
+          const title = rawTitle.trim()
+          const movieValues: unknown[] = [containsPattern(title), title]
+          const seriesValues: unknown[] = [containsPattern(title), title]
           const movie = await queryOne<{
+            relevance: number
             id: string
             title: string
             year: number | null
@@ -38,14 +67,46 @@ export function createContentTools(ctx: ToolContext) {
             content_rating: string | null
             critic_rating: number | null
           }>(
-            `SELECT id, title, year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url,
-           provider_item_id, runtime_minutes, directors, actors, tagline, content_rating, critic_rating
-           FROM movies WHERE ${anyTitleMatchesSql('$1')}
-           ORDER BY ${titleMatchRankSql('$2')} LIMIT 1`,
-            [`%${title}%`, title]
+            titleLookupSql(
+              'movies',
+              `id, title, year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url,
+               provider_item_id, runtime_minutes, directors, actors, tagline, content_rating, critic_rating`,
+              ctx.scope,
+              movieValues
+            ),
+            movieValues
           )
+          const series = await queryOne<{
+            relevance: number
+            id: string
+            title: string
+            year: number | null
+            end_year: number | null
+            genres: string[]
+            overview: string | null
+            community_rating: number | null
+            poster_url: string | null
+            provider_item_id: string | null
+            network: string | null
+            status: string | null
+            content_rating: string | null
+            critic_rating: number | null
+          }>(
+            titleLookupSql(
+              'series',
+              `id, title, year, end_year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url,
+               provider_item_id, network, status, content_rating, critic_rating`,
+              ctx.scope,
+              seriesValues
+            ),
+            seriesValues
+          )
+          // The better match wins whichever media type it is ("The Office" the
+          // show over a film merely containing the words); a tie goes to the film.
+          const closeMatch = (relevance: number) =>
+            Number(relevance) < LITERAL_MATCH_RELEVANCE ? { closeMatchFor: title } : {}
 
-          if (movie) {
+          if (movie && (!series || Number(movie.relevance) >= Number(series.relevance))) {
             const playLink = buildPlayLink(ctx.mediaServer, movie.provider_item_id, 'movie')
             const runtimeHours = movie.runtime_minutes ? Math.floor(movie.runtime_minutes / 60) : 0
             const runtimeMins = movie.runtime_minutes ? movie.runtime_minutes % 60 : 0
@@ -86,6 +147,7 @@ export function createContentTools(ctx: ToolContext) {
             return {
               id: `detail-${movie.id}`,
               type: 'movie',
+              ...closeMatch(movie.relevance),
               contentId: movie.id,
               name: movie.title,
               year: movie.year,
@@ -106,29 +168,6 @@ export function createContentTools(ctx: ToolContext) {
               actions,
             }
           }
-
-          // Try series
-          const series = await queryOne<{
-            id: string
-            title: string
-            year: number | null
-            end_year: number | null
-            genres: string[]
-            overview: string | null
-            community_rating: number | null
-            poster_url: string | null
-            provider_item_id: string | null
-            network: string | null
-            status: string | null
-            content_rating: string | null
-            critic_rating: number | null
-          }>(
-            `SELECT id, title, year, end_year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url,
-           provider_item_id, network, status, content_rating, critic_rating
-           FROM series WHERE ${anyTitleMatchesSql('$1')}
-           ORDER BY ${titleMatchRankSql('$2')} LIMIT 1`,
-            [`%${title}%`, title]
-          )
 
           if (series) {
             const playLink = buildPlayLink(ctx.mediaServer, series.provider_item_id, 'series')
@@ -183,6 +222,7 @@ export function createContentTools(ctx: ToolContext) {
             return {
               id: `detail-${series.id}`,
               type: 'series',
+              ...closeMatch(series.relevance),
               contentId: series.id,
               name: series.title,
               year: series.year,
