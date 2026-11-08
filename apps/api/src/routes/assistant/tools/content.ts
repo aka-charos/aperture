@@ -7,10 +7,12 @@ import { z } from 'zod'
 import { queryOne } from '../../../lib/db.js'
 import type { ToolContext } from '../types.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
-import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
+import { titleMatchRankSql } from '../helpers/titleMatch.js'
 import {
   closeTitleSql,
   containsPattern,
+  literalTitleSql,
+  pickTitleMatch,
   queryKeySql,
   titleRelevanceSql,
   LITERAL_MATCH_RELEVANCE,
@@ -18,21 +20,92 @@ import {
 import type { ContentDetail } from '../schemas/index.js'
 import { WATCH_HISTORY_PLAYED_SQL, displayRatingSql, libraryScopeSql } from '@aperture/core'
 
+type TitlePass = 'literal' | 'close'
+
 /**
- * The best row of one table for a named title: exact, without its article,
- * contained, then close (helpers/titleSearch.ts), within the viewer's scope.
+ * The best row of one table for a named title, within the viewer's scope.
+ * The literal pass finds a title that is, contains, or (articles aside) equals
+ * it; the close pass a spelling that resembles it (helpers/titleSearch.ts).
  * Ties on the tier go to the localized title (titleMatchRankSql).
  */
-function titleLookupSql(table: 'movies' | 'series', columns: string, scope: ToolContext['scope'], values: unknown[]): string {
+function titleLookupSql(
+  table: 'movies' | 'series',
+  columns: string,
+  scope: ToolContext['scope'],
+  values: unknown[],
+  pass: TitlePass
+): string {
   const key = queryKeySql('$2')
   return `SELECT ${columns}, ${titleRelevanceSql('$1', key)} AS relevance
            FROM ${table}
-           WHERE (${anyTitleMatchesSql('$1')} OR ${closeTitleSql(key)})
+           WHERE ${pass === 'literal' ? literalTitleSql('$1', key) : closeTitleSql(key)}
              AND ${libraryScopeSql(scope, table, (value) => {
                values.push(value)
                return `$${values.length}`
              })}
            ORDER BY relevance DESC, ${titleMatchRankSql('$2')} LIMIT 1`
+}
+
+interface MovieMatch {
+  relevance: number
+  id: string
+  title: string
+  year: number | null
+  genres: string[]
+  overview: string | null
+  community_rating: number | null
+  poster_url: string | null
+  provider_item_id: string | null
+  runtime_minutes: number | null
+  directors: string[] | null
+  actors: Array<{ name: string; role?: string; thumb?: string }> | null
+  tagline: string | null
+  content_rating: string | null
+  critic_rating: number | null
+}
+
+interface SeriesMatch {
+  relevance: number
+  id: string
+  title: string
+  year: number | null
+  end_year: number | null
+  genres: string[]
+  overview: string | null
+  community_rating: number | null
+  poster_url: string | null
+  provider_item_id: string | null
+  network: string | null
+  status: string | null
+  content_rating: string | null
+  critic_rating: number | null
+}
+
+/** The best film and the best show for one pass, asked together. */
+async function lookUpTitle(title: string, scope: ToolContext['scope'], pass: TitlePass) {
+  const movieValues: unknown[] = [containsPattern(title), title]
+  const seriesValues: unknown[] = [containsPattern(title), title]
+  const movieSql = titleLookupSql(
+    'movies',
+    `id, title, year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url,
+     provider_item_id, runtime_minutes, directors, actors, tagline, content_rating, critic_rating`,
+    scope,
+    movieValues,
+    pass
+  )
+  const seriesSql = titleLookupSql(
+    'series',
+    `id, title, year, end_year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url,
+     provider_item_id, network, status, content_rating, critic_rating`,
+    scope,
+    seriesValues,
+    pass
+  )
+  const [movie, series] = await Promise.all([
+    queryOne<MovieMatch>(movieSql, movieValues),
+    queryOne<SeriesMatch>(seriesSql, seriesValues),
+  ])
+  return { movie, series }
 }
 
 export function createContentTools(ctx: ToolContext) {
@@ -48,65 +121,19 @@ export function createContentTools(ctx: ToolContext) {
       execute: async ({ title: rawTitle }): Promise<ContentDetail | { id: string; error: string }> => {
         try {
           const title = rawTitle.trim()
-          const movieValues: unknown[] = [containsPattern(title), title]
-          const seriesValues: unknown[] = [containsPattern(title), title]
-          const movie = await queryOne<{
-            relevance: number
-            id: string
-            title: string
-            year: number | null
-            genres: string[]
-            overview: string | null
-            community_rating: number | null
-            poster_url: string | null
-            provider_item_id: string | null
-            runtime_minutes: number | null
-            directors: string[] | null
-            actors: Array<{ name: string; role?: string; thumb?: string }> | null
-            tagline: string | null
-            content_rating: string | null
-            critic_rating: number | null
-          }>(
-            titleLookupSql(
-              'movies',
-              `id, title, year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url,
-               provider_item_id, runtime_minutes, directors, actors, tagline, content_rating, critic_rating`,
-              ctx.scope,
-              movieValues
-            ),
-            movieValues
-          )
-          const series = await queryOne<{
-            relevance: number
-            id: string
-            title: string
-            year: number | null
-            end_year: number | null
-            genres: string[]
-            overview: string | null
-            community_rating: number | null
-            poster_url: string | null
-            provider_item_id: string | null
-            network: string | null
-            status: string | null
-            content_rating: string | null
-            critic_rating: number | null
-          }>(
-            titleLookupSql(
-              'series',
-              `id, title, year, end_year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url,
-               provider_item_id, network, status, content_rating, critic_rating`,
-              ctx.scope,
-              seriesValues
-            ),
-            seriesValues
-          )
-          // The better match wins whichever media type it is ("The Office" the
-          // show over a film merely containing the words); a tie goes to the film.
+          // A blank title would match every row as "contained".
+          if (!title) return { id: `error-${Date.now()}`, error: 'No title was given.' }
+
+          // A close spelling only when no title says it literally: it is a
+          // guess, and must never beat a real match of either media type.
+          let { movie, series } = await lookUpTitle(title, ctx.scope, 'literal')
+          if (!movie && !series) ({ movie, series } = await lookUpTitle(title, ctx.scope, 'close'))
+
           const closeMatch = (relevance: number) =>
             Number(relevance) < LITERAL_MATCH_RELEVANCE ? { closeMatchFor: title } : {}
+          const pick = pickTitleMatch(movie?.relevance ?? null, series?.relevance ?? null)
 
-          if (movie && (!series || Number(movie.relevance) >= Number(series.relevance))) {
+          if (movie && pick === 'movie') {
             const playLink = buildPlayLink(ctx.mediaServer, movie.provider_item_id, 'movie')
             const runtimeHours = movie.runtime_minutes ? Math.floor(movie.runtime_minutes / 60) : 0
             const runtimeMins = movie.runtime_minutes ? movie.runtime_minutes % 60 : 0
