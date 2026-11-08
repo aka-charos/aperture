@@ -53,7 +53,21 @@ export function buildNextRepliesPrompt(input: {
 }
 
 const LEAD = /^\s*(?:[-*•·]+|\d+[.)]|\(\d+\))\s*/
-const QUOTES = /^["'“”‘’«»„]+|["'“”‘’«»„]+$/g
+/** Opening quote → the closing quotes that pair with it. */
+const QUOTE_PAIRS: Record<string, string> = { '"': '"', "'": "'", '“': '”', '‘': '’', '«': '»', '„': '“”' }
+
+/**
+ * Remove quotation marks that wrap the WHOLE line, and only those: a line that
+ * starts or ends with a quoted title (`"Heat" or "Thief"?`) keeps its quotes.
+ * A pair counts as wrapping only when no other quote of that kind sits inside.
+ */
+function unwrapQuotes(line: string): string {
+  const closers = QUOTE_PAIRS[line[0]]
+  if (!closers || line.length < 2 || !closers.includes(line[line.length - 1])) return line
+  const inner = line.slice(1, -1)
+  if (inner.includes(line[0]) || [...closers].some((c) => inner.includes(c))) return line
+  return inner.trim()
+}
 
 /** What the model wrote, as at most MAX_NEXT_REPLIES clean, distinct suggestions. */
 export function parseNextReplies(text: string, question = ''): string[] {
@@ -62,7 +76,7 @@ export function parseNextReplies(text: string, question = ''): string[] {
   if (asked) seen.add(asked)
   const out: string[] = []
   for (const raw of text.split(/\r?\n/)) {
-    const line = raw.replace(LEAD, '').replace(QUOTES, '').trim()
+    const line = unwrapQuotes(raw.replace(LEAD, '').trim())
     // An introduction ("Here are some ideas:") is not a reply.
     if (!line || line.endsWith(':') || line.length > NEXT_REPLY_MAX_CHARS) continue
     const key = line.toLocaleLowerCase()

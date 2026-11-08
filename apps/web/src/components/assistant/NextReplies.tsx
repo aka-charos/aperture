@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { Box, Chip } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { useComposerRuntime, useThread } from '@assistant-ui/react'
-import { nextRepliesTarget } from './nextRepliesTarget'
+import { nextRepliesTarget, draftWithReply } from './nextRepliesTarget'
 import { NARROW_THREAD, COMPACT_THREAD } from './density'
 
 /**
  * Suggested replies under the newest answer (`POST …/conversations/:id/suggestions`).
  * Tapping one puts it in the message box as a draft to edit or send; nothing
- * is sent by the tap. Asked once per answer, after it has finished; a failed
+ * is sent by the tap, and a draft the reader typed is kept, not replaced. Asked once per answer, after it has finished; a failed
  * request, or one answered after the reader moved on, shows nothing.
  */
 export function NextReplies({ conversationId }: { conversationId: string | null }) {
@@ -60,7 +60,8 @@ export function NextReplies({ conversationId }: { conversationId: string | null 
           label={reply}
           variant="outlined"
           clickable
-          onClick={() => composer.setText(reply)}
+          // Never over what the reader typed: their draft stays (draftWithReply).
+          onClick={() => composer.setText(draftWithReply(composer.getState().text, reply, shown.replies))}
           title={t('assistant.nextReplies.hint')}
           sx={{
             height: 'auto',

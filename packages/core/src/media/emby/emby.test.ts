@@ -83,3 +83,24 @@ test('Emby: a library is removed by its id, through the documented POST', async 
   await assert.rejects(deleteVirtualLibrary(provider, 'key', ''), /id is required/)
   assert.equal(calls.length, 1)
 })
+
+test('EmbyProvider removes the library it was handed by its id, even when names repeat', async (t) => {
+  const { EmbyProvider } = await import('./EmbyProvider.js')
+  const provider = new EmbyProvider('http://emby.test')
+  const fetch = t.mock.method(provider, 'fetch', async (path: string) => {
+    if (path === '/Library/VirtualFolders') {
+      // An id that arrives as a number is still sent, and compared, as text.
+      return [
+        { ItemId: 15528, Id: 'f1', Name: 'Same title', CollectionType: 'movies' },
+        { ItemId: 15529, Id: 'f2', Name: 'Same title', CollectionType: 'movies' },
+      ]
+    }
+    return {}
+  })
+  const libraries = await provider.getLibraries('key')
+  assert.equal(libraries[1].id, '15529')
+  await provider.deleteVirtualLibrary('key', libraries[1])
+  const [path, , options] = fetch.mock.calls[1].arguments as [string, string, RequestInit]
+  assert.equal(path, '/Library/VirtualFolders/Delete')
+  assert.deepEqual(JSON.parse(String(options.body)), { Id: '15529', RefreshLibrary: true })
+})

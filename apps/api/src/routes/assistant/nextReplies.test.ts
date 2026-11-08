@@ -29,6 +29,16 @@ test('numbering, bullets, quotes and an introduction are stripped', () => {
   ])
 })
 
+test('quotes around a title inside the line are kept', () => {
+  assert.deepEqual(parseNextReplies('Is "Heat" better than "Thief"\n"Heat" or "Thief"?\n“Only “Heat” please”'), [
+    'Is "Heat" better than "Thief"',
+    '"Heat" or "Thief"?',
+    '“Only “Heat” please”',
+  ])
+  // A line wrapped whole loses only that pair.
+  assert.deepEqual(parseNextReplies("'Something lighter tonight'"), ['Something lighter tonight'])
+})
+
 test('at most three, no repeats, never the question again, nothing overlong', () => {
   const text = [
     'Something else entirely',

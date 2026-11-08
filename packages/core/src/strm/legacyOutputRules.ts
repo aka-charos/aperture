@@ -114,9 +114,12 @@ export interface GeneratedLibraryDeletion {
 export interface GeneratedLibraryRemovalPlan {
   /**
    * One entry per media-server library to delete, with every row that points
-   * at it. Jellyfin deletes by NAME, so two rows naming one library must become
-   * one delete, not two — the second would fail on a library the first already
-   * removed. Emby deletes by `serverId`.
+   * at it: two rows naming one library become one delete, not two — the second
+   * would fail on a library the first already removed. Entries are keyed by the
+   * library's id (`libraryKey`), never its name: Emby deletes by `serverId`
+   * and lets two libraries share a name, which a name key would merge into one
+   * delete, leaving the second library on the server with its rows cleared.
+   * Jellyfin deletes by name and refuses a second library of the same name.
    */
   deletions: GeneratedLibraryDeletion[]
   /** Rows whose library is no longer on the server: only the row is left to clear. */
@@ -270,6 +273,8 @@ export function planGeneratedLibraryRemoval(
 ): GeneratedLibraryRemovalPlan {
   const byId = new Map(serverLibraries.map((lib) => [lib.id, lib]))
   const byName = new Map(serverLibraries.map((lib) => [lib.name, lib]))
+  // A library's id names it; only a library the server gave no id falls back to its name.
+  const libraryKey = (lib: { id: string; name: string }) => lib.id || `name:${lib.name}`
 
   const deletions = new Map<string, GeneratedLibraryDeletion>()
   const refused = new Map<string, { serverName: string; serverId: string; rowIds: string[]; locations: string[] }>()
@@ -285,17 +290,17 @@ export function planGeneratedLibraryRemoval(
     // A library that says where it reads, and reads anywhere this row's writer
     // does not, is not this row's however the row came to point at it.
     if (rowOwnsLibrary(row, match) === false) {
-      const kept = refused.get(match.name) ?? {
+      const kept = refused.get(libraryKey(match)) ?? {
         serverName: match.name,
         serverId: match.id,
         rowIds: [],
         locations: [...(match.locations ?? [])],
       }
       kept.rowIds.push(row.id)
-      refused.set(match.name, kept)
+      refused.set(libraryKey(match), kept)
       continue
     }
-    const entry = deletions.get(match.name) ?? {
+    const entry = deletions.get(libraryKey(match)) ?? {
       serverName: match.name,
       serverId: match.id,
       rowIds: [],
@@ -303,32 +308,34 @@ export function planGeneratedLibraryRemoval(
       folders: generatedFolders(match, libraryPathPrefix) ?? [],
     }
     entry.rowIds.push(row.id)
-    deletions.set(match.name, entry)
+    deletions.set(libraryKey(match), entry)
   }
 
   // Refused for one row, but generated all the same: another row owns it, or
   // (with a root to judge by) every folder it reads is one legacy output writes
   // — another viewer's, say, whose own row is gone. It goes, and the rows that
   // only adopted it are cleared with it, since their library will be gone too.
-  for (const [name, kept] of refused) {
-    const entry = deletions.get(name)
+  for (const [key, kept] of refused) {
+    const entry = deletions.get(key)
     if (entry) {
       entry.rowIds.push(...kept.rowIds)
-      refused.delete(name)
+      refused.delete(key)
       continue
     }
+    const name = kept.serverName
     const folders = generatedFolders({ id: kept.serverId, name, locations: kept.locations }, libraryPathPrefix)
     if (folders) {
-      deletions.set(name, { serverName: name, serverId: kept.serverId, rowIds: [...kept.rowIds], orphan: false, folders })
-      refused.delete(name)
+      deletions.set(key, { serverName: name, serverId: kept.serverId, rowIds: [...kept.rowIds], orphan: false, folders })
+      refused.delete(key)
     }
   }
 
   for (const library of serverLibraries) {
-    if (deletions.has(library.name) || refused.has(library.name)) continue
+    const key = libraryKey(library)
+    if (deletions.has(key) || refused.has(key)) continue
     const folders = generatedFolders(library, libraryPathPrefix)
     if (!folders) continue
-    deletions.set(library.name, { serverName: library.name, serverId: library.id, rowIds: [], orphan: true, folders })
+    deletions.set(key, { serverName: library.name, serverId: library.id, rowIds: [], orphan: true, folders })
   }
 
   return { deletions: [...deletions.values()], alreadyGone, refused: [...refused.values()] }

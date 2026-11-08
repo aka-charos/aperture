@@ -18,7 +18,8 @@ export async function getLibraries(provider: EmbyProviderBase, apiKey: string): 
 
   return libraries.map((lib: EmbyLibrary) => ({
     // ItemId is for Items API (/Items/...), Id is for VirtualFolders API
-    id: lib.ItemId || lib.Id || '', // Primary ID for Items API
+    // String(): the id is compared with stored ids and sent in JSON bodies Emby types as strings.
+    id: String(lib.ItemId || lib.Id || ''), // Primary ID for Items API
     virtualFolderId: lib.Id || '', // VirtualFolder ID for library options
     guid: lib.Guid || lib.ItemId || lib.Id || '', // GUID is used for user permissions
     name: lib.Name,

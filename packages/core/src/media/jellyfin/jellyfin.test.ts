@@ -464,3 +464,13 @@ test('an item no administrator can read fails once, without looping on the list'
   // The cached list is re-read once on the second failure and found unchanged: no retry storm
   assert.ok(calls.filter((c) => c.endpoint === '/Users').length <= 2)
 })
+
+test('JellyfinProvider removes a library by its name, as Jellyfin takes it', async (t) => {
+  const { JellyfinProvider } = await import('./JellyfinProvider.js')
+  const provider = new JellyfinProvider('http://jf.test')
+  const fetch = t.mock.method(provider, 'fetch', async () => ({}))
+  await provider.deleteVirtualLibrary('key', { id: 'abc', name: 'AI Picks - Ann' })
+  const [path, , options] = fetch.mock.calls[0].arguments as [string, string, RequestInit]
+  assert.equal(path, '/Library/VirtualFolders?name=AI%20Picks%20-%20Ann&refreshLibrary=true')
+  assert.equal(options.method, 'DELETE')
+})

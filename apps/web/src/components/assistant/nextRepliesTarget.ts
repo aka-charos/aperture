@@ -24,3 +24,15 @@ export function nextRepliesTarget(messages: readonly ThreadMessageLike[], isRunn
   )
   return answered ? last.id : null
 }
+
+/**
+ * What the message box holds after a suggestion is tapped. An empty box, or
+ * one still holding a suggestion as it was put there, takes the new one; a
+ * draft the reader typed or edited is kept, with the suggestion added on a new
+ * line, so a tap never throws away their words.
+ */
+export function draftWithReply(current: string, reply: string, suggestions: readonly string[]): string {
+  const typed = current.trim()
+  if (!typed || suggestions.includes(typed)) return reply
+  return `${current.trimEnd()}\n${reply}`
+}
