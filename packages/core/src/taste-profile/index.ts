@@ -727,23 +727,38 @@ export async function setFranchisePreference(
   preferenceScore: number,
   isUserSet: boolean = true
 ): Promise<void> {
-  // Clamp score to -1 to 1
-  const clampedScore = Math.max(-1, Math.min(1, preferenceScore))
+  await setFranchisePreferences(userId, [{ franchiseName, mediaType, preferenceScore }], isUserSet)
+}
 
-  await withPreferenceWriteLock('franchise-preferences', userId, (client) =>
-    client.query(
-      `INSERT INTO user_franchise_preferences
-         (user_id, franchise_name, media_type, preference_score, is_user_set)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (user_id, franchise_name, media_type)
-       DO UPDATE SET
-         preference_score = $4,
-         is_user_set = $5`,
-      [userId, franchiseName, mediaType, clampedScore, isUserSet]
-    )
-  )
+/**
+ * Set several franchise scores, all or none: one transaction under the
+ * account's lock, so a failure partway (a lost connection, a lock timeout)
+ * leaves every score as it was rather than the first few changed.
+ */
+export async function setFranchisePreferences(
+  userId: string,
+  franchises: Array<{ franchiseName: string; mediaType: MediaType | 'both'; preferenceScore: number }>,
+  isUserSet: boolean = true
+): Promise<void> {
+  if (franchises.length === 0) return
+  await withPreferenceWriteLock('franchise-preferences', userId, async (client) => {
+    for (const { franchiseName, mediaType, preferenceScore } of franchises) {
+      // Clamp score to -1 to 1
+      const clampedScore = Math.max(-1, Math.min(1, preferenceScore))
+      await client.query(
+        `INSERT INTO user_franchise_preferences
+           (user_id, franchise_name, media_type, preference_score, is_user_set)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (user_id, franchise_name, media_type)
+         DO UPDATE SET
+           preference_score = $4,
+           is_user_set = $5`,
+        [userId, franchiseName, mediaType, clampedScore, isUserSet]
+      )
+    }
+  })
 
-  logger.info({ userId, franchiseName, mediaType, preferenceScore: clampedScore }, 'Set franchise preference')
+  logger.info({ userId, count: franchises.length }, 'Set franchise preferences')
 }
 
 /**
@@ -915,20 +930,31 @@ export async function setGenreWeight(
   weight: number,
   isUserSet: boolean = true
 ): Promise<void> {
-  // Clamp weight to 0 to 2
-  const clampedWeight = Math.max(0, Math.min(2, weight))
+  await setGenreWeights(userId, [{ genre, weight }], isUserSet)
+}
 
-  await withPreferenceWriteLock('genre-weights', userId, (client) =>
-    client.query(
-      `INSERT INTO user_genre_weights (user_id, genre, weight, is_user_set)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (user_id, genre)
-       DO UPDATE SET weight = $3, is_user_set = $4`,
-      [userId, genre, clampedWeight, isUserSet]
-    )
-  )
+/** Set several genre weights, all or none (as setFranchisePreferences). */
+export async function setGenreWeights(
+  userId: string,
+  genres: Array<{ genre: string; weight: number }>,
+  isUserSet: boolean = true
+): Promise<void> {
+  if (genres.length === 0) return
+  await withPreferenceWriteLock('genre-weights', userId, async (client) => {
+    for (const { genre, weight } of genres) {
+      // Clamp weight to 0 to 2
+      const clampedWeight = Math.max(0, Math.min(2, weight))
+      await client.query(
+        `INSERT INTO user_genre_weights (user_id, genre, weight, is_user_set)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (user_id, genre)
+         DO UPDATE SET weight = $3, is_user_set = $4`,
+        [userId, genre, clampedWeight, isUserSet]
+      )
+    }
+  })
 
-  logger.info({ userId, genre, weight: clampedWeight }, 'Set genre weight')
+  logger.info({ userId, count: genres.length }, 'Set genre weights')
 }
 
 /**

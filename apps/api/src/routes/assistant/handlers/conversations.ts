@@ -24,6 +24,15 @@ export const renameConversationSchema = {
   },
 }
 
+/** Creating takes the same title rules; the title is optional ('New Chat'). */
+export const createConversationSchema = {
+  tags: ['ai-assistant'],
+  body: {
+    type: 'object' as const,
+    properties: { title: { type: 'string' as const, minLength: 1, maxLength: CONVERSATION_TITLE_MAX } },
+  },
+}
+
 export function registerConversationHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/assistant/conversations
@@ -50,10 +59,10 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
    */
   fastify.post<{ Body: { title?: string } }>(
     '/api/assistant/conversations',
-    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: createConversationSchema },
     async (request, reply) => {
       const user = request.user as SessionUser
-      const { title = 'New Chat' } = request.body || {}
+      const title = request.body?.title?.trim() || 'New Chat'
 
       const conversation = await queryOne<ConversationRow>(
         `INSERT INTO assistant_conversations (user_id, title)

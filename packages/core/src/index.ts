@@ -1521,12 +1521,14 @@ export {
   // Franchise preferences
   getUserFranchisePreferences,
   setFranchisePreference,
+  setFranchisePreferences,
   bulkUpdateFranchisePreferences,
   getFranchiseAffinity,
   getFranchiseAffinityMap,
   // Genre weights
   getUserGenreWeights,
   setGenreWeight,
+  setGenreWeights,
   bulkUpdateGenreWeights,
   getGenreAffinity,
   buildGenreWeightMap,

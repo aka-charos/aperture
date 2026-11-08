@@ -91,18 +91,67 @@ test('the router decodes a parameter once, so a name with % arrives intact', asy
   assert.throws(() => decodeURIComponent('100% Wolf Collection'), URIError)
 })
 
-test('no route handler decodes a parameter or query value a second time', () => {
-  const root = fileURLToPath(new URL('.', import.meta.url))
+test('the real routes refuse bad input before anything else runs', async () => {
+  // Body validation runs before every preHandler, so through the real
+  // registrations a bad body answers 400 and a good one reaches the sign-in
+  // check (401, there is no session). A route that lost its schema would let
+  // the bad body through to that same 401.
+  const { registerTasteProfileHandlers } = await import('./settings/handlers/tasteProfile.js')
+  const { registerConversationHandlers } = await import('./assistant/handlers/conversations.js')
+  const app = Fastify({ ajv: AJV_OPTIONS, logger: false })
+  await app.register(async (scope) => {
+    registerTasteProfileHandlers(scope)
+    registerConversationHandlers(scope)
+  })
+  await app.ready()
+  const status = async (method: 'PUT' | 'PATCH' | 'POST', url: string, payload: unknown) =>
+    (await app.inject({ method, url, payload: payload as never })).statusCode
+  try {
+    const genre = '/api/settings/taste-profile/genres'
+    assert.equal(await status('PUT', genre, { genres: [{ genre: 'Drama', weight: 'NaN' }] }), 400)
+    assert.equal(await status('PUT', genre, { genres: [{ genre: 'Drama', weight: 1 }] }), 401)
+
+    const franchise = '/api/settings/taste-profile/franchises'
+    const good = { franchiseName: 'Alien', mediaType: 'movie', preferenceScore: 0.5 }
+    assert.equal(await status('PUT', franchise, { franchises: [good, { ...good, preferenceScore: 'abc' }] }), 400)
+    assert.equal(await status('PUT', franchise, { franchises: [good] }), 401)
+
+    const conversation = '/api/assistant/conversations/00000000-0000-0000-0000-000000000000'
+    assert.equal(await status('PATCH', conversation, { title: 'x'.repeat(CONVERSATION_TITLE_MAX + 1) }), 400)
+    assert.equal(await status('PATCH', conversation, { title: 'Rainy Sunday' }), 401)
+
+    assert.equal(await status('POST', '/api/assistant/conversations', { title: { nested: true } }), 400)
+    assert.equal(await status('POST', '/api/assistant/conversations', { title: 'x'.repeat(CONVERSATION_TITLE_MAX + 1) }), 400)
+    // What the browser sends: an empty object, for the default title.
+    assert.equal(await status('POST', '/api/assistant/conversations', {}), 401)
+  } finally {
+    await app.close()
+  }
+})
+
+/** The one deliberate decode, and why it stays. */
+const DECODE_ALLOWED: Record<string, string> = {
+  'config/cors.ts': 'decodes the RAW request URL to judge its path, as the router does; nothing has decoded it yet',
+}
+
+test('nothing in the API decodes a parameter or query value a second time', () => {
+  const src = fileURLToPath(new URL('..', import.meta.url))
   const offenders: string[] = []
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
       const path = join(dir, name)
       if (statSync(path).isDirectory()) walk(path)
       else if (name.endsWith('.ts') && !name.endsWith('.test.ts')) {
-        if (/decodeURIComponent\(/.test(readFileSync(path, 'utf8'))) offenders.push(path)
+        const relative = path.slice(src.length).replace(/\\/g, '/').replace(/^\//, '')
+        if (DECODE_ALLOWED[relative]) continue
+        if (/decodeURIComponent\(/.test(readFileSync(path, 'utf8'))) offenders.push(relative)
       }
     }
   }
-  walk(root)
+  walk(src)
   assert.deepEqual(offenders, [])
+  // An allowlisted file that stopped decoding is a stale entry.
+  for (const file of Object.keys(DECODE_ALLOWED)) {
+    assert.match(readFileSync(join(src, file), 'utf8'), /decodeURIComponent\(/, `${file} no longer decodes`)
+  }
 })

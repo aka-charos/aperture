@@ -234,13 +234,10 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
       const userId = request.user!.id
       const { franchises } = request.body
 
-      // Every entry was checked by the schema before this runs, so a bad one
-      // can no longer stop the batch after earlier entries were saved.
-      const { setFranchisePreference } = await import('@aperture/core')
-
-      for (const franchise of franchises) {
-        await setFranchisePreference(userId, franchise.franchiseName, franchise.mediaType, franchise.preferenceScore, true)
-      }
+      // Every entry was checked by the schema before this runs, and the batch
+      // is written in one transaction: all of it is saved, or none.
+      const { setFranchisePreferences } = await import('@aperture/core')
+      await setFranchisePreferences(userId, franchises, true)
 
       return reply.send({
         success: true,
@@ -301,12 +298,9 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
       const userId = request.user!.id
       const { genres } = request.body
 
-      // Every entry was checked by the schema before this runs (as above).
-      const { setGenreWeight } = await import('@aperture/core')
-
-      for (const genre of genres) {
-        await setGenreWeight(userId, genre.genre, genre.weight, true)
-      }
+      // Checked whole by the schema, written whole in one transaction (as above).
+      const { setGenreWeights } = await import('@aperture/core')
+      await setGenreWeights(userId, genres, true)
 
       return reply.send({
         success: true,

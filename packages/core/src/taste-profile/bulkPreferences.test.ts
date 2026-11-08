@@ -25,6 +25,8 @@ const {
   deleteGenreWeight,
   setFranchisePreference,
   deleteFranchisePreference,
+  setGenreWeights,
+  setFranchisePreferences,
   FRANCHISE_ROW_CHANGED,
   GENRE_ROW_CHANGED,
 } = await import('./index.js')
@@ -85,6 +87,34 @@ test('a genre reset is one locked transaction: lock, delete, inserts, commit', a
   // One 64-bit key per table and account, so two accounts practically never queue together.
   assert.deepEqual(statements[1].params, ['genre-weights:user-1'])
   assert.equal(statements[1].sql, 'SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))')
+})
+
+test('a hand-set batch is one transaction: all of it, or none if any entry fails', async () => {
+  reset()
+  await setGenreWeights('user-1', [
+    { genre: 'Drama', weight: 1.4 },
+    { genre: 'Horror', weight: 0.6 },
+    { genre: 'Comedy', weight: 1 },
+  ])
+  assert.deepEqual(kinds(), ['BEGIN', 'LOCK', 'INSERT', 'INSERT', 'INSERT', 'COMMIT'])
+  assert.deepEqual(statements[1].params, ['genre-weights:user-1'])
+
+  reset()
+  // The second entry fails (a lost connection, a lock timeout): the first
+  // must not stand.
+  failOn = (sql, index) => sql.includes('INSERT') && index === 3
+  await assert.rejects(
+    setFranchisePreferences('user-1', [
+      { franchiseName: 'Alien', mediaType: 'movie', preferenceScore: 0.8 },
+      { franchiseName: 'Mad Max', mediaType: 'movie', preferenceScore: -0.4 },
+    ]),
+    /insert failed/
+  )
+  assert.deepEqual(kinds(), ['BEGIN', 'LOCK', 'INSERT', 'INSERT', 'ROLLBACK'])
+
+  reset()
+  await setGenreWeights('user-1', [])
+  assert.equal(connections, 0, 'an empty batch opens nothing')
 })
 
 test('the manual set and delete take the same lock, one transaction each', async () => {

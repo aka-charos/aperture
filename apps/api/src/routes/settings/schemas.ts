@@ -1172,7 +1172,7 @@ export const updateTasteProfileSettingsSchema = {
 export const updateFranchisePreferencesSchema = {
   tags: ['settings'],
   summary: 'Set franchise preferences',
-  description: 'Set the score of one or more franchises by hand. A bad entry refuses the whole request.',
+  description: 'Set the score of one or more franchises by hand. Every entry needs all three fields; one bad or incomplete entry refuses the whole request, and a valid batch is saved all or none.',
   body: {
     type: 'object' as const,
     required: ['franchises'] as string[],
@@ -1198,7 +1198,7 @@ export const updateFranchisePreferencesSchema = {
 export const updateGenreWeightsSchema = {
   tags: ['settings'],
   summary: 'Set genre weights',
-  description: 'Set the weight of one or more genres by hand. A bad entry refuses the whole request.',
+  description: 'Set the weight of one or more genres by hand. Every entry needs both fields; one bad or incomplete entry refuses the whole request, and a valid batch is saved all or none.',
   body: {
     type: 'object' as const,
     required: ['genres'] as string[],
