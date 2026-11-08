@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Alert,
+  Button,
   Box,
   Chip,
   CircularProgress,
@@ -235,7 +236,15 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
       </Box>
 
       {series.seriesError && (
-        <Alert severity="error" sx={{ mb: 4 }}>
+        <Alert
+          severity="error"
+          sx={{ mb: 4 }}
+          action={
+            <Button color="inherit" size="small" onClick={series.retrySeries}>
+              {t('browse.errors.retry')}
+            </Button>
+          }
+        >
           {series.seriesError}
         </Alert>
       )}

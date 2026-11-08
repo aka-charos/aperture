@@ -70,6 +70,15 @@ export async function loadListPage<T>({
 }
 
 /**
+ * What Retry asks for after a failure: the page that failed. With rows on
+ * screen that was the next page, appended, since the page number advances only
+ * when a page arrives; with none it was page one.
+ */
+export function retryRequest(loaded: number, page: number): { page: number; append: boolean } {
+  return loaded > 0 ? { page: page + 1, append: true } : { page: 1, append: false }
+}
+
+/**
  * Where the list stands after a page: rows on screen, and whether another page
  * is worth asking for (a short page, or everything the total promised, ends it).
  */

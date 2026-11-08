@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PAGE_SIZE, defaultSeriesFilters } from '../constants'
-import { afterListPage, loadListPage } from './listRequests'
+import { afterListPage, loadListPage, retryRequest } from './listRequests'
 import { useListRequests } from './useListRequests'
 import type { ActiveFilterChip, ContentRating, CountryOption, FilterRanges, NetworkOption, Series } from '../types'
 import type { SeriesFilters, SortField, SortOrder } from '../components'
@@ -34,6 +34,8 @@ interface BrowseSeriesResult {
   seriesLoading: boolean
   seriesLoadingMore: boolean
   seriesError: string | null
+  /** Ask again for the page that failed (shown with the error). */
+  retrySeries: () => void
   seriesSearch: string
   setSeriesSearch: Dispatch<SetStateAction<string>>
   seriesGenre: string
@@ -166,6 +168,7 @@ export function useBrowseSeries({
         else setSeries(items)
         const next = afterListPage(seriesCountRef.current, items.length, total, append, PAGE_SIZE)
         seriesCountRef.current = next.loaded
+        setSeriesPage(page)
         setSeriesTotal(total)
         setSeriesHasMore(next.hasMore)
         setSeriesError(null)
@@ -250,19 +253,27 @@ export function useBrowseSeries({
     return () => clearTimeout(debounce)
   }, [fetchSeries, isShowing, listQuery, markShowing, resetSeries, seriesSearch, takeRemembered])
 
+  // After a failure, ask again for the page that failed (listRequests.ts).
+  const retrySeries = useCallback(() => {
+    const next = retryRequest(seriesCountRef.current, seriesPage)
+    setSeriesError(null)
+    void fetchSeries(next.page, next.append)
+  }, [fetchSeries, seriesPage])
+
   useEffect(() => {
     if (seriesObserverRef.current) {
       seriesObserverRef.current.disconnect()
     }
 
-    if (!seriesHasMore || seriesLoading || seriesLoadingMore || tabIndex !== 1) return
+    // Not while an error shows: the end of the list is still on screen, so a
+    // new observer would ask again at once, and a failure would loop (Retry
+    // resumes it).
+    if (seriesError || !seriesHasMore || seriesLoading || seriesLoadingMore || tabIndex !== 1) return
 
     seriesObserverRef.current = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting && seriesHasMore && !seriesLoadingMore) {
-          const nextPage = seriesPage + 1
-          setSeriesPage(nextPage)
-          void fetchSeries(nextPage, true)
+          void fetchSeries(seriesPage + 1, true)
         }
       },
       { threshold: 0.1 }
@@ -277,7 +288,7 @@ export function useBrowseSeries({
         seriesObserverRef.current.disconnect()
       }
     }
-  }, [fetchSeries, seriesHasMore, seriesLoading, seriesLoadingMore, seriesPage, tabIndex])
+  }, [fetchSeries, seriesError, seriesHasMore, seriesLoading, seriesLoadingMore, seriesPage, tabIndex])
 
   const activeFilters = useMemo(
     () =>
@@ -304,6 +315,7 @@ export function useBrowseSeries({
   )
 
   return {
+    retrySeries,
     series,
     seriesGenres,
     networks,

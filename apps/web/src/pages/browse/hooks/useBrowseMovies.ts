@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PAGE_SIZE, defaultMovieFilters } from '../constants'
-import { afterListPage, loadListPage } from './listRequests'
+import { afterListPage, loadListPage, retryRequest } from './listRequests'
 import { useListRequests } from './useListRequests'
 import type {
   ActiveFilterChip,
@@ -55,6 +55,8 @@ interface BrowseMoviesResult {
   moviesLoading: boolean
   moviesLoadingMore: boolean
   moviesError: string | null
+  /** Ask again for the page that failed (shown with the error). */
+  retryMovies: () => void
   movieSearch: string
   setMovieSearch: Dispatch<SetStateAction<string>>
   movieGenre: string
@@ -188,6 +190,7 @@ export function useBrowseMovies({
         else setMovies(items)
         const next = afterListPage(movieCountRef.current, items.length, total, append, PAGE_SIZE)
         movieCountRef.current = next.loaded
+        setMoviePage(page)
         setMovieTotal(total)
         setMovieHasMore(next.hasMore)
         setMoviesError(null)
@@ -277,19 +280,27 @@ export function useBrowseMovies({
     return () => clearTimeout(debounce)
   }, [fetchMovies, isShowing, listQuery, markShowing, movieSearch, resetMovies, takeRemembered])
 
+  // After a failure, ask again for the page that failed (listRequests.ts).
+  const retryMovies = useCallback(() => {
+    const next = retryRequest(movieCountRef.current, moviePage)
+    setMoviesError(null)
+    void fetchMovies(next.page, next.append)
+  }, [fetchMovies, moviePage])
+
   useEffect(() => {
     if (movieObserverRef.current) {
       movieObserverRef.current.disconnect()
     }
 
-    if (!movieHasMore || moviesLoading || moviesLoadingMore || tabIndex !== 0) return
+    // Not while an error shows: the end of the list is still on screen, so a
+    // new observer would ask again at once, and a failure would loop (Retry
+    // resumes it).
+    if (moviesError || !movieHasMore || moviesLoading || moviesLoadingMore || tabIndex !== 0) return
 
     movieObserverRef.current = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting && movieHasMore && !moviesLoadingMore) {
-          const nextPage = moviePage + 1
-          setMoviePage(nextPage)
-          void fetchMovies(nextPage, true)
+          void fetchMovies(moviePage + 1, true)
         }
       },
       { threshold: 0.1 }
@@ -304,7 +315,7 @@ export function useBrowseMovies({
         movieObserverRef.current.disconnect()
       }
     }
-  }, [fetchMovies, movieHasMore, moviePage, moviesLoading, moviesLoadingMore, tabIndex])
+  }, [fetchMovies, moviesError, movieHasMore, moviePage, moviesLoading, moviesLoadingMore, tabIndex])
 
   const activeFilters = useMemo(
     () =>
@@ -331,6 +342,7 @@ export function useBrowseMovies({
   )
 
   return {
+    retryMovies,
     movies,
     movieGenres,
     collections,

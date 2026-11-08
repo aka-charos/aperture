@@ -5500,7 +5500,8 @@
       "loadMovies": "Failed to load movies",
       "loadSeries": "Failed to load series",
       "loadPeople": "Failed to load people",
-      "connect": "Could not connect to server"
+      "connect": "Could not connect to server",
+      "retry": "Try again"
     },
     "empty": {
       "moviesFiltered": "No movies match your filters.",
@@ -5630,7 +5631,9 @@
       "notFound": "Franchise not found"
     },
     "overviewMore": "more",
-    "overviewLess": "less"
+    "overviewLess": "less",
+    "viewGrid": "Grid view",
+    "viewList": "List view"
   },
   "channels": {
     "title": "Channels",

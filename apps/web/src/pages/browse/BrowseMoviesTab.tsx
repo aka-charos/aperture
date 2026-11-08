@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Alert,
+  Button,
   Box,
   Chip,
   CircularProgress,
@@ -246,7 +247,15 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
       </Box>
 
       {movies.moviesError && (
-        <Alert severity="error" sx={{ mb: 4 }}>
+        <Alert
+          severity="error"
+          sx={{ mb: 4 }}
+          action={
+            <Button color="inherit" size="small" onClick={movies.retryMovies}>
+              {t('browse.errors.retry')}
+            </Button>
+          }
+        >
           {movies.moviesError}
         </Alert>
       )}

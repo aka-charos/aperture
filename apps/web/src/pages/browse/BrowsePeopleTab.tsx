@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Alert,
+  Button,
   Box,
   CircularProgress,
   FormControl,
@@ -110,7 +111,15 @@ export function BrowsePeopleTab({ viewMode, people }: BrowsePeopleTabProps) {
       </Box>
 
       {people.peopleError && (
-        <Alert severity="error" sx={{ mb: 4 }}>
+        <Alert
+          severity="error"
+          sx={{ mb: 4 }}
+          action={
+            <Button color="inherit" size="small" onClick={people.retryPeople}>
+              {t('browse.errors.retry')}
+            </Button>
+          }
+        >
           {people.peopleError}
         </Alert>
       )}

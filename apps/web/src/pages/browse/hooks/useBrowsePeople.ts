@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { PAGE_SIZE } from '../constants'
-import { afterListPage, loadListPage } from './listRequests'
+import { afterListPage, loadListPage, retryRequest } from './listRequests'
 import { useListRequests } from './useListRequests'
 import type { BrowsePerson } from '../types'
 import type { PeopleUrlState } from '../urlState'
@@ -26,6 +26,8 @@ interface BrowsePeopleResult {
   peopleLoading: boolean
   peopleLoadingMore: boolean
   peopleError: string | null
+  /** Ask again for the page that failed (shown with the error). */
+  retryPeople: () => void
   peopleSearch: string
   setPeopleSearch: Dispatch<SetStateAction<string>>
   peopleSortBy: PeopleSortBy
@@ -98,6 +100,7 @@ export function useBrowsePeople({ tabIndex, initialTabIsPeople, initial }: UseBr
         else setPeople(items)
         const next = afterListPage(peopleCountRef.current, items.length, total, append, PAGE_SIZE)
         peopleCountRef.current = next.loaded
+        setPeoplePage(page)
         setPeopleTotal(total)
         setPeopleHasMore(next.hasMore)
         setPeopleError(null)
@@ -119,19 +122,27 @@ export function useBrowsePeople({ tabIndex, initialTabIsPeople, initial }: UseBr
     return () => clearTimeout(debounce)
   }, [fetchPeople, peopleSearch, peopleSortBy, resetPeople, tabIndex])
 
+  // After a failure, ask again for the page that failed (listRequests.ts).
+  const retryPeople = useCallback(() => {
+    const next = retryRequest(peopleCountRef.current, peoplePage)
+    setPeopleError(null)
+    void fetchPeople(next.page, next.append)
+  }, [fetchPeople, peoplePage])
+
   useEffect(() => {
     if (peopleObserverRef.current) {
       peopleObserverRef.current.disconnect()
     }
 
-    if (!peopleHasMore || peopleLoading || peopleLoadingMore || tabIndex !== 2) return
+    // Not while an error shows: the end of the list is still on screen, so a
+    // new observer would ask again at once, and a failure would loop (Retry
+    // resumes it).
+    if (peopleError || !peopleHasMore || peopleLoading || peopleLoadingMore || tabIndex !== 2) return
 
     peopleObserverRef.current = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting && peopleHasMore && !peopleLoadingMore) {
-          const nextPage = peoplePage + 1
-          setPeoplePage(nextPage)
-          void fetchPeople(nextPage, true)
+          void fetchPeople(peoplePage + 1, true)
         }
       },
       { threshold: 0.1 }
@@ -146,9 +157,10 @@ export function useBrowsePeople({ tabIndex, initialTabIsPeople, initial }: UseBr
         peopleObserverRef.current.disconnect()
       }
     }
-  }, [fetchPeople, peopleHasMore, peopleLoading, peopleLoadingMore, peoplePage, tabIndex])
+  }, [fetchPeople, peopleError, peopleHasMore, peopleLoading, peopleLoadingMore, peoplePage, tabIndex])
 
   return {
+    retryPeople,
     people,
     peopleLoading,
     peopleLoadingMore,

@@ -357,6 +357,8 @@ export function MoviePoster({
                 src={proxiedPosterUrl}
                 alt=""
                 aria-hidden
+                loading="lazy"
+                decoding="async"
                 sx={{
                   position: 'absolute',
                   inset: 0,
@@ -372,6 +374,11 @@ export function MoviePoster({
               component="img"
               src={proxiedPosterUrl}
               alt={title}
+              // Only near the screen: Browse adds 50 cards a page, and eager posters
+              // queued ahead of the app's own requests on the browser's few
+              // connections to this host. Portraits do the same (usePersonPortrait).
+              loading="lazy"
+              decoding="async"
               onLoad={handleImageLoad}
               onError={() => setImageError(true)}
               sx={{
