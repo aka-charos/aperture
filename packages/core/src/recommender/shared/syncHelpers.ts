@@ -55,13 +55,13 @@ export async function fetchParallel<T>(
  * episodes in chunks. This is critical for very large libraries (200K+ episodes)
  * to avoid memory exhaustion.
  * 
- * @param fetchFn Function to fetch a page of episodes
+ * @param fetchFn Function to fetch a page of episodes; `skipped` counts offsets it gave up on
  * @param totalCount Total number of episodes to process
  * @param processBatch Function to process a batch of episodes
  * @param onProgress Optional progress callback
  */
 export async function streamingBatchProcess<T>(
-  fetchFn: (startIndex: number) => Promise<{ items: T[] }>,
+  fetchFn: (startIndex: number) => Promise<{ items: T[]; skipped?: number }>,
   totalCount: number,
   processBatch: (items: T[]) => Promise<{ added: number; updated: number }>,
   onProgress?: (processed: number, added: number, updated: number) => void
@@ -75,9 +75,13 @@ export async function streamingBatchProcess<T>(
   // For very large libraries, this trades some speed for reliability
   while (startIndex < totalCount) {
     // Fetch a single page
-    const { items } = await fetchFn(startIndex)
+    const { items, skipped = 0 } = await fetchFn(startIndex)
+
+    // Offsets the server could not answer for: move past them, read nothing.
+    startIndex += skipped
     
     if (items.length === 0) {
+      if (skipped > 0) continue
       break
     }
 

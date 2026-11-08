@@ -13,7 +13,7 @@ import {
 import { randomUUID } from 'crypto'
 import type { Episode } from '../../media/types.js'
 import { fetchParallel, streamingBatchProcess } from '../shared/syncHelpers.js'
-import { fetchPageShrinking } from '../shared/pageShrinking.js'
+import { fetchPageShrinking, startPageSizing } from '../shared/pageShrinking.js'
 import { clampMaxCandidatesToLibrary } from '../../lib/recommendationConfig.js'
 import {
   SERIES_PAGE_SIZE,
@@ -357,24 +357,34 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
 
       const parentIds = libraryId ? [libraryId] : undefined
       const libraryLabel = libraryId ? `library ${libraryId}` : 'all libraries'
-      const episodePage = { pageSize: EPISODE_PAGE_SIZE }
+      const episodeSizing = startPageSizing(EPISODE_PAGE_SIZE)
 
       // Use streaming batch processing to avoid memory issues with large libraries
       const streamResult = await streamingBatchProcess<Episode>(
         // Fetch function
-        (startIndex) =>
-          fetchPageShrinking(
+        async (startIndex) => {
+          const page = await fetchPageShrinking(
             (start, limit) => provider.getEpisodes(apiKey, { startIndex: start, limit, parentIds }),
             startIndex,
-            episodePage,
+            episodeSizing,
             libraryLabel,
-            ({ limit, nextLimit, status, serverException }) =>
-              addLog(
-                jobId,
-                'warn',
-                `The media server answered HTTP ${status}${serverException ? ` (${serverException})` : ''} for ${limit} episodes at offset ${startIndex} of ${libraryLabel}. Retrying with ${nextLimit}.`
-              )
-          ),
+            {
+              retry: ({ limit, nextLimit, status, serverException }) =>
+                addLog(
+                  jobId,
+                  'warn',
+                  `The media server answered HTTP ${status}${serverException ? ` (${serverException})` : ''} for ${limit} episodes at offset ${startIndex} of ${libraryLabel}. Retrying with ${nextLimit}.`
+                ),
+              skip: ({ status, serverException }) =>
+                addLog(
+                  jobId,
+                  'warn',
+                  `Skipped the episode at offset ${startIndex} of ${libraryLabel}: the media server answered HTTP ${status}${serverException ? ` (${serverException})` : ''}. Episode cleanup is skipped for this library until it can be read.`
+                ),
+            }
+          )
+          return page ? { items: page.items } : { items: [], skipped: 1 }
+        },
         episodeCount,
         // Process batch function - prepares and inserts episodes
         async (episodes) => {
