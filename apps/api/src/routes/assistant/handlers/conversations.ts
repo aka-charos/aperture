@@ -8,6 +8,22 @@ import { requireCapability } from '../../../lib/permissions.js'
 import type { ConversationRow, MessageRow } from '../types.js'
 import { isTurnActive, stopTurn } from '../helpers/activeTurns.js'
 
+/** The longest title a conversation may be renamed to. */
+export const CONVERSATION_TITLE_MAX = 200
+
+/**
+ * A title is a short string: anything else (another type, a megabyte of text)
+ * used to be stored as sent. Automatic titles are about 50 characters.
+ */
+export const renameConversationSchema = {
+  tags: ['ai-assistant'],
+  body: {
+    type: 'object' as const,
+    required: ['title'] as string[],
+    properties: { title: { type: 'string' as const, minLength: 1, maxLength: CONVERSATION_TITLE_MAX } },
+  },
+}
+
 export function registerConversationHandlers(fastify: FastifyInstance) {
   /**
    * GET /api/assistant/conversations
@@ -106,11 +122,14 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
    */
   fastify.patch<{ Params: { id: string }; Body: { title: string } }>(
     '/api/assistant/conversations/:id',
-    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: renameConversationSchema },
     async (request, reply) => {
       const user = request.user as SessionUser
       const { id } = request.params
-      const { title } = request.body
+      const title = request.body.title.trim()
+      if (!title) {
+        return reply.status(400).send({ error: 'Title is required' })
+      }
 
       const conversation = await queryOne<ConversationRow>(
         `UPDATE assistant_conversations

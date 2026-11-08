@@ -851,7 +851,8 @@ export function registerAiConfigHandlers(fastify: FastifyInstance) {
    */
   fastify.delete<{ Params: { model: string }; Querystring: { dimensions?: number } }>('/api/settings/ai/embeddings/sets/:model', { preHandler: requireAdmin, schema: deleteEmbeddingSetSchema }, async (request, reply) => {
     const { model } = request.params
-    const decodedModel = decodeURIComponent(model)
+    // Already decoded once by the router; a second decode breaks names with a %.
+    const decodedModel = model
     const { dimensions } = request.query
 
     try {

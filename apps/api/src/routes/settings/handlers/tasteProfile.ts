@@ -19,6 +19,8 @@ import {
   rebuildTasteProfileSchema,
   updateTasteProfileSettingsSchema,
   deleteFranchisePreferenceSchema,
+  updateFranchisePreferencesSchema,
+  updateGenreWeightsSchema,
   addCustomInterestSchema,
   deleteCustomInterestSchema,
 } from '../schemas.js'
@@ -227,28 +229,16 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
         preferenceScore: number
       }>
     }
-  }>('/api/settings/taste-profile/franchises', { preHandler: requireAuth, schema: { tags: ['settings'] } }, async (request, reply) => {
+  }>('/api/settings/taste-profile/franchises', { preHandler: requireAuth, schema: updateFranchisePreferencesSchema }, async (request, reply) => {
     try {
       const userId = request.user!.id
       const { franchises } = request.body
 
-      if (!Array.isArray(franchises)) {
-        return reply.status(400).send({ error: 'franchises must be an array' })
-      }
-
+      // Every entry was checked by the schema before this runs, so a bad one
+      // can no longer stop the batch after earlier entries were saved.
       const { setFranchisePreference } = await import('@aperture/core')
 
       for (const franchise of franchises) {
-        if (!franchise.franchiseName || !franchise.mediaType || franchise.preferenceScore === undefined) {
-          continue
-        }
-
-        if (franchise.preferenceScore < -1 || franchise.preferenceScore > 1) {
-          return reply.status(400).send({
-            error: `preferenceScore for "${franchise.franchiseName}" must be between -1 and 1`,
-          })
-        }
-
         await setFranchisePreference(userId, franchise.franchiseName, franchise.mediaType, franchise.preferenceScore, true)
       }
 
@@ -284,7 +274,7 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
       }
 
       const { deleteFranchisePreference } = await import('@aperture/core')
-      const deleted = await deleteFranchisePreference(userId, decodeURIComponent(franchiseName), mediaType)
+      const deleted = await deleteFranchisePreference(userId, franchiseName, mediaType)
 
       return reply.send({
         success: deleted,
@@ -306,28 +296,15 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
         weight: number
       }>
     }
-  }>('/api/settings/taste-profile/genres', { preHandler: requireAuth, schema: { tags: ['settings'] } }, async (request, reply) => {
+  }>('/api/settings/taste-profile/genres', { preHandler: requireAuth, schema: updateGenreWeightsSchema }, async (request, reply) => {
     try {
       const userId = request.user!.id
       const { genres } = request.body
 
-      if (!Array.isArray(genres)) {
-        return reply.status(400).send({ error: 'genres must be an array' })
-      }
-
+      // Every entry was checked by the schema before this runs (as above).
       const { setGenreWeight } = await import('@aperture/core')
 
       for (const genre of genres) {
-        if (!genre.genre || genre.weight === undefined) {
-          continue
-        }
-
-        if (genre.weight < 0 || genre.weight > 2) {
-          return reply.status(400).send({
-            error: `weight for "${genre.genre}" must be between 0 and 2`,
-          })
-        }
-
         await setGenreWeight(userId, genre.genre, genre.weight, true)
       }
 
@@ -357,7 +334,7 @@ export function registerTasteProfileHandlers(fastify: FastifyInstance) {
       }
 
       const { deleteGenreWeight } = await import('@aperture/core')
-      const deleted = await deleteGenreWeight(userId, decodeURIComponent(genre))
+      const deleted = await deleteGenreWeight(userId, genre)
 
       return reply.send({
         success: deleted,

@@ -266,9 +266,9 @@ System configuration including media server, AI providers, recommendation algori
 | PUT | `/api/settings/system/logging` | — |
 | GET | `/api/settings/taste-profile` | Get taste profile |
 | PATCH | `/api/settings/taste-profile` | Update taste profile settings |
-| PUT | `/api/settings/taste-profile/franchises` | — |
+| PUT | `/api/settings/taste-profile/franchises` | Set franchise preferences |
 | DELETE | `/api/settings/taste-profile/franchises/{franchiseName}` | Delete franchise preference |
-| PUT | `/api/settings/taste-profile/genres` | — |
+| PUT | `/api/settings/taste-profile/genres` | Set genre weights |
 | DELETE | `/api/settings/taste-profile/genres/{genre}` | — |
 | POST | `/api/settings/taste-profile/interests` | Add custom interest |
 | DELETE | `/api/settings/taste-profile/interests/{id}` | Delete custom interest |

@@ -1163,6 +1163,62 @@ export const updateTasteProfileSettingsSchema = {
   },
 }
 
+/**
+ * The whole batch is checked before anything is saved: the handler wrote one
+ * entry at a time and refused a bad value only when it reached it, after the
+ * earlier entries were stored, and a score that was not a number passed its
+ * range check and was stored as NaN, which recommendation scoring then reads.
+ */
+export const updateFranchisePreferencesSchema = {
+  tags: ['settings'],
+  summary: 'Set franchise preferences',
+  description: 'Set the score of one or more franchises by hand. A bad entry refuses the whole request.',
+  body: {
+    type: 'object' as const,
+    required: ['franchises'] as string[],
+    properties: {
+      franchises: {
+        type: 'array' as const,
+        maxItems: 500,
+        items: {
+          type: 'object' as const,
+          required: ['franchiseName', 'mediaType', 'preferenceScore'] as string[],
+          properties: {
+            franchiseName: { type: 'string' as const, minLength: 1, maxLength: 300 },
+            mediaType: { type: 'string' as const, enum: ['movie', 'series', 'both'] },
+            preferenceScore: { type: 'number' as const, minimum: -1, maximum: 1 },
+          },
+        },
+      },
+    },
+  },
+}
+
+/** As for franchises: the whole batch is checked before any weight is saved. */
+export const updateGenreWeightsSchema = {
+  tags: ['settings'],
+  summary: 'Set genre weights',
+  description: 'Set the weight of one or more genres by hand. A bad entry refuses the whole request.',
+  body: {
+    type: 'object' as const,
+    required: ['genres'] as string[],
+    properties: {
+      genres: {
+        type: 'array' as const,
+        maxItems: 500,
+        items: {
+          type: 'object' as const,
+          required: ['genre', 'weight'] as string[],
+          properties: {
+            genre: { type: 'string' as const, minLength: 1, maxLength: 200 },
+            weight: { type: 'number' as const, minimum: 0, maximum: 2 },
+          },
+        },
+      },
+    },
+  },
+}
+
 export const deleteFranchisePreferenceSchema = {
   tags: ['settings'],
   summary: 'Delete franchise preference',
