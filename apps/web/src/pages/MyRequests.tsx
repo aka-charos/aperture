@@ -66,6 +66,8 @@ interface DiscoveryRequestRow {
   source?: 'discovery' | 'gap_analysis'
   /** Series only: the seasons asked for. Null or absent = the whole show. */
   seasons?: number[] | null
+  /** Decided by the API: pending because Seerr never said whether it made the request. */
+  awaitingSeerr?: boolean
   createdAt: string
   updatedAt: string
   seerrLive: SeerrLive
@@ -88,6 +90,7 @@ function getRequestStatusKey(row: DiscoveryRequestRow): string | null {
   }
   const s = row.status
   if (s === 'submitted') return 'submitted'
+  if (s === 'pending' && row.awaitingSeerr === true) return 'awaitingSeerr'
   if (s === 'pending') return 'pending'
   if (s === 'approved') return 'approved'
   if (s === 'declined') return 'declined'
@@ -104,7 +107,7 @@ function statusColor(row: DiscoveryRequestRow): 'default' | 'primary' | 'seconda
   const key = getRequestStatusKey(row)
   if (key === 'available') return 'success'
   if (key === 'declined' || key === 'failed' || row.status === 'failed') return 'error'
-  if (key === 'pendingApproval' || key === 'pending' || key === 'submitted') return 'warning'
+  if (key === 'pendingApproval' || key === 'pending' || key === 'submitted' || key === 'awaitingSeerr') return 'warning'
   if (key === 'approved' || key === 'processing') return 'info'
   return 'default'
 }

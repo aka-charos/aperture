@@ -5306,6 +5306,7 @@
       "approved": "Approved",
       "submitted": "Submitted",
       "pending": "Pending",
+      "awaitingSeerr": "Waiting for Seerr",
       "failed": "Failed",
       "fallback": "{{status}}"
     },

@@ -1085,6 +1085,12 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
             (result.strandedFailed > 0
               ? `, wrote off ${result.strandedFailed} submission(s) that never reached Seerr`
               : '') +
+            (result.unconfirmedFound > 0
+              ? `, found ${result.unconfirmedFound} unanswered request(s) in Seerr`
+              : '') +
+            (result.unconfirmedFailed > 0
+              ? `, ${result.unconfirmedFailed} unanswered request(s) Seerr has no record of`
+              : '') +
             (result.unreachable > 0 ? `, ${result.unreachable} unreachable` : '')
         )
 
@@ -1097,6 +1103,8 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
           checked: result.checked,
           updated: result.updated,
           strandedFailed: result.strandedFailed,
+          unconfirmedFound: result.unconfirmedFound,
+          unconfirmedFailed: result.unconfirmedFailed,
           unreachable: result.unreachable,
         })
 

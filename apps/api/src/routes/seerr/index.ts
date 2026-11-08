@@ -11,6 +11,10 @@ import {
   getSeerrTVDetails,
   batchGetSeerrMediaStatus,
   createSeerrRequest,
+  withSeerrRequestLock,
+  settleUnconfirmedRequestsFor,
+  recordSeerrAnswer,
+  settleListedRequests,
   updateSeerrRequestStatus,
   getSeerrRequestStatus,
   createDiscoveryRequest,
@@ -367,15 +371,6 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
 
-      // Check for existing request
-      const existingRequest = await hasExistingRequest(currentUser.id, tmdbId, mediaType)
-      if (existingRequest && ['pending', 'submitted', 'approved'].includes(existingRequest.status)) {
-        return reply.status(409).send({
-          error: 'Request already exists',
-          request: existingRequest,
-        })
-      }
-
       const requireMapping =
         (await getSystemSetting('seerr_require_user_mapping')) === 'true'
       const seerrUserId = await ensureSeerrUserIdForRequest(currentUser.id, request.log)
@@ -387,71 +382,128 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         })
       }
 
-      // Create Aperture request record
-      const apertureRequestId = await createDiscoveryRequest(
-        currentUser.id,
-        mediaType,
-        tmdbId,
-        title,
-        discoveryCandidateId,
-        requestSource
-      )
+      // A season list is recorded as asked, so a later request for other
+      // seasons, and gap analysis, are not blocked by it as if it were the show.
+      const askedSeasons = mediaType === 'series' && seasons && seasons.length > 0 ? seasons : undefined
 
-      // Submit to Seerr, acting as this user rather than as the API key's
-      // owner, so the request carries their name, their quota and their
-      // auto-approve setting. Unmapped users fall back to the API key's own
-      // identity, which is what happened for everyone before.
-      const seerrMediaType = mediaType === 'movie' ? 'movie' : 'tv'
-      const requestOptions = { seasons, ...overrides }
-
-      let result = await createSeerrRequest(tmdbId, seerrMediaType, {
-        ...requestOptions,
-        ...(seerrUserId != null ? { actAsUserId: seerrUserId } : {}),
-      })
-
-      // A 403 while acting as someone has two very different causes, and
-      // guessing between them is not acceptable in either direction: a stale
-      // link left alone strands the user forever behind "You do not have
-      // permission to access this endpoint", while retrying blindly would
-      // escalate a viewer who genuinely lacks REQUEST into an admin-attributed,
-      // auto-approved request. So ask Seerr which one it is.
-      if (!result.success && result.status === 403 && seerrUserId != null) {
-        if (!(await seerrUserExists(seerrUserId))) {
-          await clearStaleSeerrUserId(currentUser.id, request.log)
-          result = await createSeerrRequest(tmdbId, seerrMediaType, requestOptions)
+      // One request per title is checked and sent at a time (core
+      // seerr/submission.ts): otherwise a double click or two people at once
+      // both pass the duplicate check before either row exists.
+      const locked = await withSeerrRequestLock(mediaType, tmdbId, async () => {
+        // An earlier request of theirs that Seerr never answered is decided
+        // first, so the duplicate check reads what really happened to it.
+        const earlier = await settleUnconfirmedRequestsFor(currentUser.id, mediaType, tmdbId)
+        if (earlier.stillWaiting) {
+          return {
+            code: 409,
+            body: {
+              error: 'Request awaiting Seerr',
+              message:
+                'An earlier request for this title is still waiting for Seerr to confirm it. Try again in a few minutes.',
+            },
+          }
         }
-      }
 
-      if (!result.success) {
-        // Update Aperture request as failed
-        await updateDiscoveryRequestStatus(apertureRequestId, 'failed', {
-          statusMessage: result.message,
+        // A whole-show request covers any seasons asked for now as well.
+        const existingRequest = await hasExistingRequest(currentUser.id, tmdbId, mediaType)
+        if (existingRequest && ['pending', 'submitted', 'approved'].includes(existingRequest.status)) {
+          return { code: 409, body: { error: 'Request already exists', request: existingRequest } }
+        }
+
+        const sentAt = new Date()
+        const apertureRequestId = await createDiscoveryRequest(
+          currentUser.id,
+          mediaType,
+          tmdbId,
+          title,
+          discoveryCandidateId,
+          requestSource,
+          askedSeasons,
+          seerrUserId
+        )
+
+        // Submit to Seerr, acting as this user rather than as the API key's
+        // owner, so the request carries their name, their quota and their
+        // auto-approve setting. Unmapped users fall back to the API key's own
+        // identity, which is what happened for everyone before.
+        const seerrMediaType = mediaType === 'movie' ? 'movie' : 'tv'
+        const requestOptions = { seasons, ...overrides }
+
+        // Who the final attempt went as, so a lost answer is matched to it.
+        let requestedAs: number | null = seerrUserId ?? null
+        let result = await createSeerrRequest(tmdbId, seerrMediaType, {
+          ...requestOptions,
+          ...(seerrUserId != null ? { actAsUserId: seerrUserId } : {}),
         })
 
-        // A quota or permission refusal is the user's answer, not a server
-        // fault — pass Seerr's own status and sentence through, or "Movie
-        // Quota exceeded" reaches them as a generic failure they cannot act on.
-        const upstream = result.status
-        const statusCode = upstream != null && upstream >= 400 && upstream < 500 ? upstream : 502
+        // A 403 while acting as someone has two very different causes, and
+        // guessing between them is not acceptable in either direction: a stale
+        // link left alone strands the user forever behind "You do not have
+        // permission to access this endpoint", while retrying blindly would
+        // escalate a viewer who genuinely lacks REQUEST into an admin-attributed,
+        // auto-approved request. So ask Seerr which one it is.
+        if (!result.success && result.status === 403 && seerrUserId != null) {
+          if (!(await seerrUserExists(seerrUserId))) {
+            await clearStaleSeerrUserId(currentUser.id, request.log)
+            requestedAs = null
+            result = await createSeerrRequest(tmdbId, seerrMediaType, requestOptions)
+          }
+        }
 
-        return reply.status(statusCode).send({
-          error: 'Failed to submit request to Seerr',
-          message: result.message,
-          apertureRequestId,
+        const outcome = await recordSeerrAnswer(apertureRequestId, result, {
+          mediaType,
+          tmdbId,
+          seasons: askedSeasons ?? null,
+          sentAt,
+          requestedAs,
+        })
+
+        if (outcome.kind === 'unconfirmed') {
+          // Not a failure: the request may exist. The row stays pending and the
+          // requests list checks it against Seerr.
+          return {
+            code: 502,
+            body: {
+              error: 'Seerr did not confirm the request',
+              message: outcome.message,
+              unconfirmed: true,
+              apertureRequestId,
+            },
+          }
+        }
+        if (outcome.kind === 'refused') {
+          // A quota or permission refusal is the user's answer, not a server
+          // fault — pass Seerr's own status and sentence through, or "Movie
+          // Quota exceeded" reaches them as a generic failure they cannot act on.
+          const upstream = outcome.status
+          const statusCode = upstream != null && upstream >= 400 && upstream < 500 ? upstream : 502
+          return {
+            code: statusCode,
+            body: {
+              error: 'Failed to submit request to Seerr',
+              message: outcome.message,
+              apertureRequestId,
+            },
+          }
+        }
+        return {
+          code: 200,
+          body: {
+            success: true,
+            message: 'Request submitted successfully',
+            apertureRequestId,
+            seerrRequestId: outcome.seerrRequestId,
+          },
+        }
+      })
+
+      if (locked.busy) {
+        return reply.status(409).send({
+          error: 'Request in progress',
+          message: 'A request for this title is being sent to Seerr right now.',
         })
       }
-
-      // Update Aperture request with Seerr info
-      await updateDiscoveryRequestStatus(apertureRequestId, 'submitted', {
-        seerrRequestId: result.requestId,
-      })
-
-      return reply.send({
-        success: true,
-        message: 'Request submitted successfully',
-        apertureRequestId,
-        seerrRequestId: result.requestId,
-      })
+      return reply.status(locked.value.code).send(locked.value.body)
     }
   )
 
@@ -498,7 +550,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
       const offsetRaw = offset ? parseInt(offset, 10) : 0
       const offsetN = Number.isFinite(offsetRaw) && offsetRaw > 0 ? offsetRaw : 0
 
-      const [total, requests] = await Promise.all([
+      const [total, listed] = await Promise.all([
         countDiscoveryRequests(scopedUserId, filter),
         getDiscoveryRequests(scopedUserId, {
           ...filter,
@@ -509,15 +561,26 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
 
       const resultScope = wantsAllUsers ? 'all' : 'mine'
 
+      // Decided here (web-never-imports-core): a pending row Seerr never
+      // answered for, which the page words as waiting for Seerr.
+      const withAwaiting = <T extends { status: string; unconfirmedSince?: Date | null }>(row: T) => ({
+        ...row,
+        awaitingSeerr: row.status === 'pending' && row.unconfirmedSince != null,
+      })
+
       if (!(await isSeerrConfigured())) {
         const withLibrary = await attachLibraryMediaIds(
-          requests.map((r) => ({
-            ...r,
+          listed.map((r) => ({
+            ...withAwaiting(r),
             seerrLive: null,
           }))
         )
         return reply.send({ requests: withLibrary, total, scope: resultScope })
       }
+
+      // Requests Seerr never answered for are looked up in Seerr now, a few per
+      // read, so the list shows what became of them (core seerr/submission.ts).
+      const requests = (await settleListedRequests(listed)).map(withAwaiting)
 
       const enriched = await Promise.all(
         requests.map(async (r) => {

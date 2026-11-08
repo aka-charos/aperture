@@ -15,8 +15,10 @@ import {
   isSeerrConfigured,
   createSeerrRequest,
   createDiscoveryRequest,
-  updateDiscoveryRequestStatus,
   hasExistingRequest,
+  withSeerrRequestLock,
+  settleUnconfirmedRequestsFor,
+  recordSeerrAnswer,
   resolveSeerrUserIdForProfile,
   getLatestCompletedSeriesGapRun,
   getActiveSeriesGapRun,
@@ -393,7 +395,7 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
         continue
       }
 
-      let seasons: number[] | undefined
+      let namedSeasons: number[] | undefined
       if (item.seasons !== undefined) {
         const named = item.mediaType === 'series' ? readRequestedSeasons(item.seasons) : null
         if (!named) {
@@ -401,21 +403,42 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
           errors.push({ tmdbId: item.tmdbId, title: item.title, message: 'Invalid seasons' })
           continue
         }
-        const active = (await getActiveSeriesRequests([item.tmdbId])).get(item.tmdbId) ?? []
-        seasons = seasonsStillToRequest(named, active)
-        if (seasons.length === 0) {
-          skipped++
-          continue
-        }
-      } else {
-        const existing = await hasExistingRequest(user.id, item.tmdbId, item.mediaType)
-        if (existing && BLOCKING_STATUSES.has(existing.status)) {
-          skipped++
-          continue
-        }
+        namedSeasons = named
       }
 
-      try {
+      // Checked and sent under the title's request lock, like every request
+      // (core seerr/submission.ts), with any earlier unanswered request of this
+      // admin's for it decided first.
+      type ItemOutcome =
+        | { kind: 'skipped' }
+        | { kind: 'inLibrary' }
+        | { kind: 'submitted' }
+        | { kind: 'failed'; message: string }
+      const decided = await withSeerrRequestLock(item.mediaType, item.tmdbId, async (): Promise<ItemOutcome> => {
+        const earlier = await settleUnconfirmedRequestsFor(user.id, item.mediaType, item.tmdbId)
+        if (earlier.stillWaiting) {
+          return { kind: 'failed', message: 'An earlier request is still waiting for Seerr to confirm it' }
+        }
+
+        let seasons: number[] | undefined
+        if (namedSeasons) {
+          const active = (await getActiveSeriesRequests([item.tmdbId])).get(item.tmdbId) ?? []
+          seasons = seasonsStillToRequest(namedSeasons, active)
+          if (seasons.length === 0) return { kind: 'skipped' }
+        } else {
+          const existing = await hasExistingRequest(user.id, item.tmdbId, item.mediaType)
+          if (existing && BLOCKING_STATUSES.has(existing.status)) return { kind: 'skipped' }
+          // A film that reached the library since the scan is no gap any more.
+          if (item.mediaType === 'movie') {
+            const held = await queryOne<{ one: number }>(
+              `SELECT 1 AS one FROM movies WHERE tmdb_id = $1 LIMIT 1`,
+              [String(item.tmdbId)]
+            )
+            if (held) return { kind: 'inLibrary' }
+          }
+        }
+
+        const sentAt = new Date()
         const apertureRequestId = await createDiscoveryRequest(
           user.id,
           item.mediaType,
@@ -423,7 +446,8 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
           item.title,
           undefined,
           'gap_analysis',
-          seasons
+          seasons,
+          seerrUserId
         )
 
         const seerrMediaType = item.mediaType === 'movie' ? 'movie' : 'tv'
@@ -439,26 +463,40 @@ const gapAnalysisRoutes: FastifyPluginAsync = async (fastify) => {
             : {}),
         })
 
-        if (!result.success) {
-          const msg = result.message ?? 'Request failed'
-          await updateDiscoveryRequestStatus(apertureRequestId, 'failed', {
-            statusMessage: msg,
-          })
-          failed++
-          errors.push({ tmdbId: item.tmdbId, title: item.title, message: msg })
-        } else {
-          await updateDiscoveryRequestStatus(apertureRequestId, 'submitted', {
-            seerrRequestId: result.requestId,
-          })
-          submitted++
-        }
-      } catch (err) {
-        failed++
-        errors.push({
+        const outcome = await recordSeerrAnswer(apertureRequestId, result, {
+          mediaType: item.mediaType,
           tmdbId: item.tmdbId,
-          title: item.title,
-          message: err instanceof Error ? err.message : 'Unknown error',
+          seasons: seasons ?? null,
+          sentAt,
+          // Sent with Seerr's body userId, so that is who Seerr credits.
+          requestedAs: seerrUserId ?? null,
         })
+        if (outcome.kind === 'submitted') return { kind: 'submitted' }
+        return { kind: 'failed', message: outcome.message }
+      }).catch((err: unknown): { busy: false; value: ItemOutcome } => ({
+        busy: false,
+        value: { kind: 'failed', message: err instanceof Error ? err.message : 'Unknown error' },
+      }))
+
+      const outcome: ItemOutcome = decided.busy
+        ? { kind: 'failed', message: 'A request for this title is being sent to Seerr right now' }
+        : decided.value
+      if (outcome.kind === 'skipped') {
+        skipped++
+        continue
+      }
+      if (outcome.kind === 'inLibrary') {
+        // Not requested, and said so: the page marks every item missing from
+        // `errors` as requested.
+        skipped++
+        errors.push({ tmdbId: item.tmdbId, title: item.title, message: 'Already in the library since the scan' })
+        continue
+      }
+      if (outcome.kind === 'submitted') {
+        submitted++
+      } else {
+        failed++
+        errors.push({ tmdbId: item.tmdbId, title: item.title, message: outcome.message })
       }
 
       if (i < items.length - 1) {

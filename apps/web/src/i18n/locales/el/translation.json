@@ -620,6 +620,7 @@
       "approved": "Εγκρίθηκε",
       "submitted": "Υποβλήθηκε",
       "pending": "Σε αναμονή",
+      "awaitingSeerr": "Αναμονή για το Seerr",
       "failed": "Απέτυχε",
       "fallback": "{{status}}"
     },

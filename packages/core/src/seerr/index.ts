@@ -8,6 +8,29 @@
 export * from './types.js'
 export type { SeerrCallResult, SeerrActAs } from './provider.js'
 
+// Sending requests, and settling one whose answer was lost
+export {
+  withSeerrRequestLock,
+  isSeerrRequestInFlight,
+  settleUnconfirmedRequestsFor,
+  settleUnconfirmedBatch,
+  listUnconfirmedRequests,
+  recordSeerrAnswer,
+  settleListedRequests,
+  UNCONFIRMED_REQUEST_MESSAGE,
+  type SeerrSubmission,
+} from './submission.js'
+export {
+  SEERR_CREATE_TIMEOUT_MS,
+  UNCONFIRMED_GIVE_UP_MS,
+  isUncertainCreateFailure,
+  findSubmittedRequest,
+  decideUnconfirmed,
+  decideTitleRows,
+  type SeerrRequestTrace,
+  type UnconfirmedOutcome,
+} from './submissionRules.js'
+
 // Provider functions
 export {
   // Configuration
@@ -20,6 +43,7 @@ export {
   getMovieDetails,
   getTVDetails,
   getMediaStatus,
+  getTitleRequests,
   listAllSeerrUsers,
   resolveSeerrUserIdForProfile,
   seerrUserExists,

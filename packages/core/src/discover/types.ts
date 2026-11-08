@@ -118,6 +118,13 @@ export interface DiscoveryRequest {
   source: DiscoveryRequestSource
   /** Series only: the seasons asked for. Null or absent = the whole show. */
   seasons?: number[] | null
+  /**
+   * When it was sent to Seerr, while no answer has said whether Seerr made it
+   * (0223). Only meaningful on a pending row; null or absent = nothing to check.
+   */
+  unconfirmedSince?: Date | null
+  /** The Seerr user it was sent as; null or absent = the API key's own user, or unknown. */
+  seerrRequestedAs?: number | null
   createdAt: Date
   updatedAt: Date
   /** Joined for the admin scope; absent when the row was fetched another way. */

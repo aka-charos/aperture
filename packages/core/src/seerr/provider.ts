@@ -10,6 +10,12 @@ import { createChildLogger } from '../lib/logger.js'
 import { getSystemSetting, setSystemSetting } from '../settings/systemSettings.js'
 import type { SeerrStatus } from '../tmdb/collectionParts.js'
 import { seerrSeasonStatuses } from './seasonStatus.js'
+import {
+  SEERR_CONFIRM_TIMEOUT_MS,
+  SEERR_CREATE_TIMEOUT_MS,
+  isUncertainCreateFailure,
+  type SeerrRequestTrace,
+} from './submissionRules.js'
 import type {
   SeerrConfig,
   SeerrSearchResult,
@@ -169,6 +175,10 @@ async function seerrCall<T>(
     headers['X-API-User'] = String(options.actAsUserId)
   }
 
+  // Any write can change what a title's status says, whoever it was made as,
+  // and one that went unanswered may still have been made.
+  if ((options.method || 'GET') !== 'GET') statusCache.clear()
+
   try {
     const response = await fetch(url, {
       method: options.method || 'GET',
@@ -187,7 +197,7 @@ async function seerrCall<T>(
       return { ok: false, status: response.status, data: null, message }
     }
 
-    // Any write can change what a title's status says, whoever it was made as.
+    // Again once answered: a status read during the write may have been cached.
     if ((options.method || 'GET') !== 'GET') statusCache.clear()
 
     // 204 No Content (DELETE) has no body to parse.
@@ -381,6 +391,32 @@ export async function getMediaStatus(
   }
 }
 
+/**
+ * Every request Seerr holds for a title, reduced to what says whose and what it
+ * was. Null when Seerr could not be read; [] when it has none (or no media row).
+ * Used to find a request whose POST went unanswered (`seerr/submission.ts`).
+ */
+export async function getTitleRequests(
+  tmdbId: number,
+  mediaType: 'movie' | 'tv'
+): Promise<SeerrRequestTrace[] | null> {
+  const options = { timeoutMs: SEERR_CONFIRM_TIMEOUT_MS }
+  const details = mediaType === 'movie'
+    ? await getMovieDetails(tmdbId, options)
+    : await getTVDetails(tmdbId, options)
+  if (!details) return null
+  const requests = details.mediaInfo?.requests ?? []
+  return requests.map((request) => ({
+    id: Number(request.id),
+    createdAt: String(request.createdAt),
+    requestedById: request.requestedBy?.id != null ? Number(request.requestedBy.id) : null,
+    is4k: Boolean(request.is4k),
+    seasons: Array.isArray(request.seasons)
+      ? request.seasons.map((season) => Number(season.seasonNumber)).filter(Number.isFinite)
+      : null,
+  }))
+}
+
 // ============================================================================
 // Seerr users (for mapping Aperture user ↔ Seerr user id)
 // ============================================================================
@@ -496,7 +532,19 @@ export async function createRequest(
   message?: string
   /** HTTP status from Seerr, so a caller can tell a refusal from an outage. */
   status?: number | null
+  /**
+   * The request may exist although this call failed: no answer, an unreadable
+   * one, or a 5xx (`isUncertainCreateFailure`). Never true with `success`.
+   */
+  uncertain: boolean
 }> {
+  // Read here rather than inside the call: no settings is a refusal, and
+  // seerrCall reports it with no status, which would read as a lost answer.
+  const config = await getSeerrConfig()
+  if (!config) {
+    return { success: false, message: 'Seerr not configured', status: null, uncertain: false }
+  }
+
   const actAsUserId = options.actAsUserId
   const body: SeerrRequestBody = {
     mediaType,
@@ -526,7 +574,7 @@ export async function createRequest(
       body.seasons = options.seasons
     } else {
       // Fetch TV details to get the number of seasons
-      const tvDetails = await getTVDetails(tmdbId)
+      const tvDetails = await getTVDetails(tmdbId, { config, timeoutMs: SEERR_CONFIRM_TIMEOUT_MS })
       if (tvDetails && tvDetails.numberOfSeasons && tvDetails.numberOfSeasons > 0) {
         // Request all seasons (1 through numberOfSeasons)
         body.seasons = Array.from({ length: tvDetails.numberOfSeasons }, (_, i) => i + 1)
@@ -542,22 +590,34 @@ export async function createRequest(
   const result = await seerrCall<SeerrRequestResponse>('/request', {
     method: 'POST',
     body: body as unknown as Record<string, unknown>,
+    config,
+    timeoutMs: SEERR_CREATE_TIMEOUT_MS,
     ...(actAsUserId != null ? { actAsUserId } : {}),
   })
 
-  if (!result.ok || !result.data) {
+  const requestId = result.data?.id
+  if (!result.ok || !Number.isSafeInteger(requestId) || (requestId as number) <= 0) {
+    // A 2xx without a request id is an answer we cannot read, not a refusal.
+    const uncertain = result.ok || isUncertainCreateFailure(result.status)
+    // Seerr's own sentence whenever it sent one (a 5xx included); only a call
+    // that got no answer at all gets ours.
+    const noAnswer = result.ok || result.status == null
     return {
       success: false,
-      message: result.message ?? 'Failed to create request',
+      message: noAnswer
+        ? 'Seerr did not answer, so it is not known whether the request was made'
+        : (result.message ?? 'Failed to create request'),
       status: result.status,
+      uncertain,
     }
   }
 
   return {
     success: true,
-    requestId: result.data.id,
+    requestId: requestId as number,
     message: 'Request created successfully',
     status: result.status,
+    uncertain: false,
   }
 }
 

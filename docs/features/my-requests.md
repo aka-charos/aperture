@@ -13,7 +13,7 @@ Aperture makes requests **as you**, on your own Seerr account, so Seerr's own ru
 A table of every request, yours (and everyone's, if you're an admin):
 
 - **What and where from** — each row shows the title, whether it's a movie or series, which seasons when a request named them, and the **source**: a *direct request* you made by name, a *Discovery* suggestion you accepted, or a *gap analysis* the administrator ran.
-- **Live status** — statuses are pulled from Seerr as it works, not stale copies: *Pending approval → Approved → Processing → Partially available → Available* (or *Declined*). The table also shows Seerr's own status message when there is one.
+- **Live status** — statuses are pulled from Seerr as it works, not stale copies: *Pending approval → Approved → Processing → Partially available → Available* (or *Declined*). The table also shows Seerr's own status message when there is one. *Waiting for Seerr* means Seerr did not answer when the request was sent, so it isn't known yet whether it was made. Aperture checks with Seerr again in the background and when you open the page, and the row becomes *Submitted* or *Failed* on its own. Ask again only if it fails.
 - **When it's available** — a link opens the title in your media server's library.
 - **Filters** — narrow by source and status; paginated for long histories.
 - **Administrators** see an **All users** switch, and can **approve or decline** requests inline for anyone.

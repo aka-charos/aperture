@@ -21,6 +21,7 @@
 import { createChildLogger } from '../lib/logger.js'
 import { query } from '../lib/db.js'
 import { getRequestStatus } from '../seerr/index.js'
+import { listUnconfirmedRequests, settleUnconfirmedBatch } from '../seerr/submission.js'
 import { updateDiscoveryRequestStatus } from './storage.js'
 import type { DiscoveryRequestStatus } from './types.js'
 
@@ -46,6 +47,10 @@ const NON_TERMINAL_STATUSES: DiscoveryRequestStatus[] = ['pending', 'submitted',
  * Generous on purpose: the cost of waiting is one title missing from Discover
  * for a day, and the cost of being hasty is writing off a request that was
  * actually in flight.
+ *
+ * A row Seerr never answered for (`seerr_unconfirmed_since`, 0223) is not
+ * written off blind: it may exist in Seerr. Those are settled against the
+ * title's own requests in Seerr instead (core `seerr/submission.ts`).
  */
 const STRANDED_PENDING_HOURS = 24
 
@@ -56,6 +61,10 @@ export interface ReconcileResult {
   checked: number
   updated: number
   strandedFailed: number
+  /** Unanswered requests found in Seerr and recorded as submitted. */
+  unconfirmedFound: number
+  /** Unanswered requests Seerr has no record of, recorded as failed. */
+  unconfirmedFailed: number
   unreachable: number
   cancelled: boolean
 }
@@ -91,6 +100,8 @@ export async function reconcileDiscoveryRequests(
     checked: 0,
     updated: 0,
     strandedFailed: 0,
+    unconfirmedFound: 0,
+    unconfirmedFailed: 0,
     unreachable: 0,
     cancelled: false,
   }
@@ -103,10 +114,21 @@ export async function reconcileDiscoveryRequests(
             status_message = COALESCE(status_message, 'No Seerr request was created; marked failed so the title can be suggested again')
       WHERE seerr_request_id IS NULL
         AND status IN ('pending', 'submitted')
+        AND NOT (status = 'pending' AND seerr_unconfirmed_since IS NOT NULL)
         AND created_at < NOW() - INTERVAL '1 hour' * $1::int`,
     [STRANDED_PENDING_HOURS]
   )
   result.strandedFailed = stranded.rowCount ?? 0
+
+  // Rows Seerr never answered for: look them up rather than guess.
+  const unconfirmed = await listUnconfirmedRequests(RECONCILE_BATCH_LIMIT)
+  if (unconfirmed.length > 0 && shouldCancel?.() !== true) {
+    const settled = await settleUnconfirmedBatch(unconfirmed)
+    for (const row of settled.values()) {
+      if (row.status === 'submitted') result.unconfirmedFound++
+      else if (row.status === 'failed') result.unconfirmedFailed++
+    }
+  }
 
   const pending = await query<{
     id: string

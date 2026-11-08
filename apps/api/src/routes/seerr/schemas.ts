@@ -122,6 +122,8 @@ export const seerrSchemas = {
       discoveryCandidateId: { type: 'string', format: 'uuid', nullable: true, description: 'Discovery candidate that triggered this request' },
       source: { type: 'string', enum: ['discovery', 'gap_analysis'], description: 'Where the request was created' },
       seasons: { type: 'array', items: { type: 'integer' }, nullable: true, description: 'Series only: the seasons asked for. Null means the whole show.' },
+      unconfirmedSince: { type: 'string', format: 'date-time', nullable: true, description: 'When it was sent to Seerr, while no answer has said whether Seerr made it. Null once Seerr answered.' },
+      awaitingSeerr: { type: 'boolean', description: 'Pending because Seerr never answered whether it made the request; it is looked up in Seerr when the list is read.' },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' },
     },

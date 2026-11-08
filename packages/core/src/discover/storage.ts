@@ -929,7 +929,9 @@ export async function createDiscoveryRequest(
   discoveryCandidateId?: string,
   source: DiscoveryRequestSource = 'discovery',
   /** Series only, when asking for particular seasons. Absent = the whole show. */
-  seasons?: number[]
+  seasons?: number[],
+  /** The Seerr user it will be sent as; absent = the API key's own user. */
+  seerrRequestedAs?: number | null
 ): Promise<string> {
   // Validate that the discovery candidate exists before linking
   // (candidates may be cleaned up during refresh, but we still want to allow the request)
@@ -947,11 +949,15 @@ export async function createDiscoveryRequest(
   }
 
   const result = await queryOne<{ id: string }>(
+    // Inserted just before it is sent, so until a status says otherwise the
+    // row is "sent, no answer yet" (0223): a crash or a lost answer leaves it
+    // to be checked against Seerr rather than pending forever.
     `INSERT INTO discovery_requests (
-      user_id, media_type, tmdb_id, title, discovery_candidate_id, status, source, seasons
-    ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)
+      user_id, media_type, tmdb_id, title, discovery_candidate_id, status, source, seasons,
+      seerr_unconfirmed_since, seerr_requested_as
+    ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, NOW(), $8)
     RETURNING id`,
-    [userId, mediaType, tmdbId, title, validCandidateId, source, seasons ?? null]
+    [userId, mediaType, tmdbId, title, validCandidateId, source, seasons ?? null, seerrRequestedAs ?? null]
   )
 
   if (!result) {
@@ -979,7 +985,8 @@ export async function updateDiscoveryRequestStatus(
      SET status = $2,
          seerr_request_id = COALESCE($3, seerr_request_id),
          seerr_media_id = COALESCE($4, seerr_media_id),
-         status_message = COALESCE($5, status_message)
+         status_message = COALESCE($5, status_message),
+         seerr_unconfirmed_since = CASE WHEN $2 = 'pending' THEN seerr_unconfirmed_since ELSE NULL END
      WHERE id = $1`,
     [
       requestId,
@@ -1113,6 +1120,8 @@ export async function getDiscoveryRequests(
     discovery_candidate_id: string | null
     source: DiscoveryRequestSource
     seasons: number[] | null
+    seerr_unconfirmed_since?: Date | null
+    seerr_requested_as?: number | null
     created_at: Date
     updated_at: Date
     requested_by_username: string | null
@@ -1132,6 +1141,8 @@ export async function getDiscoveryRequests(
     discoveryCandidateId: row.discovery_candidate_id,
     source: row.source ?? 'discovery',
     seasons: row.seasons,
+    unconfirmedSince: row.seerr_unconfirmed_since ?? null,
+    seerrRequestedAs: row.seerr_requested_as != null ? Number(row.seerr_requested_as) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     requestedByUsername: row.requested_by_username,
@@ -1159,6 +1170,7 @@ export async function hasExistingRequest(
     status_message: string | null
     discovery_candidate_id: string | null
     source: DiscoveryRequestSource
+    seerr_unconfirmed_since?: Date | null
     created_at: Date
     updated_at: Date
   }>(
@@ -1185,6 +1197,7 @@ export async function hasExistingRequest(
     statusMessage: result.status_message,
     discoveryCandidateId: result.discovery_candidate_id,
     source: result.source ?? 'discovery',
+    unconfirmedSince: result.seerr_unconfirmed_since ?? null,
     createdAt: result.created_at,
     updatedAt: result.updated_at,
   }

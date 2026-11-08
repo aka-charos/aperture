@@ -1282,6 +1282,7 @@ export {
   getMovieDetails as getSeerrMovieDetails,
   getTVDetails as getSeerrTVDetails,
   getMediaStatus as getSeerrMediaStatus,
+  getTitleRequests as getSeerrTitleRequests,
   listAllSeerrUsers,
   matchApertureProfileToSeerrUser,
   resolveSeerrUserMatch,
@@ -1339,6 +1340,14 @@ export {
   getRequestStatusLabel,
   SEERR_MEDIA_STATUS,
   SEERR_REQUEST_STATUS,
+  // Sending requests, and settling one whose answer was lost
+  withSeerrRequestLock,
+  isSeerrRequestInFlight,
+  settleUnconfirmedRequestsFor,
+  recordSeerrAnswer,
+  settleListedRequests,
+  UNCONFIRMED_REQUEST_MESSAGE,
+  type SeerrSubmission,
 } from './seerr/index.js'
 
 // Discovery (Missing Content Suggestions)
