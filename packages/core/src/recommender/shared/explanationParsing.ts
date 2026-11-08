@@ -34,6 +34,8 @@
  * that reaches the page beats no guess at all only if it is a whole one.
  */
 
+import { parseModelJson } from '../../lib/modelJson.js'
+
 // ============================================================================
 // Batch settings
 // ============================================================================
@@ -168,11 +170,16 @@ function readEntry(entry: unknown, into: Map<number, string>): void {
   if (text) into.set(index as number, text)
 }
 
-/** The whole response as JSON — an `{ explanations: [...] }` object or a bare array. */
+/**
+ * The whole response as JSON — an `{ explanations: [...] }` object or a bare
+ * array. Through `parseModelJson`, so a model's `don\'t` (not a JSON escape)
+ * is repaired and the batch still reads strictly, rather than every entry in
+ * it going through salvage's stricter acceptance.
+ */
 function readStrict(text: string): Map<number, string> | null {
   let parsed: unknown
   try {
-    parsed = JSON.parse(text)
+    parsed = parseModelJson(text)
   } catch {
     return null
   }
@@ -245,6 +252,10 @@ const SIMPLE_ESCAPES: Record<string, string> = {
   n: '\n',
   r: '\r',
   t: '\t',
+  // Not JSON: models write `don\'t` as a JavaScript string would. Read here
+  // for a response salvage reaches for another reason (cut off, or an
+  // unescaped quote); a whole one is repaired before the strict parse.
+  "'": "'",
 }
 
 /** Decode one escape sequence, or null if the response stopped inside it. */
@@ -385,9 +396,10 @@ function readSalvaged(text: string): { byIndex: Map<number, string>; rejected: n
  *
  * Strict JSON first, because a well-formed response should be read the strict
  * way — nested structures and escapes are the parser's problem, not ours, and
- * anything it returns is exactly what the model wrote. Salvage is reached only
- * when that fails, which in practice means one of two things: the response was
- * cut off, or the model left a quote unescaped inside its prose.
+ * anything it returns is exactly what the model wrote (bar a `\'` read as the
+ * apostrophe it means). Salvage is reached only when that fails, which in
+ * practice means one of two things: the response was cut off, or the model left
+ * a quote unescaped inside its prose.
  *
  * Never throws, and an unreadable response is an empty map rather than an
  * error: the caller fills gaps with its own fallback text, so partial output is

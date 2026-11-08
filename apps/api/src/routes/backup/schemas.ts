@@ -171,7 +171,7 @@ const downloadBackup = {
 const uploadBackup = {
   tags: ['backup'],
   summary: 'Upload backup',
-  description: 'Upload a backup file for later restore. Accepts .sql.gz files. Admin only.',
+  description: 'Upload a backup file for later restore. Accepts .dump, .sql and .sql.gz files. Admin only.',
   consumes: ['multipart/form-data'],
 }
 

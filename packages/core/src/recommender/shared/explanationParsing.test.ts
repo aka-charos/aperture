@@ -228,6 +228,30 @@ test('salvage decodes escapes rather than leaking them', () => {
   assert.equal(byIndex.has(2), false)
 })
 
+test("a batch with a JavaScript-style \\' is still read strictly, short entries kept", () => {
+  // \' is not a JSON escape. Repaired before the strict parse, so entry 2 (short,
+  // no closing punctuation) is kept as written instead of losing to the template
+  // the way salvage's looksComplete would make it.
+  const raw = String.raw`{"explanations":[{"index":1,"explanation":"You don\'t need the first film to follow this one."},{"index":2,"explanation":"Mann\'s best"},{"index":3,"explanation":"Its C:\d drive gag lands."}]}`
+  const { byIndex, mode, rejected } = parseExplanationResponse(raw)
+
+  assert.equal(mode, 'json')
+  assert.equal(rejected, 0)
+  assert.equal(byIndex.get(1), "You don't need the first film to follow this one.")
+  assert.equal(byIndex.get(2), "Mann's best")
+  assert.equal(byIndex.get(3), String.raw`Its C:\d drive gag lands.`)
+})
+
+test("salvage reads \\' as an apostrophe too, when the response needs salvage anyway", () => {
+  // Cut off after entry 1, so no repair makes it valid JSON.
+  const raw = String.raw`{"explanations":[{"index":1,"explanation":"You don\'t need the first film to follow this one, and C:\d stays."},{"index":2,"explanation":"cut off`
+  const { byIndex, mode } = parseExplanationResponse(raw)
+
+  assert.equal(mode, 'salvaged')
+  assert.equal(byIndex.get(1), String.raw`You don't need the first film to follow this one, and C:\d stays.`)
+  assert.equal(byIndex.has(2), false)
+})
+
 test('handles the reversed key order', () => {
   const raw =
     '{"explanations":[{"explanation":"Backwards but complete, and long enough to read as a finished thought.","index":4},{"explanation":"and this one is cut'

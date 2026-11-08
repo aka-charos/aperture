@@ -56,7 +56,6 @@ const EXEMPT: Record<string, string> = {
   // which wraps every tool. None of these returns titles outside a card list —
   // the tools that do (brief results, franchise lists, filmographies) put the
   // scope in their own SQL instead, which is why they are not listed here.
-  'assistant/tools/content.ts': 'card and single-title results, filtered by withLibraryScope',
   'assistant/tools/recommendations.ts': 'card results, filtered by withLibraryScope',
   'assistant/tools/library.ts':
     'rankings are cards (filtered by withLibraryScope); stats, genres and studios are aggregates naming no title',

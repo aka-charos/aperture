@@ -18,7 +18,8 @@ export async function getLibraries(provider: EmbyProviderBase, apiKey: string): 
 
   return libraries.map((lib: EmbyLibrary) => ({
     // ItemId is for Items API (/Items/...), Id is for VirtualFolders API
-    id: lib.ItemId || lib.Id || '', // Primary ID for Items API
+    // String(): the id is compared with stored ids and sent in JSON bodies Emby types as strings.
+    id: String(lib.ItemId || lib.Id || ''), // Primary ID for Items API
     virtualFolderId: lib.Id || '', // VirtualFolder ID for library options
     guid: lib.Guid || lib.ItemId || lib.Id || '', // GUID is used for user permissions
     name: lib.Name,
@@ -97,19 +98,22 @@ export async function createVirtualLibrary(
 }
 
 /**
- * Remove a virtual library from the media server by display name.
- * Uses DELETE /Library/VirtualFolders (Emby API).
+ * Remove a virtual library by its id (`getLibraries`' `id`, Emby's ItemId).
+ * Emby's documented removal is POST /Library/VirtualFolders/Delete with the id
+ * in the body; its DELETE /Library/VirtualFolders takes no name, so a
+ * name-based call removed nothing. Without an id nothing is sent: removing by
+ * a guess could take the wrong library.
  */
 export async function deleteVirtualLibrary(
   provider: EmbyProviderBase,
   apiKey: string,
-  name: string
+  id: string
 ): Promise<void> {
-  await provider.fetch(
-    `/Library/VirtualFolders?name=${encodeURIComponent(name)}&refreshLibrary=true`,
-    apiKey,
-    { method: 'DELETE' }
-  )
+  if (!id) throw new Error('Emby library id is required to remove a library')
+  await provider.fetch('/Library/VirtualFolders/Delete', apiKey, {
+    method: 'POST',
+    body: JSON.stringify({ Id: id, RefreshLibrary: true }),
+  })
 }
 
 /**

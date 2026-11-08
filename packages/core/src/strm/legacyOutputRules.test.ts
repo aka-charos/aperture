@@ -108,6 +108,43 @@ describe('planGeneratedLibraryRemoval', () => {
     assert.deepEqual(names(plan), [['AI Picks - Ann', ['r1', 'r2']]])
   })
 
+  test('two libraries sharing a name are two deletes, each by its own id', () => {
+    // Emby allows the same name twice. Keyed by name, both rows went to the
+    // first library: it was deleted, both rows cleared, the second left behind.
+    const plan = planGeneratedLibraryRemoval(
+      [row({ id: 'r1', providerLibraryId: 'lib-1' }), row({ id: 'r2', providerLibraryId: 'lib-2' })],
+      [
+        { id: 'lib-1', name: 'AI Picks - Ann' },
+        { id: 'lib-2', name: 'AI Picks - Ann' },
+      ]
+    )
+    assert.deepEqual(
+      plan.deletions.map((d) => [d.serverId, d.rowIds]),
+      [
+        ['lib-1', ['r1']],
+        ['lib-2', ['r2']],
+      ]
+    )
+  })
+
+  test('an orphan sharing a planned library’s name is still found', () => {
+    const plan = planGeneratedLibraryRemoval(
+      [row({ id: 'r1', providerLibraryId: 'lib-1' })],
+      [
+        { id: 'lib-1', name: 'AI Picks - Ann', locations: ['/mnt/ApertureLibraries/aperture/Ann_abc'] },
+        { id: 'lib-2', name: 'AI Picks - Ann', locations: ['/mnt/ApertureLibraries/aperture/Ann_abc'] },
+      ],
+      '/mnt/ApertureLibraries/'
+    )
+    assert.deepEqual(
+      plan.deletions.map((d) => [d.serverId, d.orphan]),
+      [
+        ['lib-1', false],
+        ['lib-2', true],
+      ]
+    )
+  })
+
   test('an ordinary library that shares no id or name is never planned', () => {
     const plan = planGeneratedLibraryRemoval(
       [row({ id: 'r1', providerLibraryId: 'lib-1', name: 'AI Picks - Ann' })],
@@ -145,6 +182,8 @@ describe('planGeneratedLibraryRemoval — orphans', () => {
       ]
     )
     assert.deepEqual(plan.deletions[1].folders, [['aperture', 'Ann_abc']])
+    // Emby removes by id, so each deletion carries the id the server reported.
+    assert.deepEqual(plan.deletions.map((d) => d.serverId), ['lib-new', 'lib-old'])
   })
 
   test('a library reading one generated folder AND one of its own is never an orphan', () => {
@@ -174,7 +213,9 @@ describe('planGeneratedLibraryRemoval — orphans', () => {
       PREFIX
     )
     assert.deepEqual(plan.deletions, [])
-    assert.deepEqual(plan.refused, [{ serverName: 'Movies', rowIds: ['r1'], locations: ['/mnt/media/Movies'] }])
+    assert.deepEqual(plan.refused, [
+      { serverName: 'Movies', serverId: 'lib-real', rowIds: ['r1'], locations: ['/mnt/media/Movies'] },
+    ])
   })
 
   test('a row whose library reports no folders is still removed — the row is the evidence', () => {

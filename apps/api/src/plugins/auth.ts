@@ -6,9 +6,11 @@ import {
   validateApiKey,
   keyAllowsAdmin,
   keyAllowsWrite,
+  isDatabaseRestoring,
   type ApiKeyScope,
 } from '@aperture/core'
 import { requestWrites } from '../lib/requestWrites.js'
+import { DATABASE_RESTORING_ERROR, answersDuringRestore } from '../lib/restoreGate.js'
 import { createChildLogger } from '../lib/logger.js'
 import { useSecureCookies } from '../config/security.js'
 import {
@@ -429,6 +431,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
 
   // Add hook to parse authentication from API key or session cookie
   fastify.addHook('onRequest', async (request, reply) => {
+    // Every lookup below reads a table a restore has locked, and would wait for
+    // it to finish. See lib/restoreGate.ts.
+    if (isDatabaseRestoring()) {
+      if (answersDuringRestore(request.url)) return
+      return reply.status(503).send(DATABASE_RESTORING_ERROR)
+    }
+
     // First, check for API key authentication (takes precedence)
     const apiKey = request.headers['x-api-key'] as string | undefined
     if (apiKey) {

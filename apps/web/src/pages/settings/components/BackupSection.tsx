@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useBackupJobProgress, type JobFinishedReason, type JobProgress } from '../hooks/useBackupJobProgress'
 import {
   Box,
   Typography,
@@ -27,6 +28,8 @@ import {
   LinearProgress,
   Collapse,
   Paper,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material'
 import BackupIcon from '@mui/icons-material/Backup'
 import RestoreIcon from '@mui/icons-material/Restore'
@@ -44,12 +47,25 @@ import CancelIcon from '@mui/icons-material/Cancel'
 /** Must match server / restore API expectation */
 const RESTORE_CONFIRM_WORD = 'RESTORE'
 
+/** How long a finished job's panel stays up. */
+const FINISHED_PANEL_MS = 5000
+
+/** Elapsed milliseconds as m:ss, or h:mm:ss past an hour. */
+function formatElapsed(ms: number): string {
+  const total = Math.floor(ms / 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(total % 60)}` : `${minutes}:${pad(total % 60)}`
+}
+
 interface BackupInfo {
   filename: string
   sizeBytes: number
   sizeFormatted: string
   createdAt: string
   isCompressed: boolean
+  cutOff?: boolean
 }
 
 interface BackupConfig {
@@ -58,23 +74,6 @@ interface BackupConfig {
   lastBackupAt: string | null
   lastBackupFilename: string | null
   lastBackupSizeFormatted: string | null
-}
-
-interface JobProgress {
-  jobId: string
-  jobName: string
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
-  startedAt: string
-  completedAt?: string
-  currentStep: string
-  currentStepIndex: number
-  totalSteps: number
-  overallProgress: number
-  itemsProcessed: number
-  itemsTotal: number
-  logs: Array<{ timestamp: string; level: string; message: string }>
-  error?: string
-  result?: Record<string, unknown>
 }
 
 export function BackupSection() {
@@ -91,16 +90,13 @@ export function BackupSection() {
   const [deletingBackup, setDeletingBackup] = useState<string | null>(null)
   const [uploadingBackup, setUploadingBackup] = useState(false)
 
-  // Job progress tracking
-  const [activeJobId, setActiveJobId] = useState<string | null>(null)
-  const [jobProgress, setJobProgress] = useState<JobProgress | null>(null)
+  // Job progress tracking (polling and the restore's token live in the hook)
   const [showLogs, setShowLogs] = useState(false)
-  const pollIntervalRef = useRef<number | null>(null)
   const logsEndRef = useRef<HTMLDivElement>(null)
+  const fetchDataRef = useRef<() => Promise<void>>(async () => {})
   
   // In-progress backup tracking
   const [inProgressBackup, setInProgressBackup] = useState<{ filename: string; sizeFormatted: string } | null>(null)
-  const backupSizePollRef = useRef<number | null>(null)
 
   // Config editing
   const [editingConfig, setEditingConfig] = useState(false)
@@ -111,6 +107,72 @@ export function BackupSection() {
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false)
   const [restoreFilename, setRestoreFilename] = useState<string | null>(null)
   const [restoreConfirmText, setRestoreConfirmText] = useState('')
+  const [skipPreRestoreBackup, setSkipPreRestoreBackup] = useState(false)
+  const [restoreCompleted, setRestoreCompleted] = useState(false)
+  const [finishedUnseen, setFinishedUnseen] = useState(false)
+
+  const handleJobFinished = useCallback(
+    (reason: JobFinishedReason, progress: JobProgress) => {
+      setCreatingBackup(false)
+      setRestoringBackup(false)
+      setInProgressBackup(null)
+      window.setTimeout(() => {
+        clearFinishedRef.current(progress.jobId)
+        // Not while a job started since is using them.
+        if (!activeJobIdRef.current) setShowLogs(false)
+      }, FINISHED_PANEL_MS)
+
+      if (reason === 'failed') {
+        // A failed restore changed nothing, so the session still works, and a page
+        // opened during it has no data yet. First, because this clears the error.
+        void fetchDataRef.current()
+        setError(progress.error || t('settingsBackup.operationFailed'))
+        return
+      }
+      if (reason === 'cancelled') return
+
+      const seconds = Math.round(Number(progress.result?.duration ?? 0) / 1000)
+      if (progress.jobName === 'restore-database') {
+        // This session may not exist any more, so no further request is safe to
+        // make from here: the alert below offers a reload instead.
+        setRestoreCompleted(true)
+        setSuccess(t('settingsBackup.restoreCompleteIn', { seconds }))
+        return
+      }
+      setSuccess(t('settingsBackup.backupCompleteIn', { filename: String(progress.result?.filename ?? ''), seconds }))
+      void fetchDataRef.current()
+    },
+    [t]
+  )
+
+  const handleTrackingLost = useCallback(
+    (reason: 'authLost' | 'gone' | 'finishedUnseen') => {
+      setCreatingBackup(false)
+      setRestoringBackup(false)
+      setInProgressBackup(null)
+      setShowLogs(false)
+      if (reason === 'finishedUnseen') {
+        setFinishedUnseen(true)
+        return
+      }
+      setError(t(reason === 'authLost' ? 'settingsBackup.sessionExpired' : 'settingsBackup.trackingLost'))
+    },
+    [t]
+  )
+
+  const { activeJobId, jobProgress, elapsedMs, contactLost, trackJob, resumeRestore, stopTracking, clearFinished } = useBackupJobProgress({
+    onFinished: handleJobFinished,
+    onLost: handleTrackingLost,
+  })
+  const clearFinishedRef = useRef(clearFinished)
+  clearFinishedRef.current = clearFinished
+  // Read rather than depended on: a job ending must not reload the page's data,
+  // because after a restore this session may no longer be able to.
+  const activeJobIdRef = useRef(activeJobId)
+  activeJobIdRef.current = activeJobId
+  // Read rather than depended on: changing language must not reload the page's data.
+  const tRef = useRef(t)
+  tRef.current = t
 
   const fetchData = useCallback(async () => {
     try {
@@ -122,6 +184,12 @@ export function BackupSection() {
         fetch('/api/backup/list', { credentials: 'include' }),
         fetch('/api/jobs', { credentials: 'include' }),
       ])
+
+      // A restore's transaction is open. Its alert and reload follow when it ends.
+      if (configRes.status === 503 || backupsRes.status === 503) {
+        if (!activeJobIdRef.current) setError(tRef.current('settingsBackup.restoreRunningElsewhere'))
+        return
+      }
 
       if (!configRes.ok) {
         throw new Error('Failed to load backup configuration')
@@ -137,20 +205,16 @@ export function BackupSection() {
       setBackups(backupsData.backups || [])
       setRetentionCount(configData.retentionCount)
 
-      // Check for running backup/restore jobs and resume tracking
+      // A backup the job console or the schedule started. Restores are not in this
+      // list: the hook picks those up from the token it saved.
       if (jobsRes.ok) {
         const jobsData = await jobsRes.json()
         const backupJob = jobsData.jobs?.find(
-          (j: { name: string; currentJobId?: string }) =>
-            (j.name === 'backup-database' || j.name === 'restore-database') && j.currentJobId
+          (j: { name: string; currentJobId?: string }) => j.name === 'backup-database' && j.currentJobId
         )
-        if (backupJob?.currentJobId && !activeJobId) {
-          setActiveJobId(backupJob.currentJobId)
-          if (backupJob.name === 'backup-database') {
-            setCreatingBackup(true)
-          } else {
-            setRestoringBackup(true)
-          }
+        if (backupJob?.currentJobId && !activeJobIdRef.current) {
+          trackJob(backupJob.currentJobId)
+          setCreatingBackup(true)
           setShowLogs(true)
         }
       }
@@ -159,159 +223,43 @@ export function BackupSection() {
     } finally {
       setLoading(false)
     }
-  }, [activeJobId])
+  }, [trackJob])
 
   useEffect(() => {
+    fetchDataRef.current = fetchData
+    if (resumeRestore()) {
+      setRestoringBackup(true)
+      setShowLogs(true)
+    }
     fetchData()
-  }, [fetchData])
+  }, [fetchData, resumeRestore])
 
-  // Poll for job progress
-  const pollJobProgress = useCallback(async (jobId: string) => {
-    try {
-      const res = await fetch(`/api/jobs/progress/${jobId}`, { credentials: 'include' })
-      
-      // Check content type before parsing
-      const contentType = res.headers.get('content-type')
-      if (!contentType?.includes('application/json')) {
-        // Got HTML or other non-JSON response - likely auth or proxy error
-        console.warn('Job progress returned non-JSON response:', contentType)
-        if (res.status === 401 || res.status === 403) {
-          setError(t('settingsBackup.sessionExpired'))
-        }
-        setActiveJobId(null)
-        setCreatingBackup(false)
-        setRestoringBackup(false)
-        setInProgressBackup(null)
-        return
-      }
-      
-      if (!res.ok) {
-        // Job might have finished and been cleaned up
-        if (res.status === 404) {
-          setActiveJobId(null)
-          setCreatingBackup(false)
-          setRestoringBackup(false)
-          setInProgressBackup(null)
-          return
-        }
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || 'Failed to get job progress')
-      }
-      const data = await res.json()
-      setJobProgress(data)
-
-      // Extract filename from logs for in-progress backup display
-      if (data.jobName === 'backup-database' && data.status === 'running') {
-        // Look for filename in logs (format: "📦 Running pg_dump to aperture_backup_xxx.dump...")
-        const filenameLog = data.logs?.find((log: { message: string }) => 
-          log.message.includes('Running pg_dump to ')
-        )
-        if (filenameLog) {
-          // Match both old .sql.gz and new .dump format
-          const match = filenameLog.message.match(/Running pg_dump to (aperture_backup_[^\s]+\.(dump|sql\.gz))/)
-          if (match) {
-            setInProgressBackup({ filename: match[1], sizeFormatted: 'Writing...' })
-          }
-        }
-      }
-
-      // Auto-scroll logs (within container only, not the page)
-      if (logsEndRef.current?.parentElement && showLogs) {
-        const container = logsEndRef.current.parentElement
-        container.scrollTop = container.scrollHeight
-      }
-
-      // Check if job is complete
-      if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
-        setActiveJobId(null)
-        setCreatingBackup(false)
-        setRestoringBackup(false)
-        setInProgressBackup(null)
-
-        if (data.status === 'completed') {
-          const result = data.result || {}
-          if (data.jobName === 'backup-database') {
-            setSuccess(`Backup created successfully: ${result.filename || 'backup'} (${Math.round((data.result?.duration || 0) / 1000)}s)`)
-          } else if (data.jobName === 'restore-database') {
-            setSuccess(`Database restored successfully (${Math.round((data.result?.duration || 0) / 1000)}s)`)
-          }
-          await fetchData()
-        } else if (data.status === 'failed') {
-          setError(data.error || 'Operation failed')
-        }
-
-        // Clear job progress after a delay
-        setTimeout(() => {
-          setJobProgress(null)
-          setShowLogs(false)
-        }, 5000)
-      }
-    } catch (err) {
-      console.error('Failed to poll job progress:', err)
-    }
-  }, [fetchData, showLogs, t])
-
-  // Set up polling when job is active
+  // Name the in-progress backup from its own log line
   useEffect(() => {
-    if (activeJobId) {
-      // Poll immediately
-      pollJobProgress(activeJobId)
-
-      // Set up interval
-      pollIntervalRef.current = window.setInterval(() => {
-        pollJobProgress(activeJobId)
-      }, 1000)
-
-      return () => {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current)
-          pollIntervalRef.current = null
-        }
-      }
+    if (jobProgress?.jobName !== 'backup-database' || jobProgress.status !== 'running') return
+    const line = jobProgress.logs?.find((log) => log.message.includes('Running pg_dump to '))
+    const match = line?.message.match(/Running pg_dump to (aperture_backup_[^\s]+\.(dump|sql\.gz))/)
+    if (match) {
+      const filename = match[1]
+      setInProgressBackup((current) =>
+        current?.filename === filename ? current : { filename, sizeFormatted: 'Writing...' }
+      )
     }
-  }, [activeJobId, pollJobProgress])
+  }, [jobProgress])
 
-  // Poll for in-progress backup file size
+  // Auto-scroll logs (within container only, not the page)
   useEffect(() => {
-    if (inProgressBackup?.filename && creatingBackup) {
-      const pollSize = async () => {
-        try {
-          const res = await fetch('/api/backup/list', { credentials: 'include' })
-          if (res.ok) {
-            const data = await res.json()
-            const currentBackup = data.backups?.find(
-              (b: BackupInfo) => b.filename === inProgressBackup.filename
-            )
-            if (currentBackup) {
-              setInProgressBackup(prev => 
-                prev ? { ...prev, sizeFormatted: currentBackup.sizeFormatted } : null
-              )
-            }
-          }
-        } catch {
-          // Ignore errors during size polling
-        }
-      }
-
-      // Poll for size every 2 seconds
-      backupSizePollRef.current = window.setInterval(pollSize, 2000)
-      pollSize() // Poll immediately
-
-      return () => {
-        if (backupSizePollRef.current) {
-          clearInterval(backupSizePollRef.current)
-          backupSizePollRef.current = null
-        }
-      }
+    if (logsEndRef.current?.parentElement && showLogs) {
+      const container = logsEndRef.current.parentElement
+      container.scrollTop = container.scrollHeight
     }
-  }, [inProgressBackup?.filename, creatingBackup])
+  }, [jobProgress, showLogs])
 
   const handleCreateBackup = async () => {
     try {
       setCreatingBackup(true)
       setError(null)
       setSuccess(null)
-      setJobProgress(null)
       setShowLogs(true)
 
       // Start backup in async mode (returns job ID immediately)
@@ -334,9 +282,8 @@ export function BackupSection() {
         throw new Error(data.error || 'Failed to create backup')
       }
 
-      // Set active job ID to start polling
       if (data.jobId) {
-        setActiveJobId(data.jobId)
+        trackJob(data.jobId)
       } else {
         // Sync mode fallback
         setSuccess(`Backup created: ${data.filename} (${data.sizeFormatted})`)
@@ -361,8 +308,7 @@ export function BackupSection() {
       if (res.ok) {
         setSuccess('Backup cancelled')
         setCreatingBackup(false)
-        setActiveJobId(null)
-        setJobProgress(null)
+        stopTracking()
         setInProgressBackup(null)
         await fetchData()
       } else {
@@ -419,6 +365,11 @@ export function BackupSection() {
         body: formData,
       })
 
+      // A proxy in front of the app refuses with a page of its own, not JSON.
+      if (!res.headers.get('content-type')?.includes('application/json')) {
+        throw new Error(t('settingsBackup.uploadRefusedByProxy', { status: res.status }))
+      }
+
       const data = await res.json()
 
       if (!res.ok) {
@@ -450,7 +401,7 @@ export function BackupSection() {
       setError(null)
       setSuccess(null)
       setRestoreDialogOpen(false)
-      setJobProgress(null)
+      setRestoreCompleted(false)
       setShowLogs(true)
 
       // Start restore in async mode (returns job ID immediately)
@@ -461,7 +412,7 @@ export function BackupSection() {
         body: JSON.stringify({
           filename: restoreFilename,
           confirmText: RESTORE_CONFIRM_WORD,
-          createPreRestoreBackup: true,
+          createPreRestoreBackup: !skipPreRestoreBackup,
         }),
       })
 
@@ -479,9 +430,9 @@ export function BackupSection() {
         throw new Error(data.error || 'Failed to restore backup')
       }
 
-      // Set active job ID to start polling
+      // The token keeps this working once the restore has replaced this session.
       if (data.jobId) {
-        setActiveJobId(data.jobId)
+        trackJob(data.jobId, data.progressToken)
       } else {
         // Sync mode fallback
         setSuccess(
@@ -568,6 +519,32 @@ export function BackupSection() {
           {success && (
             <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
               {success}
+            </Alert>
+          )}
+
+          {activeJobId && contactLost && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {t('settingsBackup.contactLost')}
+            </Alert>
+          )}
+
+          {finishedUnseen && (
+            <Alert severity="info" sx={{ mb: 2 }} onClose={() => setFinishedUnseen(false)}>
+              {t('settingsBackup.finishedWhileAway')}
+            </Alert>
+          )}
+
+          {restoreCompleted && (
+            <Alert
+              severity="warning"
+              sx={{ mb: 2 }}
+              action={
+                <Button color="inherit" size="small" onClick={() => window.location.assign('/')}>
+                  {t('settingsBackup.reloadAfterRestore')}
+                </Button>
+              }
+            >
+              {t('settingsBackup.restoreCompleteNext')}
             </Alert>
           )}
 
@@ -762,7 +739,7 @@ export function BackupSection() {
                     {jobProgress?.currentStep || t('settingsBackup.initializing')}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {jobProgress?.overallProgress || 0}%
+                    {formatElapsed(elapsedMs)} · {jobProgress?.overallProgress || 0}%
                   </Typography>
                 </Box>
                 <LinearProgress
@@ -771,6 +748,14 @@ export function BackupSection() {
                   sx={{ height: 6, borderRadius: 1 }}
                 />
               </Box>
+
+              {/* Nothing reports how far a restore has got, and it can take a long
+                  time. Said here so nobody takes the still bar for a stall. */}
+              {restoringBackup && (
+                <Alert severity="info" sx={{ mb: 1 }}>
+                  {t('settingsBackup.restoreInProgressNotice')}
+                </Alert>
+              )}
 
               {/* Logs */}
               <Collapse in={showLogs}>
@@ -873,9 +858,15 @@ export function BackupSection() {
                     .map((backup) => (
                     <TableRow key={backup.filename} hover>
                       <TableCell>
-                        <Tooltip title={t('settingsBackup.tooltipBackupComplete')}>
-                          <CheckCircleIcon fontSize="small" color="success" />
-                        </Tooltip>
+                        {backup.cutOff === true ? (
+                          <Tooltip title={t('settingsBackup.tooltipCutOff')}>
+                            <ErrorIcon fontSize="small" color="warning" />
+                          </Tooltip>
+                        ) : (
+                          <Tooltip title={t('settingsBackup.tooltipBackupComplete')}>
+                            <CheckCircleIcon fontSize="small" color="success" />
+                          </Tooltip>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Box display="flex" alignItems="center" gap={1}>
@@ -894,7 +885,7 @@ export function BackupSection() {
                           <IconButton
                             size="small"
                             onClick={() => openRestoreDialog(backup.filename)}
-                            disabled={restoringBackup || creatingBackup}
+                            disabled={restoringBackup || creatingBackup || backup.cutOff === true}
                           >
                             <RestoreIcon fontSize="small" />
                           </IconButton>
@@ -954,6 +945,26 @@ export function BackupSection() {
             placeholder={t('settingsBackup.restorePlaceholder')}
             autoFocus
           />
+          <FormControlLabel
+            sx={{ mt: 2 }}
+            control={
+              <Checkbox
+                checked={skipPreRestoreBackup}
+                onChange={(e) => setSkipPreRestoreBackup(e.target.checked)}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2">{t('settingsBackup.skipPreRestoreBackup')}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {t('settingsBackup.skipPreRestoreBackupHelp')}
+                </Typography>
+              </Box>
+            }
+          />
+          <Alert severity="info" sx={{ mt: 2 }}>
+            {t('settingsBackup.restoreSignsYouOut')}
+          </Alert>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRestoreDialogOpen(false)}>{t('common.cancel')}</Button>

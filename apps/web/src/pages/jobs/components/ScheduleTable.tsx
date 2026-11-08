@@ -46,79 +46,24 @@ interface ScheduleTableProps {
 }
 
 /**
- * Days a biweekly job must wait before running again. Mirrors BIWEEKLY_MIN_DAYS
- * in core's jobConfig — the web bundle deliberately never imports @aperture/core,
- * so this is one of the duplicated tiny constants.
+ * When this schedule next fires, as the server decided it: in the scheduler's
+ * own time zone (the container's TZ, not this browser's), with the minute
+ * offset and the biweekly skip applied. Shared by the display column and the
+ * sort key so the list cannot order itself by one answer while showing another.
+ * Null when there is no next run, or the API did not say.
  */
-const BIWEEKLY_MIN_DAYS = 13
-
-/**
- * When this schedule next fires. Shared by the display column and the sort key
- * so the list cannot order itself by one answer while showing another.
- */
-function computeNextRun(schedule: JobSchedule, lastRun: Job['lastRun'], now: Date): Date {
-  const targetHour = schedule.hour ?? 0
-  const targetMinute = schedule.minute ?? 0
-
-  const nextRun = new Date(now)
-
-  if (schedule.type === 'daily') {
-    nextRun.setHours(targetHour, targetMinute, 0, 0)
-    if (nextRun <= now) {
-      nextRun.setDate(nextRun.getDate() + 1)
-    }
-  } else if (schedule.type === 'weekly' || schedule.type === 'biweekly') {
-    // A weekly schedule can name several days, so this is the soonest match
-    // rather than the only one. Mirrors resolveScheduleDays in core: the array
-    // wins, an older schedule falls back to the scalar, nothing means Sunday.
-    const targetDays = schedule.daysOfWeek?.length
-      ? schedule.daysOfWeek
-      : [schedule.dayOfWeek ?? 0]
-    nextRun.setHours(targetHour, targetMinute, 0, 0)
-    const daysUntil = Math.min(
-      ...targetDays.map((day) => {
-        const delta = (day - now.getDay() + 7) % 7
-        // Today only counts if the time has not already passed; otherwise this
-        // day's next firing is a week out.
-        return delta === 0 && nextRun <= now ? 7 : delta
-      })
-    )
-    nextRun.setDate(nextRun.getDate() + daysUntil)
-    // A biweekly job fires on a weekly cron and the scheduler drops the
-    // off-week firing, so the next weekday match is only the next *actual* run
-    // when enough time has passed since the last one. Without this the column
-    // would confidently name a date the job is going to skip.
-    if (schedule.type === 'biweekly' && lastRun) {
-      const earliest = new Date(lastRun.startedAt)
-      earliest.setDate(earliest.getDate() + BIWEEKLY_MIN_DAYS)
-      while (nextRun < earliest) {
-        nextRun.setDate(nextRun.getDate() + 7)
-      }
-    }
-  } else if (schedule.type === 'interval') {
-    const intervalMins =
-      schedule.intervalMinutes ?? (schedule.intervalHours ?? 1) * 60
-    const ms = intervalMins * 60 * 1000
-    nextRun.setTime(Math.ceil(now.getTime() / ms) * ms)
-  }
-
-  return nextRun
+function nextRunTimestamp(schedule: JobSchedule | null | undefined): number | null {
+  if (!schedule?.isEnabled || schedule.type === 'manual' || !schedule.nextRunAt) return null
+  const at = Date.parse(schedule.nextRunAt)
+  return Number.isFinite(at) ? at : null
 }
 
-function getNextRunTime(
-  schedule: JobSchedule | null,
-  lastRun: Job['lastRun'],
-  t: TFunction
-): string {
-  if (!schedule || !schedule.isEnabled || schedule.type === 'manual') {
-    return t('admin.jobsPage.ui.dash')
-  }
-
-  const now = new Date()
-  const nextRun = computeNextRun(schedule, lastRun, now)
+function getNextRunTime(schedule: JobSchedule | null, t: TFunction): string {
+  const next = nextRunTimestamp(schedule)
+  if (next == null) return t('admin.jobsPage.ui.dash')
 
   // Format relative time
-  const diff = nextRun.getTime() - now.getTime()
+  const diff = Math.max(0, next - Date.now())
   const hours = Math.floor(diff / (1000 * 60 * 60))
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
   
@@ -140,18 +85,11 @@ function formatLastRun(lastRun: Job['lastRun'], t: TFunction): string {
 /**
  * Calculate minutes until next run for sorting
  */
-function getMinutesUntilNextRun(
-  schedule: JobSchedule | null | undefined,
-  lastRun: Job['lastRun']
-): number {
-  if (!schedule || !schedule.isEnabled || schedule.type === 'manual') {
-    return Infinity // Manual/disabled jobs sort to the end
-  }
-
-  const now = new Date()
-  const nextRun = computeNextRun(schedule, lastRun, now)
-
-  return Math.floor((nextRun.getTime() - now.getTime()) / (1000 * 60))
+function getMinutesUntilNextRun(schedule: JobSchedule | null | undefined): number {
+  const next = nextRunTimestamp(schedule)
+  // Manual, disabled and unknown sort to the end
+  if (next == null) return Infinity
+  return Math.floor((next - Date.now()) / (1000 * 60))
 }
 
 export function ScheduleTable({
@@ -188,8 +126,8 @@ export function ScheduleTable({
     
     // 4. Both are scheduled - sort by next run time (soonest first)
     if (!aManual && !bManual && aEnabled && bEnabled) {
-      const aMinutes = getMinutesUntilNextRun(a.schedule, a.lastRun ?? null)
-      const bMinutes = getMinutesUntilNextRun(b.schedule, b.lastRun ?? null)
+      const aMinutes = getMinutesUntilNextRun(a.schedule)
+      const bMinutes = getMinutesUntilNextRun(b.schedule)
       if (aMinutes !== bMinutes) return aMinutes - bMinutes
     }
     
@@ -249,7 +187,7 @@ export function ScheduleTable({
                     {isRunning ? (
                       <Chip
                         size="small"
-                        label={t('admin.jobsPage.ui.statusRunning')}
+                        label={t(job.progress?.queued ? 'admin.jobsPage.ui.queued' : 'admin.jobsPage.ui.statusRunning')}
                         sx={{
                           bgcolor: 'primary.main',
                           color: 'surface.onBrand',
@@ -294,7 +232,7 @@ export function ScheduleTable({
                       <Stack direction="row" spacing={0.5} alignItems="center">
                         <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                         <Typography variant="caption" color="text.secondary">
-                          {getNextRunTime(job.schedule ?? null, job.lastRun ?? null, t)}
+                          {getNextRunTime(job.schedule ?? null, t)}
                         </Typography>
                       </Stack>
                     </Stack>
@@ -446,7 +384,7 @@ export function ScheduleTable({
                       <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                     )}
                     <Typography variant="body2" color="text.secondary">
-                      {getNextRunTime(job.schedule ?? null, job.lastRun ?? null, t)}
+                      {getNextRunTime(job.schedule ?? null, t)}
                     </Typography>
                   </Stack>
                 </TableCell>
@@ -470,7 +408,7 @@ export function ScheduleTable({
                   {isRunning ? (
                     <Chip
                       size="small"
-                      label={t('admin.jobsPage.ui.statusRunning')}
+                      label={t(job.progress?.queued ? 'admin.jobsPage.ui.queued' : 'admin.jobsPage.ui.statusRunning')}
                       sx={{
                         bgcolor: 'primary.main',
                         color: 'surface.onBrand',

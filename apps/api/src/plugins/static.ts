@@ -4,7 +4,7 @@ import fastifyStatic from '@fastify/static'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
-import { getAppName, DEFAULT_APP_NAME } from '@aperture/core'
+import { getAppName, DEFAULT_APP_NAME, isDatabaseRestoring } from '@aperture/core'
 import { resolveBrandingAsset, brandingAssetUrl } from '../lib/brandingAssets.js'
 import { isRoutePath } from '../config/cors.js'
 
@@ -76,7 +76,9 @@ const staticPlugin: FastifyPluginAsync<StaticPluginOptions> = async (fastify, op
 
     let appName = DEFAULT_APP_NAME
     try {
-      appName = await getAppName()
+      // A restore has `system_settings` locked until it finishes, and this read
+      // would hold the page until then rather than fail.
+      if (!isDatabaseRestoring()) appName = await getAppName()
     } catch (err) {
       // A database that is down must not take the whole app offline — the shell
       // still boots and the client will fill in the name if it recovers.

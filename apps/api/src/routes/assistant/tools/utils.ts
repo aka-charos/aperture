@@ -7,52 +7,91 @@ import type { ToolSet } from 'ai'
 import { toolErrorText } from '../helpers/errors.js'
 import { isAsyncToolResult } from '../helpers/toolStream.js'
 
+/** What a string argument may be turned into, read off the field's own schema. */
+type Coercion = 'number' | 'boolean' | null
+
 /**
- * Normalize tool arguments for local LLM compatibility.
- * 
+ * The coercion a field's schema asks for, through the wrappers a tool schema
+ * uses (optional, nullable, default, describe-only effects). A union coerces
+ * only when no member accepts the string as it is.
+ */
+export function coercionFor(schema: z.ZodTypeAny): Coercion {
+  if (
+    schema instanceof z.ZodOptional ||
+    schema instanceof z.ZodNullable ||
+    schema instanceof z.ZodDefault
+  ) {
+    return coercionFor(schema._def.innerType)
+  }
+  if (schema instanceof z.ZodEffects) return coercionFor(schema._def.schema)
+  if (schema instanceof z.ZodNumber) return 'number'
+  if (schema instanceof z.ZodBoolean) return 'boolean'
+  if (schema instanceof z.ZodLiteral) {
+    const value: unknown = schema._def.value
+    return typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : null
+  }
+  if (schema instanceof z.ZodUnion) {
+    const options = schema._def.options as z.ZodTypeAny[]
+    if (options.some((option) => acceptsString(option))) return null
+    const kinds = new Set(options.map(coercionFor))
+    return kinds.size === 1 ? [...kinds][0] : null
+  }
+  return null
+}
+
+function acceptsString(schema: z.ZodTypeAny): boolean {
+  return schema.safeParse('x').success || schema.safeParse('1').success
+}
+
+/** A string as the type its field wants, or the string itself. */
+function coerce(value: string, to: Coercion): unknown {
+  if (to === 'number') {
+    if (/^-?\d+$/.test(value)) return parseInt(value, 10)
+    if (/^-?\d+\.\d+$/.test(value)) return parseFloat(value)
+  }
+  if (to === 'boolean') {
+    if (value === 'true') return true
+    if (value === 'false') return false
+  }
+  return value
+}
+
+/**
+ * Normalize tool arguments for local LLM compatibility, against the tool's
+ * own schema.
+ *
  * Local LLMs like Ollama/Llama have quirks:
  * 1. Send explicit nulls for optional parameters (Zod rejects null for .optional())
  * 2. Send numbers as strings (e.g., "15" instead of 15)
  * 3. Send booleans as strings (e.g., "true" instead of true)
- * 
- * This function normalizes these values before Zod validation.
+ *
+ * A string is converted only for a field declared as a number or a boolean.
+ * Converting every digit-only string turned a title such as "1917", "1984" or
+ * the series "24" into a number, which the field's `z.string()` then refused,
+ * so the tool failed on exactly the titles a viewer asked for. A key the
+ * schema does not declare is left as sent.
  */
-function normalizeToolArgs(obj: unknown): unknown {
-  if (obj === null || obj === undefined || typeof obj !== 'object') {
+function normalizeToolArgs(obj: unknown, coercions: ReadonlyMap<string, Coercion>): unknown {
+  if (obj === null || obj === undefined || typeof obj !== 'object' || Array.isArray(obj)) {
     return obj
   }
-  
+
   return Object.fromEntries(
     Object.entries(obj as Record<string, unknown>)
       .filter(([, v]) => v !== null) // Strip nulls
-      .map(([k, v]) => {
-        // Coerce string numbers to actual numbers
-        if (typeof v === 'string') {
-          // Check if it's a numeric string (integer)
-          if (/^-?\d+$/.test(v)) {
-            return [k, parseInt(v, 10)]
-          }
-          // Check if it's a numeric string (float)
-          if (/^-?\d+\.\d+$/.test(v)) {
-            return [k, parseFloat(v)]
-          }
-          // Check for boolean strings
-          if (v === 'true') return [k, true]
-          if (v === 'false') return [k, false]
-        }
-        return [k, v]
-      })
+      .map(([k, v]) => [k, typeof v === 'string' ? coerce(v, coercions.get(k) ?? null) : v])
   )
 }
 
 /**
  * Wrap a Zod schema with argument normalization for local LLM compatibility.
- * Handles null stripping, string-to-number coercion, and string-to-boolean coercion.
- * 
+ * Strips nulls, and turns a numeric or boolean string into a number or boolean
+ * only where the schema declares that field so (see normalizeToolArgs).
+ *
  * Usage:
  * ```typescript
  * import { nullSafe } from './utils.js'
- * 
+ *
  * inputSchema: nullSafe(z.object({
  *   query: z.string(),
  *   limit: z.number().optional(),
@@ -60,7 +99,16 @@ function normalizeToolArgs(obj: unknown): unknown {
  * ```
  */
 export function nullSafe<T extends z.ZodTypeAny>(schema: T) {
-  return z.preprocess(normalizeToolArgs, schema) as unknown as T
+  const coercions = new Map<string, Coercion>()
+  // Through a root `.refine()`/`.transform()` to the object it checks.
+  let root: z.ZodTypeAny = schema
+  while (root instanceof z.ZodEffects) root = root._def.schema
+  if (root instanceof z.ZodObject) {
+    for (const [key, field] of Object.entries(root.shape as Record<string, z.ZodTypeAny>)) {
+      coercions.set(key, coercionFor(field))
+    }
+  }
+  return z.preprocess((value) => normalizeToolArgs(value, coercions), schema) as unknown as T
 }
 
 /**

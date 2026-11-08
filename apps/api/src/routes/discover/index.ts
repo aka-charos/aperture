@@ -132,7 +132,8 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
       if (!raw) {
         return reply.status(400).send({ error: 'Missing name query parameter' })
       }
-      const decodedName = decodeURIComponent(raw)
+      // Already decoded once by the router; a second decode breaks names with a %.
+      const decodedName = raw
       const { imageUrl, tmdbPersonId } = await resolveTmdbPersonProfileImageUrl(decodedName)
       request.log.info(
         {
@@ -158,7 +159,8 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/discover/person/:name/credits-gap',
     { preHandler: requireAuth, schema: { tags: ['discovery'] } },
     async (request, reply) => {
-      const decodedName = decodeURIComponent(request.params.name)
+      // Already decoded once by the router; a second decode breaks names with a %.
+      const decodedName = request.params.name
       const showAll = request.query.showAll === 'true'
       const maxMissing = request.query.maxMissing
         ? parseInt(request.query.maxMissing, 10)
@@ -180,7 +182,8 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
     '/api/discover/person/:name/push-tmdb-portrait',
     { preHandler: [requireAuth, requireAdmin], schema: { tags: ['discovery'] } },
     async (request, reply) => {
-      const decodedName = decodeURIComponent(request.params.name)
+      // Already decoded once by the router; a second decode breaks names with a %.
+      const decodedName = request.params.name
       const itemId = await findPersonMediaServerItemIdForName(decodedName)
       if (!itemId) {
         return reply.status(400).send({
@@ -223,7 +226,8 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth, schema: { tags: ["discovery"] } },
     async (request, reply) => {
       const { name } = request.params
-      const decodedName = decodeURIComponent(name)
+      // Already decoded once by the router; a second decode breaks names with a %.
+      const decodedName = name
 
       // Only titles this viewer may open (lib/viewerScope.ts).
       const scope = await viewerScope(request)
@@ -370,7 +374,8 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: requireAuth, schema: { tags: ["discovery"] } },
     async (request, reply) => {
       const { name } = request.params
-      const decodedName = decodeURIComponent(name)
+      // Already decoded once by the router; a second decode breaks names with a %.
+      const decodedName = name
 
       // Only titles this viewer may open (lib/viewerScope.ts).
       const studioScope = await viewerScope(request)

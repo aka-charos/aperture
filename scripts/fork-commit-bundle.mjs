@@ -32,6 +32,9 @@
  * check at the base. The base is `--base`, NOT the range start: bundling only a
  * new tail (`--range <last-bundled>..dev`) must still measure provenance
  * against upstream, or every file the fork created reads as upstream's.
+ * Pass the commit the fork split from, never a moving upstream branch: once
+ * upstream deletes an inherited file or adds a path the fork already created,
+ * measuring against its tip attributes that file to the wrong side.
  *
  * Wiring files are counted apart. Barrel `index.ts` files, the locale JSON,
  * package.json and the lockfile are touched by almost every commit, so counting
@@ -598,7 +601,11 @@ function assemble() {
   md.push('')
   if (range) {
     md.push(
-      `Range \`${range.range}\` (${joined.length} non-merge commits), provenance measured against \`${range.base}\` at \`${range.baseTip.slice(0, 12)}\`, head \`${range.headTip.slice(0, 12)}\`, bundled ${range.bundledAt.slice(0, 10)}.`
+      `Range \`${range.range}\` (${joined.length} non-merge commits), provenance measured against upstream at \`${range.baseTip.slice(0, 12)}\`, head \`${range.headTip.slice(0, 12)}\`, bundled ${range.bundledAt.slice(0, 10)}.`
+    )
+    md.push('')
+    md.push(
+      `"Upstream" throughout means the code this fork split from, at that commit. Upstream's later releases are not compared: a row under Added says upstream had no form of it at that point, not that it still has none. [upstream-sync.md](upstream-sync.md) covers what upstream has done since.`
     )
     md.push('')
   }
@@ -616,7 +623,7 @@ function assemble() {
   md.push('## Method')
   md.push('')
   md.push(
-    "Each commit was read from its message (subject and body), its file list with each path marked as existing upstream or created by the fork, and its diff where the message left the classification open. The classification rules are the table above. Two rules decide most borderline cases: a change that repairs behaviour a user could hit is a fix even when the repair adds code, and a fix found inside a commit whose main purpose is something else is recorded in that commit's `also_fixes` rather than changing its category. To extend the record after new commits land, re-run the bundle step, classify only the new tail into a `verdicts-NN.tsv` in the scratch directory, and re-run `--assemble`: every existing verdict is read back from `docs/fork-divergence.tsv`, and a scratch verdict for an existing commit replaces it."
+    "Each commit was read from its message (subject and body), its file list with each path marked as existing upstream or created by the fork, and its diff where the message left the classification open. The classification rules are the table above. Two rules decide most borderline cases: a change that repairs behaviour a user could hit is a fix even when the repair adds code, and a fix found inside a commit whose main purpose is something else is recorded in that commit's `also_fixes` rather than changing its category. To extend the record after new commits land, re-run the bundle step with the range and pinned base given in the README, classify only the new tail into a `verdicts-NN.tsv` in the scratch directory, and re-run `--assemble`: every existing verdict is read back from `docs/fork-divergence.tsv`, and a scratch verdict for an existing commit replaces it."
   )
   md.push('')
 

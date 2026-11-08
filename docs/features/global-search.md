@@ -30,7 +30,7 @@ Open the full **Search** page for a bigger set of tools:
 The Search page has an **AI Search** toggle (opt-in per search, requires embeddings to be enabled):
 
 - **Off** — word matching: titles first (with fuzzy matching for typos), then cast, crew, keywords and synopsis
-- **On** — results also use **semantic matching**, so *"mind-bending sci-fi"* finds the right shelf even though no title contains those words. Matching results are marked *(with AI-powered semantic matching)*
+- **On** — results also use **semantic matching**, so *"mind-bending sci-fi"* finds the right shelf even though no title contains those words. Matching results are marked *(with AI-powered semantic matching)*. If the semantic answer takes more than a moment, the title matches show first, dimmed, and are replaced when it arrives; if it fails, the title matches stay with a note
 
 The header palette always searches literally; switch to the full page and toggle AI Search for concept-style queries.
 

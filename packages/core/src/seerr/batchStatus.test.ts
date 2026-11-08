@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 process.env.DATABASE_URL ??= 'postgres://unused:unused@127.0.0.1/unused'
 
 const { closePool, getPool } = await import('../lib/db.js')
-const { batchGetMediaStatus, deleteRequest } = await import('./provider.js')
+const { batchGetMediaStatus, batchGetSeasonStatuses, deleteRequest, getRequestStatus } = await import('./provider.js')
 
 const realFetch = globalThis.fetch
 let settingsReads: number
@@ -165,4 +165,23 @@ test('with no Seerr configured nothing is called', async () => {
   seerrAnswers()
   assert.equal((await batchGetMediaStatus(movies([800]))).size, 0)
   assert.deepEqual(calls, [])
+})
+
+test('a job reads each show season by season, and an unanswered show has no entry', async () => {
+  globalThis.fetch = (async (url: string | URL) => {
+    calls.push(String(url))
+    if (String(url).endsWith('/tv/2')) return new Response('nope', { status: 500 })
+    if (String(url).endsWith('/tv/3')) return Response.json({})
+    return Response.json({ mediaInfo: { id: 1, status: 4, seasons: [{ seasonNumber: 2, status: 5 }] } })
+  }) as typeof fetch
+
+  const statuses = await batchGetSeasonStatuses([1, 2, 3])
+  assert.equal(statuses.get(1)?.get(2), 'available')
+  assert.equal(statuses.has(2), false, 'no answer is not "nothing requested"')
+  assert.equal(statuses.get(3)?.size, 0, 'Seerr answered that it knows nothing about this show')
+})
+
+test('a finished request reads as completed while the show stays partly available', async () => {
+  globalThis.fetch = (async () => Response.json({ id: 9, status: 5, media: { status: 4 } })) as unknown as typeof fetch
+  assert.deepEqual(await getRequestStatus(9), { status: 'completed', mediaStatus: 'partially_available' })
 })

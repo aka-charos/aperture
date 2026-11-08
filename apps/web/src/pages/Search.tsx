@@ -1,5 +1,5 @@
 import { useIsPhone } from '@/hooks/useIsPhone'
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -34,6 +34,7 @@ import { useWatchStatus } from '../hooks/useWatchStatus'
 import { useWatching } from '../hooks/useWatching'
 import { PageHeading } from '@/components/PageHeading'
 import { genreLabel } from '@/lib/genreLabel'
+import { runSearchPasses, type ReadResult } from './searchPasses'
 
 interface SearchResult {
   id: string
@@ -70,6 +71,20 @@ export function SearchPage() {
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
+  // Title matches are on screen and the semantic answer is still coming: the
+  // grid is dimmed and takes no clicks, since that answer reorders it.
+  const [provisional, setProvisional] = useState(false)
+  // Which pass the results on screen came from, so the caption never calls
+  // title matches semantic.
+  const [rankedBySemantic, setRankedBySemantic] = useState(false)
+  // Semantic was asked for and failed; the title matches are shown instead.
+  const [semanticFailed, setSemanticFailed] = useState(false)
+  // inert, not just pointer-events: a keyboard user must not open a
+  // provisional poster either (Enter on a card the re-rank is about to move).
+  const resultsGridRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (resultsGridRef.current) resultsGridRef.current.inert = provisional
+  }, [provisional, results])
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalResults, setTotalResults] = useState(0)
@@ -109,53 +124,85 @@ export function SearchPage() {
     fetchFilters()
   }, [])
 
-  // Perform search
-  const performSearch = useCallback(async () => {
-    if (!query || query.trim().length < 2) {
-      setResults([])
-      setTotalResults(0)
-      return
-    }
+  // Perform search. Every run takes its own signal and is aborted when the
+  // query or a filter moves on, so a slow answer for earlier text (a semantic
+  // one above all) can never land over the results for what is in the box.
+  // With semantic on, the order of the two passes is searchPasses.ts's.
+  const performSearch = useCallback(
+    async (signal: AbortSignal) => {
+      if (!query || query.trim().length < 2) {
+        setResults([])
+        setTotalResults(0)
+        setLoading(false)
+        setProvisional(false)
+        setSemanticFailed(false)
+        return
+      }
 
-    setLoading(true)
-    setError(null)
+      setLoading(true)
+      setProvisional(false)
+      setSemanticFailed(false)
+      setError(null)
 
-    try {
       const params = new URLSearchParams({
         q: query,
         limit: String(pageSize),
       })
-
       if (type !== 'all') params.set('type', type)
       if (genre) params.set('genre', genre)
       if (collection) params.set('collection', collection)
       if (network) params.set('network', network)
       if (minRtScore > 0) params.set('minRtScore', String(minRtScore))
-      if (useSemantic) params.set('semantic', 'true')
       if (filters?.yearRange) {
         if (yearRange[0] > filters.yearRange.min) params.set('yearMin', String(yearRange[0]))
         if (yearRange[1] < filters.yearRange.max) params.set('yearMax', String(yearRange[1]))
       }
 
-      const response = await fetch(`/api/search?${params}`, { credentials: 'include' })
-      if (response.ok) {
-        const data = await response.json()
-        setResults(data.results)
-        setTotalResults(data.total)
-      } else {
-        setError(t('search.errors.searchFailed'))
+      type Answer = { results: SearchResult[]; total: number }
+      // 'failed' is an answer that came back refused; 'unreachable' never came.
+      const read = async (values: URLSearchParams): Promise<ReadResult<Answer>> => {
+        try {
+          const response = await fetch(`/api/search?${values}`, { credentials: 'include', signal })
+          return response.ok ? ((await response.json()) as Answer) : 'failed'
+        } catch {
+          return 'unreachable'
+        }
       }
-    } catch {
-      setError(t('search.errors.connect'))
-    } finally {
+
+      const outcome = await runSearchPasses<Answer>({
+        readTitle: () => read(params),
+        readSemantic: useSemantic
+          ? () => read(new URLSearchParams([...params, ['semantic', 'true']]))
+          : null,
+        aborted: () => signal.aborted,
+        show: (answer, ranking, isProvisional) => {
+          setResults(answer.results)
+          setTotalResults(answer.total)
+          setRankedBySemantic(ranking === 'semantic')
+          setProvisional(isProvisional)
+          setLoading(false)
+          setError(null)
+        },
+      })
+      if (outcome.status === 'aborted') return
+      if (outcome.status !== 'shown') {
+        setError(t(outcome.status === 'failed' ? 'search.errors.searchFailed' : 'search.errors.connect'))
+      }
+      setSemanticFailed(outcome.status === 'shown' && outcome.semanticFailed)
+      setProvisional(false)
       setLoading(false)
-    }
-  }, [query, type, genre, collection, network, minRtScore, useSemantic, yearRange, filters, t])
+    },
+    [query, type, genre, collection, network, minRtScore, useSemantic, yearRange, filters, t]
+  )
 
   // Debounced search
   useEffect(() => {
-    const debounce = setTimeout(performSearch, query ? 300 : 0)
-    return () => clearTimeout(debounce)
+    const controller = new AbortController()
+    const debounce = setTimeout(() => void performSearch(controller.signal), query ? 300 : 0)
+    return () => {
+      clearTimeout(debounce)
+      controller.abort()
+    }
   }, [performSearch, query])
 
   // Update URL params
@@ -234,7 +281,7 @@ export function SearchPage() {
                 <SearchIcon />
               </InputAdornment>
             ),
-            endAdornment: loading && (
+            endAdornment: (loading || provisional) && (
               <InputAdornment position="end">
                 <CircularProgress size={20} />
               </InputAdornment>
@@ -441,6 +488,11 @@ export function SearchPage() {
           {error}
         </Alert>
       )}
+      {semanticFailed && !error && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          {t('search.semanticFailed')}
+        </Alert>
+      )}
 
       {/* Results */}
       {!query && (
@@ -455,7 +507,7 @@ export function SearchPage() {
         </Box>
       )}
 
-      {query && !loading && results.length === 0 && (
+      {query && !loading && !provisional && !error && results.length === 0 && (
         <Box textAlign="center" py={8}>
           <Typography variant="h6" color="text.secondary">
             {t('search.noResults', { query })}
@@ -473,10 +525,23 @@ export function SearchPage() {
               count: totalResults,
               query,
             })}
-            {useSemantic ? t('search.semanticSuffix') : ''}
+            {rankedBySemantic
+              ? t('search.semanticSuffix')
+              : provisional
+                ? t('search.semanticPendingSuffix')
+                : ''}
           </Typography>
 
-          <Grid container spacing={2}>
+          {/* Provisional title matches take no clicks or keys (inert, set
+              above): the semantic answer reorders them, and an activation
+              could land on the poster moved there. */}
+          <Grid
+            ref={resultsGridRef}
+            container
+            spacing={2}
+            aria-busy={provisional}
+            sx={{ opacity: provisional ? 0.55 : 1, transition: 'opacity 150ms' }}
+          >
             {results.map((result) => (
               <Grid item xs={6} sm={4} md={3} lg={2} key={`${result.type}-${result.id}`}>
                 <MoviePoster

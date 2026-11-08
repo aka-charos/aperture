@@ -84,6 +84,15 @@ The **Sync favorites** button reconciles your watchlist with your media server f
 
 ---
 
+## On Your Media Server's Home Screen
+
+Your watchlist is kept as series favorites on your media server, and the page shows the steps for your server type.
+
+- **Emby** can host a configurable Home row. Add a Home row with **Dynamic Content** and set **Libraries** to your TV Series libraries, **Sort** to Date last content added (Descending), **Playstate** to Unplayed, and **Favorite** to Enabled.
+- **Jellyfin** cannot: its Home screen only offers a fixed set of sections (library tiles, Continue Watching, Next Up, Latest Media and so on). Find your series on the **Favorites** tab of the Jellyfin home page, or use the **Favorites** filter inside a TV library.
+
+---
+
 ## Rating Shows
 
 Rate series directly from this page — hover a poster in grid view, or use the inline control in list view — on the usual 1–10 star scale (see [The Rating System](ratings.md)). Ratings feed your recommendations.

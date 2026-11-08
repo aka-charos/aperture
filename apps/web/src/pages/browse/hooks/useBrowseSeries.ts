@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PAGE_SIZE, defaultSeriesFilters } from '../constants'
+import type { ListPage } from './listRequests'
+import { usePagedList } from './usePagedList'
 import type { ActiveFilterChip, ContentRating, CountryOption, FilterRanges, NetworkOption, Series } from '../types'
 import type { SeriesFilters, SortField, SortOrder } from '../components'
 import { buildSeriesActiveFilterChips } from '../utils/activeFilterChips'
@@ -22,6 +24,12 @@ interface SeriesResponse {
   total: number
 }
 
+/** One page of the series list, out of the response body (stable for usePagedList). */
+function readSeries(body: unknown): ListPage<Series> {
+  const data = body as SeriesResponse
+  return { items: data.series, total: data.total }
+}
+
 interface BrowseSeriesResult {
   series: Series[]
   seriesGenres: string[]
@@ -32,6 +40,10 @@ interface BrowseSeriesResult {
   seriesLoading: boolean
   seriesLoadingMore: boolean
   seriesError: string | null
+  /** The failure was a later page: show it at the end of the list, not above it. */
+  seriesErrorAtEnd: boolean
+  /** Ask again for the page that failed (shown with the error). */
+  retrySeries: () => void
   seriesSearch: string
   setSeriesSearch: Dispatch<SetStateAction<string>>
   seriesGenre: string
@@ -58,7 +70,6 @@ export function useBrowseSeries({
   restore = false,
 }: UseBrowseSeriesOptions): BrowseSeriesResult {
   const { t } = useTranslation()
-  const [series, setSeries] = useState<Series[]>([])
   const [seriesGenres, setSeriesGenres] = useState<string[]>([])
   const [networks, setNetworks] = useState<NetworkOption[]>([])
   const [seriesContentRatings, setSeriesContentRatings] = useState<ContentRating[]>([])
@@ -68,9 +79,6 @@ export function useBrowseSeries({
     seasons: { min: 1, max: 30 },
     rating: { min: 0, max: 10 },
   })
-  const [seriesLoading, setSeriesLoading] = useState(true)
-  const [seriesLoadingMore, setSeriesLoadingMore] = useState(false)
-  const [seriesError, setSeriesError] = useState<string | null>(null)
   const [seriesSearch, setSeriesSearch] = useState(initial?.search ?? '')
   const [seriesGenre, setSeriesGenre] = useState(initial?.genre ?? '')
   const [network, setNetwork] = useState(initial?.group ?? '')
@@ -79,23 +87,6 @@ export function useBrowseSeries({
   const [seriesSortOrder, setSeriesSortOrder] = useState<SortOrder>(initial?.sortOrder ?? 'asc')
   // Range ends the URL set: loading the library's real extents must keep them.
   const pinnedRangesRef = useRef(initial?.pinned ?? {})
-  const [seriesPage, setSeriesPage] = useState(1)
-  const [seriesHasMore, setSeriesHasMore] = useState(true)
-  const [seriesTotal, setSeriesTotal] = useState(0)
-  const seriesObserverRef = useRef<IntersectionObserver | null>(null)
-  const seriesLoadMoreRef = useRef<HTMLDivElement | null>(null)
-  // Loaded-count lives in a ref, not state: putting series.length in fetchSeries'
-  // deps recreates the callback after every fetch, and the fetch effect depends
-  // on fetchSeries — an infinite refetch loop (grid flickers content/skeleton).
-  const seriesCountRef = useRef(0)
-
-  const resetSeries = useCallback(() => {
-    setSeries([])
-    setSeriesPage(1)
-    setSeriesHasMore(true)
-    seriesCountRef.current = 0
-  }, [])
-
   // The list's API query, without the page number: what the list IS. It keys
   // the fetch effect (so a re-run that would send the same request does not
   // refetch, e.g. the range load leaving every parameter as it was) and the
@@ -130,6 +121,20 @@ export function useBrowseSeries({
     return params.toString()
   }, [network, seriesFilters, seriesGenre, seriesRanges, seriesSearch, seriesSortBy, seriesSortOrder])
 
+  const pageUrl = useCallback((page: number) => `/api/series?${listQuery}&page=${page}`, [listQuery])
+  // markShowing comes from the list memory below; the shared hook reads the
+  // latest through a ref, so a forward reference here is safe.
+  const markShowingRef = useRef<(key: string | null) => void>(() => {})
+  const list = usePagedList<Series>({
+    key: listQuery,
+    active: tabIndex === 1,
+    pageUrl,
+    read: readSeries,
+    failedKey: 'browse.errors.loadSeries',
+    onFirstPage: () => markShowingRef.current(listQuery),
+  })
+  const { items: series, page: seriesPage, total: seriesTotal, hasMore: seriesHasMore } = list.state
+
   const memory = useListMemory<Series>({
     tab: 'series',
     active: tabIndex === 1,
@@ -137,43 +142,7 @@ export function useBrowseSeries({
     current: { key: listQuery, items: series, page: seriesPage, total: seriesTotal, hasMore: seriesHasMore },
   })
   const markShowing = memory.markShowing
-
-  const fetchSeries = useCallback(
-    async (page: number, append = false) => {
-      if (append) {
-        setSeriesLoadingMore(true)
-      } else {
-        setSeriesLoading(true)
-      }
-
-      try {
-        const response = await fetch(`/api/series?${listQuery}&page=${page}`, { credentials: 'include' })
-        if (!response.ok) {
-          setSeriesError(t('browse.errors.loadSeries'))
-          return
-        }
-
-        const data = (await response.json()) as SeriesResponse
-        if (append) {
-          setSeries((prev) => [...prev, ...data.series])
-        } else {
-          setSeries(data.series)
-        }
-        const loadedCount = append ? seriesCountRef.current + data.series.length : data.series.length
-        seriesCountRef.current = loadedCount
-        setSeriesTotal(data.total)
-        setSeriesHasMore(data.series.length === PAGE_SIZE && loadedCount < data.total)
-        setSeriesError(null)
-        if (!append) markShowing(listQuery)
-      } catch {
-        setSeriesError(t('browse.errors.connect'))
-      } finally {
-        setSeriesLoading(false)
-        setSeriesLoadingMore(false)
-      }
-    },
-    [listQuery, markShowing, t]
-  )
+  markShowingRef.current = markShowing
 
   const fetchSeriesMetadata = useCallback(async () => {
     try {
@@ -224,56 +193,22 @@ export function useBrowseSeries({
   }, [fetchSeriesMetadata])
 
   const { takeRemembered, isShowing } = memory
+  const { reset: resetList, restore: restoreList, load: loadPage } = list
   useEffect(() => {
     // Already showing this query (restored, or a re-run that changed nothing).
     if (isShowing(listQuery)) return
     const remembered = takeRemembered(listQuery)
     if (remembered) {
-      setSeries(remembered.items)
-      setSeriesPage(remembered.page)
-      setSeriesTotal(remembered.total)
-      setSeriesHasMore(remembered.hasMore)
-      seriesCountRef.current = remembered.items.length
-      setSeriesError(null)
-      setSeriesLoading(false)
+      restoreList(remembered)
       return
     }
-    resetSeries()
+    resetList()
     markShowing(null)
     const debounce = setTimeout(() => {
-      void fetchSeries(1, false)
+      void loadPage(1, false)
     }, seriesSearch ? 300 : 0)
     return () => clearTimeout(debounce)
-  }, [fetchSeries, isShowing, listQuery, markShowing, resetSeries, seriesSearch, takeRemembered])
-
-  useEffect(() => {
-    if (seriesObserverRef.current) {
-      seriesObserverRef.current.disconnect()
-    }
-
-    if (!seriesHasMore || seriesLoading || seriesLoadingMore || tabIndex !== 1) return
-
-    seriesObserverRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && seriesHasMore && !seriesLoadingMore) {
-          const nextPage = seriesPage + 1
-          setSeriesPage(nextPage)
-          void fetchSeries(nextPage, true)
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    if (seriesLoadMoreRef.current) {
-      seriesObserverRef.current.observe(seriesLoadMoreRef.current)
-    }
-
-    return () => {
-      if (seriesObserverRef.current) {
-        seriesObserverRef.current.disconnect()
-      }
-    }
-  }, [fetchSeries, seriesHasMore, seriesLoading, seriesLoadingMore, seriesPage, tabIndex])
+  }, [isShowing, listQuery, loadPage, markShowing, resetList, restoreList, seriesSearch, takeRemembered])
 
   const activeFilters = useMemo(
     () =>
@@ -300,15 +235,17 @@ export function useBrowseSeries({
   )
 
   return {
+    retrySeries: list.retry,
+    seriesErrorAtEnd: list.state.error?.during === 'more',
     series,
     seriesGenres,
     networks,
     seriesContentRatings,
     seriesCountries,
     seriesRanges,
-    seriesLoading,
-    seriesLoadingMore,
-    seriesError,
+    seriesLoading: list.state.loading,
+    seriesLoadingMore: list.state.loadingMore,
+    seriesError: list.state.error?.message ?? null,
     seriesSearch,
     setSeriesSearch,
     seriesGenre,
@@ -323,7 +260,7 @@ export function useBrowseSeries({
     setSeriesSortOrder,
     seriesTotal,
     seriesHasMore,
-    seriesLoadMoreRef,
+    seriesLoadMoreRef: list.loadMoreRef,
     activeFilters,
     handleSeriesSortChange,
   }

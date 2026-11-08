@@ -3,7 +3,7 @@
  */
 
 import { createChildLogger } from '../lib/logger.js'
-import { tmdbRequest, getImageUrl, type ApiLogCallback } from './client.js'
+import { tmdbLookup, tmdbRequest, getImageUrl, type ApiLogCallback, type TmdbLookup } from './client.js'
 import type { TMDbCollectionDetails, CollectionData } from './types.js'
 
 const logger = createChildLogger('tmdb:collections')
@@ -53,6 +53,14 @@ export async function getCollectionData(
   }
 
   return collectionDetailsToCollectionData(details)
+}
+
+/** `getCollectionData` for a caller that must tell a failed request from a collection TMDb lacks. */
+export async function lookupCollectionData(collectionId: number): Promise<TmdbLookup<CollectionData>> {
+  const answer = await tmdbLookup<TMDbCollectionDetails>(`/collection/${collectionId}`)
+  return answer.status === 'ok'
+    ? { status: 'ok', data: collectionDetailsToCollectionData(answer.data) }
+    : answer
 }
 
 /**

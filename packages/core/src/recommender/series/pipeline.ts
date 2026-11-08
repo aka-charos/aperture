@@ -95,6 +95,7 @@ import {
   detectAndUpdateFranchises,
 } from '../../taste-profile/index.js'
 import { getItemFranchises } from '../../taste-profile/franchise.js'
+import { DEFAULT_MIN_FRANCHISE_ITEMS, DEFAULT_MIN_FRANCHISE_SIZE } from '../../taste-profile/types.js'
 import { getDislikedSeriesIds } from './taste.js'
 import { getWatchedGenreCounts } from '../genreFamiliarity.js'
 import { getWatchedYears, summarizeEraFit } from '../eraDiagnostics.js'
@@ -971,8 +972,15 @@ export async function generateSeriesRecommendationsForUser(
         // The legacy builder reads the raw column, so this centroid is raw.
         profileSpace = 'raw'
         await storeNewTasteProfile(user.id, 'series', tasteProfile, currentModelId || undefined, 'raw')
-        // Also detect franchises
-        await detectAndUpdateFranchises(user.id, 'series')
+        // Also detect franchises. 'merge', never the default 'reset': a reset
+        // deletes franchises the viewer set by hand, which only the viewer's
+        // own "Reset All" may do. A stored profile without a vector also lands
+        // here, so its thresholds are the viewer's when it has them.
+        await detectAndUpdateFranchises(user.id, 'series', {
+          mode: 'merge',
+          minFranchiseItems: storedProfile?.minFranchiseItems ?? DEFAULT_MIN_FRANCHISE_ITEMS,
+          minFranchiseSize: storedProfile?.minFranchiseSize ?? DEFAULT_MIN_FRANCHISE_SIZE,
+        })
         logger.info({ userId: user.id }, '💾 Stored new taste profile and detected franchises')
       }
     } else {

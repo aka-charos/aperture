@@ -313,4 +313,10 @@ export const jobDefinitions: JobDefinition[] = [
       'Compare TMDB movie collections to your library and store missing titles (does not request via Seerr)',
     cron: null,
   },
+  {
+    name: 'refresh-series-gaps',
+    description:
+      'Compare the seasons TMDb says have aired to the episodes in your library and store the gaps (does not request via Seerr)',
+    cron: null,
+  },
 ]

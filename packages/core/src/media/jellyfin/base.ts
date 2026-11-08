@@ -4,9 +4,22 @@
  * Core class with constructor, authentication helpers, and fetch functionality.
  */
 
+import { MediaServerHttpError } from '../httpError.js'
 import { createChildLogger } from '../../lib/logger.js'
+import {
+  MediaServerIncompleteResponseError,
+  MediaServerTimeoutError,
+  requestMediaServer,
+  type MediaServerReply,
+} from '../serverRequest.js'
 
 export const logger = createChildLogger('jellyfin-provider')
+
+function jellyfinIncompleteResponseError(): Error {
+  return new Error(
+    'Jellyfin answered but stopped partway through its response. The server is reachable; it may be overloaded.'
+  )
+}
 
 export class JellyfinProviderBase {
   readonly type = 'jellyfin' as const
@@ -36,44 +49,45 @@ export class JellyfinProviderBase {
       ...((options.headers as Record<string, string>) || {}),
     }
 
-    // Add 60 second timeout with AbortController (increased from 30s for large libraries)
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 60000)
-
     const startTime = Date.now()
-    let response: Response
+    let response: MediaServerReply
     try {
-      response = await fetch(url, {
-        ...options,
-        headers,
-        signal: controller.signal,
-      })
+      // 60 seconds for a slot, for the answer to start, and of silence in the
+      // body (a large library's listing may stream longer than that).
+      response = await requestMediaServer(this.baseUrl, url, { ...options, headers }, 60_000)
     } catch (err) {
-      clearTimeout(timeoutId)
       const duration = Date.now() - startTime
-      if (err instanceof Error && err.name === 'AbortError') {
-        logger.error({ url, duration }, '⏱️ Jellyfin API request timed out after 60 seconds')
+      if (err instanceof MediaServerTimeoutError) {
+        logger.error({ url, duration, stage: err.stage }, `⏱️ Jellyfin API request: ${err.message}`)
+        if (err.stage === 'queue') {
+          throw new Error(
+            "Jellyfin is busy: Aperture's requests to it did not finish within 60 seconds, so this one was not sent."
+          )
+        }
+        if (err.stage === 'body') throw jellyfinIncompleteResponseError()
         throw new Error(
           `Connection to Jellyfin timed out after 60 seconds. Please check that your media server URL (${this.baseUrl}) is accessible from the Aperture container.`
         )
+      }
+      // The server answered, so this is not a connection problem.
+      if (err instanceof MediaServerIncompleteResponseError) {
+        logger.error({ url, duration, status: err.status, err: err.cause }, '❌ Jellyfin API response broke off')
+        throw jellyfinIncompleteResponseError()
       }
       logger.error({ url, duration, err }, '❌ Jellyfin API network error')
       throw new Error(
         `Failed to connect to Jellyfin at ${this.baseUrl}. Please verify the URL is correct and the server is running.`
       )
-    } finally {
-      clearTimeout(timeoutId)
     }
     const duration = Date.now() - startTime
+    const { text } = response
 
     if (!response.ok) {
-      const text = await response.text()
       logger.error({ status: response.status, url, body: text, duration }, '❌ Jellyfin API error')
-      throw new Error(`Jellyfin API error: ${response.status} ${response.statusText}`)
+      throw new MediaServerHttpError('Jellyfin', response.status, response.statusText, text)
     }
 
     // Some endpoints return empty response
-    const text = await response.text()
     if (!text) {
       logger.debug({ url, duration, empty: true }, '✅ Jellyfin API Response (empty)')
       return {} as T

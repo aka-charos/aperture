@@ -12,6 +12,7 @@ import {
   scheduleToCron,
   formatSchedule,
   isScheduledRunDue,
+  schedulerTimeZone,
   type JobConfig,
 } from '@aperture/core'
 
@@ -22,8 +23,22 @@ interface ScheduledJob {
   task: ScheduledTask
   cronExpression: string
   schedule: string // Human-readable
+  /** The config the task was built from, so readers see what actually runs. */
+  config: JobConfig
 }
 const scheduledTasks: Map<string, ScheduledJob> = new Map()
+
+/** Whether initializeScheduler has registered the tasks (false at boot until it has). */
+let schedulerReady = false
+
+/**
+ * Until the scheduler has started, no task is registered yet, so a reader of
+ * getRegisteredSchedule would see nothing scheduled at all; it falls back to
+ * the saved schedule instead (the jobs list does).
+ */
+export function isSchedulerReady(): boolean {
+  return schedulerReady
+}
 
 // Job execution function - will be set by the jobs routes
 let jobExecutor: ((jobName: string) => Promise<void>) | null = null
@@ -90,7 +105,8 @@ function scheduleJob(config: JobConfig): void {
       logger.error({ err, job: config.jobName }, `❌ Scheduled job failed: ${config.jobName}`)
     }
   }, {
-    timezone: process.env.TZ || 'America/New_York',
+    // The same zone the jobs list works the next run out in.
+    timezone: schedulerTimeZone(),
     scheduled: true,
   })
 
@@ -98,8 +114,19 @@ function scheduleJob(config: JobConfig): void {
     task,
     cronExpression,
     schedule: humanSchedule,
+    config,
   })
   logger.info({ job: config.jobName, cron: cronExpression, schedule: humanSchedule }, `📅 Job scheduled: ${config.jobName} (${humanSchedule})`)
+}
+
+/**
+ * The schedule node-cron is actually running for a job, or null when it runs
+ * none (manual, switched off, an invalid expression, or a refresh that failed).
+ * The jobs list works the next run out from this, not from the saved row, so
+ * it never promises a firing the scheduler does not have.
+ */
+export function getRegisteredSchedule(jobName: string): JobConfig | null {
+  return scheduledTasks.get(jobName)?.config ?? null
 }
 
 /**
@@ -129,6 +156,7 @@ export async function initializeScheduler(): Promise<void> {
       scheduled++
     }
 
+    schedulerReady = true
     logger.info(
       { scheduled, manual, disabled, total: configs.length },
       `📅 Scheduler initialized: ${scheduled} scheduled, ${manual} manual-only, ${disabled} disabled`
@@ -188,6 +216,7 @@ export function stopScheduler(): void {
   }
   
   scheduledTasks.clear()
+  schedulerReady = false
   logger.info('✅ Scheduler stopped')
 }
 

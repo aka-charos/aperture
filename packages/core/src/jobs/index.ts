@@ -1,5 +1,7 @@
 export {
   createJobProgress,
+  createQueuedJobProgress,
+  startQueuedJob,
   setJobStep,
   updateJobProgress,
   addLog,
@@ -30,7 +32,10 @@ export {
   normalizeScheduleDays,
   isBiweeklyRunDue,
   isScheduledRunDue,
+  getLastCompletedRunStarts,
   BIWEEKLY_MIN_DAYS,
   type JobConfig,
   type ScheduleType,
 } from './jobConfig.js'
+
+export { nextScheduledRun, schedulerTimeZone, DEFAULT_SCHEDULER_TIME_ZONE } from './nextRun.js'

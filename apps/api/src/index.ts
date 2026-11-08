@@ -6,6 +6,8 @@ import {
   getMigrationStatus,
   detectInterruptedEnrichmentRuns,
   recoverInterruptedNewsletterSends,
+  closeInterruptedSeriesGapRuns,
+  closeInterruptedGapRuns,
   checkEvidenceThresholdProvenance,
   getAllJobConfigs,
   checkDatabaseClientCompatibility,
@@ -97,6 +99,11 @@ async function main() {
   // A newsletter send runs in this process, so one left 'sending' by a restart
   // can never finish; it reads as failed and a retry reaches whoever was missed.
   await recoverInterruptedNewsletterSends()
+
+  // Likewise a gap scan: before the scheduler starts, so no live scan can be closed.
+  // Neither call throws, so a stale row can never stop the server from starting.
+  await closeInterruptedSeriesGapRuns()
+  await closeInterruptedGapRuns()
 
   // The evidence threshold is a raw cosine, so it only means anything relative
   // to the embedding model that produced it -- and swapping that model is a

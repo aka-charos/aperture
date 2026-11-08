@@ -228,6 +228,8 @@ export interface Episode {
   seriesName: string
   seasonNumber: number
   episodeNumber: number
+  /** Last number a multi-episode item covers; absent = this one episode (`episodeNumberEnd`). */
+  episodeNumberEnd?: number
   name: string
   overview?: string
   premiereDate?: string

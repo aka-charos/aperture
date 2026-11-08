@@ -2,6 +2,7 @@ import type { EmbyItem, EmbySeries, EmbyEpisode } from './types.js'
 import type { Movie, Series, Episode } from '../types.js'
 import { normalizeCountries } from '../../countries/canonical.js'
 import { withoutManagedTags } from '../managedTags.js'
+import { episodeNumberEnd } from '../episodeRange.js'
 import {
   extractPeopleNames,
   mapEmbyActors,
@@ -9,9 +10,9 @@ import {
   mapEmbyMediaSources,
   mapEmbyStudios,
   mapEmbyUserData,
-  mapEmbyVideoQuality,
   seriesEndYear,
 } from './mapperHelpers.js'
+import { mapVideoQuality } from '../videoQuality.js'
 
 export { mapEmbyEpisodeToWatched, mapEmbyItemToWatchedMovie } from './mapperHelpers.js'
 
@@ -20,7 +21,7 @@ export function mapEmbyItemToMovie(item: EmbyItem, baseUrl: string): Movie {
   const writers = extractPeopleNames(item.People, ['Writer'])
   const actors = mapEmbyActors(item.People, baseUrl)
   const primarySource = item.MediaSources?.[0]
-  const quality = mapEmbyVideoQuality(primarySource)
+  const quality = mapVideoQuality(primarySource)
 
   return {
     id: item.Id,
@@ -109,6 +110,7 @@ export function mapEmbyItemToEpisode(item: EmbyEpisode, baseUrl: string): Episod
     seriesName: item.SeriesName,
     seasonNumber: item.ParentIndexNumber,
     episodeNumber: item.IndexNumber,
+    episodeNumberEnd: episodeNumberEnd(item.IndexNumber, item.IndexNumberEnd),
     name: item.Name,
     overview: item.Overview,
     premiereDate: item.PremiereDate,

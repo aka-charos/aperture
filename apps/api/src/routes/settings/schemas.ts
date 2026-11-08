@@ -20,7 +20,7 @@ const aiFunctionEnum = [...AI_FUNCTIONS]
 export const mediaServerInfoSchema = {
   tags: ['settings'],
   summary: 'Get media server info',
-  description: 'Get public media server information for frontend use (play buttons, deep links). Available to all authenticated users. Returns server type, base URL, and server name.',
+  description: 'Get public media server information for frontend use (play buttons, deep links). Available to all authenticated users. Returns server type, base URL, server name, and a capabilities map describing features that differ between Emby and Jellyfin (e.g. dynamicHomeRows).',
 }
 
 export const mediaServerConfigSchema = {
@@ -115,7 +115,7 @@ export const updateLibrarySchema = {
   params: {
     type: 'object' as const,
     properties: {
-      id: { type: 'string' as const, format: 'uuid', description: 'Library config ID' },
+      id: { type: 'string' as const, minLength: 1, maxLength: 255, description: 'Library ID from the media server' },
     },
     required: ['id'] as string[],
   },
@@ -1160,6 +1160,62 @@ export const updateTasteProfileSettingsSchema = {
       minFranchiseSize: { type: 'integer' as const },
     },
     required: ['mediaType'] as string[],
+  },
+}
+
+/**
+ * The whole batch is checked before anything is saved: the handler wrote one
+ * entry at a time and refused a bad value only when it reached it, after the
+ * earlier entries were stored, and a score that was not a number passed its
+ * range check and was stored as NaN, which recommendation scoring then reads.
+ */
+export const updateFranchisePreferencesSchema = {
+  tags: ['settings'],
+  summary: 'Set franchise preferences',
+  description: 'Set the score of one or more franchises by hand. Every entry needs all three fields; one bad or incomplete entry refuses the whole request, and a valid batch is saved all or none.',
+  body: {
+    type: 'object' as const,
+    required: ['franchises'] as string[],
+    properties: {
+      franchises: {
+        type: 'array' as const,
+        maxItems: 500,
+        items: {
+          type: 'object' as const,
+          required: ['franchiseName', 'mediaType', 'preferenceScore'] as string[],
+          properties: {
+            franchiseName: { type: 'string' as const, minLength: 1, maxLength: 300 },
+            mediaType: { type: 'string' as const, enum: ['movie', 'series', 'both'] },
+            preferenceScore: { type: 'number' as const, minimum: -1, maximum: 1 },
+          },
+        },
+      },
+    },
+  },
+}
+
+/** As for franchises: the whole batch is checked before any weight is saved. */
+export const updateGenreWeightsSchema = {
+  tags: ['settings'],
+  summary: 'Set genre weights',
+  description: 'Set the weight of one or more genres by hand. Every entry needs both fields; one bad or incomplete entry refuses the whole request, and a valid batch is saved all or none.',
+  body: {
+    type: 'object' as const,
+    required: ['genres'] as string[],
+    properties: {
+      genres: {
+        type: 'array' as const,
+        maxItems: 500,
+        items: {
+          type: 'object' as const,
+          required: ['genre', 'weight'] as string[],
+          properties: {
+            genre: { type: 'string' as const, minLength: 1, maxLength: 200 },
+            weight: { type: 'number' as const, minimum: 0, maximum: 2 },
+          },
+        },
+      },
+    },
   },
 }
 

@@ -1,7 +1,7 @@
 /**
  * The watch-stats responses are a fixed list of fields, and nothing in them can
  * give away how many accounts exist: the count is printed on the page, so a total
- * or a share beside it is the number of users (F-186). In `test:security` so CI
+ * or a share beside it is the number of users (F-193). In `test:security` so CI
  * runs it.
  */
 import test from 'node:test'

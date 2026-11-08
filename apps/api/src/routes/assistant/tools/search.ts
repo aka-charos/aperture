@@ -15,6 +15,14 @@ import { query, queryOne } from '../../../lib/db.js'
 import { buildPlayLink } from '../helpers/mediaServer.js'
 import { annotateWatchedItems } from '../helpers/unwatched.js'
 import { anyTitleMatchesSql, titleMatchRankSql } from '../helpers/titleMatch.js'
+import {
+  closeTitleSql,
+  containsPattern,
+  foundByTitle,
+  literalTitleSql,
+  queryKeySql,
+  titleRelevanceSql,
+} from '../helpers/titleSearch.js'
 import { normalizeCountryQuery } from '../helpers/countryMatch.js'
 import { briefResult, FORMAT_PARAM_DESCRIPTION } from './utils.js'
 import { keepNewTitles, mergeNearestByRank } from './semanticOrder.js'
@@ -291,14 +299,15 @@ export function createSearchTools(ctx: ToolContext) {
   return {
     searchContent: tool({
       description:
-        'Comprehensive search for movies and TV series with ALL available filters. Use for specific queries with known criteria. For conceptual/vague queries like "mind-bending movies", use semanticSearch instead. Set watchStatus to search WITHIN what the user has (or has not) watched — this is the only way to answer "which X have I seen", since getWatchHistory returns recent plays in order and cannot filter.',
+        'Comprehensive search for movies and TV series with ALL available filters, and the way to find a title the user NAMES: it matches the title or original title exactly, without a leading article, as part of a longer title, or spelled slightly wrong, and lists title matches first. Close spellings are candidates: when several are plausible, say which you mean or ask. Use for specific queries with known criteria. For conceptual/vague queries like "mind-bending movies", use semanticSearch instead. Set watchStatus to search WITHIN what the user has (or has not) watched — this is the only way to answer "which X have I seen", since getWatchHistory returns recent plays in order and cannot filter.',
       inputSchema: nullSafe(z.object({
         // Text search
         query: z
           .string()
           .optional()
           .describe(
-            'Literal text to find in the title or plot summary. NOT a concept search: ' +
+            'A title as the user wrote it (typos and a missing "The" are fine; leave out the ' +
+              'rest of their sentence), or literal text to find in the plot summary. NOT a concept search: ' +
               '"noir", "slow-burn", "feel-good" will match almost nothing, because those ' +
               'words rarely appear in a title or synopsis. Use semanticSearch for a mood, ' +
               'style or theme, and this only for words you expect to be written down.'
@@ -384,7 +393,7 @@ export function createSearchTools(ctx: ToolContext) {
       })),
       execute: async (params) => {
         const {
-          query: searchQuery,
+          query: rawQuery,
           genre,
           year,
           yearMin,
@@ -411,6 +420,8 @@ export function createSearchTools(ctx: ToolContext) {
           format = 'cards',
         } = params
 
+        // Padding is not part of a title: " Heat " must still find Heat.
+        const searchQuery = rawQuery?.trim() || undefined
         const items: ContentItem[] = []
         // ContentItem folds the year into `subtitle`; a brief line wants it back.
         const yearById = new Map<string, number | null>()
@@ -418,20 +429,32 @@ export function createSearchTools(ctx: ToolContext) {
         const safeLimit = Math.min(limit ?? 15, 50)
 
         // Helper to build WHERE clause
-        const buildWhere = (isMovie: boolean) => {
+        // 'literal' finds titles and synopses that say the query; 'close' only
+        // titles spelled nearly like it, asked when the literal pass found no
+        // title (helpers/titleSearch.ts says why never both at once).
+        const buildWhere = (isMovie: boolean, pass: 'literal' | 'close') => {
           const conditions: string[] = []
           const values: unknown[] = []
           let idx = 1
+          // How well the title matches the query (helpers/titleSearch.ts); 0 without one.
+          let relevance = '0::float8'
 
           if (searchQuery) {
             // Original/sort titles too: a third of a real library carries a
             // different original title, so "Ascenseur pour l'échafaud" found
             // nothing while the film sat there as "Elevator to the Gallows".
+            // A title spelled a little wrong ("Housemaids" for "The
+            // Housemaid") is the close pass's (helpers/titleSearch.ts).
+            const pattern = `$${idx}`
+            const key = queryKeySql(`$${idx + 1}`)
             conditions.push(
-              `(${anyTitleMatchesSql(`$${idx}`)} OR unaccent(overview) ILIKE unaccent($${idx}))`
+              pass === 'literal'
+                ? `(${literalTitleSql(pattern, key)} OR unaccent(overview) ILIKE unaccent(${pattern}))`
+                : closeTitleSql(key)
             )
-            values.push(`%${searchQuery}%`)
-            idx++
+            values.push(containsPattern(searchQuery), searchQuery)
+            idx += 2
+            relevance = titleRelevanceSql(pattern, key)
           }
           if (genre) {
             conditions.push(`$${idx} = ANY(genres)`)
@@ -546,7 +569,7 @@ export function createSearchTools(ctx: ToolContext) {
 
           values.push(safeLimit)
           const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-          return { whereClause, values, limitIdx: idx }
+          return { whereClause, values, limitIdx: idx, relevance }
         }
 
         // Sort column mapping
@@ -561,44 +584,60 @@ export function createSearchTools(ctx: ToolContext) {
         const order = sortOrder === 'asc' ? 'ASC' : 'DESC'
         const nullsOrder = sortOrder === 'asc' ? 'NULLS FIRST' : 'NULLS LAST'
 
-        if (type === 'movies' || type === 'both') {
-          const { whereClause, values, limitIdx } = buildWhere(true)
-          const movieResult = await query<MovieResult & { provider_item_id?: string }>(
-            `SELECT id, title, year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url, provider_item_id, directors
-             FROM movies ${whereClause}
-             ORDER BY ${sortColumn} ${order} ${nullsOrder} LIMIT $${limitIdx}`,
-            values
-          )
+        // Title matches first (exact, then without its article, then contained,
+        // then close), the requested sort within each; without a query the
+        // relevance is 0 everywhere and the sort alone decides, as before.
+        type Found = { row: (MovieResult | SeriesResult) & { provider_item_id?: string; relevance: number }; mediaType: 'movie' | 'series' }
+        const runPass = async (pass: 'literal' | 'close'): Promise<Found[]> => {
+          const found: Found[] = []
 
-          for (const m of movieResult.rows) {
-            const titleKey = m.title.toLowerCase()
-            if (!seenTitles.has(titleKey)) {
-              seenTitles.add(titleKey)
-              const playLink = buildPlayLink(ctx.mediaServer, m.provider_item_id, 'movie')
-              yearById.set(m.id, m.year)
-              items.push(formatContentItem(m, 'movie', playLink))
-            }
+          if (type === 'movies' || type === 'both') {
+            const { whereClause, values, limitIdx, relevance } = buildWhere(true, pass)
+            const movieResult = await query<MovieResult & { provider_item_id?: string; relevance: number }>(
+              `SELECT id, title, year, genres, overview, ${displayRatingSql()} AS community_rating, poster_url, provider_item_id, directors,
+                      ${relevance} AS relevance
+               FROM movies ${whereClause}
+               ORDER BY relevance DESC, ${sortColumn} ${order} ${nullsOrder} LIMIT $${limitIdx}`,
+              values
+            )
+            for (const row of movieResult.rows) found.push({ row, mediaType: 'movie' })
           }
+
+          if (type === 'series' || type === 'both') {
+            const { whereClause, values, limitIdx, relevance } = buildWhere(false, pass)
+            const seriesResult = await query<SeriesResult & { provider_item_id?: string; relevance: number }>(
+              `SELECT id, title, year, genres, network, overview, ${displayRatingSql()} AS community_rating, poster_url, provider_item_id, directors,
+                      ${relevance} AS relevance
+               FROM series ${whereClause}
+               ORDER BY relevance DESC, ${sortColumn !== 'runtime_minutes' ? sortColumn : displayRatingSql()} ${order} ${nullsOrder} LIMIT $${limitIdx}`,
+              values
+            )
+            for (const row of seriesResult.rows) found.push({ row, mediaType: 'series' })
+          }
+          return found
         }
 
-        if (type === 'series' || type === 'both') {
-          const { whereClause, values, limitIdx } = buildWhere(false)
-          const seriesResult = await query<SeriesResult & { provider_item_id?: string }>(
-            `SELECT id, title, year, genres, network, overview, ${displayRatingSql()} AS community_rating, poster_url, provider_item_id, directors
-             FROM series ${whereClause}
-             ORDER BY ${sortColumn !== 'runtime_minutes' ? sortColumn : displayRatingSql()} ${order} ${nullsOrder} LIMIT $${limitIdx}`,
-            values
-          )
+        const found = await runPass('literal')
+        // Nothing found BY TITLE (perhaps only synopses that use the word): the
+        // name may be misspelled, so look for close spellings too. They rank
+        // above synopsis matches and below any literal title, of which there
+        // is none here.
+        if (searchQuery && !foundByTitle(found.map((f) => f.row.relevance))) {
+          found.push(...(await runPass('close')))
+        }
 
-          for (const s of seriesResult.rows) {
-            const titleKey = s.title.toLowerCase()
-            if (!seenTitles.has(titleKey)) {
-              seenTitles.add(titleKey)
-              const playLink = buildPlayLink(ctx.mediaServer, s.provider_item_id, 'series')
-              yearById.set(s.id, s.year)
-              items.push(formatContentItem(s, 'series', playLink))
-            }
-          }
+        // A named title must not sit below the other media type's synopsis
+        // matches, so with a query the two lists merge by relevance (stable:
+        // movies first on a tie, as before) and the answer keeps the best
+        // `limit` of them. Without one, both lists stand as they were.
+        if (searchQuery) found.sort((a, b) => Number(b.row.relevance) - Number(a.row.relevance))
+        for (const { row, mediaType } of found) {
+          const titleKey = row.title.toLowerCase()
+          if (seenTitles.has(titleKey)) continue
+          seenTitles.add(titleKey)
+          yearById.set(row.id, row.year)
+          items.push(formatContentItem(row, mediaType, buildPlayLink(ctx.mediaServer, row.provider_item_id, mediaType)))
+          if (searchQuery && items.length >= safeLimit) break
         }
 
         if (items.length === 0) {

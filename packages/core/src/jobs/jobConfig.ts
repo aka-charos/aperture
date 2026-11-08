@@ -153,21 +153,25 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
     dayOfWeek?: number
   }
 > = {
-  // === EVERY 30 MINUTES ===
+  // The jobs that read the media server keep off :00 and :30, where sync-users
+  // (every 30 minutes) fires, and off each other's minutes, so a busy hour
+  // never starts them all at once.
+
+  // === EVERY 30 MINUTES (:00 and :30; cron's */30 takes no offset) ===
   'sync-users': { scheduleType: 'interval', hour: 0, minute: 0, intervalMinutes: 30 },
 
-  // === EVERY HOUR (staggered by 15 mins) ===
-  'sync-series-watch-history': { scheduleType: 'interval', hour: 0, minute: 0, intervalHours: 1 },
-  'sync-watching-favorites': { scheduleType: 'interval', hour: 0, minute: 30, intervalHours: 1 },
+  // === EVERY HOUR ===
+  'sync-series-watch-history': { scheduleType: 'interval', hour: 0, minute: 5, intervalHours: 1 },
+  'sync-watching-favorites': { scheduleType: 'interval', hour: 0, minute: 50, intervalHours: 1 },
 
   // === EVERY 2 HOURS ===
-  'sync-movie-watch-history': { scheduleType: 'interval', hour: 0, minute: 0, intervalHours: 2 },
+  'sync-movie-watch-history': { scheduleType: 'interval', hour: 0, minute: 25, intervalHours: 2 },
 
-  // === EVERY 3 HOURS (staggered by 10 mins) ===
-  'sync-movies': { scheduleType: 'interval', hour: 0, minute: 0, intervalHours: 3 },
+  // === EVERY 3 HOURS ===
+  'sync-movies': { scheduleType: 'interval', hour: 0, minute: 40, intervalHours: 3 },
   'sync-series': { scheduleType: 'interval', hour: 0, minute: 10, intervalHours: 3 },
   'sync-movie-libraries': { scheduleType: 'interval', hour: 0, minute: 20, intervalHours: 3 },
-  'sync-series-libraries': { scheduleType: 'interval', hour: 0, minute: 30, intervalHours: 3 },
+  'sync-series-libraries': { scheduleType: 'interval', hour: 0, minute: 35, intervalHours: 3 },
 
   // === EVERY 6 HOURS (staggered by 10 mins) ===
   'enrich-metadata': { scheduleType: 'interval', hour: 0, minute: 0, intervalHours: 6 },
@@ -206,6 +210,7 @@ export const JOB_SCHEDULE_DEFAULTS: Record<
   'full-reset-movie-recommendations': { scheduleType: 'manual', hour: 0, minute: 0 },
   'full-reset-series-recommendations': { scheduleType: 'manual', hour: 0, minute: 0 },
   'refresh-library-gaps': { scheduleType: 'manual', hour: 0, minute: 0 },
+  'refresh-series-gaps': { scheduleType: 'manual', hour: 0, minute: 0 },
   // Deliberately manual: each profile already carries its own
   // refresh_interval_days, so this exists for the one-off sweep after an
   // algorithm change, not as an ongoing schedule.
@@ -231,12 +236,28 @@ const CONFIG_COLUMNS = `job_name, schedule_type, schedule_hour, schedule_minute,
             schedule_day_of_week, schedule_days_of_week, schedule_interval_hours,
             schedule_interval_minutes, max_items_per_run, is_enabled, updated_at`
 
+/**
+ * The minute a stored row runs at. Until now the schedule dialog saved every
+ * interval job with no minute, which ran it at :00 and threw away the seed's
+ * offset, so an INTERVAL row with none takes the seed's and goes back to its
+ * stagger. A time of day with no minute stays :00, as the API documents.
+ */
+export function storedScheduleMinute(
+  jobName: string,
+  scheduleType: string,
+  stored: number | null
+): number | null {
+  if (stored != null) return stored
+  if (scheduleType !== 'interval') return null
+  return JOB_SCHEDULE_DEFAULTS[jobName]?.minute ?? null
+}
+
 function rowToConfig(row: JobConfigRow): JobConfig {
   return {
     jobName: row.job_name,
     scheduleType: row.schedule_type as ScheduleType,
     scheduleHour: row.schedule_hour,
-    scheduleMinute: row.schedule_minute,
+    scheduleMinute: storedScheduleMinute(row.job_name, row.schedule_type, row.schedule_minute),
     scheduleDayOfWeek: row.schedule_day_of_week,
     scheduleDaysOfWeek: row.schedule_days_of_week,
     scheduleIntervalHours: row.schedule_interval_hours,
@@ -514,6 +535,23 @@ export function formatSchedule(config: JobConfig): string {
  * run the job, because skipping on a database hiccup would be indistinguishable
  * from the schedule silently breaking.
  */
+/**
+ * When each named job's last COMPLETED run started: what isScheduledRunDue
+ * reads per job, in one query for a list. A job with no completed run is
+ * absent. Throws on a database failure; a caller showing the answer decides
+ * what to say without it.
+ */
+export async function getLastCompletedRunStarts(jobNames: string[]): Promise<Map<string, Date>> {
+  if (jobNames.length === 0) return new Map()
+  const result = await query<{ job_name: string; started_at: Date }>(
+    `SELECT job_name, MAX(started_at) AS started_at FROM job_runs
+      WHERE job_name = ANY($1::text[]) AND status = 'completed'
+      GROUP BY job_name`,
+    [jobNames]
+  )
+  return new Map(result.rows.map((row) => [row.job_name, row.started_at]))
+}
+
 export async function isScheduledRunDue(
   jobName: string,
   scheduleType: ScheduleType,
@@ -522,15 +560,9 @@ export async function isScheduledRunDue(
   if (scheduleType !== 'biweekly') return { due: true, lastRunAt: null }
 
   try {
-    const lastRun = await queryOne<{ started_at: Date }>(
-      `SELECT started_at FROM job_runs
-        WHERE job_name = $1 AND status = 'completed'
-        ORDER BY started_at DESC
-        LIMIT 1`,
-      [jobName]
-    )
-
-    const lastRunAt = lastRun?.started_at ?? null
+    // The same reader the jobs list predicts the next run with, so the two
+    // can never disagree about which run counts.
+    const lastRunAt = (await getLastCompletedRunStarts([jobName])).get(jobName) ?? null
     return { due: isBiweeklyRunDue(lastRunAt, now), lastRunAt }
   } catch (err) {
     logger.warn({ err, jobName }, 'Could not read job history for biweekly check, running anyway')

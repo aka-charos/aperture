@@ -11,8 +11,12 @@ import {
   getLastJobRuns,
   isLegacyLibraryOutputEnabled,
   legacyJobBlockedReason,
+  getLastCompletedRunStarts,
+  nextScheduledRun,
+  schedulerTimeZone,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
+import { getRegisteredSchedule, isSchedulerReady } from '../../../lib/scheduler.js'
 import { jobSchemas } from '../schemas.js'
 import { jobDefinitions } from '../definitions.js'
 import { activeJobs } from '../state.js'
@@ -37,6 +41,30 @@ export async function registerListHandlers(fastify: FastifyInstance) {
       // Read once for the whole list. The console greys a card on the decided
       // reason rather than holding its own list of which jobs are legacy.
       const legacyOutputEnabled = await isLegacyLibraryOutputEnabled()
+      const now = new Date()
+      const timeZone = schedulerTimeZone()
+
+      // The next run is decided here, in the scheduler's zone, from the
+      // schedule node-cron is actually running (not the saved row, which a
+      // failed refresh can leave unapplied), so the page never works it out.
+      // Before the scheduler has started nothing is registered yet, and the
+      // saved schedule, which it is about to register, stands in.
+      const schedulerReady = isSchedulerReady()
+      const registered = new Map(
+        jobDefinitions.map((def) => [
+          def.name,
+          schedulerReady ? getRegisteredSchedule(def.name) : (configMap.get(def.name) ?? null),
+        ])
+      )
+      // The biweekly rule reads the last COMPLETED run, as the scheduler's
+      // isScheduledRunDue does: one query for every running biweekly job.
+      // Unreadable, it counts as no run, the scheduler's own fail-open.
+      const biweekly = [...registered]
+        .filter(([, schedule]) => schedule?.scheduleType === 'biweekly')
+        .map(([name]) => name)
+      const lastCompleted = await getLastCompletedRunStarts(biweekly).catch(
+        () => new Map<string, Date>()
+      )
 
       const jobs = await Promise.all(
         jobDefinitions.map(async (def) => {
@@ -44,6 +72,14 @@ export async function registerListHandlers(fastify: FastifyInstance) {
           const progress = activeJobId ? getJobProgress(activeJobId) : null
           const config = configMap.get(def.name) || (await getJobConfig(def.name))
           const lastRun = lastRunsMap.get(def.name)
+          const running = registered.get(def.name)
+          const nextRunAt = running
+            ? nextScheduledRun(running, {
+                now,
+                timeZone,
+                lastCompletedAt: lastCompleted.get(def.name) ?? null,
+              })
+            : null
 
           return {
             ...def,
@@ -61,6 +97,9 @@ export async function registerListHandlers(fastify: FastifyInstance) {
                   currentStep: progress.currentStep,
                   itemsProcessed: progress.itemsProcessed,
                   itemsTotal: progress.itemsTotal,
+                  // Waiting for another media-server job's turn: read off the
+                  // live record, the same field the card's stream carries.
+                  queued: progress.queued === true,
                 }
               : null,
             schedule: config
@@ -75,6 +114,8 @@ export async function registerListHandlers(fastify: FastifyInstance) {
                   maxItemsPerRun: config.maxItemsPerRun,
                   isEnabled: config.isEnabled,
                   formatted: formatSchedule(config),
+                  nextRunAt: nextRunAt?.toISOString() ?? null,
+                  timeZone,
                 }
               : null,
             lastRun: lastRun

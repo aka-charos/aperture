@@ -39,6 +39,8 @@ export interface SeerrMediaInfo {
   status4k?: SeerrMediaStatus
   mediaType: 'movie' | 'tv'
   requests?: SeerrMediaRequest[]
+  /** TV only: each season Seerr has a row for. */
+  seasons?: { seasonNumber: number; status: number; status4k?: number }[]
 }
 
 export type SeerrMediaStatus = 
@@ -61,9 +63,11 @@ export interface SeerrMediaRequest {
   createdAt: string
   updatedAt: string
   is4k: boolean
+  /** TV only: the seasons this request asked for. */
+  seasons?: { seasonNumber: number }[]
 }
 
-export type SeerrRequestStatus = 
+export type SeerrRequestStatus =
   | 1 // PENDING
   | 2 // APPROVED
   | 3 // DECLINED

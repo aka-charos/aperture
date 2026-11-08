@@ -67,3 +67,10 @@ test('partially_available is not treated as available', () => {
     'approved'
   )
 })
+
+test('a completed request is available even while the show is only partly available', () => {
+  assert.equal(
+    resolveRequestStatus('approved', { status: 'completed', mediaStatus: 'partially_available' }),
+    'available'
+  )
+})

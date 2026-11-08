@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Alert,
+  Button,
   Box,
   CircularProgress,
   FormControl,
@@ -109,8 +110,16 @@ export function BrowsePeopleTab({ viewMode, people }: BrowsePeopleTabProps) {
         </Box>
       </Box>
 
-      {people.peopleError && (
-        <Alert severity="error" sx={{ mb: 4 }}>
+      {people.peopleError && !people.peopleErrorAtEnd && (
+        <Alert
+          severity="error"
+          sx={{ mb: 4 }}
+          action={
+            <Button color="inherit" size="small" onClick={people.retryPeople}>
+              {t('browse.errors.retry')}
+            </Button>
+          }
+        >
           {people.peopleError}
         </Alert>
       )}
@@ -118,11 +127,13 @@ export function BrowsePeopleTab({ viewMode, people }: BrowsePeopleTabProps) {
       {people.peopleLoading ? (
         renderPeopleSkeleton(viewMode)
       ) : people.people.length === 0 ? (
-        <Typography color="text.secondary">
-          {people.peopleSearch
-            ? t('browse.empty.peopleFiltered')
-            : t('browse.empty.peopleNoSync')}
-        </Typography>
+        people.peopleError ? null : (
+          <Typography color="text.secondary">
+            {people.peopleSearch
+              ? t('browse.empty.peopleFiltered')
+              : t('browse.empty.peopleNoSync')}
+          </Typography>
+        )
       ) : (
         <>
           {viewMode === 'grid' ? (
@@ -156,6 +167,19 @@ export function BrowsePeopleTab({ viewMode, people }: BrowsePeopleTabProps) {
             py={4}
           >
             {people.peopleLoadingMore && <CircularProgress size={32} />}
+            {people.peopleErrorAtEnd && (
+              <Alert
+                severity="error"
+                sx={{ width: '100%' }}
+                action={
+                  <Button color="inherit" size="small" onClick={people.retryPeople}>
+                    {t('browse.errors.retry')}
+                  </Button>
+                }
+              >
+                {people.peopleError}
+              </Alert>
+            )}
             {!people.peopleHasMore && people.people.length > 0 && (
               <Typography variant="body2" color="text.secondary">
                 {t('browse.loadMore.allPeople', {

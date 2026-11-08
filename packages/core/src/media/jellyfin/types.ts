@@ -30,7 +30,10 @@ export interface JellyfinUser {
 }
 
 export interface JellyfinLibrary {
-  Id: string
+  /** Item id of the library; what /Library/VirtualFolders actually returns */
+  ItemId?: string
+  /** Not returned by /Library/VirtualFolders; kept as a fallback */
+  Id?: string
   Guid?: string
   Name: string
   CollectionType: string
@@ -83,6 +86,12 @@ export interface JellyfinItem {
     Container: string
     Size?: number
     Bitrate?: number
+    MediaStreams?: Array<{
+      Type: string // Video, Audio, Subtitle
+      Codec?: string
+      Width?: number
+      Height?: number
+    }>
   }>
   ImageTags?: {
     Primary?: string
@@ -107,6 +116,7 @@ export interface JellyfinEpisode extends JellyfinItem {
   SeriesName: string
   ParentIndexNumber?: number // Season number
   IndexNumber?: number // Episode number
+  IndexNumberEnd?: number // Last episode number of a multi-episode file
 }
 
 export interface JellyfinItemsResponse {

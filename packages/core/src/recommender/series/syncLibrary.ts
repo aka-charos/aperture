@@ -13,6 +13,7 @@ import {
 import { randomUUID } from 'crypto'
 import type { Episode } from '../../media/types.js'
 import { fetchParallel, streamingBatchProcess } from '../shared/syncHelpers.js'
+import { fetchPageShrinking } from '../shared/pageShrinking.js'
 import { clampMaxCandidatesToLibrary } from '../../lib/recommendationConfig.js'
 import {
   SERIES_PAGE_SIZE,
@@ -24,7 +25,7 @@ import type { SyncSeriesResult, LibrarySeriesSyncResult, PreparedSeries, Prepare
 import { reconcileRemovedSeries } from './reconcile.js'
 import { processSeriesBatch } from './seriesBatch.js'
 import { buildRebindIndex, type TitleYearRow } from '../shared/titleYearRebind.js'
-import { processEpisodeBatch } from './episodeBatch.js'
+import { processEpisodeBatch, settleRekeyedEpisodes } from './episodeBatch.js'
 
 export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResult> {
   const jobId = existingJobId || randomUUID()
@@ -345,23 +346,36 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         `📂 Processing ${episodeCount} episodes from library${libraryId ? ` ${libraryId}` : ''} (streaming)...`
       )
 
+      // New media-server ids at numbers the library holds: settled once this
+      // library's listing is read in full (episodeBatch.ts settleRekeyedEpisodes).
+      const rekeyedEpisodes: PreparedEpisode[] = []
       let lastLogTime = Date.now()
       // Track base counts for this library (to accumulate across multiple libraries)
       const baseProcessed = processedEpisodes
       const baseAdded = episodesAdded
       const baseUpdated = episodesUpdated
 
+      const parentIds = libraryId ? [libraryId] : undefined
+      const libraryLabel = libraryId ? `library ${libraryId}` : 'all libraries'
+      const episodePage = { pageSize: EPISODE_PAGE_SIZE }
+
       // Use streaming batch processing to avoid memory issues with large libraries
       const streamResult = await streamingBatchProcess<Episode>(
         // Fetch function
-        (startIndex, limit) =>
-          provider.getEpisodes(apiKey, {
+        (startIndex) =>
+          fetchPageShrinking(
+            (start, limit) => provider.getEpisodes(apiKey, { startIndex: start, limit, parentIds }),
             startIndex,
-            limit,
-            parentIds: libraryId ? [libraryId] : undefined,
-          }),
+            episodePage,
+            libraryLabel,
+            ({ limit, nextLimit, status, serverException }) =>
+              addLog(
+                jobId,
+                'warn',
+                `The media server answered HTTP ${status}${serverException ? ` (${serverException})` : ''} for ${limit} episodes at offset ${startIndex} of ${libraryLabel}. Retrying with ${nextLimit}.`
+              )
+          ),
         episodeCount,
-        EPISODE_PAGE_SIZE,
         // Process batch function - prepares and inserts episodes
         async (episodes) => {
           for (const episode of episodes) {
@@ -405,6 +419,7 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
             const result = await processEpisodeBatch(batch, existingEpisodeIds, existingEpisodeKeys)
             batchAdded += result.added
             batchUpdated += result.updated
+            rekeyedEpisodes.push(...result.rekeyed)
           }
 
           return { added: batchAdded, updated: batchUpdated }
@@ -441,6 +456,19 @@ export async function syncSeries(existingJobId?: string): Promise<SyncSeriesResu
         'info',
         `✅ Library complete: ${streamResult.totalProcessed} episodes (${streamResult.totalAdded} new, ${streamResult.totalUpdated} updated)`
       )
+
+      const { rebound, widened } = await settleRekeyedEpisodes(rekeyedEpisodes, {
+        expected: libraryResult.expectedEpisodeCount,
+        fetched: libraryResult.fetchedEpisodeCount,
+        seen: libraryResult.seenEpisodeProviderIds,
+      })
+      if (rebound > 0 || widened > 0) {
+        addLog(
+          jobId,
+          'info',
+          `🔁 ${rebound} episode(s) moved onto a new media-server id, ${widened} widened by a second version (${libraryLabel})`
+        )
+      }
     }
 
     const { seriesRemoved, episodesRemoved } = await reconcileRemovedSeries(jobId, librarySyncResults)

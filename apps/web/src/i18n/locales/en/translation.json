@@ -7,6 +7,7 @@
       "hrMin": "{{hr}}h {{min}}m"
     },
     "appName": "{{appName}}",
+    "databaseRestoring": "The database is being restored. This page continues by itself when it finishes.",
     "save": "Save",
     "loading": "Loading…",
     "cancel": "Cancel",
@@ -107,12 +108,19 @@
     },
     "gaps": {
       "pageTitle": "Gap Analysis",
-      "pageSubtitle": "Compare TMDB movie collections against your synced library to find missing titles. Requests via Seerr are never automatic — you choose what to request.",
+      "pageSubtitle": "Compare TMDB movie collections and aired TV seasons against your synced library to find what is missing. Requests via Seerr are never automatic — you choose what to request.",
       "errorLoadGapAnalysis": "Failed to load gap analysis",
       "errorFailedToLoad": "Failed to load",
       "errorLoadDetails": "Failed to load details",
       "errorRequestFailed": "Request failed",
       "errorRefreshFailed": "Refresh failed",
+      "scanFailed": "The last scan failed. Any results shown are from the scan before it. {{detail}}",
+      "failureReason": {
+        "interrupted": "The app restarted while it was running.",
+        "tmdbSilent": "TMDb stopped answering. Check the API key and try again.",
+        "tmdbPartial": "TMDb answered too little of the scan to replace these results. Try again later."
+      },
+      "scanInProgressKeeping": "Scan in progress. These are the last results until it finishes.",
       "seerrRequested": "Requested",
       "seerrProcessing": "Processing",
       "seerrAvailable": "Available",
@@ -181,7 +189,67 @@
       "dialogRequestTitle": "Request via Seerr?",
       "dialogBulkBody": "This will send {{count}} request(s) to Seerr using your linked account (Radarr options already chosen). You can track them under My Requests.",
       "moviesCount": "{{count}} movies",
-      "selectedTitles": "{{count}} selected titles"
+      "selectedTitles": "{{count}} selected titles",
+      "tabMovies": "Movies",
+      "tabTv": "TV shows",
+      "series": {
+        "selectShowAria": "Select the seasons of {{name}}",
+        "expandAria": "Show every season of {{name}}",
+        "numberingChip": "Season numbering differs from TMDb",
+        "numberingExplained": "The library and TMDb number this show's seasons differently, so these figures can't be read as gaps. Nothing here is offered for request.",
+        "missingSeasons_one": "Missing season: {{list}}",
+        "missingSeasons_other": "Missing seasons: {{list}}",
+        "partialSeasons_one": "Partly held season: {{list}}",
+        "partialSeasons_other": "Partly held seasons: {{list}}",
+        "partialEntry": "{{season}} ({{held}} of {{aired}})",
+        "seasonsOwned": "{{owned}} of {{total}} seasons",
+        "requestSeasons_one": "Request {{count}} season",
+        "requestSeasons_other": "Request {{count}} seasons",
+        "seasonLabel": "Season {{number}}",
+        "episodesHeld": "{{held}} of {{aired}} episodes",
+        "inSeerrChip": "In Seerr",
+        "requestTitle_one": "{{name}}: season {{seasons}}",
+        "requestTitle_other": "{{name}}: seasons {{seasons}}",
+        "airedOrder": "Every season that has aired, in order",
+        "openShow": "Open show",
+        "tmdbMissing": "TMDb isn't configured, so aired seasons can't be looked up.",
+        "noShows": "No show in the library has a TMDb id yet. Run the TV sync first.",
+        "seerrMissing": "Seerr isn't configured, so missing seasons are listed but can't be requested.",
+        "scanInProgress": "Scan in progress — figures update as each batch of shows finishes.",
+        "noRunYet": "No run yet. Start an analysis to compare your shows with the seasons TMDb says have aired.",
+        "staleEpisodes_one": "{{episodes}} episode has been added or changed in the library since this scan. Run the analysis again to include it.",
+        "staleEpisodes_other": "{{episodes}} episodes have been added or changed in the library since this scan. Run the analysis again to include them.",
+        "statShows": "Shows with gaps",
+        "statMissing": "Missing seasons",
+        "statMissingDetail": "Aired, no episode in the library or Seerr",
+        "statPartial": "Partly held seasons",
+        "statPartialDetail": "Aired, only some episodes in the library",
+        "statCoverage": "Aired seasons in library",
+        "progressShows": "{{processed}} / {{total}} shows",
+        "lookupsFailed_one": "TMDb didn't answer for {{shows}} show",
+        "lookupsFailed_other": "TMDb didn't answer for {{shows}} shows",
+        "notOnTmdb_one": "{{shows}} show isn't on TMDb",
+        "notOnTmdb_other": "{{shows}} shows aren't on TMDb",
+        "withoutTmdbId_one": "{{shows}} show has no TMDb id",
+        "withoutTmdbId_other": "{{shows}} shows have no TMDb id",
+        "searchLabel": "Search shows",
+        "networkFilter": "Network",
+        "noNetwork": "No network listed",
+        "noNetworks": "No networks",
+        "kindFilter": "Seasons",
+        "kindMissing": "Missing entirely",
+        "kindPartial": "Partly held",
+        "kindBoth": "Missing or partly held",
+        "kindNumbering": "Numbering differs ({{count}})",
+        "selectShownAria": "Select every season shown",
+        "showingShows_one": "Showing {{shown}} of {{total}} show",
+        "showingShows_other": "Showing {{shown}} of {{total}} shows",
+        "seasonsInView_one": "{{seasons}} season",
+        "seasonsInView_other": "{{seasons}} seasons",
+        "noGaps": "Every show in this snapshot has all its aired seasons, or the rest are already in Seerr.",
+        "noMatches": "No shows match these filters.",
+        "dialogBulkBody": "This will send requests for {{count}} shows to Seerr using your linked account (Sonarr options already chosen). You can track them under My Requests."
+      }
     },
     "translationsPage": {
       "title": "Translations",
@@ -689,6 +757,13 @@
         "configInterval": "Interval",
         "configManualOnlyOption": "Manual only",
         "configTime": "Time",
+        "configMinute": "Minute",
+        "queued": "Queued",
+        "queuedTooltip": "Waiting for another job that works the media server to finish. Jobs like this take turns so the server is not asked for everything at once.",
+        "configMinuteHint": "Minutes past the hour, 0 to 59.",
+        "configMinuteInvalid": "Enter a minute from 0 to 59.",
+        "configTimeZone": "Times are in the server's time zone: {{timeZone}}",
+        "configPreviewIntervalAt": "{{interval}} at :{{minute}}",
         "configDayOfWeek": "Day of week",
         "configDaysOfWeek": "Days of week",
         "configDaysOfWeekHint": "Pick one or more days. The job runs at the same time on each.",
@@ -736,10 +811,6 @@
         "weekdayShortThu": "Thu",
         "weekdayShortFri": "Fri",
         "weekdayShortSat": "Sat",
-        "hour12am": "12:00 AM",
-        "hour12pm": "12:00 PM",
-        "hourAm": "{{hour}}:00 AM",
-        "hourPm": "{{hour}}:00 PM",
         "configRunLimit_translations": "Translations per run",
         "configRunLimitHint_translations": "The most title × language pairs one run will attempt, scheduled or manual. Each pair is one or two short model calls. Leave blank for the default ({{default}}).",
         "runLimitCaption_translations_one": "Up to {{count}} translation per run",
@@ -1002,7 +1073,7 @@
     },
     "gapAnalysis": {
       "title": "Gap analysis",
-      "blurb": "Collections and franchises your library is missing"
+      "blurb": "Franchise films and TV seasons your library is missing"
     },
     "tmdb": {
       "title": "TMDB",
@@ -2160,7 +2231,9 @@
     "noResultsHint": "Try adjusting your filters or search terms",
     "foundResults_one": "Found {{count}} result for \"{{query}}\"",
     "foundResults_other": "Found {{count}} results for \"{{query}}\"",
-    "semanticSuffix": " (with AI-powered semantic matching)"
+    "semanticSuffix": " (with AI-powered semantic matching)",
+    "semanticPendingSuffix": " (title matches; AI matching is on its way)",
+    "semanticFailed": "AI matching is not available right now, so these are title matches only."
   },
   "filterPopper": {
     "filters": "Filters",
@@ -2781,12 +2854,14 @@
     "chipGzip": "gzip",
     "now": "Now",
     "tooltipBackupComplete": "Backup complete",
+    "tooltipCutOff": "This upload was cut off at the old 10 MB limit, so it can't be restored. Upload it again and delete this copy.",
+    "uploadRefusedByProxy": "The upload was refused before it reached the app (HTTP {{status}}). A reverse proxy in front of the app may limit upload size.",
     "tooltipRestore": "Restore",
     "tooltipDownload": "Download",
     "tooltipDelete": "Delete",
     "restoreDialogTitle": "Restore Database",
     "restoreWarningTitle": "Warning:",
-    "restoreWarningBody": "This will replace all current data with the backup. A pre-restore backup will be created automatically.",
+    "restoreWarningBody": "This will replace all current data with the backup. A safety backup of the current data is taken first unless you skip it below, and the restore stops if that backup fails.",
     "restoreFrom": "You are about to restore from: {{filename}}",
     "restoreConfirmPrompt": "To confirm, type {{word}} below:",
     "restorePlaceholder": "Type RESTORE to confirm",
@@ -2794,7 +2869,20 @@
     "restoreButton": "Restore Database",
     "uploadSuccess": "Backup uploaded: {{filename}} ({{size}})",
     "configSaved": "Backup configuration saved",
-    "sessionExpired": "Session expired. Please refresh and try again."
+    "sessionExpired": "Session expired. Please refresh and try again.",
+    "operationFailed": "Operation failed",
+    "backupCompleteIn": "Backup created: {{filename}} ({{seconds}}s)",
+    "restoreCompleteIn": "Database restored ({{seconds}}s)",
+    "restoreCompleteNext": "Reload to continue. Sessions came from the backup too, so you may need to sign in again.",
+    "reloadAfterRestore": "Reload",
+    "restoreInProgressNotice": "A restore can take several minutes on a large database, and the app is unavailable to everyone until it finishes. Keep this page open. If it fails, the data stays as it was.",
+    "restoreSignsYouOut": "The app is unavailable while the restore runs. Sessions come from the backup too, so you may need to sign in again afterwards. The restore also needs free disk space in the backup folder for the expanded data.",
+    "skipPreRestoreBackup": "Skip the safety backup",
+    "skipPreRestoreBackupHelp": "On a large database the safety backup roughly doubles the wait. Skip it only if you already have a recent copy.",
+    "trackingLost": "This page lost track of the job because the server no longer has a record of it. The server may have restarted. Check the backup list and the server log to see how it ended.",
+    "restoreRunningElsewhere": "A database restore is running, so this page can't load until it finishes.",
+    "contactLost": "The server hasn't answered for over a minute, so this page can't tell how the job is going. It may still be running. This page keeps asking and will show how it ended.",
+    "finishedWhileAway": "A restore you started ended while you were away from this page, and the server no longer has its result. If you're asked to sign in again or your data has changed, it worked. Otherwise it failed and nothing was replaced, and the server log says why."
   },
   "settingsTmdb": {
     "title": "TMDb Integration",
@@ -4730,7 +4818,11 @@
     "errorConversationLoad": "Couldn't load the conversation. Please try again.",
     "errorConversationDelete": "Couldn't delete the conversation. Please try again.",
     "errorConversationRename": "Couldn't rename the conversation. Please try again.",
-    "errorMessagesSave": "Your latest messages couldn't be saved — they may be missing when you reopen this conversation."
+    "errorMessagesSave": "Your latest messages couldn't be saved — they may be missing when you reopen this conversation.",
+    "nextReplies": {
+      "label": "Suggested replies",
+      "hint": "Puts this in the message box, ready to edit or send"
+    }
   },
   "impersonation": {
     "bannerViewingAs": "Viewing as {{name}}",
@@ -5208,6 +5300,8 @@
     "typeMovie": "Movie",
     "typeSeries": "Series",
     "seerrRequest": "Seerr request #{{id}}",
+    "seasons_one": "Season {{list}}",
+    "seasons_other": "Seasons {{list}}",
     "openInLibrary": "Open in library",
     "details": "Details",
     "empty": "No requests yet. When you request titles from Discovery, they will appear here.",
@@ -5420,7 +5514,8 @@
       "loadMovies": "Failed to load movies",
       "loadSeries": "Failed to load series",
       "loadPeople": "Failed to load people",
-      "connect": "Could not connect to server"
+      "connect": "Could not connect to server",
+      "retry": "Try again"
     },
     "empty": {
       "moviesFiltered": "No movies match your filters.",
@@ -5550,7 +5645,9 @@
       "notFound": "Franchise not found"
     },
     "overviewMore": "more",
-    "overviewLess": "less"
+    "overviewLess": "less",
+    "viewGrid": "Grid view",
+    "viewList": "List view"
   },
   "channels": {
     "title": "Channels",
@@ -5684,7 +5781,11 @@
     "noEpisodeData": "No episode data available",
     "checkBackSoon": "Check back soon",
     "seriesComplete": "Series Complete",
-    "episodesTotal": "{{count}} episodes"
+    "episodesTotal": "{{count}} episodes",
+    "homeRowDynamicTitle": "Show these on your Emby Home screen",
+    "homeRowDynamicBody": "Your tracked series are favorited on Emby. To get a Home row for them, add a Home row with Dynamic Content: choose your TV Series libraries, sort by Date last content added (Descending), set Playstate to Unplayed, and turn Favorite on.",
+    "homeRowFavoritesTabTitle": "Find these on your Jellyfin Favorites tab",
+    "homeRowFavoritesTabBody": "Your tracked series are favorited on Jellyfin. Jellyfin's Home screen can't show a filtered row, so open the Favorites tab on the Jellyfin home page, or use the Favorites filter inside a TV library."
   },
   "setup": {
     "step": {
@@ -5820,6 +5921,8 @@
       "errLoad": "Failed to load available backups",
       "errUpload": "Failed to upload backup",
       "errRestore": "Failed to restore backup",
+      "cutOff": "Cut off",
+      "uploadRefusedByProxy": "The upload was refused before it reached the app (HTTP {{status}}). A reverse proxy in front of the app may limit upload size.",
       "successUpload": "Backup uploaded: {{filename}} ({{size}})",
       "successRestored": "Database restored successfully! The page will reload in 3 seconds to complete the restore process.",
       "confirmWord": "RESTORE",
@@ -7164,5 +7267,9 @@
       "unavailable": "Your server is not sending newsletters at the moment.",
       "error": "Could not save your choice."
     }
+  },
+  "mediaServerTypeMismatch": {
+    "message": "This server identifies itself as {{detected}}, but {{appName}} is set to {{selected}}. Features that differ between the two servers will not behave correctly.",
+    "useDetected": "Switch to {{detected}}"
   }
 }

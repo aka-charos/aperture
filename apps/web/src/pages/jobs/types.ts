@@ -20,6 +20,13 @@ export interface JobSchedule {
   maxItemsPerRun?: number | null
   isEnabled: boolean
   formatted: string
+  /**
+   * When the scheduler next runs the job, decided server-side in its own time
+   * zone. Null for manual or switched off; absent on older API builds.
+   */
+  nextRunAt?: string | null
+  /** The zone the schedule's times are read in (the container's TZ). */
+  timeZone?: string
 }
 
 /**
@@ -53,6 +60,8 @@ export interface JobProgress {
   logs: LogEntry[]
   error?: string
   result?: Record<string, unknown>
+  /** Waiting its turn behind another media-server job (set on the live record). */
+  queued?: boolean
 }
 
 export interface JobLastRun {
@@ -91,6 +100,8 @@ export interface Job {
     currentStep: string
     itemsProcessed: number
     itemsTotal: number
+    /** Waiting its turn behind another media-server job, decided by the API. */
+    queued?: boolean
   }
   schedule?: JobSchedule | null
   lastRun?: JobLastRun | null

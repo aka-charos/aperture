@@ -27,7 +27,7 @@ export interface ServerOptions {
   loggerInstance?: FastifyBaseLogger
 }
 
-/** Ceiling for any multipart upload; individual routes may cap lower. */
+/** Ceiling for a multipart upload unless its route sets another; backups do (`BACKUP_UPLOAD_MAX_BYTES`). */
 const MAX_UPLOAD_FILE_SIZE = 10 * 1024 * 1024
 
 function fromContainerProbe(request: FastifyRequest): boolean {
@@ -175,7 +175,8 @@ export async function buildServer(options: ServerOptions = {}): Promise<any> {
   // the image routes, which left every multipart POST under /api/backup and
   // /api/setup/backup failing with 415 before the handler ever ran.
   //
-  // Routes needing a tighter bound pass their own `limits` to `request.file()`.
+  // Routes needing another bound pass their own `limits` to `request.file()`. Over
+  // the bound the stream ends early with no error: read `file.truncated`.
   await fastify.register(multipart, {
     limits: {
       fileSize: MAX_UPLOAD_FILE_SIZE,

@@ -156,7 +156,8 @@ export async function getCollectionDataCached(
 }
 
 /**
- * Fetch from TMDb and persist to cache (gap analysis pipeline).
+ * Fetch from TMDb and persist to cache. The gap scan needs to tell a failed request
+ * from a collection TMDb lacks, so it uses `lookupCollectionData` instead.
  */
 export async function fetchCollectionDataAndCache(
   collectionId: number,

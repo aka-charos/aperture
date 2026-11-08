@@ -133,6 +133,8 @@
       "errLoad": "Αποτυχία φόρτωσης διαθέσιμων αντιγράφων ασφαλείας",
       "errUpload": "Αποτυχία μεταφόρτωσης αντιγράφου ασφαλείας",
       "errRestore": "Αποτυχία επαναφοράς αντιγράφου ασφαλείας",
+      "cutOff": "Κομμένο",
+      "uploadRefusedByProxy": "Η αποστολή απορρίφθηκε πριν φτάσει στην εφαρμογή (HTTP {{status}}). Ένας αντίστροφος διακομιστής μεσολάβησης μπροστά από την εφαρμογή ίσως περιορίζει το μέγεθος αποστολής.",
       "successUpload": "Το αντίγραφο ασφαλείας μεταφορτώθηκε: {{filename}} ({{size}})",
       "successRestored": "Η βάση δεδομένων επαναφέρθηκε με επιτυχία! Η σελίδα θα φορτωθεί ξανά σε 3 δευτερόλεπτα για να ολοκληρωθεί η διαδικασία επαναφοράς.",
       "confirmWord": "ΕΠΑΝΑΦΟΡΑ",
@@ -602,6 +604,8 @@
     "typeMovie": "Ταινία",
     "typeSeries": "Σειρά",
     "seerrRequest": "Αίτημα Seerr #{{id}}",
+    "seasons_one": "Σεζόν {{list}}",
+    "seasons_other": "Σεζόν {{list}}",
     "openInLibrary": "Άνοιγμα στη βιβλιοθήκη",
     "details": "Λεπτομέρειες",
     "empty": "Δεν έχετε αιτήματα ακόμη. Όσα ζητάτε από την Ανακάλυψη θα εμφανίζονται εδώ.",
@@ -1075,6 +1079,7 @@
       "hrMin": "{{hr}}ώ {{min}}λ"
     },
     "appName": "{{appName}}",
+    "databaseRestoring": "Γίνεται επαναφορά της βάσης δεδομένων. Η σελίδα θα συνεχίσει μόνη της μόλις ολοκληρωθεί.",
     "save": "Αποθήκευση",
     "loading": "Φόρτωση…",
     "cancel": "Άκυρο",
@@ -1433,7 +1438,11 @@
     "threadCrashBody": "Κάτι πήγε στραβά στην εμφάνιση της απάντησης. Η συζήτησή σας έχει αποθηκευτεί — δοκιμάστε ξανά ή ανανεώστε τη σελίδα αν συνεχιστεί.",
     "threadCrashRetry": "Δοκιμάστε ξανά",
     "renameChat": "Μετονομασία συζήτησης",
-    "deleteChat": "Διαγραφή συζήτησης"
+    "deleteChat": "Διαγραφή συζήτησης",
+    "nextReplies": {
+      "label": "Προτεινόμενες απαντήσεις",
+      "hint": "Το βάζει στο πλαίσιο μηνύματος, έτοιμο για επεξεργασία ή αποστολή"
+    }
   },
   "settingsMediaServer": {
     "title": "Διακομιστής πολυμέσων",
@@ -1651,7 +1660,8 @@
       "loadMovies": "Οι ταινίες δεν φορτώθηκαν",
       "loadSeries": "Οι σειρές δεν φορτώθηκαν",
       "loadPeople": "Οι συντελεστές δεν φορτώθηκαν",
-      "connect": "Δεν ήταν δυνατή η σύνδεση με τον διακομιστή"
+      "connect": "Δεν ήταν δυνατή η σύνδεση με τον διακομιστή",
+      "retry": "Δοκιμάστε ξανά"
     },
     "empty": {
       "moviesFiltered": "Καμία ταινία δεν ταιριάζει με τα φίλτρα σας.",
@@ -1781,7 +1791,9 @@
       "notFound": "Το franchise δεν βρέθηκε"
     },
     "overviewMore": "περισσότερα",
-    "overviewLess": "λιγότερα"
+    "overviewLess": "λιγότερα",
+    "viewGrid": "Προβολή πλέγματος",
+    "viewList": "Προβολή λίστας"
   },
   "settingsRecAlgo": {
     "title": "Αλγόριθμος Συστάσεων",
@@ -2502,7 +2514,11 @@
     "episodesTotal": "{{count}} επεισόδια",
     "removeConfirmTitle": "Να αφαιρεθεί από τη λίστα σας;",
     "removeConfirmBody": "Το «{{title}}» θα αφαιρεθεί από τη λίστα σας. Επειδή η λίστα συγχρονίζεται με τα αγαπημένα του media server σας, θα αφαιρεθεί και από τα αγαπημένα σας στο Emby/Jellyfin.",
-    "removeConfirmAction": "Αφαίρεση"
+    "removeConfirmAction": "Αφαίρεση",
+    "homeRowDynamicTitle": "Show these on your Emby Home screen",
+    "homeRowDynamicBody": "Your tracked series are favorited on Emby. To get a Home row for them, add a Home row with Dynamic Content: choose your TV Series libraries, sort by Date last content added (Descending), set Playstate to Unplayed, and turn Favorite on.",
+    "homeRowFavoritesTabTitle": "Find these on your Jellyfin Favorites tab",
+    "homeRowFavoritesTabBody": "Your tracked series are favorited on Jellyfin. Jellyfin's Home screen can't show a filtered row, so open the Favorites tab on the Jellyfin home page, or use the Favorites filter inside a TV library."
   },
   "settingsBackup": {
     "title": "Δημιουργία & Επαναφορά Αντιγράφων Ασφαλείας",
@@ -2538,12 +2554,14 @@
     "chipGzip": "gzip",
     "now": "Τώρα",
     "tooltipBackupComplete": "Το αντίγραφο ασφαλείας ολοκληρώθηκε",
+    "tooltipCutOff": "Αυτό το αρχείο κόπηκε στο παλιό όριο των 10 MB, οπότε δεν μπορεί να γίνει επαναφορά του. Ανεβάστε το ξανά και διαγράψτε αυτό το αντίγραφο.",
+    "uploadRefusedByProxy": "Η αποστολή απορρίφθηκε πριν φτάσει στην εφαρμογή (HTTP {{status}}). Ένας αντίστροφος διακομιστής μεσολάβησης μπροστά από την εφαρμογή ίσως περιορίζει το μέγεθος αποστολής.",
     "tooltipRestore": "Επαναφορά",
     "tooltipDownload": "Λήψη",
     "tooltipDelete": "Διαγραφή",
     "restoreDialogTitle": "Επαναφορά Βάσης Δεδομένων",
     "restoreWarningTitle": "Προσοχή:",
-    "restoreWarningBody": "Αυτό θα αντικαταστήσει όλα τα τρέχοντα δεδομένα με το αντίγραφο ασφαλείας. Θα δημιουργηθεί αυτόματα ένα αντίγραφο πριν από την επαναφορά.",
+    "restoreWarningBody": "Αυτό θα αντικαταστήσει όλα τα τρέχοντα δεδομένα με το αντίγραφο ασφαλείας. Πρώτα δημιουργείται αντίγραφο των τρεχόντων δεδομένων, εκτός αν το παραλείψετε παρακάτω, και η επαναφορά σταματά αν αυτό αποτύχει.",
     "restoreFrom": "Πρόκειται να γίνει επαναφορά από: {{filename}}",
     "restoreConfirmPrompt": "Για επιβεβαίωση, πληκτρολογήστε {{word}} παρακάτω:",
     "restorePlaceholder": "Πληκτρολογήστε RESTORE για επιβεβαίωση",
@@ -2551,7 +2569,20 @@
     "restoreButton": "Επαναφορά Βάσης Δεδομένων",
     "uploadSuccess": "Το αντίγραφο ασφαλείας μεταφορτώθηκε: {{filename}} ({{size}})",
     "configSaved": "Η ρύθμιση αντιγράφων ασφαλείας αποθηκεύτηκε",
-    "sessionExpired": "Η συνεδρία έληξε. Ανανεώστε τη σελίδα και δοκιμάστε ξανά."
+    "sessionExpired": "Η συνεδρία έληξε. Ανανεώστε τη σελίδα και δοκιμάστε ξανά.",
+    "operationFailed": "Η ενέργεια απέτυχε",
+    "backupCompleteIn": "Το αντίγραφο ασφαλείας δημιουργήθηκε: {{filename}} ({{seconds}} δ)",
+    "restoreCompleteIn": "Η βάση δεδομένων επαναφέρθηκε ({{seconds}} δ)",
+    "restoreCompleteNext": "Ανανεώστε τη σελίδα για να συνεχίσετε. Οι συνεδρίες προέρχονται κι αυτές από το αντίγραφο, οπότε ίσως χρειαστεί να συνδεθείτε ξανά.",
+    "reloadAfterRestore": "Ανανέωση",
+    "restoreInProgressNotice": "Σε μεγάλη βάση δεδομένων η επαναφορά μπορεί να διαρκέσει αρκετά λεπτά, και η εφαρμογή δεν είναι διαθέσιμη σε κανέναν μέχρι να τελειώσει. Κρατήστε αυτή τη σελίδα ανοιχτή. Αν αποτύχει, τα δεδομένα μένουν ως είχαν.",
+    "restoreSignsYouOut": "Η εφαρμογή δεν είναι διαθέσιμη όσο τρέχει η επαναφορά. Οι συνεδρίες προέρχονται κι αυτές από το αντίγραφο, οπότε ίσως χρειαστεί να συνδεθείτε ξανά μετά. Η επαναφορά χρειάζεται επίσης ελεύθερο χώρο στον φάκελο των αντιγράφων για τα αποσυμπιεσμένα δεδομένα.",
+    "skipPreRestoreBackup": "Παράλειψη του αντιγράφου ασφαλείας",
+    "skipPreRestoreBackupHelp": "Σε μεγάλη βάση δεδομένων το αντίγραφο περίπου διπλασιάζει την αναμονή. Παραλείψτε το μόνο αν έχετε ήδη πρόσφατο αντίγραφο.",
+    "trackingLost": "Η σελίδα έχασε την παρακολούθηση της εργασίας, επειδή ο διακομιστής δεν έχει πλέον εγγραφή της. Ίσως έγινε επανεκκίνηση. Δείτε τη λίστα αντιγράφων και το αρχείο καταγραφής του διακομιστή για να μάθετε πώς τελείωσε.",
+    "restoreRunningElsewhere": "Εκτελείται επαναφορά της βάσης δεδομένων, οπότε η σελίδα δεν μπορεί να φορτώσει μέχρι να ολοκληρωθεί.",
+    "contactLost": "Ο διακομιστής δεν έχει απαντήσει για πάνω από ένα λεπτό, οπότε η σελίδα δεν μπορεί να δείξει πώς πάει η εργασία. Ίσως εκτελείται ακόμη. Η σελίδα συνεχίζει να ρωτά και θα δείξει πώς τελείωσε.",
+    "finishedWhileAway": "Μια επαναφορά που ξεκινήσατε τελείωσε ενώ λείπατε από αυτή τη σελίδα, και ο διακομιστής δεν έχει πλέον το αποτέλεσμά της. Αν σας ζητηθεί να συνδεθείτε ξανά ή τα δεδομένα σας έχουν αλλάξει, πέτυχε. Αλλιώς απέτυχε χωρίς να αντικατασταθεί τίποτα, και το αρχείο καταγραφής του διακομιστή εξηγεί τον λόγο."
   },
   "welcomeModal": {
     "title": "Καλώς ήρθατε στο {{appName}}",
@@ -4196,7 +4227,9 @@
     "noResultsHint": "Δοκιμάστε να αλλάξετε τα φίλτρα ή τους όρους αναζήτησης",
     "foundResults_one": "{{count}} αποτέλεσμα για «{{query}}»",
     "foundResults_other": "{{count}} αποτελέσματα για «{{query}}»",
-    "semanticSuffix": " (με αναζήτηση νοήματος από το AI)"
+    "semanticSuffix": " (με αναζήτηση νοήματος από το AI)",
+    "semanticPendingSuffix": " (αντιστοιχίες τίτλου· η αναζήτηση νοήματος από το AI έρχεται)",
+    "semanticFailed": "Η αναζήτηση νοήματος από το AI δεν είναι διαθέσιμη αυτή τη στιγμή, οπότε εμφανίζονται μόνο αντιστοιχίες τίτλου."
   },
   "language": {
     "defaultsTitle": "Προεπιλογές γλώσσας",
@@ -4311,12 +4344,79 @@
     },
     "gaps": {
       "pageTitle": "Ανάλυση Κενών",
-      "pageSubtitle": "Συγκρίνετε τις συλλογές ταινιών του TMDB με τη συγχρονισμένη βιβλιοθήκη σας για να εντοπίσετε τίτλους που λείπουν. Τα αιτήματα μέσω Seerr δεν είναι ποτέ αυτόματα — εσείς επιλέγετε τι θα ζητήσετε.",
+      "pageSubtitle": "Συγκρίνετε τις συλλογές ταινιών του TMDB και τις σεζόν που έχουν προβληθεί με τη συγχρονισμένη βιβλιοθήκη σας για να εντοπίσετε τι λείπει. Τα αιτήματα μέσω Seerr δεν είναι ποτέ αυτόματα — εσείς επιλέγετε τι θα ζητήσετε.",
+      "tabMovies": "Ταινίες",
+      "tabTv": "Σειρές",
+      "series": {
+        "selectShowAria": "Επιλογή των σεζόν της σειράς {{name}}",
+        "expandAria": "Εμφάνιση όλων των σεζόν της σειράς {{name}}",
+        "numberingChip": "Η αρίθμηση σεζόν διαφέρει από το TMDb",
+        "numberingExplained": "Η βιβλιοθήκη και το TMDb αριθμούν διαφορετικά τις σεζόν αυτής της σειράς, οπότε αυτά τα νούμερα δεν μπορούν να διαβαστούν ως κενά. Δεν προσφέρεται κανένα αίτημα εδώ.",
+        "missingSeasons_one": "Λείπει η σεζόν: {{list}}",
+        "missingSeasons_other": "Λείπουν οι σεζόν: {{list}}",
+        "partialSeasons_one": "Μερικώς διαθέσιμη σεζόν: {{list}}",
+        "partialSeasons_other": "Μερικώς διαθέσιμες σεζόν: {{list}}",
+        "partialEntry": "{{season}} ({{held}} από {{aired}})",
+        "seasonsOwned": "{{owned}} από {{total}} σεζόν",
+        "requestSeasons_one": "Αίτημα για {{count}} σεζόν",
+        "requestSeasons_other": "Αίτημα για {{count}} σεζόν",
+        "seasonLabel": "Σεζόν {{number}}",
+        "episodesHeld": "{{held}} από {{aired}} επεισόδια",
+        "inSeerrChip": "Στο Seerr",
+        "requestTitle_one": "{{name}}: σεζόν {{seasons}}",
+        "requestTitle_other": "{{name}}: σεζόν {{seasons}}",
+        "airedOrder": "Όλες οι σεζόν που έχουν προβληθεί, με τη σειρά",
+        "openShow": "Άνοιγμα σειράς",
+        "tmdbMissing": "Το TMDb δεν έχει ρυθμιστεί, οπότε δεν μπορούν να βρεθούν οι σεζόν που έχουν προβληθεί.",
+        "noShows": "Καμία σειρά της βιβλιοθήκης δεν έχει ακόμη αναγνωριστικό TMDb. Εκτελέστε πρώτα τον συγχρονισμό σειρών.",
+        "seerrMissing": "Το Seerr δεν έχει ρυθμιστεί, οπότε οι σεζόν που λείπουν εμφανίζονται αλλά δεν μπορούν να ζητηθούν.",
+        "scanInProgress": "Σάρωση σε εξέλιξη — τα νούμερα ενημερώνονται καθώς ολοκληρώνεται κάθε παρτίδα σειρών.",
+        "noRunYet": "Δεν έχει γίνει ακόμη εκτέλεση. Ξεκινήστε μια ανάλυση για να συγκρίνετε τις σειρές σας με τις σεζόν που έχουν προβληθεί σύμφωνα με το TMDb.",
+        "staleEpisodes_one": "{{episodes}} επεισόδιο προστέθηκε ή άλλαξε στη βιβλιοθήκη μετά από αυτή τη σάρωση. Εκτελέστε ξανά την ανάλυση για να συμπεριληφθεί.",
+        "staleEpisodes_other": "{{episodes}} επεισόδια προστέθηκαν ή άλλαξαν στη βιβλιοθήκη μετά από αυτή τη σάρωση. Εκτελέστε ξανά την ανάλυση για να συμπεριληφθούν.",
+        "statShows": "Σειρές με κενά",
+        "statMissing": "Σεζόν που λείπουν",
+        "statMissingDetail": "Έχουν προβληθεί, κανένα επεισόδιο στη βιβλιοθήκη ή στο Seerr",
+        "statPartial": "Μερικώς διαθέσιμες σεζόν",
+        "statPartialDetail": "Έχουν προβληθεί, μόνο μερικά επεισόδια στη βιβλιοθήκη",
+        "statCoverage": "Σεζόν στη βιβλιοθήκη",
+        "progressShows": "{{processed}} / {{total}} σειρές",
+        "lookupsFailed_one": "Το TMDb δεν απάντησε για {{shows}} σειρά",
+        "lookupsFailed_other": "Το TMDb δεν απάντησε για {{shows}} σειρές",
+        "notOnTmdb_one": "{{shows}} σειρά δεν υπάρχει στο TMDb",
+        "notOnTmdb_other": "{{shows}} σειρές δεν υπάρχουν στο TMDb",
+        "withoutTmdbId_one": "{{shows}} σειρά δεν έχει αναγνωριστικό TMDb",
+        "withoutTmdbId_other": "{{shows}} σειρές δεν έχουν αναγνωριστικό TMDb",
+        "searchLabel": "Αναζήτηση σειρών",
+        "networkFilter": "Δίκτυο",
+        "noNetwork": "Χωρίς δίκτυο",
+        "noNetworks": "Κανένα δίκτυο",
+        "kindFilter": "Σεζόν",
+        "kindMissing": "Λείπουν εντελώς",
+        "kindPartial": "Μερικώς διαθέσιμες",
+        "kindBoth": "Λείπουν ή μερικώς διαθέσιμες",
+        "kindNumbering": "Διαφορετική αρίθμηση ({{count}})",
+        "selectShownAria": "Επιλογή όλων των σεζόν που εμφανίζονται",
+        "showingShows_one": "Εμφανίζεται {{shown}} από {{total}} σειρά",
+        "showingShows_other": "Εμφανίζονται {{shown}} από {{total}} σειρές",
+        "seasonsInView_one": "{{seasons}} σεζόν",
+        "seasonsInView_other": "{{seasons}} σεζόν",
+        "noGaps": "Κάθε σειρά αυτού του στιγμιότυπου έχει όλες τις σεζόν που έχουν προβληθεί, ή οι υπόλοιπες είναι ήδη στο Seerr.",
+        "noMatches": "Καμία σειρά δεν ταιριάζει με αυτά τα φίλτρα.",
+        "dialogBulkBody": "Θα σταλούν αιτήματα για {{count}} σειρές στο Seerr με τον συνδεδεμένο λογαριασμό σας (οι επιλογές Sonarr έχουν ήδη οριστεί). Μπορείτε να τα παρακολουθείτε στα Αιτήματά μου."
+      },
       "errorLoadGapAnalysis": "Αποτυχία φόρτωσης ανάλυσης κενών",
       "errorFailedToLoad": "Αποτυχία φόρτωσης",
       "errorLoadDetails": "Αποτυχία φόρτωσης λεπτομερειών",
       "errorRequestFailed": "Το αίτημα απέτυχε",
       "errorRefreshFailed": "Η ανανέωση απέτυχε",
+      "scanFailed": "Η τελευταία σάρωση απέτυχε. Όσα αποτελέσματα εμφανίζονται είναι από την προηγούμενη σάρωση. {{detail}}",
+      "failureReason": {
+        "interrupted": "Η εφαρμογή επανεκκινήθηκε ενώ εκτελούνταν.",
+        "tmdbSilent": "Το TMDb σταμάτησε να απαντά. Ελέγξτε το κλειδί API και δοκιμάστε ξανά.",
+        "tmdbPartial": "Το TMDb απάντησε σε πολύ μικρό μέρος της σάρωσης για να αντικαταστήσει αυτά τα αποτελέσματα. Δοκιμάστε ξανά αργότερα."
+      },
+      "scanInProgressKeeping": "Σάρωση σε εξέλιξη. Αυτά είναι τα τελευταία αποτελέσματα μέχρι να ολοκληρωθεί.",
       "seerrRequested": "Ζητήθηκε",
       "seerrProcessing": "Επεξεργάζεται",
       "seerrAvailable": "Διαθέσιμο",
@@ -4353,7 +4453,7 @@
       "readyLine_one": "TMDb and Seerr connected · {{movies}} library movie carries TMDb collection data",
       "readyLine_other": "TMDb and Seerr connected · {{movies}} library movies carry TMDb collection data",
       "scannedAt": "Scanned {{when}} ({{relative}})",
-      "scanInProgress": "Scan in progress — figures update as each batch of collections finishes.",
+      "scanInProgress": "Σάρωση σε εξέλιξη — τα νούμερα ενημερώνονται καθώς ολοκληρώνεται κάθε παρτίδα συλλογών.",
       "staleMovies_one": "{{movies}} movie has been added to the library since this scan. Run the analysis again to include it.",
       "staleMovies_other": "{{movies}} movies have been added to the library since this scan. Run the analysis again to include them.",
       "statCollections": "Collections with gaps",
@@ -4834,6 +4934,13 @@
         "configInterval": "Διάστημα",
         "configManualOnlyOption": "Μόνο χειροκίνητα",
         "configTime": "Ώρα",
+        "configMinute": "Λεπτό",
+        "queued": "Σε αναμονή",
+        "queuedTooltip": "Περιμένει να τελειώσει άλλη εργασία που απασχολεί τον διακομιστή πολυμέσων. Αυτές οι εργασίες εκτελούνται με τη σειρά, ώστε ο διακομιστής να μη δέχεται όλα τα αιτήματα ταυτόχρονα.",
+        "configMinuteHint": "Λεπτά μετά την ώρα, από 0 έως 59.",
+        "configMinuteInvalid": "Δώστε λεπτό από 0 έως 59.",
+        "configTimeZone": "Οι ώρες είναι στη ζώνη ώρας του διακομιστή: {{timeZone}}",
+        "configPreviewIntervalAt": "{{interval}}, στο :{{minute}}",
         "configDayOfWeek": "Ημέρα της εβδομάδας",
         "configPreviewManualOnly": "Μόνο χειροκίνητα - αυτή η εργασία δεν μπορεί να προγραμματιστεί",
         "configPreviewDisabled": "Η εργασία είναι απενεργοποιημένη",
@@ -4859,10 +4966,6 @@
         "weekdayThu": "Πέμπτη",
         "weekdayFri": "Παρασκευή",
         "weekdaySat": "Σάββατο",
-        "hour12am": "12:00 πμ",
-        "hour12pm": "12:00 μμ",
-        "hourAm": "{{hour}}:00 πμ",
-        "hourPm": "{{hour}}:00 μμ",
         "configBiweekly": "Every 2 weeks",
         "configBiweeklyNote": "Cron cannot express a two-week cycle, so this job is checked every week and skipped unless at least 13 days have passed since its last successful run.",
         "configPreviewBiweekly": "Runs every other {{day}} at {{time}}",
@@ -5539,7 +5642,7 @@
     },
     "gapAnalysis": {
       "title": "Gap analysis",
-      "blurb": "Collections and franchises your library is missing"
+      "blurb": "Ταινίες franchise και σεζόν σειρών που λείπουν από τη βιβλιοθήκη σας"
     },
     "tmdb": {
       "title": "TMDB",
@@ -7207,5 +7310,9 @@
     "sameAsEnglish": "Ίδιο με τα Αγγλικά",
     "allLanguages": "Όλες οι γλώσσες",
     "saveShortcut": "Ctrl+Enter για αποθήκευση"
+  },
+  "mediaServerTypeMismatch": {
+    "message": "This server identifies itself as {{detected}}, but {{appName}} is set to {{selected}}. Features that differ between the two servers will not behave correctly.",
+    "useDetected": "Switch to {{detected}}"
   }
 }

@@ -38,6 +38,7 @@ Jobs aren't chained, but these orderings are real constraints:
 | `remove-legacy-libraries` | Once, when phasing out the legacy libraries |
 | `evaluate-recommender` | Before/after algorithm changes — offline holdout metrics |
 | `refresh-library-gaps` | Refresh the missing-collections report |
+| `refresh-series-gaps` | Refresh the missing-seasons report |
 
 ## Ongoing Care
 

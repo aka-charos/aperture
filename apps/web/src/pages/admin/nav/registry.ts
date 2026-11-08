@@ -181,7 +181,7 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     titleKey: 'adminNav.gapAnalysis.title',
     blurbKey: 'adminNav.gapAnalysis.blurb',
     docs: ['gap-analysis'],
-    aliases: ['gaps', 'missing', 'collections', 'franchise', 'tmdb collection'],
+    aliases: ['gaps', 'missing', 'collections', 'franchise', 'tmdb collection', 'seasons', 'tv', 'series', 'network'],
     ownsHeading: true,
   },
 

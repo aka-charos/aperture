@@ -55,6 +55,7 @@ A title analysis takes roughly one to three minutes, so size the per-run limit t
 |-----|------------------|--------------|
 | `evaluate-recommender` | manual | Offline holdout evaluation — reads only, changes nothing ([Evaluation](evaluation.md)) |
 | `refresh-library-gaps` | manual | Re-scan TMDb collections vs the library ([Gap analysis](gap-analysis.md)); never requests via Seerr |
+| `refresh-series-gaps` | manual | Re-scan aired TV seasons vs the episodes in the library ([Gap analysis](gap-analysis.md#tv-shows)); never requests via Seerr |
 
 ## Integrations & Housekeeping
 
@@ -70,7 +71,7 @@ A title analysis takes roughly one to three minutes, so size the per-run limit t
 | `refresh-assistant-suggestions` | weekly, Sunday 00:00 | Refresh the chat welcome-screen suggestion chips from the newest completed run |
 | `refresh-ai-pricing` | weekly, Sunday 00:00 | Refresh the LLM pricing catalog (Helicone) used by the [cost estimator](cost-estimate.md) |
 
-Five jobs have **no job card** — `sync-users`, `refresh-assistant-suggestions`, `backup-database`, `cleanup-auth-state`, `refresh-library-gaps` appear only on the Schedule tab (gap analysis is run from its own page).
+Six jobs have **no job card** — `sync-users`, `refresh-assistant-suggestions`, `backup-database`, `cleanup-auth-state`, `refresh-library-gaps`, `refresh-series-gaps` appear only on the Schedule tab (gap analysis is run from its own page).
 
 ---
 

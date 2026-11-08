@@ -17,7 +17,7 @@
  * kind of answer to give.
  *
  * Ambiguity now resolves toward 'discovery'. A discovery turn suppresses only
- * three list-building tools (DISCOVERY_SUPPRESSED_TOOLS in handlers/chat.ts)
+ * three list-building tools (DISCOVERY_SUPPRESSED_TOOLS in tools/index.ts)
  * and keeps history, ratings and stats, whereas a library turn has no web tool
  * at all — so discovery is very nearly the superset, and the cheaper mistake.
  * The error path still falls back to 'library': a routing *failure* is

@@ -10,7 +10,19 @@ import { mediaProxySchemas } from './schemas.js'
 import { requireAuth } from '../../plugins/auth.js'
 import { withDefaultImageSize } from './imageSize.js'
 
-const mediaProxyRoutes: FastifyPluginAsync = async (fastify) => {
+/**
+ * How long one image may take, reading the body included. A longer wait only holds
+ * a browser connection for longer: a failure here costs one poster, which the next
+ * page view asks for again, since only a success is cached. Set well above the
+ * median measured for these images on the live instance, about half a second, so
+ * it catches a stall rather than a slow resize.
+ */
+const IMAGE_DEADLINE_MS = 15_000
+
+const mediaProxyRoutes: FastifyPluginAsync<{ timeoutMs?: number }> = async (
+  fastify,
+  { timeoutMs = IMAGE_DEADLINE_MS }
+) => {
   // Register schemas
   for (const [name, schema] of Object.entries(mediaProxySchemas)) {
     fastify.addSchema({ $id: name, ...schema })
@@ -61,15 +73,25 @@ const mediaProxyRoutes: FastifyPluginAsync = async (fastify) => {
     const queryString = withDefaultImageSize(imagePath, rawQuery)
     const imageUrl = `${config.baseUrl}/${imagePath}${queryString}`
 
+    // Ends the upstream request on the deadline, or as soon as the browser leaves.
+    const disconnected = new AbortController()
+    const signal = AbortSignal.any([disconnected.signal, AbortSignal.timeout(timeoutMs)])
+    const cancel = () => {
+      if (!reply.raw.writableEnded) disconnected.abort()
+    }
+    reply.raw.once('close', cancel)
+
     try {
       // Fetch image from media server
       const response = await fetch(imageUrl, {
+        signal,
         headers: {
           'X-Emby-Authorization': `MediaBrowser Client="Aperture", Device="Aperture Server", DeviceId="aperture-server", Version="1.0.0", Token="${config.apiKey}"`,
         },
       })
 
       if (!response.ok) {
+        await response.body?.cancel()
         if (response.status === 404) {
           return reply.status(404).send({ error: 'Image not found' })
         }
@@ -87,8 +109,12 @@ const mediaProxyRoutes: FastifyPluginAsync = async (fastify) => {
 
       return reply.send(buffer)
     } catch (err) {
+      if (disconnected.signal.aborted) return reply.status(499).send({ error: 'Client closed the request' })
+      if (signal.aborted) return reply.status(504).send({ error: 'Media server image timed out' })
       fastify.log.error({ err, imagePath }, 'Failed to fetch image from media server')
       return reply.status(502).send({ error: 'Failed to fetch image from media server' })
+    } finally {
+      reply.raw.removeListener('close', cancel)
     }
   })
 }

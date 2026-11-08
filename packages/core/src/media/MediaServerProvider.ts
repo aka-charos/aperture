@@ -99,9 +99,11 @@ export interface MediaServerProvider {
   ): Promise<LibraryCreateResult>
 
   /**
-   * Remove a virtual library from the media server by its display name
+   * Remove a virtual library from the media server. Emby removes by the
+   * library's id, Jellyfin by its display name, so callers pass both as the
+   * server reported them (`getLibraries`).
    */
-  deleteVirtualLibrary(apiKey: string, name: string): Promise<void>
+  deleteVirtualLibrary(apiKey: string, library: { id: string; name: string }): Promise<void>
 
   /**
    * Get user's current library access settings
@@ -342,8 +344,15 @@ export interface MediaServerProvider {
 
   /**
    * Delete a collection
+   * @param opts.clearRankSortNames - Also remove the "NN - Title" sort-name prefix the collection
+   *   wrote on its members. Only for a collection created with rankAndPin (Top Picks): any other
+   *   collection never wrote one, and a member's prefix may belong to another collection.
    */
-  deleteCollection(apiKey: string, collectionId: string): Promise<void>
+  deleteCollection(
+    apiKey: string,
+    collectionId: string,
+    opts?: { clearRankSortNames?: boolean }
+  ): Promise<void>
 
   /** The id of the collection (Box Set) with exactly this name, or null. */
   findCollectionByName(apiKey: string, name: string): Promise<string | null>

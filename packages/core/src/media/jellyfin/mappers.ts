@@ -6,8 +6,10 @@
 
 import { normalizeCountries } from '../../countries/canonical.js'
 import { withoutManagedTags } from '../managedTags.js'
+import { episodeNumberEnd } from '../episodeRange.js'
 import type { Movie, Series, Episode } from '../types.js'
 import type { JellyfinItem, JellyfinEpisode } from './types.js'
+import { mapVideoQuality } from '../videoQuality.js'
 
 export function mapJellyfinItemToMovie(item: JellyfinItem, baseUrl: string): Movie {
   const directors =
@@ -65,6 +67,7 @@ export function mapJellyfinItemToMovie(item: JellyfinItem, baseUrl: string): Mov
     // that has been cleaned.
     productionCountries: normalizeCountries(item.ProductionLocations),
     awards: item.Awards,
+    ...mapVideoQuality(item.MediaSources?.[0]),
     userData: item.UserData
       ? {
           playCount: item.UserData.PlayCount,
@@ -165,6 +168,7 @@ export function mapJellyfinItemToEpisode(item: JellyfinEpisode, baseUrl: string)
     seriesName: item.SeriesName,
     seasonNumber: item.ParentIndexNumber || 0,
     episodeNumber: item.IndexNumber || 0,
+    episodeNumberEnd: episodeNumberEnd(item.IndexNumber, item.IndexNumberEnd),
     name: item.Name,
     overview: item.Overview,
     premiereDate: item.PremiereDate,

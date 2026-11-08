@@ -7,10 +7,13 @@
  * is about the WORK, is identical for every user, and is written from web
  * sources rather than from anything the recommender computed.
  *
- * Collapsed by default. An analysis is more likely to brush against the ending
- * than a synopsis is, because meaning lives there — the prompt asks only
- * pre-viewing questions to keep that structural rather than instructional, but
- * the same caution that puts `plot_full` behind a button in MediaHero applies.
+ * Open by default, on the first section, when there is an analysis to read; a
+ * title without one stays a closed header. It used to be collapsed, on the same
+ * caution that puts `plot_full` behind a button in MediaHero: an analysis is
+ * more likely to brush against the ending than a synopsis is, because meaning
+ * lives there. But the prompt asks only pre-viewing questions, which keeps
+ * that structural rather than instructional, and a closed panel cost every
+ * reader a click on every title. Tabs mean only one section shows at a time.
  * That structural answer is also why no standing disclaimer sits above the
  * text: a notice hedging about spoilers on every title, forever, is a worse
  * trade than the closed question set it would be apologising for.
@@ -193,8 +196,9 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Collapsed by default on every title — see the spoiler note above.
-  const [open, setOpen] = useState(false)
+  // The reader's own open/closed choice; null until they click the header.
+  // While null the panel follows the title — see `open` below.
+  const [userOpen, setUserOpen] = useState<boolean | null>(null)
   const [tab, setTab] = useState<number | 'all'>(0)
   const [showSources, setShowSources] = useState(false)
 
@@ -234,9 +238,10 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   }, [analysisUrl])
 
   // Keyed on the TITLE, not `analysisUrl`: a change of display language reloads
-  // the text but must not close a panel somebody is reading.
+  // the text but must not close a panel somebody is reading. A new title
+  // follows its own default (`open` below), not the last one's click.
   useEffect(() => {
-    setOpen(false)
+    setUserOpen(null)
     setTab(0)
     setShowSources(false)
   }, [mediaType, mediaId])
@@ -244,7 +249,7 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   // A failed run is reported inside the panel, and the Write button that starts
   // it sits in the header — so a failure while collapsed would be invisible.
   useEffect(() => {
-    if (error) setOpen(true)
+    if (error) setUserOpen(true)
   }, [error])
 
   /**
@@ -364,6 +369,13 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
   // row is current — which is what bounds the spend without an admin gate:
   // one rewrite per title per prompt version, not a button anyone can lean on.
   const canRewrite = hasAnalysis && Boolean(data?.stale)
+  // Open by default only when there is an analysis to read, on its first
+  // section. A title with nothing yet, or a declined one, stays a closed header
+  // with its chip or button — opening it would only show a line saying there is
+  // nothing here. A run that finishes while the page is up opens the panel by
+  // itself, unless the reader has already chosen (an error opens it anyway).
+  const open = userOpen ?? hasAnalysis
+  const setOpen = (value: boolean) => setUserOpen(value)
   // One open run holding everything is the fallback, not a special case: it is
   // what an ungated analysis produces anyway, so an older server and a row with
   // no usable paragraph map both land on the path that was here before.
@@ -423,7 +435,7 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
         <ButtonBase
           component="div"
           aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => setOpen(!open)}
           sx={{
             display: 'flex',
             width: '100%',
@@ -473,8 +485,8 @@ export function TitleAnalysis({ mediaType, mediaId }: TitleAnalysisProps) {
                   finding out. See `analysisChip` for the five readings.
 
                   A title nobody has asked about yet gets no chip at all — it
-                  gets the button, here rather than inside, because the panel is
-                  collapsed by default and an action nobody can see is an action
+                  gets the button, here rather than inside, because the panel
+                  can be collapsed and an action nobody can see is an action
                   nobody takes. */}
               {chip ? (
                 <Tooltip title={chip.tooltip}>

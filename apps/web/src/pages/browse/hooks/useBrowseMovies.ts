@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PAGE_SIZE, defaultMovieFilters } from '../constants'
+import type { ListPage } from './listRequests'
+import { usePagedList } from './usePagedList'
 import type {
   ActiveFilterChip,
   Collection,
@@ -30,6 +32,12 @@ interface MoviesResponse {
   total: number
 }
 
+/** One page of the movie list, out of the response body (stable for usePagedList). */
+function readMovies(body: unknown): ListPage<Movie> {
+  const data = body as MoviesResponse
+  return { items: data.movies, total: data.total }
+}
+
 interface MovieMetadataResponse {
   genres?: string[]
   collections?: Collection[]
@@ -53,6 +61,10 @@ interface BrowseMoviesResult {
   moviesLoading: boolean
   moviesLoadingMore: boolean
   moviesError: string | null
+  /** The failure was a later page: show it at the end of the list, not above it. */
+  moviesErrorAtEnd: boolean
+  /** Ask again for the page that failed (shown with the error). */
+  retryMovies: () => void
   movieSearch: string
   setMovieSearch: Dispatch<SetStateAction<string>>
   movieGenre: string
@@ -79,7 +91,6 @@ export function useBrowseMovies({
   restore = false,
 }: UseBrowseMoviesOptions): BrowseMoviesResult {
   const { t } = useTranslation()
-  const [movies, setMovies] = useState<Movie[]>([])
   const [movieGenres, setMovieGenres] = useState<string[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
   const [movieContentRatings, setMovieContentRatings] = useState<ContentRating[]>([])
@@ -90,9 +101,6 @@ export function useBrowseMovies({
     runtime: { min: 0, max: 300 },
     rating: { min: 0, max: 10 },
   })
-  const [moviesLoading, setMoviesLoading] = useState(true)
-  const [moviesLoadingMore, setMoviesLoadingMore] = useState(false)
-  const [moviesError, setMoviesError] = useState<string | null>(null)
   const [movieSearch, setMovieSearch] = useState(initial?.search ?? '')
   const [movieGenre, setMovieGenre] = useState(initial?.genre ?? '')
   const [collection, setCollection] = useState(initial?.group ?? '')
@@ -101,23 +109,6 @@ export function useBrowseMovies({
   const [movieSortOrder, setMovieSortOrder] = useState<SortOrder>(initial?.sortOrder ?? 'asc')
   // Range ends the URL set: loading the library's real extents must keep them.
   const pinnedRangesRef = useRef(initial?.pinned ?? {})
-  const [moviePage, setMoviePage] = useState(1)
-  const [movieHasMore, setMovieHasMore] = useState(true)
-  const [movieTotal, setMovieTotal] = useState(0)
-  const movieObserverRef = useRef<IntersectionObserver | null>(null)
-  const movieLoadMoreRef = useRef<HTMLDivElement | null>(null)
-  // Loaded-count lives in a ref, not state: putting movies.length in fetchMovies'
-  // deps recreates the callback after every fetch, and the fetch effect depends
-  // on fetchMovies — an infinite refetch loop (grid flickers content/skeleton).
-  const movieCountRef = useRef(0)
-
-  const resetMovies = useCallback(() => {
-    setMovies([])
-    setMoviePage(1)
-    setMovieHasMore(true)
-    movieCountRef.current = 0
-  }, [])
-
   // The list's API query, without the page number: what the list IS. It keys
   // the fetch effect (so a re-run that would send the same request does not
   // refetch, e.g. the range load leaving every parameter as it was) and the
@@ -152,6 +143,20 @@ export function useBrowseMovies({
     return params.toString()
   }, [collection, movieFilters, movieGenre, movieRanges, movieSearch, movieSortBy, movieSortOrder])
 
+  const pageUrl = useCallback((page: number) => `/api/movies?${listQuery}&page=${page}`, [listQuery])
+  // markShowing comes from the list memory below; the shared hook reads the
+  // latest through a ref, so a forward reference here is safe.
+  const markShowingRef = useRef<(key: string | null) => void>(() => {})
+  const list = usePagedList<Movie>({
+    key: listQuery,
+    active: tabIndex === 0,
+    pageUrl,
+    read: readMovies,
+    failedKey: 'browse.errors.loadMovies',
+    onFirstPage: () => markShowingRef.current(listQuery),
+  })
+  const { items: movies, page: moviePage, total: movieTotal, hasMore: movieHasMore } = list.state
+
   const memory = useListMemory<Movie>({
     tab: 'movies',
     active: tabIndex === 0,
@@ -159,37 +164,7 @@ export function useBrowseMovies({
     current: { key: listQuery, items: movies, page: moviePage, total: movieTotal, hasMore: movieHasMore },
   })
   const markShowing = memory.markShowing
-
-  const fetchMovies = useCallback(
-    async (page: number, append = false) => {
-      if (append) setMoviesLoadingMore(true)
-      else setMoviesLoading(true)
-
-      try {
-        const response = await fetch(`/api/movies?${listQuery}&page=${page}`, { credentials: 'include' })
-        if (!response.ok) {
-          setMoviesError(t('browse.errors.loadMovies'))
-          return
-        }
-
-        const data = (await response.json()) as MoviesResponse
-        if (append) setMovies((prev) => [...prev, ...data.movies])
-        else setMovies(data.movies)
-        const loadedCount = append ? movieCountRef.current + data.movies.length : data.movies.length
-        movieCountRef.current = loadedCount
-        setMovieTotal(data.total)
-        setMovieHasMore(data.movies.length === PAGE_SIZE && loadedCount < data.total)
-        setMoviesError(null)
-        if (!append) markShowing(listQuery)
-      } catch {
-        setMoviesError(t('browse.errors.connect'))
-      } finally {
-        setMoviesLoading(false)
-        setMoviesLoadingMore(false)
-      }
-    },
-    [listQuery, markShowing, t]
-  )
+  markShowingRef.current = markShowing
 
   const fetchMovieMetadata = useCallback(async () => {
     try {
@@ -245,56 +220,22 @@ export function useBrowseMovies({
   }, [fetchMovieMetadata])
 
   const { takeRemembered, isShowing } = memory
+  const { reset: resetList, restore: restoreList, load: loadPage } = list
   useEffect(() => {
     // Already showing this query (restored, or a re-run that changed nothing).
     if (isShowing(listQuery)) return
     const remembered = takeRemembered(listQuery)
     if (remembered) {
-      setMovies(remembered.items)
-      setMoviePage(remembered.page)
-      setMovieTotal(remembered.total)
-      setMovieHasMore(remembered.hasMore)
-      movieCountRef.current = remembered.items.length
-      setMoviesError(null)
-      setMoviesLoading(false)
+      restoreList(remembered)
       return
     }
-    resetMovies()
+    resetList()
     markShowing(null)
     const debounce = setTimeout(() => {
-      void fetchMovies(1, false)
+      void loadPage(1, false)
     }, movieSearch ? 300 : 0)
     return () => clearTimeout(debounce)
-  }, [fetchMovies, isShowing, listQuery, markShowing, movieSearch, resetMovies, takeRemembered])
-
-  useEffect(() => {
-    if (movieObserverRef.current) {
-      movieObserverRef.current.disconnect()
-    }
-
-    if (!movieHasMore || moviesLoading || moviesLoadingMore || tabIndex !== 0) return
-
-    movieObserverRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && movieHasMore && !moviesLoadingMore) {
-          const nextPage = moviePage + 1
-          setMoviePage(nextPage)
-          void fetchMovies(nextPage, true)
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    if (movieLoadMoreRef.current) {
-      movieObserverRef.current.observe(movieLoadMoreRef.current)
-    }
-
-    return () => {
-      if (movieObserverRef.current) {
-        movieObserverRef.current.disconnect()
-      }
-    }
-  }, [fetchMovies, movieHasMore, moviePage, moviesLoading, moviesLoadingMore, tabIndex])
+  }, [isShowing, listQuery, loadPage, markShowing, movieSearch, resetList, restoreList, takeRemembered])
 
   const activeFilters = useMemo(
     () =>
@@ -321,6 +262,8 @@ export function useBrowseMovies({
   )
 
   return {
+    retryMovies: list.retry,
+    moviesErrorAtEnd: list.state.error?.during === 'more',
     movies,
     movieGenres,
     collections,
@@ -328,9 +271,9 @@ export function useBrowseMovies({
     movieResolutions,
     movieCountries,
     movieRanges,
-    moviesLoading,
-    moviesLoadingMore,
-    moviesError,
+    moviesLoading: list.state.loading,
+    moviesLoadingMore: list.state.loadingMore,
+    moviesError: list.state.error?.message ?? null,
     movieSearch,
     setMovieSearch,
     movieGenre,
@@ -345,7 +288,7 @@ export function useBrowseMovies({
     setMovieSortOrder,
     movieTotal,
     movieHasMore,
-    movieLoadMoreRef,
+    movieLoadMoreRef: list.loadMoreRef,
     activeFilters,
     handleMovieSortChange,
   }

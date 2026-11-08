@@ -121,6 +121,7 @@ export const seerrSchemas = {
       seerrRequestId: { type: 'integer', nullable: true, description: 'Seerr request ID if submitted' },
       discoveryCandidateId: { type: 'string', format: 'uuid', nullable: true, description: 'Discovery candidate that triggered this request' },
       source: { type: 'string', enum: ['discovery', 'gap_analysis'], description: 'Where the request was created' },
+      seasons: { type: 'array', items: { type: 'integer' }, nullable: true, description: 'Series only: the seasons asked for. Null means the whole show.' },
       createdAt: { type: 'string', format: 'date-time' },
       updatedAt: { type: 'string', format: 'date-time' },
     },

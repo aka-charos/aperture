@@ -93,6 +93,17 @@ import { unslothInferenceBaseUrl } from './unslothServer.js'
 import { benchEndpointFrom, type BenchEndpoint } from './benchEndpoint.js'
 import { describeAiError } from './aiErrors.js'
 import {
+  chatTestAbortMessage,
+  chatToolTestFailure,
+  CHAT_TEST_DEADLINE_MS,
+  CHAT_TEST_INPUT_SCHEMA,
+  CHAT_TEST_MAX_OUTPUT_TOKENS,
+  CHAT_TEST_PROMPT,
+  CHAT_TEST_STALL_MS,
+  CHAT_TEST_TOOL,
+} from './chatToolTest.js'
+import { startStreamStallGuard } from './streamStall.js'
+import {
   isCustomModelProvider,
   type CustomModelProvider,
 } from './ai-capabilities/customModels.js'
@@ -2681,13 +2692,18 @@ async function runProviderConnectionTest(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const model = (provider as any)(providerConfig.model) as LanguageModel
 
-      // Import generateText from ai package
-      const { generateText } = await import('ai')
-      await generateText({
-        model,
-        prompt: 'Say "ok" and nothing else.',
-        maxOutputTokens: 20,
-      })
+      if (fn === 'chat') {
+        // The assistant runs on tool calls, so its role is tested on one
+        // (lib/chatToolTest.ts): a prose answer is not a pass.
+        await checkChatToolCall(model)
+      } else {
+        const { generateText } = await import('ai')
+        await generateText({
+          model,
+          prompt: 'Say "ok" and nothing else.',
+          maxOutputTokens: 20,
+        })
+      }
 
       // The model answered; now say what it can be configured with. A model is
       // usually tested at the moment it is added, which is exactly when an
@@ -2711,6 +2727,68 @@ async function runProviderConnectionTest(
     )
 
     return { success: false, error: describeTestFailure(described) }
+  }
+}
+
+/**
+ * Ask the model for one streamed tool call, the way the chat asks, and throw
+ * with the reason when no valid call comes back (`chatToolTestFailure`).
+ * The tool has no `execute`, so nothing runs and the stream ends after the
+ * one step. A provider error is rethrown as itself, so the button shows the
+ * provider's own words.
+ *
+ * Bounded by a stall guard (lib/streamStall.ts): silence past
+ * CHAT_TEST_STALL_MS or a whole run past CHAT_TEST_DEADLINE_MS ends the test
+ * with its own message. Racing `guard.aborted` is what ends the wait; the
+ * abort alone does not. `limits` exists for the tests.
+ */
+export async function checkChatToolCall(
+  model: LanguageModel,
+  limits: { stallMs?: number; deadlineMs?: number } = {}
+): Promise<void> {
+  const { streamText, tool } = await import('ai')
+  const stallMs = limits.stallMs ?? CHAT_TEST_STALL_MS
+  const deadlineMs = limits.deadlineMs ?? CHAT_TEST_DEADLINE_MS
+  const guard = startStreamStallGuard({ stallMs, deadlineMs, checkMs: Math.min(1000, stallMs) })
+  try {
+    // A provider error arrives as a stream part, not a throw: without this it
+    // would read as "answered in text" and hide the provider's own words.
+    let streamError: unknown
+    const result = streamText({
+      model,
+      prompt: CHAT_TEST_PROMPT,
+      tools: {
+        [CHAT_TEST_TOOL]: tool({
+          description: 'Connection test. Call it with status "ok".',
+          inputSchema: CHAT_TEST_INPUT_SCHEMA,
+        }),
+      },
+      toolChoice: 'auto',
+      maxOutputTokens: CHAT_TEST_MAX_OUTPUT_TOKENS,
+      maxRetries: 0,
+      abortSignal: guard.signal,
+      // Any part counts as life, reasoning included.
+      onChunk: () => guard.activity(),
+      onError: ({ error }) => {
+        streamError ??= error
+      },
+    })
+    const ended = await Promise.race([
+      result.consumeStream().then(() => null),
+      guard.aborted,
+    ])
+    const abandoned = ended ?? guard.reason()
+    if (abandoned) {
+      throw new Error(chatTestAbortMessage(abandoned, abandoned === 'stalled' ? stallMs : deadlineMs))
+    }
+    if (streamError) throw streamError
+    const failure = chatToolTestFailure({
+      calls: (await result.toolCalls).map((call) => ({ toolName: call.toolName, invalid: call.invalid === true })),
+      finishReason: await result.finishReason,
+    })
+    if (failure) throw new Error(failure)
+  } finally {
+    guard.stop()
   }
 }
 

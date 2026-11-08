@@ -106,7 +106,7 @@ Under **Admin console → Appearance → Language defaults**, the instance-wide 
 
 ### Gap Analysis (admin)
 
-**Gap Analysis** (**Admin console → Library → Gap analysis**, `/admin/library/gaps`) compares TMDB movie collection membership to your synced `movies` table so you can see which franchise entries are missing. It is **not** the same as user [Discovery](features/discovery.md) (per-user suggestions).
+**Gap Analysis** (**Admin console → Library → Gap analysis**, `/admin/library/gaps`) compares TMDB movie collection membership to your synced `movies` table so you can see which franchise entries are missing, and on its **TV shows** tab compares the seasons TMDB says have aired to the episodes you hold, filterable by network ([details](admin/gap-analysis.md#tv-shows)). It is **not** the same as user [Discovery](features/discovery.md) (per-user suggestions).
 
 **Prerequisites**
 
@@ -116,7 +116,7 @@ Under **Admin console → Appearance → Language defaults**, the instance-wide 
 
 **Operations**
 
-- Use **Run analysis** on the page (or run the **`refresh-library-gaps`** job under Operations → Jobs). The job only calls TMDb and your database — it **never** requests content from Seerr automatically.
+- Use **Run analysis** on the page (or run the **`refresh-library-gaps`** or **`refresh-series-gaps`** job under Operations → Jobs). The jobs only read from TMDb, Seerr and your database — they **never** request content from Seerr automatically.
 - Gap-initiated requests are stored with `source: gap_analysis` and appear on **My Requests** with a **Gap Analysis** badge; they can be filtered with the Source dropdown.
 - Re-run analysis after large library syncs so counts stay accurate.
 
@@ -203,7 +203,7 @@ Groups in the admin nav (one page per route):
 | Daily 02:00–04:30 | `backup-database` 02:00, `refresh-ratings` 02:30, `sync-lldap-emails` 03:15, `cleanup-auth-state` 03:30, `reconcile-discovery-requests` 04:30 |
 | Daily 05:00–07:00 | `refresh-top-picks` 05:00, `enrich-studio-logos` 05:30, `sync-home-sections` 05:45, `generate-discovery-suggestions` 06:00, `enrich-mdblist` 07:00 |
 | Weekly (Sunday) | `generate-movie-recommendations` and `generate-series-recommendations` 04:00, `auto-request-top-picks`, `refresh-assistant-suggestions` and `refresh-ai-pricing` 00:00 |
-| Manual until given a schedule | `full-reset-movie-recommendations`, `full-reset-series-recommendations`, `refresh-library-gaps`, `rebuild-taste-profiles`, `evaluate-recommender`, `refresh-embedding-centering`, `refresh-recommendation-explanations`, `check-recommendation-explanations`, `remove-legacy-libraries`, `generate-title-analysis`, `translate-title-synopses`, `translate-title-analyses` |
+| Manual until given a schedule | `full-reset-movie-recommendations`, `full-reset-series-recommendations`, `refresh-library-gaps`, `refresh-series-gaps`, `rebuild-taste-profiles`, `evaluate-recommender`, `refresh-embedding-centering`, `refresh-recommendation-explanations`, `check-recommendation-explanations`, `remove-legacy-libraries`, `generate-title-analysis`, `translate-title-synopses`, `translate-title-analyses` |
 
 All 40 jobs, seeded — edit per job in **Operations → Jobs** (see [Job scheduling](admin/job-scheduling.md)). The scheduler reads the `job_config` table seeded from these defaults (the definitions file's cron fields are not what it reads). Times follow `TZ` (default `America/New_York`). Missed runs do not catch up.
 

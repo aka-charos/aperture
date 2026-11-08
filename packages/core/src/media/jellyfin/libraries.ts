@@ -5,6 +5,8 @@
 import type { Library, LibraryCreateResult } from '../types.js'
 import type { JellyfinLibrary, JellyfinUser } from './types.js'
 import type { JellyfinProviderBase } from './base.js'
+import { updateJellyfinItemSafely } from './itemUpdates.js'
+import { setForcedSortName } from '../sortName.js'
 
 type JellyfinVirtualFoldersResponse = JellyfinLibrary[] | { Items: JellyfinLibrary[] }
 
@@ -22,9 +24,10 @@ export async function getLibraries(
   const libraries = Array.isArray(response) ? response : response.Items ?? []
 
   return libraries.map((lib: JellyfinLibrary) => ({
-    // Jellyfin uses Id for VirtualFolders API
-    id: lib.Id,
-    guid: lib.Guid || lib.Id, // Jellyfin may use Id for permissions
+    // /Library/VirtualFolders identifies a library by ItemId (the id the Items API and
+    // user library permissions use). It has no Id or Guid field; those are kept only as fallbacks.
+    id: lib.ItemId || lib.Id || '',
+    guid: lib.ItemId || lib.Guid || lib.Id || '',
     name: lib.Name,
     collectionType: lib.CollectionType,
     path: lib.Path,
@@ -131,29 +134,14 @@ async function setLibrarySortTitle(
   // Prepend !!!!!! to sort title so library appears at top when sorted alphabetically
   const sortTitle = `!!!!!!${name}`
 
-  try {
-    // Fetch the full item data (required by Jellyfin API for updates)
-    const item = await provider.fetch<Record<string, unknown>>(`/Items/${libraryId}`, apiKey)
-
-    // Update the sort name and lock it to prevent automatic overwrites
-    item.ForcedSortName = sortTitle
-
-    // Merge with existing locked fields if any
-    const existingLocked = Array.isArray(item.LockedFields) ? item.LockedFields : []
-    if (!existingLocked.includes('SortName')) {
-      item.LockedFields = [...existingLocked, 'SortName']
-    }
-
-    // POST the full item back
-    await provider.fetch(`/Items/${libraryId}`, apiKey, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(item),
-    })
-  } catch {
-    // Non-fatal: library will still work, just won't sort to top
-    console.warn(`Failed to set sort title for library ${libraryId}`)
-  }
+  // Non-fatal: library will still work, just won't sort to top
+  await updateJellyfinItemSafely(
+    provider,
+    apiKey,
+    libraryId,
+    (item) => setForcedSortName(item, sortTitle),
+    { operation: 'setLibrarySortTitle' }
+  )
 }
 
 /**

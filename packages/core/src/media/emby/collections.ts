@@ -5,7 +5,9 @@
 import type { CollectionCreateResult } from '../types.js'
 import type { EmbyItemsResponse } from './types.js'
 import type { EmbyProviderBase } from './base.js'
-import { setForcedSortName, updateEmbyItemSafely } from './itemUpdates.js'
+import { updateEmbyItemSafely } from './itemUpdates.js'
+import { clearRankSortName, setForcedSortName } from '../sortName.js'
+import { mapWithConcurrency } from '../../lib/concurrency.js'
 import {
   buildCollectionCreateParams,
   buildItemSearchParams,
@@ -54,6 +56,19 @@ export async function createOrUpdateCollection(
       await provider.fetch(collectionItemsPath(collection.Id, itemIds), apiKey, {
         method: 'POST',
       })
+    }
+
+    // Items that left the ranking keep no rank prefix on the user's real library entry. Only a
+    // collection that writes prefixes may undo them (a rankAndPin: false collection never did,
+    // and the item's prefix may belong to Top Picks).
+    if (rankAndPin) {
+      const keep = new Set(itemIds)
+      const previousIds = (existingItems.Items ?? []).map((item) => item.Id)
+      await clearRankSortNames(
+        provider,
+        apiKey,
+        previousIds.filter((id) => !keep.has(id))
+      )
     }
   } else {
     const createParams = buildCollectionCreateParams(name, itemIds)
@@ -107,12 +122,24 @@ export async function updateCollectionOverview(
   )
 }
 
+/**
+ * @param opts.clearRankSortNames - Also remove the rank prefix the collection wrote on its
+ *   members; only for a collection created with rankAndPin (Top Picks).
+ */
 export async function deleteCollection(
   provider: EmbyProviderBase,
   apiKey: string,
-  collectionId: string
+  collectionId: string,
+  opts?: { clearRankSortNames?: boolean }
 ): Promise<void> {
+  // Read the members first: once the collection is gone they can no longer be listed
+  const memberIds = opts?.clearRankSortNames
+    ? await getCollectionItems(provider, apiKey, collectionId).catch(() => [])
+    : []
+
   await provider.fetch(`/Items/${collectionId}`, apiKey, { method: 'DELETE' })
+
+  await clearRankSortNames(provider, apiKey, memberIds)
 }
 
 export async function getCollectionItems(
@@ -208,4 +235,24 @@ async function setItemRankSortNames(
       { itemId, operation: 'setItemRankSortName' }
     )
   }
+}
+
+/**
+ * Undo setItemRankSortNames for items that are no longer ranked (the rule is `clearRankSortName`,
+ * shared with Jellyfin: only an exact "NN - <its name>" is cleared).
+ */
+async function clearRankSortNames(
+  provider: EmbyProviderBase,
+  apiKey: string,
+  itemIds: string[]
+): Promise<void> {
+  await mapWithConcurrency(itemIds, 4, (itemId) =>
+    updateEmbyItemSafely(
+      provider,
+      apiKey,
+      `/Items/${itemId}`,
+      (item) => (clearRankSortName(item) ? undefined : false),
+      { itemId, operation: 'clearRankSortName' }
+    )
+  )
 }

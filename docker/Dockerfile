@@ -4,7 +4,7 @@
 # ===================================================================
 
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 
 ENV HUSKY=0
@@ -35,7 +35,7 @@ RUN pnpm -r build
 
 # ===================================================================
 # Stage 3: Production dependencies only
-FROM node:20-alpine AS prod-deps
+FROM node:24-alpine AS prod-deps
 WORKDIR /app
 
 ENV HUSKY=0
@@ -52,13 +52,44 @@ RUN pnpm install --prod --frozen-lockfile --ignore-scripts && \
 
 # ===================================================================
 # Stage 4: Runtime
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
 # Install dependencies:
 # - fontconfig: Sharp SVG text rendering (needed for poster overlays)
-# - postgresql-client: pg_dump and pg_restore for database backup/restore
-RUN apk add --no-cache fontconfig postgresql-client
+# - postgresql18-client: pg_dump and pg_restore for database backup/restore
+#
+# The client major is PINNED to 18, ahead of the bundled pgvector:pg16 server,
+# on purpose. Both rules below are from PostgreSQL's own source (pg_dump's
+# minRemoteVersion/maxRemoteVersion and the archive's K_VERS):
+#
+#   - pg_dump accepts any server from 9.2 up to its OWN major, never a newer
+#     one. An 18 client backs up a 16, 17 or 18 server.
+#   - pg_restore reads archives from its own major and older. 17 and 18 write
+#     archive 1.16, which a 16 client refuses ("unsupported version (1.16) in
+#     file header"); every backup this fork has written came from a floating
+#     client that was already 17 or 18, so pinning DOWN to 16 would make the
+#     app unable to restore them.
+#
+# Pinned rather than the unpinned `postgresql-client`, which follows Alpine's
+# newest major and so changed under the image without any commit. The Alpine
+# release itself is NOT pinned (`node:24-alpine`), so Node security patches keep
+# arriving: Docker stops rebuilding older Alpine variants. Packages exist per
+# Alpine release (18 is in 3.23's and 3.24's main repository); if a future base
+# drops postgresql18-client, `apk add` fails the build loudly rather than
+# installing something else.
+#
+# Moving the database past 18 needs this line raised first, or backups stop,
+# and the Alpine release must offer the new package. The server and client
+# majors are also compared at startup (clientCompatibility.ts).
+RUN apk add --no-cache fontconfig postgresql18-client
+
+# The client tools must be the major pinned above, or the build stops here
+# rather than shipping a different pg_dump than this file promises.
+RUN for tool in pg_dump pg_restore psql; do \
+      "$tool" --version | grep -q '(PostgreSQL) 18\.' || \
+        { echo "$tool is not PostgreSQL 18: $("$tool" --version)"; exit 1; }; \
+    done
 
 # Add non-root user
 RUN addgroup --system --gid 1001 nodejs && \

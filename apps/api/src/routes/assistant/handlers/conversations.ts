@@ -6,7 +6,34 @@ import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
 import { requireCapability } from '../../../lib/permissions.js'
 import type { ConversationRow, MessageRow } from '../types.js'
-import { isTurnActive } from '../helpers/activeTurns.js'
+import { isTurnActive, stopTurn } from '../helpers/activeTurns.js'
+import { suggestNextReplies } from '../nextReplies.js'
+import { withInferenceContext } from '@aperture/core'
+
+/** The longest title a conversation may be renamed to. */
+export const CONVERSATION_TITLE_MAX = 200
+
+/**
+ * A title is a short string: anything else (another type, a megabyte of text)
+ * used to be stored as sent. Automatic titles are about 50 characters.
+ */
+export const renameConversationSchema = {
+  tags: ['ai-assistant'],
+  body: {
+    type: 'object' as const,
+    required: ['title'] as string[],
+    properties: { title: { type: 'string' as const, minLength: 1, maxLength: CONVERSATION_TITLE_MAX } },
+  },
+}
+
+/** Creating takes the same title rules; the title is optional ('New Chat'). */
+export const createConversationSchema = {
+  tags: ['ai-assistant'],
+  body: {
+    type: 'object' as const,
+    properties: { title: { type: 'string' as const, minLength: 1, maxLength: CONVERSATION_TITLE_MAX } },
+  },
+}
 
 export function registerConversationHandlers(fastify: FastifyInstance) {
   /**
@@ -34,10 +61,10 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
    */
   fastify.post<{ Body: { title?: string } }>(
     '/api/assistant/conversations',
-    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: createConversationSchema },
     async (request, reply) => {
       const user = request.user as SessionUser
-      const { title = 'New Chat' } = request.body || {}
+      const title = request.body?.title?.trim() || 'New Chat'
 
       const conversation = await queryOne<ConversationRow>(
         `INSERT INTO assistant_conversations (user_id, title)
@@ -106,11 +133,14 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
    */
   fastify.patch<{ Params: { id: string }; Body: { title: string } }>(
     '/api/assistant/conversations/:id',
-    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: renameConversationSchema },
     async (request, reply) => {
       const user = request.user as SessionUser
       const { id } = request.params
-      const { title } = request.body
+      const title = request.body.title.trim()
+      if (!title) {
+        return reply.status(400).send({ error: 'Title is required' })
+      }
 
       const conversation = await queryOne<ConversationRow>(
         `UPDATE assistant_conversations
@@ -150,6 +180,58 @@ export function registerConversationHandlers(fastify: FastifyInstance) {
       }
 
       return reply.status(204).send()
+    }
+  )
+
+  /**
+   * POST /api/assistant/conversations/:id/stop
+   * End the turn running in this conversation: its model calls stop, and what
+   * was written so far is saved (handlers/chat.ts). Only the conversation's
+   * own user can stop it; nothing running and someone else's turn both answer
+   * `{ stopped: false }`, so the reply says nothing about other accounts.
+   */
+  fastify.post<{ Params: { id: string } }>(
+    '/api/assistant/conversations/:id/stop',
+    { preHandler: [requireAuth, requireCapability('assistant')], schema: { tags: ["ai-assistant"] } },
+    async (request, reply) => {
+      const user = request.user as SessionUser
+      return reply.send({ stopped: stopTurn(request.params.id, user.id) })
+    }
+  )
+
+  /**
+   * POST /api/assistant/conversations/:id/suggestions
+   * Up to three short messages the reader might send next, for the latest
+   * answer (../nextReplies.ts). Writes nothing; a POST because it spends a
+   * model call. Any failure answers an empty list: the suggestions are an
+   * extra, and the reader is shown nothing rather than an error.
+   */
+  fastify.post<{ Params: { id: string } }>(
+    '/api/assistant/conversations/:id/suggestions',
+    {
+      preHandler: [requireAuth, requireCapability('assistant')],
+      schema: { tags: ['ai-assistant'], summary: 'Suggested next replies for the latest answer' },
+    },
+    async (request, reply) => {
+      const user = request.user as SessionUser
+      const { id } = request.params
+      const owned = await queryOne<{ id: string }>(
+        `SELECT id FROM assistant_conversations WHERE id = $1 AND user_id = $2`,
+        [id, user.id]
+      ).catch(() => null)
+      if (!owned) return reply.status(404).send({ error: 'Conversation not found' })
+      // An answer still being written is not the latest answer yet.
+      if (isTurnActive(id)) return reply.send({ suggestions: [] })
+      try {
+        const suggestions = await withInferenceContext(
+          { feature: 'assistant.nextReplies', sessionId: id, userId: user.id },
+          () => suggestNextReplies(id, user.id)
+        )
+        return reply.send({ suggestions })
+      } catch (err) {
+        request.log.warn({ err, conversationId: id }, 'Suggested replies not written')
+        return reply.send({ suggestions: [] })
+      }
     }
   )
 

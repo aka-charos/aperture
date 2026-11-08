@@ -9,6 +9,7 @@
 import type { PersonDetails } from '../types.js'
 import type { JellyfinItem, JellyfinItemsResponse } from './types.js'
 import { logger, type JellyfinProviderBase } from './base.js'
+import { readJellyfinItem } from './itemUpdates.js'
 
 /** On Person items: PremiereDate = birth date, EndDate = death date, ProductionLocations[0] = birthplace. */
 const PERSON_DETAIL_FIELDS = 'Overview,PremiereDate,EndDate,ProductionLocations,ProviderIds'
@@ -36,10 +37,7 @@ export async function getPersonDetails(
 ): Promise<PersonDetails | null> {
   if (opts.personId) {
     try {
-      const item = await provider.fetch<JellyfinItem>(
-        `/Items/${opts.personId}?Fields=${PERSON_DETAIL_FIELDS}`,
-        apiKey
-      )
+      const item = await readJellyfinItem<JellyfinItem>(provider, apiKey, opts.personId)
       if (item?.Id) {
         return mapJellyfinItemToPersonDetails(item)
       }

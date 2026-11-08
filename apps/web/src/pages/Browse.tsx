@@ -211,10 +211,10 @@ export function BrowsePage() {
         />
 
         <ToggleButtonGroup value={currentViewMode} exclusive onChange={handleViewModeChange} size="small" data-tour="browse-view">
-          <ToggleButton value="grid">
+          <ToggleButton value="grid" aria-label={t('browse.viewGrid')}>
             <GridViewIcon fontSize="small" />
           </ToggleButton>
-          <ToggleButton value="list">
+          <ToggleButton value="list" aria-label={t('browse.viewList')}>
             <ViewListIcon fontSize="small" />
           </ToggleButton>
         </ToggleButtonGroup>

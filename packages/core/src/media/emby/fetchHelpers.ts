@@ -2,11 +2,27 @@
  * Emby fetch helpers — timeout, error normalization, and response parsing.
  */
 
+import { MediaServerHttpError } from '../httpError.js'
+
 export const EMBY_FETCH_TIMEOUT_MS = 60_000
 
 export function embyTimeoutError(baseUrl: string): Error {
   return new Error(
     `Connection to Emby timed out after ${EMBY_FETCH_TIMEOUT_MS / 1000} seconds. Please check that your media server URL (${baseUrl}) is accessible from the Aperture container.`
+  )
+}
+
+/** Every request slot stayed taken for the whole wait. */
+export function embyBusyError(): Error {
+  return new Error(
+    `Emby is busy: Aperture's requests to it did not finish within ${EMBY_FETCH_TIMEOUT_MS / 1000} seconds, so this one was not sent.`
+  )
+}
+
+/** Emby answered, then stopped sending (or broke off) partway through. */
+export function embyIncompleteResponseError(): Error {
+  return new Error(
+    'Emby answered but stopped partway through its response. The server is reachable; it may be overloaded.'
   )
 }
 
@@ -16,8 +32,8 @@ export function embyConnectionError(baseUrl: string): Error {
   )
 }
 
-export function embyHttpError(status: number, statusText: string): Error {
-  return new Error(`Emby API error: ${status} ${statusText}`)
+export function embyHttpError(status: number, statusText: string, body: string): MediaServerHttpError {
+  return new MediaServerHttpError('Emby', status, statusText, body)
 }
 
 export function isEmbyNotFoundError(err: unknown): boolean {

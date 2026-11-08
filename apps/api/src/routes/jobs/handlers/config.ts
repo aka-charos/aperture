@@ -197,7 +197,12 @@ export async function registerConfigHandlers(fastify: FastifyInstance) {
         try {
           await refreshJobSchedule(name)
         } catch (schedErr) {
+          // Saved but not running: say so, or the dialog closes on a schedule
+          // the scheduler never took up.
           logger.error({ err: schedErr, job: name }, 'Failed to refresh job schedule')
+          return reply.status(503).send({
+            error: 'The schedule was saved, but the scheduler could not apply it. Save again to retry.',
+          })
         }
 
         return reply.send({

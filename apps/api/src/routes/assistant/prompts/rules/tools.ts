@@ -41,6 +41,8 @@ CRITICAL: Choose the RIGHT search tool:
 - **semanticSearch** - Same kind of query, ranked by text similarity ALONE: no personalization, no watched filter. For impersonal library lookups ("does the library have anything about X").
 - **searchContent** - For specific/filterable searches (titles, genres, years, ratings, content ratings, directors, actors, studios, runtime, etc.)
 
+A title the user NAMES goes to searchContent (query) or getContentDetails (title) exactly as they wrote it, typos included: both find "The Housemaid" from "Housemaid" or "Housemaids", and list title matches first. Close spellings are looked for only when no title says the words. A match found only by a close spelling is a guess (getContentDetails marks it **closeMatchFor**): name the title you found, and ask when several are plausible. If a named title is still not found and they described it, search the description with semanticSearch.
+
 CRITICAL: a limit the user states is a filter, never part of the search text. searchMyRecommendations, semanticSearch and findCandidatesInLibrary all take **genre, yearMin, yearMax, minRating, maxRuntime**, and the search enforces them; putting "under 90 minutes" in a concept enforces nothing, and a three-hour film can still come back as the closest match. Pass only what they actually asked for, not what you think would suit them. If a result carries **limitsNote**, what it says is true of the answer: say it plainly. Any fallback search gets the same limits. The other list tools (getTopRated, getUnwatched, getMyRecommendations and the like) do not know these limits, and stop being available once a search has stated them.
 
 Note: when a discovery/web tool is available, an open "find me something like…" request goes there FIRST — it is the primary path for recommendations. The tools above are for library-scoped questions and for falling back.
@@ -124,8 +126,9 @@ CRITICAL: national cinema is **country**, never genre and never query:
 - "Korean thrillers" → searchContent(country: "South Korea", genre: "Thriller")
 - "French film noir" → semanticSearch(concept: "film noir", country: "France")
 
-The last one is the shape to learn. **query** matches literal text in the title
-or plot summary, so a style word put there finds nothing: almost no film noir
+The last one is the shape to learn. **query** matches words written in the title
+or plot summary (and, when no title has them, titles spelled nearly like them),
+so a style word put there finds nothing: almost no film noir
 has "noir" written in its title or synopsis, and there is no "Film Noir" genre
 either. When a request combines a *style* with a *fact* — a mood, movement or
 feel plus a country, era or watch status — the style goes to semanticSearch as

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useCallback, useEffect, useState } from 'react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { PAGE_SIZE } from '../constants'
+import type { ListPage } from './listRequests'
+import { usePagedList } from './usePagedList'
 import type { BrowsePerson } from '../types'
 import type { PeopleUrlState } from '../urlState'
 
@@ -19,11 +20,21 @@ interface PeopleResponse {
   total: number
 }
 
+/** One page of the people list, out of the response body (stable for usePagedList). */
+function readPeople(body: unknown): ListPage<BrowsePerson> {
+  const data = body as PeopleResponse
+  return { items: data.people, total: data.total }
+}
+
 interface BrowsePeopleResult {
   people: BrowsePerson[]
   peopleLoading: boolean
   peopleLoadingMore: boolean
   peopleError: string | null
+  /** The failure was a later page: show it at the end of the list, not above it. */
+  peopleErrorAtEnd: boolean
+  /** Ask again for the page that failed (shown with the error). */
+  retryPeople: () => void
   peopleSearch: string
   setPeopleSearch: Dispatch<SetStateAction<string>>
   peopleSortBy: PeopleSortBy
@@ -34,122 +45,53 @@ interface BrowsePeopleResult {
 }
 
 export function useBrowsePeople({ tabIndex, initialTabIsPeople, initial }: UseBrowsePeopleOptions): BrowsePeopleResult {
-  const { t } = useTranslation()
-  const [people, setPeople] = useState<BrowsePerson[]>([])
-  const [peopleLoading, setPeopleLoading] = useState(() => initialTabIsPeople)
-  const [peopleLoadingMore, setPeopleLoadingMore] = useState(false)
-  const [peopleError, setPeopleError] = useState<string | null>(null)
   const [peopleSearch, setPeopleSearch] = useState(initial?.search ?? '')
   const [peopleSortBy, setPeopleSortBy] = useState<PeopleSortBy>(initial?.sortBy ?? 'credits')
-  const [peoplePage, setPeoplePage] = useState(1)
-  const [peopleHasMore, setPeopleHasMore] = useState(true)
-  const [peopleTotal, setPeopleTotal] = useState(0)
-  const peopleObserverRef = useRef<IntersectionObserver | null>(null)
-  const peopleLoadMoreRef = useRef<HTMLDivElement | null>(null)
-  // Loaded-count lives in a ref, not state: putting people.length in fetchPeople's
-  // deps recreates the callback after every fetch, and the fetch effect depends
-  // on fetchPeople — an infinite refetch loop (grid flickers content/skeleton).
-  const peopleCountRef = useRef(0)
+  const onTab = tabIndex === 2
 
-  const resetPeople = useCallback(() => {
-    setPeople([])
-    setPeoplePage(1)
-    setPeopleHasMore(true)
-    peopleCountRef.current = 0
-  }, [])
-
-  const fetchPeople = useCallback(
-    async (page: number, append = false) => {
-      if (append) {
-        setPeopleLoadingMore(true)
-      } else {
-        setPeopleLoading(true)
-      }
-
-      try {
-        const params = new URLSearchParams({
-          page: String(page),
-          pageSize: String(PAGE_SIZE),
-          sortBy: peopleSortBy,
-        })
-        if (peopleSearch) params.set('search', peopleSearch)
-
-        const response = await fetch(`/api/discover/people?${params}`, { credentials: 'include' })
-        if (!response.ok) {
-          setPeopleError(t('browse.errors.loadPeople'))
-          return
-        }
-
-        const data = (await response.json()) as PeopleResponse
-        if (append) {
-          setPeople((prev) => [...prev, ...data.people])
-        } else {
-          setPeople(data.people)
-        }
-        const loadedCount = append ? peopleCountRef.current + data.people.length : data.people.length
-        peopleCountRef.current = loadedCount
-        setPeopleTotal(data.total)
-        setPeopleHasMore(data.people.length === PAGE_SIZE && loadedCount < data.total)
-        setPeopleError(null)
-      } catch {
-        setPeopleError(t('browse.errors.connect'))
-      } finally {
-        setPeopleLoading(false)
-        setPeopleLoadingMore(false)
-      }
+  const pageUrl = useCallback(
+    (page: number) => {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE), sortBy: peopleSortBy })
+      if (peopleSearch) params.set('search', peopleSearch)
+      return `/api/discover/people?${params}`
     },
-    [peopleSearch, peopleSortBy, t]
+    [peopleSearch, peopleSortBy]
   )
 
+  // The key changes whenever the effect below starts a new list, the tab
+  // included: it does nothing off the People tab and starts over on return.
+  const list = usePagedList<BrowsePerson>({
+    key: onTab ? `${peopleSortBy}\n${peopleSearch}` : null,
+    active: onTab,
+    pageUrl,
+    read: readPeople,
+    failedKey: 'browse.errors.loadPeople',
+    initialLoading: initialTabIsPeople,
+  })
+
+  const { reset: resetList, load: loadPage } = list
   useEffect(() => {
-    if (tabIndex !== 2) return
-    resetPeople()
+    if (!onTab) return
+    resetList()
     const debounce = setTimeout(() => {
-      void fetchPeople(1, false)
+      void loadPage(1, false)
     }, peopleSearch ? 300 : 0)
     return () => clearTimeout(debounce)
-  }, [fetchPeople, peopleSearch, peopleSortBy, resetPeople, tabIndex])
-
-  useEffect(() => {
-    if (peopleObserverRef.current) {
-      peopleObserverRef.current.disconnect()
-    }
-
-    if (!peopleHasMore || peopleLoading || peopleLoadingMore || tabIndex !== 2) return
-
-    peopleObserverRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && peopleHasMore && !peopleLoadingMore) {
-          const nextPage = peoplePage + 1
-          setPeoplePage(nextPage)
-          void fetchPeople(nextPage, true)
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    if (peopleLoadMoreRef.current) {
-      peopleObserverRef.current.observe(peopleLoadMoreRef.current)
-    }
-
-    return () => {
-      if (peopleObserverRef.current) {
-        peopleObserverRef.current.disconnect()
-      }
-    }
-  }, [fetchPeople, peopleHasMore, peopleLoading, peopleLoadingMore, peoplePage, tabIndex])
+  }, [loadPage, onTab, peopleSearch, resetList])
 
   return {
-    people,
-    peopleLoading,
-    peopleLoadingMore,
-    peopleError,
+    people: list.state.items,
+    peopleLoading: list.state.loading,
+    peopleLoadingMore: list.state.loadingMore,
+    peopleError: list.state.error?.message ?? null,
+    peopleErrorAtEnd: list.state.error?.during === 'more',
+    retryPeople: list.retry,
     peopleSearch,
     setPeopleSearch,
     peopleSortBy,
     setPeopleSortBy,
-    peopleHasMore,
-    peopleTotal,
-    peopleLoadMoreRef,
+    peopleHasMore: list.state.hasMore,
+    peopleTotal: list.state.total,
+    peopleLoadMoreRef: list.loadMoreRef,
   }
 }

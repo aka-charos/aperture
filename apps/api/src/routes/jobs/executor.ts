@@ -30,11 +30,14 @@ import {
   reconcileDiscoveryRequests,
   getDiscoveryConfig,
   createJobProgress,
+  createQueuedJobProgress,
+  startQueuedJob,
   setJobStep,
   addLog,
   completeJob,
   failJob,
   isJobCancelled,
+  getJobProgress,
   updateJobProgress,
   generateTitleAnalyses,
   generateTitleTranslations,
@@ -47,6 +50,7 @@ import {
   sendNotificationEmails,
   createChildLogger,
   runLibraryGapAnalysis,
+  runSeriesGapAnalysis,
   rebuildAllTasteProfiles,
   refreshCenteredEmbeddings,
   getEmbeddingSetsReport,
@@ -58,10 +62,12 @@ import {
   checkRecommendationExplanations,
   withInferenceContext,
   refreshQualityRatingsSafely,
+  type JobProgress,
 } from '@aperture/core'
 import { syncAllTraktRatings } from '../trakt/index.js'
 import { refreshAssistantSuggestions } from '../assistant/jobs/refreshSuggestions.js'
 import { releaseJob } from './state.js'
+import { MEDIA_SERVER_JOBS, mediaServerTurns, runInTurn } from './mediaServerTurns.js'
 import { jobDefinitions } from './definitions.js'
 import { resolveRunLimit } from './runLimit.js'
 
@@ -92,7 +98,25 @@ export async function runJob(
   jobId: string,
   trigger: JobTrigger = 'manual'
 ): Promise<void> {
-  return withInferenceContext({ feature: `job:${name}` }, () => executeJob(name, jobId, trigger))
+  return withInferenceContext({ feature: `job:${name}` }, () =>
+    MEDIA_SERVER_JOBS.has(name)
+      ? executeInTurn(name, jobId, trigger)
+      : executeJob(name, jobId, trigger)
+  )
+}
+
+/** Runs a media-server job when its turn comes (mediaServerTurns.ts runInTurn). */
+function executeInTurn(name: string, jobId: string, trigger: JobTrigger): Promise<void> {
+  return runInTurn<JobProgress>(name, jobId, () => executeJob(name, jobId, trigger), {
+    turns: mediaServerTurns,
+    isCancelled: isJobCancelled,
+    createQueued: createQueuedJobProgress,
+    startQueued: startQueuedJob,
+    current: getJobProgress,
+    complete: (id) => completeJob(id),
+    releaseSlot: releaseJob,
+    log: (message) => logger.info({ job: name, jobId }, message),
+  })
 }
 
 async function executeJob(name: string, jobId: string, trigger: JobTrigger): Promise<void> {
@@ -962,22 +986,44 @@ async function executeJob(name: string, jobId: string, trigger: JobTrigger): Pro
       case 'refresh-library-gaps': {
         createJobProgress(jobId, 'refresh-library-gaps', 4)
         const result = await runLibraryGapAnalysis({ jobId })
-        completeJob(jobId, {
-          runId: result.runId,
-          collectionsScanned: result.collectionsScanned,
-          totalParts: result.totalParts,
-          ownedParts: result.ownedParts,
-          missingCount: result.missingCount,
-        })
-        logger.info(
-          {
-            job: name,
-            jobId,
+        // A cancelled scan kept nothing, and cancelJob already wrote its job_runs row.
+        if (!result.cancelled) {
+          completeJob(jobId, {
             runId: result.runId,
+            collectionsScanned: result.collectionsScanned,
+            totalParts: result.totalParts,
+            ownedParts: result.ownedParts,
             missingCount: result.missingCount,
-          },
-          `✅ Library gap analysis complete`
-        )
+          })
+          logger.info(
+            {
+              job: name,
+              jobId,
+              runId: result.runId,
+              missingCount: result.missingCount,
+            },
+            `✅ Library gap analysis complete`
+          )
+        }
+        break
+      }
+      case 'refresh-series-gaps': {
+        createJobProgress(jobId, 'refresh-series-gaps', 3)
+        const result = await runSeriesGapAnalysis({ jobId })
+        // A cancelled scan kept nothing, and cancelJob already wrote its job_runs row.
+        if (!result.cancelled) {
+          completeJob(jobId, {
+            runId: result.runId,
+            showsScanned: result.showsScanned,
+            showsListed: result.showsListed,
+            missingSeasons: result.missingSeasons,
+            partialSeasons: result.partialSeasons,
+          })
+          logger.info(
+            { job: name, jobId, runId: result.runId, missingSeasons: result.missingSeasons },
+            `✅ TV gap analysis complete`
+          )
+        }
         break
       }
       case 'generate-discovery-suggestions': {

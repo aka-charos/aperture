@@ -307,6 +307,7 @@ export {
 
 // Migrations
 export { runMigrations, getMigrationStatus, type MigrationResult } from './migrations.js'
+export { forgetOffsiteRecovery } from './analysis/offsite.js'
 
 // Media Server Providers
 export {
@@ -315,6 +316,12 @@ export {
   createMediaServerProvider,
   getMediaServerProvider,
   InvalidCredentialsError,
+  detectMediaServerType,
+  classifyMediaServer,
+  describeDetection,
+  getMediaServerCapabilities,
+  type DetectedMediaServer,
+  type MediaServerCapabilities,
   type MediaServerProvider,
   type MediaServerType,
   type AuthResult,
@@ -456,6 +463,8 @@ export {
 // Job Progress
 export {
   createJobProgress,
+  createQueuedJobProgress,
+  startQueuedJob,
   setJobStep,
   updateJobProgress,
   addLog,
@@ -487,7 +496,11 @@ export {
   normalizeScheduleDays,
   isBiweeklyRunDue,
   isScheduledRunDue,
+  getLastCompletedRunStarts,
   BIWEEKLY_MIN_DAYS,
+  nextScheduledRun,
+  schedulerTimeZone,
+  DEFAULT_SCHEDULER_TIME_ZONE,
   type JobConfig,
   type ScheduleType,
 } from './jobs/index.js'
@@ -534,6 +547,11 @@ export {
 
 // AI error descriptions -- compact enough to log, unlike the raw APICallError
 export { describeAiError, type AiErrorDescription } from './lib/aiErrors.js'
+
+// JSON a model wrote by hand: strict parse, then one retry with `\'` repaired
+export { parseModelJson, repairModelJsonEscapes } from './lib/modelJson.js'
+// Short interactive AI text (sparkle buttons, preview notes, the assistant's suggested replies).
+export { generateShortText, getShortTextWriter, type ShortTextWriter } from './lib/shortText.js'
 
 export {
   WATCH_DATE_BANDS,
@@ -1060,6 +1078,15 @@ export {
   formatBytes,
   cancelBackupProcess,
   checkDatabaseClientCompatibility,
+  isDatabaseRestoring,
+  isRestoreInProgress,
+  restoreInTransaction,
+  uploadedBackupFilename,
+  UPLOAD_TYPE_ERROR,
+  BACKUP_UPLOAD_MAX_BYTES,
+  backupUploadTooLargeMessage,
+  BackupUploadTooLargeError,
+  writeBackupUpload,
   type BackupConfig,
   type BackupInfo,
   type BackupResult,
@@ -1437,6 +1464,8 @@ export {
   runLibraryGapAnalysis,
   getLatestCompletedGapRun,
   getActiveRunningGapRun,
+  getFailedGapRun,
+  closeInterruptedGapRuns,
   getDistinctMovieCollectionIds,
   getLibraryMovieTmdbIdSet,
   getMovieTmdbIdsWithActiveDiscoveryRequest,
@@ -1456,6 +1485,28 @@ export {
   type GapResultsSortDir,
 } from './gap-analysis/index.js'
 
+// Gap analysis (aired TV seasons vs the episodes the library holds)
+export {
+  runSeriesGapAnalysis,
+  getLatestCompletedSeriesGapRun,
+  getActiveSeriesGapRun,
+  getFailedSeriesGapRun,
+  closeInterruptedSeriesGapRuns,
+  getSeriesGapPrerequisites,
+  countEpisodesChangedSince,
+  getActiveSeriesRequests,
+  listSeriesGapShows,
+  type SeriesGapRun,
+  type SeriesGapScanResult,
+} from './gap-analysis/series.js'
+export {
+  readRequestedSeasons,
+  seasonsStillToRequest,
+  type SeriesGapShow,
+  type SeriesGapSeason,
+  type SeasonStanding,
+} from './gap-analysis/seriesRules.js'
+
 // Taste Profile System
 export {
   // Profile retrieval and storage
@@ -1474,12 +1525,14 @@ export {
   // Franchise preferences
   getUserFranchisePreferences,
   setFranchisePreference,
+  setFranchisePreferences,
   bulkUpdateFranchisePreferences,
   getFranchiseAffinity,
   getFranchiseAffinityMap,
   // Genre weights
   getUserGenreWeights,
   setGenreWeight,
+  setGenreWeights,
   bulkUpdateGenreWeights,
   getGenreAffinity,
   buildGenreWeightMap,

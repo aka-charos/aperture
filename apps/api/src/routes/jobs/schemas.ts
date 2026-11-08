@@ -52,6 +52,14 @@ export const jobComponentSchemas = {
           maxItemsPerRun: { type: 'integer' as const, nullable: true, description: "Configured items per run; null means the job's default" },
           isEnabled: { type: 'boolean' as const, description: 'Whether schedule is enabled' },
           formatted: { type: 'string' as const, description: 'Human-readable schedule description' },
+          nextRunAt: {
+            type: 'string' as const,
+            format: 'date-time',
+            nullable: true,
+            description:
+              'When the scheduler next runs the job, from the schedule it is actually running, in its own time zone; null when it runs none (manual, switched off, or not applied)',
+          },
+          timeZone: { type: 'string' as const, description: 'The time zone the schedule is read in (the container TZ)' },
         },
       },
       progress: {
@@ -63,6 +71,10 @@ export const jobComponentSchemas = {
           currentStep: { type: 'string' as const, nullable: true, description: 'Current step description' },
           itemsProcessed: { type: 'integer' as const, description: 'Items processed so far' },
           itemsTotal: { type: 'integer' as const, description: 'Total items to process' },
+          queued: {
+            type: 'boolean' as const,
+            description: 'Waiting for another media-server job to finish before it starts',
+          },
         },
       },
       lastRun: {
@@ -249,7 +261,8 @@ const updateJobConfig = {
           { type: 'null' as const },
           { type: 'number' as const, minimum: 0, maximum: 59 },
         ],
-        description: 'Minute to run (0-59). Defaults to 0.',
+        description:
+          'Minute to run (0-59). Omitted: :00 for a time of day; an interval job keeps its default offset.',
       },
       scheduleDayOfWeek: {
         anyOf: [
