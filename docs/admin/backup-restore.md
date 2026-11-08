@@ -49,6 +49,23 @@ Everything in Postgres: content, embeddings, users, settings, assistant conversa
 
 `pg_dump -F c` against `DATABASE_URL` works from outside the container too — same restore path via `pg_restore`. See [External database](external-database.md) for the compose variant that keeps Postgres outside Aperture's container.
 
+## Client and Server Versions
+
+The app's image carries the **PostgreSQL 18** client tools, ahead of the bundled PostgreSQL 16 database on purpose:
+
+- `pg_dump` works against any server up to its own major, so an 18 client backs up a 16, 17 or 18 database. Moving the database past 18 needs a newer image first, or backups stop; the startup log says so.
+- Files written by a 17 or 18 client can only be read by a 17 or newer `pg_restore`. The tools inside a PostgreSQL 16 database container refuse them (`unsupported version (1.16) in file header`).
+
+**Restore through the app whenever it runs.** **Restore** above uses the app's own tools, empties the schema first so a backup older than the app restores cleanly, and applies everything in one transaction, so a failure changes nothing.
+
+**By hand, only into an empty database**, for example a fresh volume on a new host before the app has started. A newer client's `pg_restore` always sends `SET transaction_timeout = 0`, which PostgreSQL 16 refuses, and a restore that carries on past an error can leave some tables replaced and others not. So convert the backup to SQL, drop that line, and apply it in one transaction that stops at the first error:
+
+```bash
+docker run --rm -i --network container:aperture-db -e PGPASSWORD=app pgvector/pgvector:pg18 sh -c "pg_restore --no-owner --no-acl --file=- | sed '/^SET transaction_timeout = 0;$/d' | psql -h 127.0.0.1 -U app -d aperture --single-transaction -v ON_ERROR_STOP=1" < backup.dump
+```
+
+Replace `aperture-db` with your database container's name, and `app` (password, user) and `aperture` (database) with the values in your `DATABASE_URL`. With an [external database](external-database.md), drop `--network container:…` and point `-h` at its host. The command prints `COMMIT` at the end when it worked; on any error it rolls back and the database stays empty.
+
 ---
 
 **Related:** [Database management](database-management.md) · [External database](external-database.md) · [Job scheduling](job-scheduling.md)

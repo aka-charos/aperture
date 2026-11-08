@@ -847,7 +847,7 @@ Existing verdicts are read back from `docs/fork-divergence.tsv` by commit hash, 
 
 ## Tech stack
 
-- **Backend** — Node 20, Fastify 5, TypeScript, PostgreSQL + pgvector, raw SQL (no ORM), pino, node-cron, nodemailer
+- **Backend** — Node 24, Fastify 5, TypeScript, PostgreSQL + pgvector, raw SQL (no ORM), pino, node-cron, nodemailer
 - **Frontend** — React 18, Vite 6, MUI 6, react-router 7, i18next, assistant-ui, d3, recharts
 - **AI** — Vercel AI SDK 5 with providers for OpenAI, Anthropic, Google, Groq, DeepSeek, OpenRouter, Ollama and Hugging Face; LM Studio, Z.AI and any other OpenAI-compatible endpoint through the OpenAI-compatible provider
 - **Infrastructure** — Docker, pnpm workspaces, GitHub Actions. `:dev` images are amd64; arm64 is built for `main`, release tags and manual workflow runs
