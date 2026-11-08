@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequestGuard } from '../../../lib/requestGuard'
-import { afterListPage, loadListPage, retryRequest, type ListPage } from './listRequests'
+import { loadListPage, type ListPage } from './listRequests'
 
 /**
  * The bug this pins: a slow Browse reply to an older search landed after the
@@ -129,48 +129,17 @@ test('only a current request reports an error', async () => {
   assert.deepEqual(await cancelled, { kind: 'stale' })
 })
 
-test('afterListPage counts rows on screen and stops on a short or complete page', () => {
-  assert.deepEqual(afterListPage(0, 50, 120, false, 50), { loaded: 50, hasMore: true })
-  assert.deepEqual(afterListPage(50, 50, 120, true, 50), { loaded: 100, hasMore: true })
-  assert.deepEqual(afterListPage(100, 20, 120, true, 50), { loaded: 120, hasMore: false })
-  assert.deepEqual(afterListPage(0, 50, 50, false, 50), { loaded: 50, hasMore: false })
-  // Page one replaces, whatever was loaded before.
-  assert.deepEqual(afterListPage(300, 50, 120, false, 50), { loaded: 50, hasMore: true })
-})
-
-test('Retry asks again for the page that failed', () => {
-  // Nothing on screen: page one failed.
-  assert.deepEqual(retryRequest(0, 1), { page: 1, append: false })
-  // Two pages on screen (the page number only moves when a page arrives), so
-  // the failure was page three, appended.
-  assert.deepEqual(retryRequest(100, 2), { page: 3, append: true })
-})
-
-test('a failed "load more" neither skips its page nor loops', () => {
-  for (const [name, error, setPage] of [
-    ['useBrowseMovies', 'moviesError', 'setMoviePage'],
-    ['useBrowseSeries', 'seriesError', 'setSeriesPage'],
-    ['useBrowsePeople', 'peopleError', 'setPeoplePage'],
-  ]) {
-    const source = readFileSync(new URL(`./${name}.ts`, import.meta.url), 'utf8')
-    // The scroll observer stays off while an error shows; with the end of the
-    // list still on screen, a new one would ask again at once, forever.
-    assert.match(source, new RegExp(`if \\(${error} \\|\\| !`), `${name}: observer runs during an error`)
-    // The page number moves when a page ARRIVES (inside the success branch,
-    // as `setXPage(page)`), never before the request, or a failure skips it.
-    assert.doesNotMatch(source, new RegExp(`${setPage}\\([^)]*\\+ 1|${setPage}\\(nextPage`), `${name}: page advanced ahead of its reply`)
-    assert.match(source, new RegExp(`\\.current = next\\.loaded\\n\\s+${setPage}\\(page\\)`), `${name}: page set before success`)
-    assert.match(source, /retryRequest\(/, `${name}: no retry`)
-  }
-})
-
-test('every Browse list hook pages through the shared loader and guard', () => {
+test('every Browse list pages through the one shared hook', () => {
   for (const name of ['useBrowseMovies', 'useBrowseSeries', 'useBrowsePeople']) {
     const source = readFileSync(new URL(`./${name}.ts`, import.meta.url), 'utf8')
-    assert.match(source, /= useListRequests\(/, `${name}: no list request guard`)
-    assert.match(source, /await loadListPage\(\{\s*guard: requests,/, `${name}: pages without the shared loader`)
-    assert.match(source, /if \(outcome\.kind === 'stale'\) return\n/, `${name}: a stale reply is not dropped first`)
+    assert.match(source, /= usePagedList<\w+>\(\{/, `${name}: pages without usePagedList`)
+    // Paging, its observer and its requests live in usePagedList alone.
+    assert.doesNotMatch(source, /IntersectionObserver|loadListPage\(|useListRequests\(/, `${name}: pages by hand`)
     // The list itself is never fetched by hand (metadata fetches are fine).
     assert.doesNotMatch(source, /fetch\(`\/api\/(movies|series|discover\/people)\?/, `${name}: fetches its list directly`)
   }
+  const shared = readFileSync(new URL('./usePagedList.ts', import.meta.url), 'utf8')
+  assert.match(shared, /await loadListPage\(\{ guard,/)
+  assert.match(shared, /if \(outcome\.kind === 'stale'\) return\n/, 'a stale reply is not dropped first')
+  assert.match(shared, /shouldLoadMore\(state, active\)/, 'the observer ignores the paging rule')
 })

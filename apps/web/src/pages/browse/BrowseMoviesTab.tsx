@@ -246,7 +246,7 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
         )}
       </Box>
 
-      {movies.moviesError && (
+      {movies.moviesError && !movies.moviesErrorAtEnd && (
         <Alert
           severity="error"
           sx={{ mb: 4 }}
@@ -263,11 +263,13 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
       {movies.moviesLoading ? (
         renderSkeleton(viewMode)
       ) : movies.movies.length === 0 ? (
-        <Typography color="text.secondary">
-          {movies.movieSearch || movies.movieGenre || movies.collection || movies.activeFilters.length > 0
-            ? t('browse.empty.moviesFiltered')
-            : t('browse.empty.moviesNoSync')}
-        </Typography>
+        movies.moviesError ? null : (
+          <Typography color="text.secondary">
+            {movies.movieSearch || movies.movieGenre || movies.collection || movies.activeFilters.length > 0
+              ? t('browse.empty.moviesFiltered')
+              : t('browse.empty.moviesNoSync')}
+          </Typography>
+        )
       ) : (
         <>
           {viewMode === 'grid' ? (
@@ -329,6 +331,19 @@ export function BrowseMoviesTab({ viewMode, movies, presets }: BrowseMoviesTabPr
             py={4}
           >
             {movies.moviesLoadingMore && <CircularProgress size={32} />}
+            {movies.moviesErrorAtEnd && (
+              <Alert
+                severity="error"
+                sx={{ width: '100%' }}
+                action={
+                  <Button color="inherit" size="small" onClick={movies.retryMovies}>
+                    {t('browse.errors.retry')}
+                  </Button>
+                }
+              >
+                {movies.moviesError}
+              </Alert>
+            )}
             {!movies.movieHasMore && movies.movies.length > 0 && (
               <Typography variant="body2" color="text.secondary">
                 {t('browse.loadMore.allMovies', {

@@ -235,7 +235,7 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
         )}
       </Box>
 
-      {series.seriesError && (
+      {series.seriesError && !series.seriesErrorAtEnd && (
         <Alert
           severity="error"
           sx={{ mb: 4 }}
@@ -252,11 +252,13 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
       {series.seriesLoading ? (
         renderSkeleton(viewMode)
       ) : series.series.length === 0 ? (
-        <Typography color="text.secondary">
-          {series.seriesSearch || series.seriesGenre || series.network || series.activeFilters.length > 0
-            ? t('browse.empty.seriesFiltered')
-            : t('browse.empty.seriesNoSync')}
-        </Typography>
+        series.seriesError ? null : (
+          <Typography color="text.secondary">
+            {series.seriesSearch || series.seriesGenre || series.network || series.activeFilters.length > 0
+              ? t('browse.empty.seriesFiltered')
+              : t('browse.empty.seriesNoSync')}
+          </Typography>
+        )
       ) : (
         <>
           {viewMode === 'grid' ? (
@@ -324,6 +326,19 @@ export function BrowseSeriesTab({ viewMode, series, presets }: BrowseSeriesTabPr
             py={4}
           >
             {series.seriesLoadingMore && <CircularProgress size={32} />}
+            {series.seriesErrorAtEnd && (
+              <Alert
+                severity="error"
+                sx={{ width: '100%' }}
+                action={
+                  <Button color="inherit" size="small" onClick={series.retrySeries}>
+                    {t('browse.errors.retry')}
+                  </Button>
+                }
+              >
+                {series.seriesError}
+              </Alert>
+            )}
             {!series.seriesHasMore && series.series.length > 0 && (
               <Typography variant="body2" color="text.secondary">
                 {t('browse.loadMore.allSeries', {
