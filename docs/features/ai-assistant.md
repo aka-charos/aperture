@@ -99,6 +99,7 @@ A suggestion carousel has a **create-playlist** action: the titles it recommende
 - **Discovery turns use the internet** — when the answer needs web sources, the request involves external services; library-only questions stay local
 - **It doesn't guess watched state** — with "only unwatched" on, the filter is real: played titles and 5%+ progress are excluded
 - **Welcome-screen suggestion chips** refresh with your latest recommendation run — a one-click way in
+- **Suggested replies** — under the newest answer, up to three follow-ups written for that answer. Tapping one puts it in the message box to edit or send; nothing is sent until you send it. Each answer costs one short extra call to your Text Generation model (the chat model when none is set), and they are not shown again after you reload a conversation
 - **Stop really stops** — the stop button ends the answer there, and what was written so far is kept in the conversation. Leaving the conversation or closing the tab doesn't stop it: the answer keeps going and is waiting when you come back
 
 ---

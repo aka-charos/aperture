@@ -46,6 +46,7 @@ import { useUnwatchedOnly, setUnwatchedOnly } from './unwatchedPreference'
 import { useStatusPhase, setStatusPhase } from './assistantStatus'
 import { NARROW_THREAD, COMPACT_THREAD, chatText, scaleChatTypography } from './density'
 import { requestTurnStop } from './stopTurn'
+import { NextReplies } from './NextReplies'
 
 /** Shared avatar geometry; it shrinks on a compact thread and goes on a narrow one. */
 const avatarSx = {
@@ -1265,6 +1266,10 @@ function ThreadBody({
               AssistantMessage,
             }}
           />
+
+          {/* Drafts for the reader's next message, under the newest answer
+              once it has finished (NextReplies). */}
+          <NextReplies conversationId={conversationId} />
 
           <ThreadPrimitive.If running>
             <LoadingIndicator />

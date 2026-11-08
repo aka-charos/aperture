@@ -550,6 +550,8 @@ export { describeAiError, type AiErrorDescription } from './lib/aiErrors.js'
 
 // JSON a model wrote by hand: strict parse, then one retry with `\'` repaired
 export { parseModelJson, repairModelJsonEscapes } from './lib/modelJson.js'
+// Short interactive AI text (sparkle buttons, preview notes, the assistant's suggested replies).
+export { generateShortText, getShortTextWriter, type ShortTextWriter } from './lib/shortText.js'
 
 export {
   WATCH_DATE_BANDS,
