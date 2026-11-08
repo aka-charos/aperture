@@ -19,9 +19,34 @@ export const CHAT_TEST_PROMPT = `Call the ${CHAT_TEST_TOOL} tool once, with stat
 
 /**
  * Room for a reasoning model to think before it calls: a plain test's 20
- * tokens would cut one off mid-thought and read as "cannot call tools".
+ * tokens would cut one off mid-thought and read as "cannot call tools". Kept
+ * modest because every press is billed, and the request is trivial.
  */
-export const CHAT_TEST_MAX_OUTPUT_TOKENS = 4000
+export const CHAT_TEST_MAX_OUTPUT_TOKENS = 2000
+
+/**
+ * Silence that ends the test (lib/streamStall.ts): a server that accepted the
+ * request and went quiet. Long enough for a local model to start answering
+ * once loaded; a cold load can take longer, and the message says so.
+ */
+export const CHAT_TEST_STALL_MS = 45_000
+
+/**
+ * The test's whole allowance, however lively the stream. Below the least
+ * patient hop in front of the app (a Cloudflare tunnel cuts at 100 s), so the
+ * button shows a verdict rather than a network error; it also bounds what a
+ * long-thinking model can bill for one press.
+ */
+export const CHAT_TEST_DEADLINE_MS = 80_000
+
+/** What the button says when the test was abandoned rather than answered. */
+export function chatTestAbortMessage(reason: 'stalled' | 'deadline' | 'cancelled', limitMs: number): string {
+  const seconds = Math.round(limitMs / 1000)
+  if (reason === 'stalled') {
+    return `The model sent nothing for ${seconds} seconds. A local server may still be loading it: wait, then press Test again.`
+  }
+  return `The model had not called the test tool after ${seconds} seconds; it may still have been thinking. Press Test again once it is loaded, or choose a faster model.`
+}
 
 /**
  * The tool's arguments. A zod schema, because the SDK validates a call against

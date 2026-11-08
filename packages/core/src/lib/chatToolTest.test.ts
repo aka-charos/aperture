@@ -1,7 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  chatTestAbortMessage,
   chatToolTestFailure,
+  CHAT_TEST_DEADLINE_MS,
+  CHAT_TEST_STALL_MS,
   CHAT_TEST_TOOL,
   CHAT_TEST_PROMPT,
   CHAT_TEST_INPUT_SCHEMA,
@@ -90,4 +93,60 @@ test('the check passes a streamed valid call and refuses prose, a wrong argument
     /did not match its schema/
   )
   await assert.rejects(checkChatToolCall(fakeModel([], new Error('model not loaded')) as never), /model not loaded/)
+})
+
+/** A model that answers nothing, or keeps "thinking" forever, until aborted. */
+function endlessModel(kind: 'silent' | 'thinking') {
+  return {
+    specificationVersion: 'v2' as const,
+    provider: 'fake',
+    modelId: 'fake',
+    supportedUrls: {},
+    async doGenerate(): Promise<never> {
+      throw new Error('not used')
+    },
+    async doStream(options: { abortSignal?: AbortSignal }) {
+      let timer: ReturnType<typeof setInterval> | undefined
+      return {
+        stream: new ReadableStream({
+          start(controller) {
+            controller.enqueue({ type: 'stream-start', warnings: [] })
+            if (kind === 'silent') return
+            controller.enqueue({ type: 'reasoning-start', id: 'r' })
+            timer = setInterval(() => controller.enqueue({ type: 'reasoning-delta', id: 'r', delta: 'hmm ' }), 10)
+            timer.unref()
+            options.abortSignal?.addEventListener('abort', () => clearInterval(timer))
+          },
+          cancel() {
+            clearInterval(timer)
+          },
+        }),
+      }
+    },
+  }
+}
+
+test('a silent server and a model that never stops thinking both end with a verdict, not a hang', async (t) => {
+  // The guard's timer is unref'd so it never keeps a process alive; a running
+  // server holds the event loop open, so the test does the same.
+  const keepAlive = setInterval(() => {}, 1000)
+  t.after(() => clearInterval(keepAlive))
+  await assert.rejects(
+    checkChatToolCall(endlessModel('silent') as never, { stallMs: 60, deadlineMs: 5000 }),
+    /sent nothing for 0 seconds/
+  )
+  // Thinking is activity, so only the deadline ends it.
+  const started = Date.now()
+  await assert.rejects(
+    checkChatToolCall(endlessModel('thinking') as never, { stallMs: 60, deadlineMs: 250 }),
+    /had not called the test tool after 0 seconds/
+  )
+  assert.ok(Date.now() - started < 3000, 'ended at the deadline')
+})
+
+test('the limits sit under a 100 s tunnel, and each abort reads as itself', () => {
+  assert.ok(CHAT_TEST_DEADLINE_MS < 100_000)
+  assert.ok(CHAT_TEST_STALL_MS < CHAT_TEST_DEADLINE_MS)
+  assert.match(chatTestAbortMessage('stalled', 45_000), /sent nothing for 45 seconds/)
+  assert.match(chatTestAbortMessage('deadline', 80_000), /after 80 seconds/)
 })

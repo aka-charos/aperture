@@ -93,12 +93,16 @@ import { unslothInferenceBaseUrl } from './unslothServer.js'
 import { benchEndpointFrom, type BenchEndpoint } from './benchEndpoint.js'
 import { describeAiError } from './aiErrors.js'
 import {
+  chatTestAbortMessage,
   chatToolTestFailure,
+  CHAT_TEST_DEADLINE_MS,
   CHAT_TEST_INPUT_SCHEMA,
   CHAT_TEST_MAX_OUTPUT_TOKENS,
   CHAT_TEST_PROMPT,
+  CHAT_TEST_STALL_MS,
   CHAT_TEST_TOOL,
 } from './chatToolTest.js'
+import { startStreamStallGuard } from './streamStall.js'
 import {
   isCustomModelProvider,
   type CustomModelProvider,
@@ -2730,41 +2734,62 @@ async function runProviderConnectionTest(
  * Ask the model for one streamed tool call, the way the chat asks, and throw
  * with the reason when no valid call comes back (`chatToolTestFailure`).
  * The tool has no `execute`, so nothing runs and the stream ends after the
- * one step. A stream error is rethrown as itself, so the button shows the
+ * one step. A provider error is rethrown as itself, so the button shows the
  * provider's own words.
+ *
+ * Bounded by a stall guard (lib/streamStall.ts): silence past
+ * CHAT_TEST_STALL_MS or a whole run past CHAT_TEST_DEADLINE_MS ends the test
+ * with its own message. Racing `guard.aborted` is what ends the wait; the
+ * abort alone does not. `limits` exists for the tests.
  */
-export async function checkChatToolCall(model: LanguageModel): Promise<void> {
+export async function checkChatToolCall(
+  model: LanguageModel,
+  limits: { stallMs?: number; deadlineMs?: number } = {}
+): Promise<void> {
   const { streamText, tool } = await import('ai')
-  // A provider error arrives as a stream part, not a throw: without this it
-  // would read as "answered in text" and hide the provider's own words.
-  let streamError: unknown
-  const result = streamText({
-    onError: ({ error }) => {
-      streamError ??= error
-    },
-    model,
-    prompt: CHAT_TEST_PROMPT,
-    tools: {
-      [CHAT_TEST_TOOL]: tool({
-        description: 'Connection test. Call it with status "ok".',
-        inputSchema: CHAT_TEST_INPUT_SCHEMA,
-      }),
-    },
-    toolChoice: 'auto',
-    maxOutputTokens: CHAT_TEST_MAX_OUTPUT_TOKENS,
-    maxRetries: 0,
-  })
-  await result.consumeStream({
-    onError: (error) => {
-      streamError ??= error
-    },
-  })
-  if (streamError) throw streamError
-  const failure = chatToolTestFailure({
-    calls: (await result.toolCalls).map((call) => ({ toolName: call.toolName, invalid: call.invalid === true })),
-    finishReason: await result.finishReason,
-  })
-  if (failure) throw new Error(failure)
+  const stallMs = limits.stallMs ?? CHAT_TEST_STALL_MS
+  const deadlineMs = limits.deadlineMs ?? CHAT_TEST_DEADLINE_MS
+  const guard = startStreamStallGuard({ stallMs, deadlineMs, checkMs: Math.min(1000, stallMs) })
+  try {
+    // A provider error arrives as a stream part, not a throw: without this it
+    // would read as "answered in text" and hide the provider's own words.
+    let streamError: unknown
+    const result = streamText({
+      model,
+      prompt: CHAT_TEST_PROMPT,
+      tools: {
+        [CHAT_TEST_TOOL]: tool({
+          description: 'Connection test. Call it with status "ok".',
+          inputSchema: CHAT_TEST_INPUT_SCHEMA,
+        }),
+      },
+      toolChoice: 'auto',
+      maxOutputTokens: CHAT_TEST_MAX_OUTPUT_TOKENS,
+      maxRetries: 0,
+      abortSignal: guard.signal,
+      // Any part counts as life, reasoning included.
+      onChunk: () => guard.activity(),
+      onError: ({ error }) => {
+        streamError ??= error
+      },
+    })
+    const ended = await Promise.race([
+      result.consumeStream().then(() => null),
+      guard.aborted,
+    ])
+    const abandoned = ended ?? guard.reason()
+    if (abandoned) {
+      throw new Error(chatTestAbortMessage(abandoned, abandoned === 'stalled' ? stallMs : deadlineMs))
+    }
+    if (streamError) throw streamError
+    const failure = chatToolTestFailure({
+      calls: (await result.toolCalls).map((call) => ({ toolName: call.toolName, invalid: call.invalid === true })),
+      finishReason: await result.finishReason,
+    })
+    if (failure) throw new Error(failure)
+  } finally {
+    guard.stop()
+  }
 }
 
 /** The sentence a test button shows for a failed request. */
