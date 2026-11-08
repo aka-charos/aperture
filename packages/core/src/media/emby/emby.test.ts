@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { EmbyProviderBase } from './base.js'
 import { createOrUpdateCollection, deleteCollection } from './collections.js'
+import { deleteVirtualLibrary } from './libraries.js'
 
 interface Call {
   endpoint: string
@@ -64,4 +65,21 @@ test('Emby: delete clears members only when asked to', async () => {
   const plain = fakeProvider(dropped(), ['m1', 'm3'])
   await deleteCollection(plain.provider, 'key', 'c1')
   assert.deepEqual(plain.calls.map((c) => `${c.method} ${c.endpoint}`), ['DELETE /Items/c1'])
+})
+
+test('Emby: a library is removed by its id, through the documented POST', async () => {
+  const calls: Array<{ endpoint: string; method?: string; body?: unknown }> = []
+  const provider = {
+    async fetch(endpoint: string, _apiKey: string, options: RequestInit = {}) {
+      calls.push({ endpoint, method: options.method, body: JSON.parse(String(options.body)) })
+      return {}
+    },
+  } as unknown as EmbyProviderBase
+  await deleteVirtualLibrary(provider, 'key', '15529')
+  assert.deepEqual(calls, [
+    { endpoint: '/Library/VirtualFolders/Delete', method: 'POST', body: { Id: '15529', RefreshLibrary: true } },
+  ])
+  // No id, no call: a guess could remove the wrong library.
+  await assert.rejects(deleteVirtualLibrary(provider, 'key', ''), /id is required/)
+  assert.equal(calls.length, 1)
 })

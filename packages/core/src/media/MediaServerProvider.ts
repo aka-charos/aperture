@@ -99,9 +99,11 @@ export interface MediaServerProvider {
   ): Promise<LibraryCreateResult>
 
   /**
-   * Remove a virtual library from the media server by its display name
+   * Remove a virtual library from the media server. Emby removes by the
+   * library's id, Jellyfin by its display name, so callers pass both as the
+   * server reported them (`getLibraries`).
    */
-  deleteVirtualLibrary(apiKey: string, name: string): Promise<void>
+  deleteVirtualLibrary(apiKey: string, library: { id: string; name: string }): Promise<void>
 
   /**
    * Get user's current library access settings

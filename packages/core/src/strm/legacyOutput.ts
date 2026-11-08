@@ -206,7 +206,7 @@ export async function removeRenamedPersonalLibrary(input: {
       )
       return
     }
-    await provider.deleteVirtualLibrary(apiKey, library.name)
+    await provider.deleteVirtualLibrary(apiKey, library)
     logger.info({ userId, mediaType, oldName: library.name }, 'Library under the old name removed')
   } catch (err) {
     logger.warn({ err, userId, mediaType, oldName: old.name }, 'Could not remove the library under its old name')
@@ -433,9 +433,9 @@ export async function removeGeneratedLibraries(
         addLog(jobId, 'warn', '🛑 Cancelled — libraries not yet removed are left as they were.')
         break
       }
-      const { serverName, rowIds, orphan, folders } = plan.deletions[i]
+      const { serverName, serverId, rowIds, orphan, folders } = plan.deletions[i]
       try {
-        await provider.deleteVirtualLibrary(key, serverName)
+        await provider.deleteVirtualLibrary(key, { id: serverId, name: serverName })
         if (rowIds.length > 0) {
           await query(`DELETE FROM strm_libraries WHERE id = ANY($1::uuid[])`, [rowIds])
         }

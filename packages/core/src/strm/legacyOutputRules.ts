@@ -97,6 +97,8 @@ export interface ServerLibraryRef {
 
 export interface GeneratedLibraryDeletion {
   serverName: string
+  /** The server's id for it: Emby removes by id, Jellyfin by name. */
+  serverId: string
   /** Rows pointing at it — empty for an orphan. */
   rowIds: string[]
   /**
@@ -112,9 +114,9 @@ export interface GeneratedLibraryDeletion {
 export interface GeneratedLibraryRemovalPlan {
   /**
    * One entry per media-server library to delete, with every row that points
-   * at it. The delete is by NAME (that is what `/Library/VirtualFolders` takes),
-   * so two rows naming one library must become one delete, not two — the
-   * second would fail on a library the first already removed.
+   * at it. Jellyfin deletes by NAME, so two rows naming one library must become
+   * one delete, not two — the second would fail on a library the first already
+   * removed. Emby deletes by `serverId`.
    */
   deletions: GeneratedLibraryDeletion[]
   /** Rows whose library is no longer on the server: only the row is left to clear. */
@@ -126,7 +128,7 @@ export interface GeneratedLibraryRemovalPlan {
    * point at the operator's library or at another viewer's. Their rows are
    * kept, which is the state they were already in.
    */
-  refused: Array<{ serverName: string; rowIds: string[]; locations: string[] }>
+  refused: Array<{ serverName: string; serverId: string; rowIds: string[]; locations: string[] }>
 }
 
 /** The folders under the libraries root that legacy output writes, and no others. */
@@ -270,7 +272,7 @@ export function planGeneratedLibraryRemoval(
   const byName = new Map(serverLibraries.map((lib) => [lib.name, lib]))
 
   const deletions = new Map<string, GeneratedLibraryDeletion>()
-  const refused = new Map<string, { serverName: string; rowIds: string[]; locations: string[] }>()
+  const refused = new Map<string, { serverName: string; serverId: string; rowIds: string[]; locations: string[] }>()
   const alreadyGone: string[] = []
 
   for (const row of rows) {
@@ -285,6 +287,7 @@ export function planGeneratedLibraryRemoval(
     if (rowOwnsLibrary(row, match) === false) {
       const kept = refused.get(match.name) ?? {
         serverName: match.name,
+        serverId: match.id,
         rowIds: [],
         locations: [...(match.locations ?? [])],
       }
@@ -294,6 +297,7 @@ export function planGeneratedLibraryRemoval(
     }
     const entry = deletions.get(match.name) ?? {
       serverName: match.name,
+      serverId: match.id,
       rowIds: [],
       orphan: false,
       folders: generatedFolders(match, libraryPathPrefix) ?? [],
@@ -313,9 +317,9 @@ export function planGeneratedLibraryRemoval(
       refused.delete(name)
       continue
     }
-    const folders = generatedFolders({ id: '', name, locations: kept.locations }, libraryPathPrefix)
+    const folders = generatedFolders({ id: kept.serverId, name, locations: kept.locations }, libraryPathPrefix)
     if (folders) {
-      deletions.set(name, { serverName: name, rowIds: [...kept.rowIds], orphan: false, folders })
+      deletions.set(name, { serverName: name, serverId: kept.serverId, rowIds: [...kept.rowIds], orphan: false, folders })
       refused.delete(name)
     }
   }
@@ -324,7 +328,7 @@ export function planGeneratedLibraryRemoval(
     if (deletions.has(library.name) || refused.has(library.name)) continue
     const folders = generatedFolders(library, libraryPathPrefix)
     if (!folders) continue
-    deletions.set(library.name, { serverName: library.name, rowIds: [], orphan: true, folders })
+    deletions.set(library.name, { serverName: library.name, serverId: library.id, rowIds: [], orphan: true, folders })
   }
 
   return { deletions: [...deletions.values()], alreadyGone, refused: [...refused.values()] }

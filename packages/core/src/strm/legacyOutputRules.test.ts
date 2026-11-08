@@ -145,6 +145,8 @@ describe('planGeneratedLibraryRemoval — orphans', () => {
       ]
     )
     assert.deepEqual(plan.deletions[1].folders, [['aperture', 'Ann_abc']])
+    // Emby removes by id, so each deletion carries the id the server reported.
+    assert.deepEqual(plan.deletions.map((d) => d.serverId), ['lib-new', 'lib-old'])
   })
 
   test('a library reading one generated folder AND one of its own is never an orphan', () => {
@@ -174,7 +176,9 @@ describe('planGeneratedLibraryRemoval — orphans', () => {
       PREFIX
     )
     assert.deepEqual(plan.deletions, [])
-    assert.deepEqual(plan.refused, [{ serverName: 'Movies', rowIds: ['r1'], locations: ['/mnt/media/Movies'] }])
+    assert.deepEqual(plan.refused, [
+      { serverName: 'Movies', serverId: 'lib-real', rowIds: ['r1'], locations: ['/mnt/media/Movies'] },
+    ])
   })
 
   test('a row whose library reports no folders is still removed — the row is the evidence', () => {

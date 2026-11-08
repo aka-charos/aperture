@@ -146,9 +146,9 @@ async function removeStrmLibraryRecords(
   }
 
   const cleared = new Set<string>(plan.alreadyGone)
-  for (const { serverName, rowIds } of plan.deletions) {
+  for (const { serverName, serverId, rowIds } of plan.deletions) {
     try {
-      await provider.deleteVirtualLibrary(apiKey, serverName)
+      await provider.deleteVirtualLibrary(apiKey, { id: serverId, name: serverName })
       for (const id of rowIds) cleared.add(id)
       logger.info({ userId: user.id, name: serverName }, 'Deleted virtual library from media server')
     } catch (err) {

@@ -97,19 +97,22 @@ export async function createVirtualLibrary(
 }
 
 /**
- * Remove a virtual library from the media server by display name.
- * Uses DELETE /Library/VirtualFolders (Emby API).
+ * Remove a virtual library by its id (`getLibraries`' `id`, Emby's ItemId).
+ * Emby's documented removal is POST /Library/VirtualFolders/Delete with the id
+ * in the body; its DELETE /Library/VirtualFolders takes no name, so a
+ * name-based call removed nothing. Without an id nothing is sent: removing by
+ * a guess could take the wrong library.
  */
 export async function deleteVirtualLibrary(
   provider: EmbyProviderBase,
   apiKey: string,
-  name: string
+  id: string
 ): Promise<void> {
-  await provider.fetch(
-    `/Library/VirtualFolders?name=${encodeURIComponent(name)}&refreshLibrary=true`,
-    apiKey,
-    { method: 'DELETE' }
-  )
+  if (!id) throw new Error('Emby library id is required to remove a library')
+  await provider.fetch('/Library/VirtualFolders/Delete', apiKey, {
+    method: 'POST',
+    body: JSON.stringify({ Id: id, RefreshLibrary: true }),
+  })
 }
 
 /**
