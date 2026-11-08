@@ -14,13 +14,13 @@ Works for **movies** and **TV series**, in **14 languages**, and shows each view
 
 ## About this fork
 
-This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) is a fork of [dgruhin-hrizn/aperture](https://github.com/dgruhin-hrizn/aperture). It is based on upstream **v0.7.8** and carries more than seven hundred commits of features and fixes on top. Upstream has since released versions up to v1.0.0; those releases are **not** merged here, though some of their fixes and performance work have been adapted.
+This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) is a fork of [dgruhin-hrizn/aperture](https://github.com/dgruhin-hrizn/aperture). It is based on upstream **v0.7.8** and carries more than eight hundred commits of features and fixes on top. Upstream has since released versions up to v1.0.2; those releases are **not** merged here, though some of their fixes and performance work have been adapted.
 
 - Active development happens on **`dev`**. That is the branch to deploy from.
 - `main` is a plain mirror of upstream, kept identical to it. Nothing is developed there, and nothing from `dev` goes to it.
 - Images are published to **`ghcr.io/aka-charos/aperture:dev`** whenever a push to `dev` changes the application (`apps/`, `packages/`, `db/`, `docker/` or the lockfile) and passes lint and typecheck. That tag is built for **amd64 only** — see [ARM hosts](#arm-hosts).
 - Version identity is two fields, not one string: `APP_VERSION` is the upstream lineage (`0.7.8`), `APP_BUILD` is the fork build (`mod.<commits>.g<sha>`). Both appear in the admin console and in `/api/health`.
-- GitHub shows this fork as hundreds of commits "behind" upstream. That counter overstates the gap, since most of it is work already here under other hashes. What is really missing is upstream's release work from v0.7.9 to v1.0.0. See [Staying in step with upstream](docs/upstream-sync.md).
+- GitHub shows this fork as hundreds of commits "behind" upstream. That counter overstates the gap, since most of it is work already here under other hashes. What is really missing is upstream's release work from v0.7.9 to v1.0.2. See [Staying in step with upstream](docs/upstream-sync.md).
 
 **This README is written as a delta against upstream v0.7.8**, in three layers:
 
@@ -28,12 +28,12 @@ This repository ([aka-charos/aperture](https://github.com/aka-charos/aperture)) 
 - [What this fork changes](#what-this-fork-changes) — the same ground area by area. Each section is marked **new** or **reworked**, and a reworked one opens with what upstream already had.
 - [What this fork fixes](#what-this-fork-fixes) — defects in code inherited from upstream, grouped by area.
 
-What arrived unchanged is under [Inherited from upstream](#inherited-from-upstream). The commits behind it are classified in [docs/fork-divergence.md](docs/fork-divergence.md), up to 2026-11-07. Of the 792 commits it covers:
+What arrived unchanged is under [Inherited from upstream](#inherited-from-upstream). The commits behind it are classified in [docs/fork-divergence.md](docs/fork-divergence.md), up to 2026-11-08. Of the 822 commits it covers:
 
-- **66** add something upstream had no form of.
-- **325** enhance something upstream already had.
-- **108** fix a defect in inherited code, and **57** more fixes ride inside other commits.
-- **201** fix the fork's own work.
+- **67** add something upstream had no form of.
+- **330** enhance something upstream already had.
+- **115** fix a defect in inherited code, and **60** more fixes ride inside other commits.
+- **214** fix the fork's own work.
 - The rest are docs, chores and measurement.
 
 ### At a glance
@@ -64,13 +64,13 @@ What arrived unchanged is under [Inherited from upstream](#inherited-from-upstre
 
 | Area                       | What changed                                                                                                                                                                                                                                                                                                                                                                                     |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **AI roles & providers**   | Model picker with prices, tool-calling and reasoning badges from live catalogs; real capability detection for OpenRouter and local servers; one provider key shared across roles; provider errors logged in the provider's own words.                                                                                                                                                            |
+| **AI roles & providers**   | Model picker with prices, tool-calling and reasoning badges from live catalogs; real capability detection for OpenRouter and local servers; one provider key shared across roles; provider errors logged in the provider's own words; a Chat Test that proves the model can call a tool, with a time limit so it always answers. |
 | **Embeddings**             | A 2560-wide table, a stored-sets panel showing what switching would cost, mean-centred vectors, retrieval modes where a model supports one, and a canonical text that stopped embedding nationality six times.                                                                                                                                                                                   |
 | **Recommender**            | MMR diversity, availability-adjusted genre preference, completion-weighted series, match insights on every scored title, explanations written from real data and reused when nothing the model was shown has changed, an explanations-only rerun, one-click rewrite of a single pick's explanation, and interest slots backed by a tag on the title rather than by how near it sits to a phrase. |
-| **Assistant**              | Intent routing with a grounded web search (Google, Tavily and fastCRW), a taste-profile section on every discovery answer shown as tabs of card grids, dock and full page, live status, turns saved by the server, episode search, stored analyses, what is coming next for followed shows, and limits a request states (genre, years, rating, runtime) kept on every section.                   |
+| **Assistant**              | Intent routing with a grounded web search (Google, Tavily and fastCRW), a taste-profile section on every discovery answer shown as tabs of card grids, dock and full page, live status, turns saved by the server, episode search, stored analyses, what is coming next for followed shows, and limits a request states (genre, years, rating, runtime) kept on every section; Stop that ends the turn on the server and keeps what was written; up to three suggested replies under each answer; and a named title found without its "The" or with a small typo. |
 | **Discovery & requests**   | Candidates embedded and ranked by taste, a tuning panel with measured influence, requests filed as the person who made them, in-app approve/decline, and gap analysis of missing TV seasons by network.                                                                                                                                                                                          |
 | **Watch stats & history**  | Every figure opens the titles behind it; heatmap and taste-vs-crowd sections; whole-history search; a Watcher Identity written from played titles and rewritten by the recommendation run whenever the taste profile moves.                                                                                                                                                                      |
-| **Browse, search, detail** | A searchable country filter that matches a title's country of origin, a Browse selection that lives in the URL so Back restores it, search that ignores accents and punctuation and matches original titles, detail pages that state each fact once, and collections written to Emby as Box Sets.                                                                                                |
+| **Browse, search, detail** | A searchable country filter that matches a title's country of origin, a Browse selection that lives in the URL so Back restores it, search that ignores accents and punctuation and matches original titles, detail pages that state each fact once, and collections written to Emby as Box Sets; lists that ignore a late reply to an older query and say where a page failed, with Try again; and a Search page that shows title matches while the semantic ones are on their way. |
 | **Dashboard & Watching**   | Titles open in the detail dialog over the page, shows that aired recently appear for viewers who were caught up, upcoming episodes only inside a two-month horizon, bigger posters, and posters that end on a whole poster.                                                                                                                                                                      |
 | **Language**               | A flag in the app bar switches the app language, recommendations follow it by default, and the login page has its own flag. The translations editor works one language at a time with untranslated counts.                                                                                                                                                                                       |
 | **User settings**          | Four tabs by subject — Recommendations, Display, Account and the Emby home screen — one card layout, and saves that cannot overtake each other.                                                                                                                                                                                                                                                  |
@@ -78,7 +78,7 @@ What arrived unchanged is under [Inherited from upstream](#inherited-from-upstre
 | **Mobile**                 | A layout pass over the shell, detail pages, dashboard, Explore, Top Picks, My Requests and Watch Stats, with touch-sized targets, and a phone first screen whose app bar, checklist and tour offer fit a narrow screen.                                                                                                                                                                          |
 | **Admin console**          | A two-level nav generated from one registry — 10 groups, 52 sections — with a ⌘⇧K palette over sections, individual settings and every job, and a Guide button on every section.                                                                                                                                                                                                                 |
 | **Access**                 | Access as its own switch, library access that follows the media server, permissions decided on the server, scoped API keys, an assistant permission, and accounts deleted from the media server paused and removable by an admin.                                                                                                                                                                |
-| **Jobs**                   | Weekly schedules on several weekdays, biweekly runs, cancellation that holds a slot until the work stops, a stall guard on streamed model calls, per-run caps and logs that keep their head.                                                                                                                                                                                                     |
+| **Jobs**                   | Weekly schedules on several weekdays, biweekly runs, cancellation that holds a slot until the work stops, a stall guard on streamed model calls, per-run caps and logs that keep their head; jobs that read the whole media server take turns; requests to it with a cap per server and a limit on a silent answer; and schedules that keep their minute, with the next run worked out in the server's time zone. |
 | **Legacy library output**  | STRM and symlink libraries are now one switch, off on a new install; switching it off writes nothing, and a removal job clears what was written. Recommendations are read in the app and on the Emby home screen instead.                                                                                                                                                                        |
 
 **Fixed** — defects in code inherited from upstream. The worst of them:
@@ -92,7 +92,7 @@ What arrived unchanged is under [Inherited from upstream](#inherited-from-upstre
 | **Recommender**             | Disliked titles still pulled the taste profile toward them, "% Match" could pass 100%, a 20% diversity setting acted as a hard sort by genre, and favourites were recommended back.                                                                                                   |
 | **Discovery & requests**    | Discover's taste term never ran, so popularity decided half the ranking, and every request was filed as the admin and auto-approved.                                                                                                                                                  |
 | **Enrichment & embeddings** | Adding an OMDb key later did nothing, OMDb's quota errors retired titles as "not found", a failed MDBList batch was stamped "no data" for good, and enriched keywords never reached the embeddings.                                                                                   |
-| **Assistant & search**      | Leaving a chat mid-turn lost the exchange, a resumed conversation never saved new turns, and searching a title with a colon returned an error shown as "No results".                                                                                                                  |
+| **Assistant & search**      | Leaving a chat mid-turn lost the exchange, a resumed conversation never saved new turns, and searching a title with a colon returned an error shown as "No results"; a title such as *1917* or *24* broke the assistant's lookup, and Stop never stopped the model calls. |
 
 ---
 
@@ -204,6 +204,7 @@ Upstream had four AI roles — embeddings, chat, text generation and exploration
 - **Fallback models and fallback API keys** for free-tier work — extra Google keys for grounded web search, and a chain of fallback models (on any provider, local ones included) for title analysis — with call pacing and per-key cooldowns. A spare key answers "this account is out of quota", a spare model answers "this model is gone".
 - **Spend dashboard** beside the cost estimator, measuring what calls actually cost: OpenRouter's billed figure, and Z.AI's computed from its published prices and labelled as an estimate. Unpriced calls are reported as unknown, never as $0.
 - **Readable provider failures** — errors are logged with status, model and the provider's own words instead of the whole prompt, and a Z.AI address missing its API path is named as such rather than reading as a dead key.
+- **The Chat Test proves tool calling.** The assistant runs on tool calls, so the Chat role's Test asks for one, streamed, and passes only on a valid call; a model that only answers in prose fails here, with what it did instead, never in the chat. It gives up after 45 seconds of silence or 80 in all, so it always answers rather than leaving a proxy to cut it. Saving is not held up by it.
 - **OpenRouter flex tier** — read per model from its endpoint listing and offered per role; the Test button sends one real flex request and says what tier served it.
 - **Pacing only where there is a limit** — the call-spacing option is not offered, and not applied, for LM Studio, Unsloth Studio and Ollama.
 - **Keys stay on the server.** The settings pages receive "a key is saved" and a four-character hint, never the key; Test, model discovery and the LM Studio probe use the saved key server-side and only for the address it was saved for, so a test pointed at someone else's server cannot collect it. Secrets inside structured settings no longer appear in logs.
@@ -260,6 +261,9 @@ Upstream had the chat assistant: a dialog with library tools for search, history
 - Rich cards with synopsis, grounded reason, director, favourite and watched state, laid out in a responsive grid; when an answer has several sections they are tabs. A cut synopsis ends in "More ›", which opens the title in place without leaving the conversation. A single-title card can rate the title and add a series to Watching, and compacts in a narrow chat.
 - **fastCRW as a third web-search source** beside Google and Tavily, and Gemini is asked to search in English whatever language the request is in.
 - **Build a playlist or collection from chat picks**, carrying the request that produced them.
+- **Stop stops.** The button ends the turn on the server too, so its model calls and web searches stop being paid for, and what was written so far is what the conversation keeps. Leaving the conversation or the tab still lets a turn finish.
+- **Suggested replies** — up to three follow-ups under the newest answer, written by one short call after the turn (never a step of the chat's own budget). A tap puts one in the message box as a draft, after anything already typed.
+- **A title you name is found as you wrote it.** "Housemaid" or "Housemaids" finds *The Housemaid*; titles matching the name come before titles that only mention it in their synopsis, and a close spelling is looked for only when nothing matches literally, with a strict bar, and said to be a guess.
 - Optional **unwatched-only** mode, and suggestion chips drawn from your newest completed run.
 - Every result is limited to the libraries you can open, and the assistant can be switched on or off per account.
 
@@ -333,7 +337,8 @@ Upstream had the Watch Stats page — genres, decades, ratings, people, studios 
 
 - **Country filter** with search, multi-select and AND/OR matching that matches a title's **country of origin** by default (every co-producer on request), plus a searchable network filter and reordered content ratings. The selection lives in the URL, so Back restores it and the scroll position, and a row expanded from a grid opens the whole row.
 - **Seasons sort and filter** count seasons from the episodes the library actually holds, since Emby leaves a show's season total empty.
-- **Library search** ignores accents and punctuation, matches original titles as well as localized ones, and ranks by how much of your query a title contains.
+- **Library search** ignores accents and punctuation, matches original titles as well as localized ones, and ranks by how much of your query a title contains. With semantic search on, title matches show first and the semantic answer replaces them when it arrives; an answer for earlier text never lands over newer results.
+- **Browse lists keep up with you.** A reply to an older query or filter is ignored rather than replacing the new list (or being remembered for Back), a page that fails says so where it failed, at the top or at the end of the list, with **Try again**, and posters load as you scroll.
 - **Detail pages say each thing once** — ratings and awards on the hero line, director and writer beside them, one info card below; the duplicate genre, critic-rating and awards panels are gone.
 - **Faster title pages and similar titles.** A detail page loads its parts in parallel and asks the media server for images at the size they are drawn, rather than 2–3 MB originals. Similar titles and the assistant's searches stay on the vector index while they filter, where they used to fall back to scanning every embedding (a ten-title similar list measured 1.46 s before and about a millisecond after).
 - **Series detail** with per-season and per-episode progress and inline episode descriptions.
@@ -459,6 +464,8 @@ Upstream had the jobs console with editable daily, weekly and interval schedules
 - **Weekly schedules on as many weekdays as you like, and biweekly**, with the next run date shown from the same resolver the scheduler uses.
 - **Cancellation that works**: a cancelled job holds its slot until it actually stops, and a refused start says why instead of silently doing nothing.
 - **Stuck model calls end** — a streamed call that goes silent for ten minutes is abandoned, and Stop reaches into a call that is still in flight rather than waiting for it.
+- **The media server is asked one job at a time.** Syncs and publishing jobs that read the whole library or every user take turns through one queue (shown as Queued, and cancellable before they start); at most four requests go to a server at once, and an answer that goes silent mid-way fails instead of holding a job forever.
+- **Schedules keep their minute**, and the next run is worked out on the server, in its own time zone, from the schedule actually running.
 - **Per-run item caps** where a job declares one — title analysis takes a titles-per-run limit, applied to manual and scheduled runs alike.
 - **Log windowing** that keeps the head as well as the tail, and says how many entries were actually lost.
 - A boot check that names schedule rows for jobs this build no longer has.
@@ -497,6 +504,7 @@ Defects in code inherited from upstream, grouped by area. Each line is something
 - Leaving a chat mid-turn lost both the question and the answer, and a resumed conversation never saved new turns.
 - A playlist's description never reached the media server, and a channel's free-text preferences were stored but never used.
 - Adding a custom interest had never worked: every add was rejected and the page hid the failure.
+- A genre-weight or franchise reset that failed part-way left a half-written list, two saves for one account could delete across each other, and a hand-set batch saved part-way, storing a non-number score as "NaN" for the recommender to read.
 - Two different films sharing a title and year were folded into one library row by the sync, which then flipped between them every pass — so search, pickers and the library showed one of the two, depending on whose library access was asking.
 - A title the media server rescanned and re-added under a new id (often with no year yet) got a new library row and lost the old one, and the old row took its ratings, watch history, recommendations and Watch This items with it. The sync now keeps the row when the old item is gone from the server and the new one matches it on two external ids (TMDb, IMDb, TVDb) with none disagreeing, or on one id and a related name. One id alone is never enough, since that is what a mis-identified item carries. A blank field sent mid-scan also no longer erases a stored year, overview, credit list or content rating.
 
@@ -547,12 +555,16 @@ Defects in code inherited from upstream, grouped by area. Each line is something
 - The assistant's semantic search sorted by rating before cutting the list, so a close match was dropped for being rated low, under cards saying "closest to".
 - Assistant lookups compared English titles only, hiding about 30% of films, and its writer, director and tag filters matched nothing.
 - A turn could end with no answer at all, or stop mid-sentence; play links were detected by the English word "play", which broke them in 13 of 14 locales.
+- A title made only of digits — *1917*, *1984*, *24* — reached the assistant's tools as a number, so the lookup failed. A named title was found only by its exact words and then ranked by rating, so a typo found nothing and the result limit could cut the title asked for.
+- Stop only stopped the browser reading: the model calls and web searches carried on and were paid for.
 
 ### Jobs and admin
 
 - A cancelled job freed its slot while still running, so a second run started beside it. The Schedule tab's enable switch reset a job to "daily at midnight", and a refused start showed nothing.
 - The server refused every source-library switch, because it expected an id the media server never uses, and the page showed no error. The libraries Aperture reads could not be changed after setup.
-- An image from a stalled media server held its browser connection open with no time limit.
+- An image from a stalled media server held its browser connection open with no time limit, and a media-server answer that stalled part-way could hold a job, and its slot, forever.
+- Every save of a job's schedule reset its minute to :00.
+- A person, studio or franchise whose name contains % could not be opened or saved, because the name was decoded twice. Emby libraries were removed with a delete by name that Emby's current API does not document; the documented call, by the library's id, is used now.
 - Orphaned schedule rows from old job renames failed every night with "Unknown job".
 - The database purge could not run on any instance created after migration 0078.
 - One failing MDBList job wrote an alert per request, and resolved alerts could never be cleared.

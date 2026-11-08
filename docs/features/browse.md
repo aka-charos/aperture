@@ -94,7 +94,7 @@ Any combination of filters can be saved as a **preset** from the Presets menu:
 - A two-line **overview** (with "View on TMDb" alongside)
 - Your rating, inline; series add their **status** (Airing/Ended) and **season count**, plus an **Add to Watching** toggle
 
-Results load infinitely as you scroll, with an end message at the bottom of the match set.
+Results load infinitely as you scroll, with an end message at the bottom of the match set, and posters load as they come into view. If a page fails to load, a message says so where it failed — above the list for the first page, at the end for a later one — with **Try again**. Changing the search or a filter while a page is loading drops the old answer, so the list always matches what is selected.
 
 ### Coming Back
 
