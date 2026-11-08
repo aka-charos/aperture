@@ -6,7 +6,7 @@ This fork ([aka-charos/aperture](https://github.com/aka-charos/aperture)) tracks
 
 GitHub's ahead/behind counter compares commit identities. This fork's history split from upstream's on 2026-01-10, and upstream's work has reached `dev` as copies with different hashes, never as merges. So every upstream commit since the split counts as "behind", even when its change is already here.
 
-As of 2026-11-08 the counter reads 780 behind `upstream/main` (at v1.0.2): 635 ordinary commits plus 145 merge commits.
+As of 2026-11-09 the counter reads 782 behind `upstream/main` (at v1.0.3): 636 ordinary commits plus 146 merge commits.
 
 ## The real gap
 
@@ -17,7 +17,7 @@ git fetch upstream
 git cherry -v dev upstream/main
 ```
 
-A `-` line is a change already on `dev`; a `+` line is not. On 2026-11-08, **568 of the 635 were `-` and 67 were `+`**. The gap was eight commits on 2026-10-17; upstream's run to v1.0.0 added 49, and v1.0.1 to v1.0.2 the last ten. None of the 57 has been merged as is. A read-through on 2026-11-06 of these and the two `upstream/dev` commits below sorted them as 10 already covered, 1 to cherry-pick, 8 to adapt and 40 to skip. The first five items from that list are listed under "Taken in part" below.
+A `-` line is a change already on `dev`; a `+` line is not. On 2026-11-09, **568 of the 636 were `-` and 68 were `+`**. The gap was eight commits on 2026-10-17; upstream's run to v1.0.0 added 49, v1.0.1 to v1.0.2 ten more, and v1.0.3 the last one. None of the 57 has been merged as is. A read-through on 2026-11-06 of these and the two `upstream/dev` commits below sorted them as 10 already covered, 1 to cherry-pick, 8 to adapt and 40 to skip. The first five items from that list are listed under "Taken in part" below.
 
 From upstream's v0.7.9 and v0.7.10 releases of 2026-09-18 (8 commits):
 
@@ -45,6 +45,10 @@ From upstream's v1.0.1 and v1.0.2, 2026-11-05 to 2026-11-07 (10 commits; `upstre
 - `270a5b9d`, `7ce960d2`: STRM and symlink output guidance and a **Check output compatibility** action, plus a documentation refresh
 - release chores (`1a23dbc3`, `bb71a1b1`)
 
+From upstream's v1.0.3 of 2026-11-08 (1 commit):
+
+- `5e3dca1b`: Encore back as a floating chat panel over the current page, a phone dock button for it, Dashboard as the phone landing page, and a fix for deleting saved chats. Upstream's delete sent a JSON `Content-Type` with an empty body, which Fastify rejects before the handler runs.
+
 ### Taken in part
 
 `git cherry` matches exact patches, so a change adapted by hand still shows as `+`. That covers some of the list above:
@@ -62,6 +66,7 @@ From upstream's v1.0.1 and v1.0.2, 2026-11-05 to 2026-11-07 (10 commits; `upstre
 - **From v0.8.0-dev.8.1 (`49ab0c8f`):** the assistant finds a named title without its leading article or with a small typo, title matches ranked before synopsis matches. Built on this fork's library-search keys (`0178`, `aperture_search_key`, trigram indexes) rather than upstream's inline SQL, for both `searchContent` and `getContentDetails`, which also now compares films and shows and reads the viewer's scope in SQL (`helpers/titleSearch.ts`). Its single-result phone card targets Encore's own card component and was not taken.
 - **Read and not taken, v0.8.0-dev.8.2 to v1.0.2:** Encore's card actions (`7102ec9d`) and phone layouts (`706116c9`), the 1.0.0 welcome-tour redesign (`a9505a99`), its phone layout pass over upstream's own shell (`a37f3aa1`) and the Play Iris artwork (`fadea8d2`), and the response styles of `b0b0f684`. Each targets Encore or upstream's own components; this fork has its own onboarding, layout and per-model reasoning settings.
 - **From v0.8.0-dev.8.3 (`52b74472`):** the Chat role's Test asks for one streamed tool call and passes only on a valid one (`lib/chatToolTest.ts`), for every provider, Test only (upstream also gates Save, for OpenAI-compatible). Not taken: its live OpenAI model list (OpenAI-compatible and LM Studio already list live models here), Encore's release schedule and relative release windows, and v0.8.0-dev.8.2's Encore card actions.
+- **Read and not taken, v1.0.3 (`5e3dca1b`):** all of it targets Encore and upstream's own shell. The assistant here already floats as a dock or dialog over the page (`AssistantChatSurface`) and already renames and deletes chats. Its delete bug was never here: `useAssistantChat.ts` sends its DELETE with no body and no `Content-Type`, and the one web DELETE that sets a JSON `Content-Type` (custom models, `AIFunctionCard.tsx`) sends a body.
 
 ## Why not merge
 
