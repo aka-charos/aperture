@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link as RouterLink, useSearchParams } from 'react-router-dom'
+import { Link as RouterLink, useLocation, useSearchParams } from 'react-router-dom'
 import {
   Box,
   Typography,
@@ -151,8 +151,38 @@ function MyRequestsContent() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
   const [allUsers, setAllUsers] = useState(false)
   // `?tab=issues` is where an issue notification opens, so it lands on the right list.
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const [tab, setTab] = useState<'requests' | 'issues'>(searchParams.get('tab') === 'issues' ? 'issues' : 'requests')
+  /**
+   * `?q=` is the search banner's hand-over: the request panel starts with that
+   * text. Read once and taken out of the address, so a reload after the viewer
+   * has searched for something else does not bring the old text back. Each
+   * hand-over is keyed by the navigation that brought it, which remounts the
+   * panel, and lands on the Requests tab even when this page was already open
+   * on Issues (the same page instance stays mounted across that navigation).
+   */
+  const handoverQuery = searchParams.get('q')
+  const [handover, setHandover] = useState<{ query: string; key: string } | null>(() => {
+    const query = handoverQuery?.trim()
+    return query ? { query, key: location.key } : null
+  })
+  useEffect(() => {
+    if (handoverQuery == null) return
+    const query = handoverQuery.trim()
+    if (query) {
+      setHandover((prev) => (prev?.key === location.key ? prev : { query, key: location.key }))
+      setTab('requests')
+    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('q')
+        return next
+      },
+      { replace: true }
+    )
+  }, [handoverQuery, location.key, setSearchParams])
   const [deciding, setDeciding] = useState<string | null>(null)
   const [snackbar, setSnackbar] = useState<{
     open: boolean
@@ -422,6 +452,9 @@ function MyRequestsContent() {
       {tab === 'requests' && (
       <>
       <ContentSearchPanel
+        // A new hand-over from the search banner starts the panel over with it.
+        key={handover?.key ?? 'no-handover'}
+        initialQuery={handover?.query}
         onShowDetails={(item: ContentSearchItem) => {
           if (item.mediaType === 'person') return
 

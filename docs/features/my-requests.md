@@ -27,7 +27,7 @@ Selecting a row opens a TMDb detail modal with the full picture of what was requ
 You can request content from several places; all of it lands here:
 
 - **Discover** — hover a suggestion card and request it directly. See [Discover](discovery.md).
-- **Search & request by name** — on the My Requests page, search your Seerr catalog for anything at all — including titles Aperture's Discovery never surfaced — and request it. These are recorded as *direct requests*.
+- **Search & request by name** — on the My Requests page, search your Seerr catalog for anything at all — including titles Aperture's Discovery never surfaced — and request it. These are recorded as *direct requests*. A library search that finds titles your server is missing offers a shortcut here with your search already filled in (see [Global Search](global-search.md#not-in-the-library)).
 - **Person pages** — the *Not in your library* section of an actor's or director's page can request any of their missing titles (for series, you pick the seasons). See [Person Pages](person-pages.md).
 - **Series detail pages** — the *missing episodes* card can request the seasons your server doesn't have. See [Series Details](series-detail.md).
 - **Franchise pages** — the *Not in your library* films of a movie collection. See [Franchise Tracker](franchises.md#a-franchise-page).

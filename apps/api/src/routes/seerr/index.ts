@@ -51,6 +51,7 @@ import {
   decideRequestSchema,
 } from './schemas.js'
 import { resolveSearchSource } from './sources/index.js'
+import { isRequestable, summarizeMissing } from './sources/requestability.js'
 import { pickRequestOverrides, resolveRequestSource } from './requestOptions.js'
 import {
   clearStaleSeerrUserId,
@@ -621,6 +622,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
           totalResults: 0,
           canRequest: false,
           source: null,
+          missing: { movies: 0, series: 0, more: false },
         })
       }
 
@@ -663,19 +665,25 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         withLibrary.map((r) => [`${r.mediaType}-${r.tmdbId}`, r.libraryMediaId])
       )
 
+      const results = found.results.map((r) => {
+        const libraryMediaId =
+          r.mediaType === 'person'
+            ? null
+            : libraryById.get(`${r.mediaType}-${r.tmdbId}`) ?? null
+        const inLibrary = libraryMediaId !== null
+        // Decided here (sources/requestability.ts), so the panel's buttons and
+        // the library search's banner read one answer.
+        return { ...r, libraryMediaId, inLibrary, requestable: isRequestable({ ...r, inLibrary }) }
+      })
+
       return reply.send({
         page: found.page,
         totalPages: found.totalPages,
         totalResults: found.totalResults,
         canRequest,
         source: source.id,
-        results: found.results.map((r) => {
-          const libraryMediaId =
-            r.mediaType === 'person'
-              ? null
-              : libraryById.get(`${r.mediaType}-${r.tmdbId}`) ?? null
-          return { ...r, libraryMediaId, inLibrary: libraryMediaId !== null }
-        }),
+        results,
+        missing: summarizeMissing(results, found.totalPages, found.page),
       })
     }
   )

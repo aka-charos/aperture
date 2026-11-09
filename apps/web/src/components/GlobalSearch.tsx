@@ -30,6 +30,9 @@ import CloseIcon from '@mui/icons-material/Close'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { matchSearchShortcut } from '@/lib/searchShortcut'
 import { genreLabel } from '@/lib/genreLabel'
+import { MissingTitlesBanner } from './MissingTitlesBanner'
+import { useMissingTitles } from '@/hooks/useMissingTitles'
+import { CONTENT_SEARCH_MIN_QUERY, requestSearchPath } from '@/lib/missingTitles'
 
 interface SearchResult {
   id: string
@@ -51,6 +54,13 @@ interface SearchResult {
  */
 type SearchStatus = 'idle' | 'loading' | 'done' | 'error'
 
+/**
+ * Keyboard positions above the first result: the "view all" row, then the
+ * missing-titles banner when it is showing. Results are 0, 1, 2, …
+ */
+const VIEW_ALL_ROW = -1
+const REQUEST_ROW = -2
+
 export function GlobalSearch() {
   const { t } = useTranslation()
   const fullScreen = useIsPhone()
@@ -70,7 +80,14 @@ export function GlobalSearch() {
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
-  const hasTerm = query.trim().length >= 2
+  const hasTerm = query.trim().length >= CONTENT_SEARCH_MIN_QUERY
+  // Asked separately from the library search, so the results never wait for it.
+  const missing = useMissingTitles(query)
+
+  // The banner can go away under the keyboard selection; fall back to "view all".
+  useEffect(() => {
+    if (!missing) setSelectedIndex((prev) => (prev === REQUEST_ROW ? VIEW_ALL_ROW : prev))
+  }, [missing])
 
   // Arrow keys move the highlight; without this it walks off the bottom of
   // the list and the reader cannot see what Enter would open.
@@ -122,7 +139,7 @@ export function GlobalSearch() {
   // shows results for text that is no longer in the box.
   useEffect(() => {
     const term = query.trim()
-    if (term.length < 2) {
+    if (term.length < CONTENT_SEARCH_MIN_QUERY) {
       setResults([])
       setStatus('idle')
       setSelectedIndex(-1)
@@ -172,24 +189,41 @@ export function GlobalSearch() {
     }
   }, [navigate, handleClose, query])
 
+  const handleRequestMissing = useCallback(() => {
+    if (!missing) return
+    navigate(requestSearchPath(missing.query))
+    handleClose()
+  }, [missing, navigate, handleClose])
+
+  // Order on screen: "view all", the banner (when shown), then the results.
   const handleKeyboardNav = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setSelectedIndex((prev) => Math.min(prev + 1, results.length - 1))
+        setSelectedIndex((prev) => {
+          if (prev === VIEW_ALL_ROW && missing) return REQUEST_ROW
+          if (results.length === 0) return prev
+          return Math.min((prev === REQUEST_ROW ? VIEW_ALL_ROW : prev) + 1, results.length - 1)
+        })
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        setSelectedIndex((prev) => Math.max(prev - 1, -1))
+        setSelectedIndex((prev) => {
+          if (prev === 0 && missing) return REQUEST_ROW
+          if (prev === REQUEST_ROW) return VIEW_ALL_ROW
+          return Math.max(prev - 1, VIEW_ALL_ROW)
+        })
       } else if (e.key === 'Enter' && query.trim()) {
         e.preventDefault()
         if (selectedIndex >= 0 && selectedIndex < results.length) {
           handleResultClick(results[selectedIndex])
+        } else if (selectedIndex === REQUEST_ROW && missing) {
+          handleRequestMissing()
         } else {
           handleViewAllResults()
         }
       }
     },
-    [results, selectedIndex, handleResultClick, handleViewAllResults, query]
+    [results, selectedIndex, handleResultClick, handleViewAllResults, handleRequestMissing, missing, query]
   )
 
   return (
@@ -320,7 +354,7 @@ export function GlobalSearch() {
                 px: 2.5,
                 py: 1.25,
                 color: 'primary.main',
-                bgcolor: selectedIndex === -1 ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                bgcolor: selectedIndex === VIEW_ALL_ROW ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
                 '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
               }}
             >
@@ -330,6 +364,20 @@ export function GlobalSearch() {
               </Typography>
             </ButtonBase>
           )}
+
+          {/*
+            * Titles the library is missing, counted from the request backend's
+            * search, with a way to the request panel that keeps the query.
+            * Its own request, later and slower than the library search above;
+            * it slides in when it answers and never holds the results back.
+            * Renders nothing for viewers who cannot request.
+            */}
+          <MissingTitlesBanner
+            found={missing}
+            variant="dialog"
+            selected={selectedIndex === REQUEST_ROW}
+            onNavigate={handleClose}
+          />
 
           {/* Results */}
           <Box

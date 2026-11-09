@@ -23,6 +23,12 @@ Open the full **Search** page for a bigger set of tools:
 - **Min RT Score** and **Year range** sliders
 - Results as a poster grid with your ratings and watch badges
 
+### Not in the library?
+
+If you can request titles, both the palette and the Search page also check your Seerr catalog for what you typed. When it finds films or shows that aren't on your server and nobody has requested yet, a line under the search box says how many (for example *"4 films and 2 TV shows matching "aftersun" are not on …"*) with **Request what you can't find**. That opens [My Requests](my-requests.md) with the same search already filled in, so you can request them there. In the palette, the line is part of the arrow-key order, between **View all results** and the first result.
+
+Your library results never wait for this: they appear as usual, and the line slides in a moment later, once Seerr answers. If Seerr isn't set up or doesn't answer, the line simply doesn't appear. "At least" means Seerr has more pages of results than the first one counted.
+
 ---
 
 ## AI Search

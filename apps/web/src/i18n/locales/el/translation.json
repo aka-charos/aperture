@@ -5956,6 +5956,22 @@
     "movies": "Ταινίες",
     "series": "Σειρές"
   },
+  "missingTitles": {
+    "movies_one": "{{count}} ταινία",
+    "movies_other": "{{count}} ταινίες",
+    "series_one": "{{count}} σειρά",
+    "series_other": "{{count}} σειρές",
+    "both": "{{movies}} και {{series}}",
+    "summary_one": "Λείπει από τη βιβλιοθήκη: {{titles}} για «{{query}}».",
+    "summary_other": "Λείπουν από τη βιβλιοθήκη: {{titles}} για «{{query}}».",
+    "summaryNamed_one": "Λείπει από το {{serverName}}: {{titles}} για «{{query}}».",
+    "summaryNamed_other": "Λείπουν από το {{serverName}}: {{titles}} για «{{query}}».",
+    "summaryMore_one": "Λείπει από τη βιβλιοθήκη τουλάχιστον {{titles}} για «{{query}}».",
+    "summaryMore_other": "Λείπουν από τη βιβλιοθήκη τουλάχιστον {{titles}} για «{{query}}».",
+    "summaryMoreNamed_one": "Λείπει από το {{serverName}} τουλάχιστον {{titles}} για «{{query}}».",
+    "summaryMoreNamed_other": "Λείπουν από το {{serverName}} τουλάχιστον {{titles}} για «{{query}}».",
+    "action": "Ζήτησε ό,τι δεν βρίσκεις"
+  },
   "reportIssue": {
     "title": "Αναφορά προβλήματος",
     "subtitle": "Πείτε μας τι δεν πάει καλά με το «{{title}}». Πείτε μας συγκεκριμένα πού συμβαίνει — αυτό μετράει περισσότερο από το πόσο σοβαρό είναι.",

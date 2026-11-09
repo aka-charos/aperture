@@ -34,11 +34,10 @@ import { RequestSeerrOptionsDialog } from './RequestSeerrOptionsDialog'
 import { SeasonSelectModal, type SeasonInfo } from '../pages/discovery/components/SeasonSelectModal'
 import { useSeerrRequest } from '../pages/discovery/hooks/useSeerrRequest'
 import type { SeerrRequestOptions } from '../types/seerrRequest'
+import { CONTENT_SEARCH_DEBOUNCE_MS, CONTENT_SEARCH_MIN_QUERY } from '../lib/missingTitles'
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500'
 const TMDB_PROFILE_BASE = 'https://image.tmdb.org/t/p/w185'
-const SEARCH_DEBOUNCE_MS = 400
-const MIN_QUERY_LENGTH = 2
 
 export interface ContentSearchItem {
   tmdbId: number
@@ -56,6 +55,11 @@ export interface ContentSearchItem {
   knownFor: string[]
   inLibrary: boolean
   libraryMediaId: string | null
+  /**
+   * Decided by the API (`routes/seerr/sources/requestability.ts`): a Request
+   * control belongs here. An already requested title keeps it, disabled.
+   */
+  requestable: boolean
 }
 
 interface ContentSearchResponse {
@@ -73,6 +77,13 @@ interface ContentSearchPanelProps {
   /** Raised after a request lands, so the host can refresh its own list. */
   onRequested?: (item: ContentSearchItem) => void
   onNotify?: (message: string, severity: 'success' | 'error') => void
+  /**
+   * Text to start with, e.g. a library search that came here through the
+   * search banner (`?q=` on My Requests), so nobody types it twice. Searched
+   * at once, without the typing pause. Read on mount only: the host remounts
+   * the panel (`key`) for a new hand-over.
+   */
+  initialQuery?: string
 }
 
 /**
@@ -136,8 +147,8 @@ function SearchResultCard({
         }}
         // Something already in the library, or already available in Seerr, has
         // nothing to request — the button would submit a duplicate that Seerr
-        // answers with a 409.
-        canRequest={canRequest && !item.inLibrary && item.availability !== 'available'}
+        // answers with a 409. The API decides it; absent means no.
+        canRequest={canRequest && item.requestable === true}
         isRequesting={isRequesting}
         onRequest={() => setOptionsOpen(true)}
         overview={item.overview}
@@ -175,12 +186,13 @@ export function ContentSearchPanel({
   onShowDetails,
   onRequested,
   onNotify,
+  initialQuery,
 }: ContentSearchPanelProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { submitRequest, isRequesting, fetchTVDetails } = useSeerrRequest()
 
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery ?? '')
   const [loading, setLoading] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -189,6 +201,12 @@ export function ContentSearchPanel({
   const [justRequested, setJustRequested] = useState<Set<number>>(new Set())
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /**
+   * The handed-over query is searched without the typing pause: nobody is
+   * typing, and the banner that sent it has usually warmed the server's cache.
+   * Cleared by the first keystroke.
+   */
+  const immediateQueryRef = useRef<string | null>(initialQuery?.trim() || null)
   /**
    * Guards against an older response overwriting a newer one. Typing fires
    * several requests and they do not necessarily land in order, so results
@@ -232,7 +250,7 @@ export function ContentSearchPanel({
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     const trimmed = query.trim()
-    if (trimmed.length < MIN_QUERY_LENGTH) {
+    if (trimmed.length < CONTENT_SEARCH_MIN_QUERY) {
       requestSeqRef.current++
       setData(null)
       setLoading(false)
@@ -240,7 +258,8 @@ export function ContentSearchPanel({
       setUnavailable(false)
       return
     }
-    debounceRef.current = setTimeout(() => void runSearch(trimmed), SEARCH_DEBOUNCE_MS)
+    const delay = immediateQueryRef.current === trimmed ? 0 : CONTENT_SEARCH_DEBOUNCE_MS
+    debounceRef.current = setTimeout(() => void runSearch(trimmed), delay)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
@@ -282,7 +301,7 @@ export function ContentSearchPanel({
   const series = results.filter((r) => r.mediaType === 'series')
   const people = results.filter((r) => r.mediaType === 'person')
   const titles = movies.length + series.length
-  const hasQuery = query.trim().length >= MIN_QUERY_LENGTH
+  const hasQuery = query.trim().length >= CONTENT_SEARCH_MIN_QUERY
 
   return (
     <Paper variant="outlined" sx={{ borderRadius: 2, p: { xs: 2, md: 3 }, mb: 3 }}>
@@ -297,7 +316,10 @@ export function ContentSearchPanel({
         fullWidth
         size="small"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          immediateQueryRef.current = null
+          setQuery(e.target.value)
+        }}
         placeholder={t('contentSearch.placeholder')}
         slotProps={{
           input: {

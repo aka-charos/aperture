@@ -351,7 +351,7 @@ export const searchContentSchema = {
   tags: ['seerr'],
   summary: 'Search movies, TV shows and people',
   description:
-    'Search for content that may not be in the library. Results are in Aperture’s own shape regardless of which backend answered, and carry decided values (inLibrary, availability, requested) rather than provider status codes.',
+    'Search for content that may not be in the library. Results are in Aperture’s own shape regardless of which backend answered, and carry decided values (inLibrary, availability, requested, requestable) rather than provider status codes. `missing` counts the films and shows on this page that could still be requested, with `more` when further pages exist.',
   querystring: {
     type: 'object',
     required: ['query'],

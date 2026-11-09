@@ -176,8 +176,9 @@ async function seerrCall<T>(
   }
 
   // Any write can change what a title's status says, whoever it was made as,
-  // and one that went unanswered may still have been made.
-  if ((options.method || 'GET') !== 'GET') statusCache.clear()
+  // and one that went unanswered may still have been made. Search answers
+  // carry the same statuses, so they go too.
+  if ((options.method || 'GET') !== 'GET') forgetSeerrAnswers()
 
   try {
     const response = await fetch(url, {
@@ -198,7 +199,7 @@ async function seerrCall<T>(
     }
 
     // Again once answered: a status read during the write may have been cached.
-    if ((options.method || 'GET') !== 'GET') statusCache.clear()
+    if ((options.method || 'GET') !== 'GET') forgetSeerrAnswers()
 
     // 204 No Content (DELETE) has no body to parse.
     if (response.status === 204) {
@@ -278,6 +279,26 @@ export async function testSeerrConnection(config?: SeerrConfig): Promise<{
 // Search & Media Info
 // ============================================================================
 
+const SEARCH_CACHE_TTL_MS = 60_000
+const SEARCH_CACHE_MAX_ENTRIES = 300
+
+/**
+ * Search answers, kept briefly. The library search's banner asks on every pause
+ * in typing, and the request panel it leads to asks the same question again a
+ * moment later; without this each one is a Seerr call and a TMDb call behind it.
+ *
+ * Seerr's search carries no viewer (no `X-API-User`), so the answer is the same
+ * for everyone. Keyed by address and key, like the status cache, so a settings
+ * change reuses nothing; the query is folded to lower case and trimmed, since
+ * TMDb's search ignores both. Successful answers only (`AsyncCache` keeps no
+ * null), and cleared with the status cache by any write (`forgetSeerrAnswers`),
+ * so a request just made never reads back as unrequested.
+ */
+const searchCache = new AsyncCache<SeerrSearchResult>({
+  ttlMs: SEARCH_CACHE_TTL_MS,
+  maxEntries: SEARCH_CACHE_MAX_ENTRIES,
+})
+
 /**
  * Search for movies and TV shows
  */
@@ -285,9 +306,16 @@ export async function searchContent(
   query: string,
   page: number = 1
 ): Promise<SeerrSearchResult | null> {
-  return seerrRequest<SeerrSearchResult>(
-    `/search?query=${encodeURIComponent(query)}&page=${page}`
+  const config = await getSeerrConfig()
+  if (!config) return null
+  const key = JSON.stringify([config.url, config.apiKey, query.trim().toLowerCase(), page])
+  const answer = await searchCache.get(key, () =>
+    seerrRequest<SeerrSearchResult>(
+      `/search?query=${encodeURIComponent(query)}&page=${page}`,
+      { config }
+    )
   )
+  return answer ?? null
 }
 
 /**
@@ -731,6 +759,12 @@ const statusCache = new AsyncCache<MediaStatus>({
   maxEntries: STATUS_CACHE_MAX_ENTRIES,
 })
 const limitStatusCall = concurrencyLimit(STATUS_CONCURRENCY)
+
+/** Everything kept from Seerr's answers; any write may have changed them. */
+function forgetSeerrAnswers(): void {
+  statusCache.clear()
+  searchCache.clear()
+}
 const limitJobStatusCall = concurrencyLimit(STATUS_CONCURRENCY)
 
 /**

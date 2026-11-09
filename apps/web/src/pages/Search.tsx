@@ -33,6 +33,8 @@ import { useUserRatings } from '../hooks/useUserRatings'
 import { useWatchStatus } from '../hooks/useWatchStatus'
 import { useWatching } from '../hooks/useWatching'
 import { PageHeading } from '@/components/PageHeading'
+import { MissingTitlesBanner } from '@/components/MissingTitlesBanner'
+import { useMissingTitles } from '@/hooks/useMissingTitles'
 import { genreLabel } from '@/lib/genreLabel'
 import { runSearchPasses, type ReadResult } from './searchPasses'
 
@@ -69,6 +71,8 @@ export function SearchPage() {
 
   // Search state
   const [query, setQuery] = useState(searchParams.get('q') || '')
+  // Its own request; the library results never wait for it.
+  const missing = useMissingTitles(query)
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   // Title matches are on screen and the semantic answer is still coming: the
@@ -295,6 +299,8 @@ export function SearchPage() {
           }}
         />
       </Box>
+
+      <MissingTitlesBanner found={missing} variant="page" />
 
       {/* Filter Toggle */}
       <Box display="flex" gap={2} mb={3} flexWrap="wrap" alignItems="center">

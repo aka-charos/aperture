@@ -5351,6 +5351,22 @@
     "movies": "Movies",
     "series": "TV shows"
   },
+  "missingTitles": {
+    "movies_one": "{{count}} film",
+    "movies_other": "{{count}} films",
+    "series_one": "{{count}} TV show",
+    "series_other": "{{count}} TV shows",
+    "both": "{{movies}} and {{series}}",
+    "summary_one": "{{titles}} matching “{{query}}” is not in the library.",
+    "summary_other": "{{titles}} matching “{{query}}” are not in the library.",
+    "summaryNamed_one": "{{titles}} matching “{{query}}” is not on {{serverName}}.",
+    "summaryNamed_other": "{{titles}} matching “{{query}}” are not on {{serverName}}.",
+    "summaryMore_one": "At least {{titles}} matching “{{query}}” is not in the library.",
+    "summaryMore_other": "At least {{titles}} matching “{{query}}” are not in the library.",
+    "summaryMoreNamed_one": "At least {{titles}} matching “{{query}}” is not on {{serverName}}.",
+    "summaryMoreNamed_other": "At least {{titles}} matching “{{query}}” are not on {{serverName}}.",
+    "action": "Request what you can’t find"
+  },
   "reportIssue": {
     "title": "Report a problem",
     "subtitle": "Tell the team what is wrong with “{{title}}” on your media server. Be specific — where it happens matters more than how bad it is.",
