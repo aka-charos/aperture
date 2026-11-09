@@ -222,7 +222,10 @@ export function SimilarMedia({
             Array.from({ length: DEFAULT_SIMILAR_MEDIA_LIMIT }, (_, i) => (
               <Box key={i}>
                 <Skeleton variant="rounded" sx={{ width: '100%', height: 'auto', aspectRatio: '2 / 3' }} />
+                {/* Two title lines and the genre line, as the loaded card reserves. */}
                 <Skeleton variant="text" sx={{ mt: 1, width: '80%' }} />
+                <Skeleton variant="text" sx={{ width: '60%' }} />
+                <Skeleton variant="text" sx={{ width: '40%' }} />
               </Box>
             ))}
           {similar.map((item) => (
@@ -242,8 +245,6 @@ export function SimilarMedia({
                 }
                 hideWatchingToggle={mediaType === 'movie'}
                 responsive
-                // These cards are narrow; one line cut most titles to a word.
-                titleLines={2}
                 onClick={() => openMedia(mediaType, item.id)}
               />
               <ConnectionReasonChips reasons={item.reasons} />

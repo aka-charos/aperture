@@ -93,12 +93,12 @@ export interface MoviePosterProps {
   /** Make poster fill container width with 2:3 aspect ratio (for responsive grids) */
   responsive?: boolean
   /**
-   * How many lines the title may use before it is clipped. Defaults to 1, which
-   * is what every existing grid renders — a narrow card in a dense row wants one
-   * line and an ellipsis. Pass 2 where the title is the point and the reader has
-   * no other way to tell two entries apart ("The Lord of the Ri…" three times
-   * over). At 2 the block reserves both lines whether or not the second is used,
-   * so cards in a row still line up.
+   * How many lines the title may use before it is clipped. Defaults to 2: a
+   * card is narrow, and one line cut most titles to a word or two ("The
+   * Forest O…"), with nothing else on the card to tell them apart. Both lines
+   * are reserved whether or not the second is used, so cards in a row still
+   * line up, and the year stays outside the clip. Pass 1 only where a row's
+   * height matters more than the title.
    */
   titleLines?: 1 | 2
   /**
@@ -228,7 +228,7 @@ export function MoviePoster({
   metaLine,
   loading = false,
   responsive = false,
-  titleLines = 1,
+  titleLines = 2,
   overviewBelow,
   children,
 }: MoviePosterProps) {
@@ -305,7 +305,9 @@ export function MoviePoster({
             borderRadius: 1,
           }}
         />
+        {/* As tall as the loaded card's title block, so nothing moves when it lands. */}
         <Skeleton variant="text" width="80%" sx={{ mt: 1 }} />
+        {titleLines > 1 && <Skeleton variant="text" width="60%" />}
         <Skeleton variant="text" width="40%" />
       </Box>
     )
@@ -603,30 +605,46 @@ export function MoviePoster({
           const inlineYear = !hideYear && !(metaLine != null && metaLine !== '') && year != null
           const yearText = inlineYear ? `(${year})` : null
           return titleLines > 1 ? (
-            <Typography
-              ref={titleElRef}
-              variant="body2"
-              fontWeight={500}
-              title={yearText ? `${title} ${yearText}` : title}
-              sx={{
-                lineHeight: 1.3,
-                display: '-webkit-box',
-                WebkitLineClamp: titleLines,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                // Reserved whether or not the second line is used, so a one-line
-                // title does not shorten its card and stagger the row.
-                minHeight: `${1.3 * titleLines}em`,
-              }}
-            >
-              {title}
-              {yearText && (
-                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>
-                  {' '}
-                  {yearText}
+            // Both lines reserved whether or not the second is used, so a
+            // one-line title does not shorten its card and stagger the row.
+            // The year stays outside the clamp, as in the one-line form: a
+            // title too long for both lines loses words, never its year,
+            // which sits at the end of the title's last line.
+            <Box sx={{ minHeight: `${1.3 * titleLines}em` }}>
+              <Box
+                display="flex"
+                gap={0.5}
+                minWidth={0}
+                title={yearText ? `${title} ${yearText}` : title}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    ref={titleElRef}
+                    variant="body2"
+                    fontWeight={500}
+                    sx={{
+                      lineHeight: 1.3,
+                      display: '-webkit-box',
+                      WebkitLineClamp: titleLines,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      overflowWrap: 'anywhere',
+                    }}
+                  >
+                    {title}
+                  </Typography>
                 </Box>
-              )}
-            </Typography>
+                {yearText && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ lineHeight: 1.3, flexShrink: 0, alignSelf: 'flex-end' }}
+                  >
+                    {yearText}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
           ) : (
             <Box
               display="flex"
