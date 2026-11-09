@@ -54,6 +54,14 @@ export type StatusPhase =
   | 'help'
   | 'broadening'
   | 'working'
+  // Newsletter writing assistant (routes/newsletters/assistant)
+  | 'newTitles'
+  | 'household'
+  | 'hiddenGems'
+  | 'audience'
+  | 'pastIssues'
+  | 'readingDraft'
+  | 'drafting'
   // Discovery sub-phases (one tool call, nine stages)
   | 'discoveryScouting'
   | 'discoveryShortlist'
@@ -113,6 +121,14 @@ const TOOL_PHASES: Record<string, StatusPhase> = {
   // The discovery tool reports its own sub-phases from inside execute; this is
   // just the first line, shown before it gets going.
   findCandidatesInLibrary: 'discoveryScouting',
+  // Newsletter writing assistant
+  getRecentlyAdded: 'newTitles',
+  getHouseholdFavourites: 'household',
+  getHiddenGems: 'hiddenGems',
+  checkAudienceReach: 'audience',
+  getPastIssues: 'pastIssues',
+  readCurrentDraft: 'readingDraft',
+  proposeDraft: 'drafting',
 }
 
 /**

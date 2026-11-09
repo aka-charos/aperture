@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { Editor } from '@tiptap/react'
 import { useTranslation } from 'react-i18next'
 import {
   Alert,
@@ -22,11 +23,13 @@ import {
   OutlinedInput,
   Select,
   Stack,
+  Tab,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  Tabs,
   TextField,
   Typography,
 } from '@mui/material'
@@ -46,6 +49,14 @@ import {
 } from './api'
 import { NewsletterBodyEditor } from './NewsletterBodyEditor'
 import { StatusChip } from './StatusChip'
+import { keepPageOnChunkFailure } from '../../../lib/staleChunk'
+import { titleIdsIn, type EditorNode, type NewsletterAssistantHost } from './assistant/assistantParts'
+
+// Loaded when first opened. Held against a chunk reload: the editor may hold
+// unsaved work (lib/staleChunk.ts).
+const NewsletterAssistantPanel = lazy(() =>
+  keepPageOnChunkFailure(() => import('./assistant/NewsletterAssistantPanel'))
+)
 
 const PREVIEW_DEBOUNCE_MS = 1200
 const POLL_MS = 2000
@@ -92,6 +103,62 @@ export function NewsletterEditor({
   const editable =
     newsletter?.status === 'draft' || (newsletter?.status === 'failed' && newsletter.sentCount === 0)
   const canSend = newsletter?.status === 'draft' || newsletter?.status === 'failed'
+
+  // The right column shows the preview or the writing assistant. The assistant
+  // stays mounted once opened, so switching back to the preview keeps the
+  // conversation.
+  const [pane, setPane] = useState<'preview' | 'assistant'>('preview')
+  const [assistantOpened, setAssistantOpened] = useState(false)
+  const editorRef = useRef<Editor | null>(null)
+  // Until the admin has put the cursor somewhere, an insert goes at the end
+  // rather than at the editor's initial selection, the very top.
+  const editorTouched = useRef(false)
+  const latest = useRef({ subject, preheader, content, groupIds })
+  latest.current = { subject, preheader, content, groupIds }
+
+  const onEditorReady = useCallback((editor: Editor | null) => {
+    editorRef.current = editor
+    editorTouched.current = false
+    editor?.on('focus', () => {
+      editorTouched.current = true
+    })
+  }, [])
+
+  const assistantHost = useMemo<NewsletterAssistantHost>(
+    () => ({
+      editable,
+      getDraft: () => ({
+        subject: latest.current.subject,
+        preheader: latest.current.preheader,
+        content: latest.current.content ?? {},
+        groupIds: latest.current.groupIds,
+      }),
+      titlesInNewsletter: titleIdsIn(content),
+      defaultFields: options.defaultTitleFields,
+      insertNodes: (nodes: EditorNode[]) => {
+        const editor = editorRef.current
+        if (!editor || nodes.length === 0) return
+        editor
+          .chain()
+          .focus(editorTouched.current ? undefined : 'end')
+          .insertContent(nodes)
+          .run()
+      },
+      replaceContent: (nodes: EditorNode[]) => {
+        // An editor command, so Undo in the toolbar brings the old text back.
+        editorRef.current?.chain().focus().setContent({ type: 'doc', content: nodes }, { emitUpdate: true }).run()
+      },
+      setSubject: (value: string) => {
+        setSubject(value.slice(0, 200))
+        setDirty(true)
+      },
+      setPreheader: (value: string) => {
+        setPreheader(value.slice(0, 200))
+        setDirty(true)
+      },
+    }),
+    [content, editable, options.defaultTitleFields]
+  )
 
   const load = useCallback(async () => {
     try {
@@ -427,6 +494,7 @@ export function NewsletterEditor({
               availableFields={availableFields}
               defaultFields={defaultFields}
               analysisParts={analysisParts}
+              onEditorReady={onEditorReady}
               onChange={(doc) => {
                 setContent(doc)
                 setDirty(true)
@@ -476,59 +544,87 @@ export function NewsletterEditor({
           )}
         </Stack>
 
-        <Card variant="outlined" sx={{ position: { md: 'sticky' }, top: { md: 16 } }}>
-          <CardContent>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
-              <Typography variant="subtitle1" fontWeight={600} sx={{ flex: 1 }}>
-                {t('admin.newsletters.editor.preview')}
-              </Typography>
-              <TextField
-                select
-                size="small"
-                label={t('admin.newsletters.editor.previewLanguage')}
-                value={previewLanguage}
-                onChange={(event) => setPreviewLanguage(event.target.value)}
-                sx={{ minWidth: 150 }}
-              >
-                {options.languages.map((language) => (
-                  <MenuItem key={language.code} value={language.code}>
-                    {language.label}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <Button size="small" startIcon={<RefreshIcon />} onClick={() => void refreshPreview()} disabled={previewing}>
-                {t('admin.newsletters.editor.refresh')}
-              </Button>
-            </Stack>
-            <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
-              {t('admin.newsletters.editor.previewHelp')}
-            </Typography>
-            {preview ? (
-              <>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  <strong>{t('admin.newsletters.editor.subject')}:</strong> {preview.subject || '—'}
+        <Stack spacing={1} sx={{ position: { md: 'sticky' }, top: { md: 16 }, minWidth: 0 }}>
+          {editable && (
+            <Tabs
+              value={pane}
+              onChange={(_event, value: 'preview' | 'assistant') => {
+                setPane(value)
+                if (value === 'assistant') setAssistantOpened(true)
+              }}
+              sx={{ minHeight: 40, '& .MuiTab-root': { minHeight: 40 } }}
+            >
+              <Tab value="preview" label={t('admin.newsletters.editor.preview')} />
+              <Tab value="assistant" label={t('admin.newsletters.assistant.title')}/>
+            </Tabs>
+          )}
+          {editable && assistantOpened && (
+            <Box
+              sx={{
+                display: pane === 'assistant' ? 'block' : 'none',
+                height: { xs: '75dvh', md: 'calc(100dvh - 140px)' },
+                minHeight: 480,
+              }}
+            >
+              <Suspense fallback={<LinearProgress />}>
+                <NewsletterAssistantPanel host={assistantHost} />
+              </Suspense>
+            </Box>
+          )}
+          <Card variant="outlined" sx={{ display: pane === 'preview' || !editable ? 'block' : 'none' }}>
+            <CardContent>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                <Typography variant="subtitle1" fontWeight={600} sx={{ flex: 1 }}>
+                  {t('admin.newsletters.editor.preview')}
                 </Typography>
-                {/* An empty sandbox: the email's HTML runs no script and reaches nothing of this page. */}
-                <Box
-                  component="iframe"
-                  title={t('admin.newsletters.editor.preview')}
-                  sandbox=""
-                  srcDoc={preview.html}
-                  sx={{
-                    width: '100%',
-                    height: 640,
-                    border: 0,
-                    borderRadius: 1,
-                    bgcolor: '#f4f4f7',
-                    opacity: previewing ? 0.5 : 1,
-                  }}
-                />
-              </>
-            ) : (
-              <LinearProgress />
-            )}
-          </CardContent>
-        </Card>
+                <TextField
+                  select
+                  size="small"
+                  label={t('admin.newsletters.editor.previewLanguage')}
+                  value={previewLanguage}
+                  onChange={(event) => setPreviewLanguage(event.target.value)}
+                  sx={{ minWidth: 150 }}
+                >
+                  {options.languages.map((language) => (
+                    <MenuItem key={language.code} value={language.code}>
+                      {language.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <Button size="small" startIcon={<RefreshIcon />} onClick={() => void refreshPreview()} disabled={previewing}>
+                  {t('admin.newsletters.editor.refresh')}
+                </Button>
+              </Stack>
+              <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
+                {t('admin.newsletters.editor.previewHelp')}
+              </Typography>
+              {preview ? (
+                <>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>{t('admin.newsletters.editor.subject')}:</strong> {preview.subject || '—'}
+                  </Typography>
+                  {/* An empty sandbox: the email's HTML runs no script and reaches nothing of this page. */}
+                  <Box
+                    component="iframe"
+                    title={t('admin.newsletters.editor.preview')}
+                    sandbox=""
+                    srcDoc={preview.html}
+                    sx={{
+                      width: '100%',
+                      height: 640,
+                      border: 0,
+                      borderRadius: 1,
+                      bgcolor: '#f4f4f7',
+                      opacity: previewing ? 0.5 : 1,
+                    }}
+                  />
+                </>
+              ) : (
+                <LinearProgress />
+              )}
+            </CardContent>
+          </Card>
+        </Stack>
       </Box>
 
       <Dialog open={confirmSend} onClose={() => setConfirmSend(false)}>

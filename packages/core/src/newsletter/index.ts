@@ -71,3 +71,15 @@ export {
   type StartSendResult,
 } from './send.js'
 export { analysisPassages, buildNewsletterContent, posterRequestUrl } from './build.js'
+export { loadTitleFacts, visibleTitlesByUser, type TitleFacts } from './build.js'
+export {
+  DRAFT_BLOCK_KINDS,
+  DRAFT_MAX_BLOCKS,
+  buildDraftContent,
+  describeDraftForModel,
+  draftTitleRefs,
+  type DraftBlockInput,
+  type DraftResult,
+  type DraftTitleInfo,
+  type EditorNode,
+} from './draft.js'

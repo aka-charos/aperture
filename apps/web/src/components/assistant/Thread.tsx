@@ -13,6 +13,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ReactMarkdown from 'react-markdown'
+import { readStreamError } from './streamErrors'
 import type { Components } from 'react-markdown'
 import {
   ThreadPrimitive,
@@ -222,18 +223,6 @@ function UserMessage() {
   )
 }
 
-// Backend stream errors arrive as "AI_ERROR:<code>:<detail>" (see api
-// helpers/errors.ts). Map each stable code to localized copy; anything
-// unparseable falls back to the generic message with the raw text as detail.
-const STREAM_ERROR_KEYS: Record<string, string> = {
-  not_configured: 'assistant.streamErrorNotConfigured',
-  provider_auth: 'assistant.streamErrorProviderAuth',
-  provider_quota: 'assistant.streamErrorProviderQuota',
-  provider_model: 'assistant.streamErrorProviderModel',
-  provider_unreachable: 'assistant.streamErrorProviderUnreachable',
-  db_unavailable: 'assistant.streamErrorDbUnavailable',
-}
-
 // Shown inside the assistant message when its run failed (message status
 // incomplete/error) — the regenerate button in the action bar stays available.
 function AssistantMessageError() {
@@ -247,9 +236,8 @@ function AssistantMessageError() {
       : status.error instanceof Error
         ? status.error.message
         : ''
-  const match = /^AI_ERROR:([a-z_]+):?([\s\S]*)$/.exec(raw)
-  const key = match ? STREAM_ERROR_KEYS[match[1]] : undefined
-  const detail = (match ? match[2] : raw).trim()
+  // Backend stream errors arrive coded (streamErrors.ts).
+  const { key, detail } = readStreamError(raw)
 
   return (
     <Box
@@ -263,7 +251,7 @@ function AssistantMessageError() {
       }}
     >
       <Typography variant="body2" sx={{ color: 'error.light' }}>
-        {t(key ?? 'assistant.streamErrorGeneric')}
+        {t(key)}
       </Typography>
       {detail && (
         <Typography

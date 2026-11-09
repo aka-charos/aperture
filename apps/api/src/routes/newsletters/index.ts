@@ -14,6 +14,7 @@
  * - POST   /api/newsletters/audience         - who a send to these groups would reach
  * - POST   /api/newsletters/:id/send         - start sending; 202, then poll the newsletter
  * - GET    /api/newsletters/:id/deliveries
+ * - POST   /api/newsletters/assistant        - the writing assistant, streamed (newsletters/assistant/)
  * - GET/POST/PUT/DELETE /api/newsletter-groups[...]   - send groups and their hand-picked members
  *
  * Viewer:
@@ -72,6 +73,7 @@ import {
 } from '@aperture/core'
 import { queryOne } from '../../lib/db.js'
 import { requireAdmin, requireAuth } from '../../plugins/auth.js'
+import { registerNewsletterAssistant } from './assistant/handler.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SUBJECT_MAX = 200
@@ -168,6 +170,8 @@ function previewLanguage(value: unknown, fallback: AppLocaleCode): AppLocaleCode
 }
 
 const newslettersRoutes: FastifyPluginAsync = async (fastify) => {
+  registerNewsletterAssistant(fastify)
+
   // ------------------------------------------------------------ options
 
   fastify.get('/api/newsletters/options', { preHandler: requireAdmin }, async () => {

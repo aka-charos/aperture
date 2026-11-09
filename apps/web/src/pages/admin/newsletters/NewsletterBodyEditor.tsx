@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -196,6 +196,7 @@ export function NewsletterBodyEditor({
   defaultFields,
   analysisParts,
   onChange,
+  onEditorReady,
 }: {
   /** Read once, when the editor mounts; remount (a `key`) to load another document. */
   initialContent: Record<string, unknown>
@@ -203,6 +204,8 @@ export function NewsletterBodyEditor({
   defaultFields: string[]
   analysisParts: { movie: string[]; series: string[] }
   onChange: (doc: Record<string, unknown>) => void
+  /** The editor instance, for the writing assistant to insert into; null once it is gone. */
+  onEditorReady?: (editor: Editor | null) => void
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   // The node view reads the field list through a getter, so options arriving
@@ -225,6 +228,13 @@ export function NewsletterBodyEditor({
     content: initialContent,
     onUpdate: ({ editor: e }) => onChange(e.getJSON() as Record<string, unknown>),
   })
+
+  const readyRef = useRef(onEditorReady)
+  readyRef.current = onEditorReady
+  useEffect(() => {
+    readyRef.current?.(editor ?? null)
+    return () => readyRef.current?.(null)
+  }, [editor])
 
   if (!editor) return null
   return (
