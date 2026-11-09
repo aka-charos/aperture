@@ -22,7 +22,7 @@ export const TITLE_POSTER_GRID_SX = {
  * A card still loading, drawn by the poster itself so its title lines always
  * match the loaded card's.
  */
-export function TitlePosterPlaceholder() {
+function TitlePosterPlaceholder() {
   return <MoviePoster title="" loading responsive />
 }
 

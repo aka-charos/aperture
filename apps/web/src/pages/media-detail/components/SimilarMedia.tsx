@@ -28,11 +28,10 @@ import type { GraphNode, ConnectionReason, ConnectionType } from '../../../compo
 import { connectionTypeLabel } from '../../../i18n/connectionTypeLabel'
 import { GraphExplorer } from '../../../components/GraphExplorer'
 import type { MediaType, SimilarItem } from '../types'
-import { TitlePosterCard, TitlePosterPlaceholder, TITLE_POSTER_GRID_SX } from './TitlePosterCard'
-import {
-  DEFAULT_SIMILAR_MEDIA_LIMIT,
-  FULLSCREEN_SIMILAR_GRAPH_LIMIT,
-} from '../constants'
+import { TitlePosterCard, TitlePosterPlaceholderRow, TITLE_POSTER_GRID_SX } from './TitlePosterCard'
+import { COMPACT_SIMILAR_GRAPH_LIMIT, FULLSCREEN_SIMILAR_GRAPH_LIMIT } from '../constants'
+import { useGridColumns } from '../hooks/useGridColumns'
+import { wholeRowCount } from '../wholeRows'
 
 const MAX_LIST_REASON_CHIPS = 3
 
@@ -118,9 +117,14 @@ export function SimilarMedia({
     goToHistoryIndex,
     startOver,
   } = useSimilarityData(mediaType, viewMode === 'graph' ? mediaId || null : null, {
-    limit: DEFAULT_SIMILAR_MEDIA_LIMIT,
+    limit: COMPACT_SIMILAR_GRAPH_LIMIT,
     depth: 1,
   })
+
+  // The list draws whole rows only: the grid fits as many cards as its column
+  // allows, so no fetched count can promise to fill the last row by itself.
+  const [gridRef, columns] = useGridColumns()
+  const shown = similar.slice(0, wholeRowCount(similar.length, columns))
 
   // Fetch expanded graph data for fullscreen (depth=3 - deep spider out effect)
   const {
@@ -181,12 +185,13 @@ export function SimilarMedia({
 
   return (
     <Box>
-      {viewMode === 'list' ? (
-        <Box sx={TITLE_POSTER_GRID_SX}>
-          {loading &&
-            similar.length === 0 &&
-            Array.from({ length: DEFAULT_SIMILAR_MEDIA_LIMIT }, (_, i) => <TitlePosterPlaceholder key={i} />)}
-          {similar.map((item) => (
+      {viewMode === 'list' && loading && similar.length === 0 ? (
+        // One row of placeholders, as Next from here shows: how many titles
+        // come back is not known yet.
+        <TitlePosterPlaceholderRow />
+      ) : viewMode === 'list' ? (
+        <Box ref={gridRef} sx={TITLE_POSTER_GRID_SX}>
+          {shown.map((item) => (
             <TitlePosterCard
               key={item.id}
               mediaType={mediaType}
