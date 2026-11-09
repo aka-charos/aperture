@@ -8,6 +8,7 @@
 
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
+import { displayRatingSql } from '../ratings/displayRating.js'
 import { addLog, isJobCancelled, setJobStep, updateJobProgress } from '../jobs/progress.js'
 import { batchGetSeasonStatuses, isSeerrConfigured } from '../seerr/provider.js'
 import { tmdbLookup } from '../tmdb/client.js'
@@ -465,12 +466,16 @@ export async function listSeriesGapShows(options: {
     numbering_differs: boolean
     seasons: StoredSeason[]
     library_id: string | null
+    rating: string | null
+    genres: string[] | null
   }>(
-    // One library row per show; resolved here so a show removed since the scan has no dead link.
-    `SELECT r.tmdb_id, r.title, r.poster_path, r.networks, r.numbering_differs, r.seasons, lib.id AS library_id
+    // One library row per show; resolved here so a show removed since the scan has no
+    // dead link. Its rating and genres are read now too, from that row.
+    `SELECT r.tmdb_id, r.title, r.poster_path, r.networks, r.numbering_differs, r.seasons,
+            lib.id AS library_id, lib.rating, lib.genres
      FROM gap_analysis_series_results r
      LEFT JOIN LATERAL (
-       SELECT s.id FROM series s
+       SELECT s.id, ${displayRatingSql('s')} AS rating, s.genres FROM series s
        WHERE s.tmdb_id = r.tmdb_id::text
        ORDER BY s.created_at ASC
        LIMIT 1
@@ -490,6 +495,9 @@ export async function listSeriesGapShows(options: {
         posterPath: row.poster_path,
         networks: row.networks,
         libraryId: row.library_id,
+        // NUMERIC arrives as a string; NULL stays null, never 0.
+        rating: row.rating != null ? Number(row.rating) : null,
+        genres: row.genres ?? [],
         numberingDiffers: row.numbering_differs,
         seasons: row.seasons,
       },

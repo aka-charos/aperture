@@ -27,6 +27,8 @@ function show(id: number, title: string, partial: Partial<SeriesGapShow> = {}): 
     posterPath: null,
     networks: [],
     libraryId: null,
+    rating: null,
+    genres: [],
     numberingDiffers: false,
     seasons: [],
     total: 4,

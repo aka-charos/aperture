@@ -24,6 +24,10 @@ export interface SeriesGapShow {
   posterPath: string | null
   networks: string[]
   libraryId: string | null
+  /** The library row's rating as every surface shows it; null = unrated. */
+  rating: number | null
+  /** Stored (English) genre names; drawn through `genreLabel`. */
+  genres: string[]
   numberingDiffers: boolean
   seasons: SeriesGapSeason[]
   total: number

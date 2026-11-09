@@ -238,6 +238,8 @@ const showRow = {
   posterPath: null,
   networks: ['HBO'],
   libraryId: 'lib',
+  rating: 8.4,
+  genres: ['Drama'],
   numberingDiffers: false,
 }
 

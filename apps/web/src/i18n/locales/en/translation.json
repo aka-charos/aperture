@@ -195,6 +195,9 @@
       "series": {
         "selectShowAria": "Select the seasons of {{name}}",
         "expandAria": "Show every season of {{name}}",
+        "ratingAria": "Rated {{rating}}",
+        "unrated": "No rating",
+        "moreGenres": "+{{count}}",
         "numberingChip": "Season numbering differs from TMDb",
         "numberingExplained": "The library and TMDb number this show's seasons differently, so these figures can't be read as gaps. Nothing here is offered for request.",
         "missingSeasons_one": "Missing season: {{list}}",

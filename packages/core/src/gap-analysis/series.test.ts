@@ -305,6 +305,8 @@ test('a read applies a request made since the scan', async () => {
       networks: ['HBO'],
       numbering_differs: false,
       library_id: 'lib-1',
+      rating: '8.40',
+      genres: ['Drama', 'Crime'],
       seasons: [
         { seasonNumber: 1, airDate: null, posterPath: null, airedEpisodes: 10, heldEpisodes: 0, holding: 'missing', seerrStatus: 'none' },
         { seasonNumber: 2, airDate: null, posterPath: null, airedEpisodes: 10, heldEpisodes: 0, holding: 'missing', seerrStatus: 'none' },
@@ -317,6 +319,8 @@ test('a read applies a request made since the scan', async () => {
 
   assert.equal(total, 1)
   assert.equal(shows[0].libraryId, 'lib-1')
+  assert.equal(shows[0].rating, 8.4)
+  assert.deepEqual(shows[0].genres, ['Drama', 'Crime'])
   assert.deepEqual(
     shows[0].seasons.map((s) => [s.seasonNumber, s.standing, s.requestable]),
     [
@@ -324,4 +328,29 @@ test('a read applies a request made since the scan', async () => {
       [2, 'requested', false],
     ]
   )
+})
+
+test('a show removed from the library since the scan reads as unrated, with no genres', async () => {
+  resultRows = [
+    {
+      tmdb_id: 2,
+      title: 'Gone',
+      poster_path: null,
+      networks: [],
+      numbering_differs: false,
+      library_id: null,
+      rating: null,
+      genres: null,
+      seasons: [
+        { seasonNumber: 1, airDate: null, posterPath: null, airedEpisodes: 10, heldEpisodes: 0, holding: 'missing', seerrStatus: 'none' },
+      ],
+    },
+  ]
+  requestRows = []
+
+  const { shows } = await listSeriesGapShows({ runId: 'run-1' })
+
+  // NULL is unrated, never 0 (Number(null) is 0).
+  assert.equal(shows[0].rating, null)
+  assert.deepEqual(shows[0].genres, [])
 })

@@ -1,11 +1,15 @@
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Box, Button, Checkbox, Chip, Collapse, IconButton, Paper, Typography } from '@mui/material'
+import { Box, Button, Checkbox, Chip, Collapse, IconButton, Paper, Tooltip, Typography } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import StarIcon from '@mui/icons-material/Star'
 import TvIcon from '@mui/icons-material/Tv'
+import { useGenreLabel } from '../../../lib/genreLabel'
 import type { SeriesGapShow } from './seriesListing'
 
 const TMDB_THUMB = 'https://image.tmdb.org/t/p/w154'
+/** Genres drawn as chips; the rest go into a "+N" chip whose tooltip names them. */
+const GENRES_SHOWN = 3
 
 interface GapSeriesRowProps {
   show: SeriesGapShow
@@ -35,8 +39,15 @@ export function GapSeriesRow({
   onRequestAll,
   children,
 }: GapSeriesRowProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const genreLabel = useGenreLabel()
   const { title, total, owned, pending } = show
+  const rating =
+    show.rating != null
+      ? show.rating.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+      : null
+  const genres = show.genres.map(genreLabel)
+  const hiddenGenres = genres.slice(GENRES_SHOWN)
   const ownedPct = total > 0 ? (owned / total) * 100 : 0
   const pendingPct = total > 0 ? (pending / total) * 100 : 0
   const allSelected = requestableCount > 0 && selectedCount >= requestableCount
@@ -147,6 +158,48 @@ export function GapSeriesRow({
               </>
             )}
           </Box>
+        </Box>
+
+        {/* A fixed width once the row has room, so ratings and genres line up down the
+            list; narrower, it takes its own line under the title. */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            minWidth: 0,
+            width: { xs: '100%', sm: 'auto', lg: '22rem' },
+          }}
+        >
+          <Box
+            role="img"
+            aria-label={rating ? t('admin.gaps.series.ratingAria', { rating }) : t('admin.gaps.series.unrated')}
+            title={rating ? undefined : t('admin.gaps.series.unrated')}
+            sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: '3.25rem', flexShrink: 0 }}
+          >
+            <StarIcon aria-hidden sx={{ fontSize: 16, color: rating ? 'warning.light' : 'action.disabled' }} />
+            <Typography aria-hidden variant="body2" fontWeight={600} color={rating ? 'text.primary' : 'text.disabled'}>
+              {rating ?? '–'}
+            </Typography>
+          </Box>
+          {genres.length > 0 && (
+            <Box sx={{ display: 'flex', gap: 0.5, minWidth: 0, overflow: 'hidden' }}>
+              {genres.slice(0, GENRES_SHOWN).map((genre) => (
+                <Chip key={genre} size="small" variant="outlined" label={genre} sx={{ flexShrink: 1, minWidth: 0 }} />
+              ))}
+              {hiddenGenres.length > 0 && (
+                <Tooltip title={hiddenGenres.join(', ')}>
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={t('admin.gaps.series.moreGenres', { count: hiddenGenres.length })}
+                    aria-label={hiddenGenres.join(', ')}
+                    sx={{ flexShrink: 0 }}
+                  />
+                </Tooltip>
+              )}
+            </Box>
+          )}
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 'auto' }}>

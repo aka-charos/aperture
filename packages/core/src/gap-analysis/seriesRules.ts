@@ -187,6 +187,10 @@ export interface SeriesGapShow {
   networks: string[]
   /** The library row holding this show now, resolved on read. */
   libraryId: string | null
+  /** That row's rating as every surface shows it (`displayRatingSql`); null = unrated or gone. */
+  rating: number | null
+  /** That row's genres, as stored (English; the page localises them). */
+  genres: string[]
   numberingDiffers: boolean
   seasons: SeriesGapSeason[]
   /** Aired regular seasons. */
@@ -199,7 +203,10 @@ export interface SeriesGapShow {
 }
 
 export function decideSeriesGapShow(
-  row: Pick<SeriesGapShow, 'tmdbId' | 'title' | 'posterPath' | 'networks' | 'libraryId' | 'numberingDiffers'> & {
+  row: Pick<
+    SeriesGapShow,
+    'tmdbId' | 'title' | 'posterPath' | 'networks' | 'libraryId' | 'rating' | 'genres' | 'numberingDiffers'
+  > & {
     seasons: readonly StoredSeason[]
   },
   active: readonly ActiveSeriesRequest[]
@@ -221,6 +228,8 @@ export function decideSeriesGapShow(
     posterPath: row.posterPath,
     networks: row.networks,
     libraryId: row.libraryId,
+    rating: row.rating,
+    genres: row.genres,
     numberingDiffers: row.numberingDiffers,
     seasons,
     total: seasons.length,
