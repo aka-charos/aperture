@@ -1,6 +1,6 @@
 import { useIsPhone } from '@/hooks/useIsPhone'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useNavigationType, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Box,
@@ -108,6 +108,31 @@ export function SearchPage() {
   )
   const [useSemantic, setUseSemantic] = useState(searchParams.get('semantic') === 'true')
   const [showFilters, setShowFilters] = useState(false)
+
+  /**
+   * The state above is read from the address once, on mount. A search started
+   * elsewhere while this page is open (the search dialog's "view all", or
+   * back/forward) arrives as a new address on the same page instance, so it is
+   * taken over here. The page's own writes below are replace navigations and
+   * are skipped: they hold what is already in the state, and reading them back
+   * could land a moment late and undo a keystroke.
+   */
+  const location = useLocation()
+  const navigationType = useNavigationType()
+  const adoptedKeyRef = useRef(location.key)
+  useEffect(() => {
+    if (adoptedKeyRef.current === location.key) return
+    adoptedKeyRef.current = location.key
+    if (navigationType === 'REPLACE') return
+    setQuery(searchParams.get('q') || '')
+    setType((searchParams.get('type') as 'all' | 'movie' | 'series') || 'all')
+    setGenre(searchParams.get('genre') || '')
+    setCollection(searchParams.get('collection') || '')
+    setNetwork(searchParams.get('network') || '')
+    setMinRtScore(parseInt(searchParams.get('minRtScore') || '0', 10))
+    setUseSemantic(searchParams.get('semantic') === 'true')
+    setPage(1)
+  }, [location.key, navigationType, searchParams])
 
   // Fetch filter options
   useEffect(() => {
