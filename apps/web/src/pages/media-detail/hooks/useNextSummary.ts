@@ -47,7 +47,7 @@ export function useNextSummary(titleRef: string | null): NextSummaryState {
     fetchNext<NextSummaryResponse>(`summary?title=${encodeURIComponent(titleRef)}`, controller.signal)
       .then((response) => setAnswer({ ref: titleRef, items: response.items }))
       .catch(() => {
-        /* fails quietly: no card; the hero's What next button still leads to the page */
+        /* fails quietly: no card; the hero's Next from here button still leads to the page */
       })
     return () => controller.abort()
   }, [titleRef, reached])

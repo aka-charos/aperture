@@ -94,7 +94,7 @@ export function MediaDetailPage({
   // operator's. The route also allows a viewer's own picks, as the bulk one does.
   const onRefreshExplanation = user?.isAdmin ? refreshExplanation : undefined
 
-  // Next from here, from this title: the hero's What next button and the card.
+  // Next from here, from this title: the hero's Next from here button and the card.
   const titleRef = id ? titleRefFor(mediaType, id) : null
   const nextPath = titleRef ? nextPathFor(titleRef) : null
   const nextSummary = useNextSummary(titleRef)
