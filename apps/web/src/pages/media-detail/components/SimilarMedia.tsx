@@ -242,6 +242,8 @@ export function SimilarMedia({
                 }
                 hideWatchingToggle={mediaType === 'movie'}
                 responsive
+                // These cards are narrow; one line cut most titles to a word.
+                titleLines={2}
                 onClick={() => openMedia(mediaType, item.id)}
               />
               <ConnectionReasonChips reasons={item.reasons} />
