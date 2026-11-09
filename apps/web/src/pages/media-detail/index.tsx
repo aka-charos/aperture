@@ -15,8 +15,7 @@ import {
   MediaInfoCard,
   SeasonsList,
   MissingSeasonsCard,
-  SimilarMedia,
-  WhatNextCard,
+  RelatedPanel,
   MovieInsights,
   TitleAnalysis,
   RecommendToDialog,
@@ -94,7 +93,8 @@ export function MediaDetailPage({
   // operator's. The route also allows a viewer's own picks, as the bulk one does.
   const onRefreshExplanation = user?.isAdmin ? refreshExplanation : undefined
 
-  // Next from here, from this title: the hero's Next from here button and the card.
+  // Next from here, from this title: the hero's Next from here button and the
+  // tab beside Related.
   const titleRef = id ? titleRefFor(mediaType, id) : null
   const nextPath = titleRef ? nextPathFor(titleRef) : null
   const nextSummary = useNextSummary(titleRef)
@@ -260,20 +260,6 @@ export function MediaDetailPage({
                   up with and a line nobody can track. */}
               {id && <TitleAnalysis mediaType={mediaType} mediaId={id} />}
               <MediaInfoCard media={media} />
-              {/* What to watch after this, from Next from here. Asked for
-                  only as it nears the screen; draws nothing until it has some. */}
-              {nextPath && (
-                <WhatNextCard
-                  state={nextSummary}
-                  title={media.title}
-                  nextPath={nextPath}
-                  onOpen={(title) =>
-                    onOpenMedia
-                      ? onOpenMedia(title.type, title.id)
-                      : navigate(`/${title.type === 'movie' ? 'movies' : 'series'}/${title.id}`)
-                  }
-                />
-              )}
               {/* Aired episodes missing from the server + Seerr requests (series only) */}
               {isSeries(media) && (
                 <MissingSeasonsCard
@@ -289,15 +275,24 @@ export function MediaDetailPage({
             </Box>
           </Grid>
 
-          {/* Right Column - Similar */}
+          {/* Right Column - Related titles and Next from here, as two tabs.
+              Keyed by title, so each title opens on Related as a list. */}
           <Grid item xs={12} md={6} data-tour="title-similar">
-            <SimilarMedia
+            <RelatedPanel
+              key={id}
               mediaType={mediaType}
               mediaId={id}
               mediaTitle={media.title}
               similar={similar}
-              loading={similarLoading}
+              similarLoading={similarLoading}
               onOpenMedia={onOpenMedia}
+              nextPath={nextPath}
+              nextSummary={nextSummary}
+              onOpenNext={(title) =>
+                onOpenMedia
+                  ? onOpenMedia(title.type, title.id)
+                  : navigate(`/${title.type === 'movie' ? 'movies' : 'series'}/${title.id}`)
+              }
             />
           </Grid>
         </Grid>

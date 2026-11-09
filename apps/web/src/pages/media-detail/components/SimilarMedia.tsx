@@ -3,8 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   Box,
   Typography,
-  Tabs,
-  Tab,
   Breadcrumbs,
   Link,
   IconButton,
@@ -19,8 +17,6 @@ import {
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import { MoviePoster } from '@aperture/ui'
-import GridViewIcon from '@mui/icons-material/GridView'
-import BubbleChartIcon from '@mui/icons-material/BubbleChart'
 import HomeIcon from '@mui/icons-material/Home'
 import NavigateNextIcon from '@mui/icons-material/NavigateNext'
 import FullscreenOutlinedIcon from '@mui/icons-material/FullscreenOutlined'
@@ -83,8 +79,12 @@ function ConnectionReasonChips({ reasons }: { reasons?: ConnectionReason[] }) {
   )
 }
 
+export type SimilarViewMode = 'list' | 'graph'
+
 interface SimilarMediaProps {
   mediaType: MediaType
+  /** Chosen by the panel's List/Graph switch (`RelatedPanel`), which draws the heading. */
+  viewMode: SimilarViewMode
   mediaId?: string
   mediaTitle?: string
   similar: SimilarItem[]
@@ -96,6 +96,7 @@ interface SimilarMediaProps {
 
 export function SimilarMedia({
   mediaType,
+  viewMode,
   mediaId,
   mediaTitle,
   similar,
@@ -107,7 +108,6 @@ export function SimilarMedia({
   const { getRating, setRating } = useUserRatings()
   const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
-  const [viewMode, setViewMode] = useState<'list' | 'graph'>('list')
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -142,12 +142,6 @@ export function SimilarMedia({
     limit: FULLSCREEN_SIMILAR_GRAPH_LIMIT,
     depth: 3,
   })
-
-  // View mode intentionally always starts on 'list' and is not persisted:
-  // every item view should open with the List, Graph is a per-visit choice.
-  const handleViewModeChange = useCallback((_: unknown, v: 'list' | 'graph') => {
-    setViewMode(v)
-  }, [])
 
   // Get current center node title
   const currentTitle =
@@ -205,50 +199,6 @@ export function SimilarMedia({
 
   return (
     <Box>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 1,
-          mb: 2,
-        }}
-      >
-        <Typography variant="h6" fontWeight={600}>
-          {mediaType === 'movie'
-            ? t('mediaDetail.similar.titleMovies')
-            : t('mediaDetail.similar.titleSeries')}
-        </Typography>
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Tabs
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
-            value={viewMode}
-            onChange={handleViewModeChange}
-            sx={{ minHeight: 36 }}
-          >
-            <Tab
-              value="list"
-              icon={<GridViewIcon fontSize="small" />}
-              iconPosition="start"
-              label={t('mediaDetail.similar.tabList')}
-              sx={{ minHeight: 36, py: 0 }}
-            />
-            <Tab
-              value="graph"
-              icon={<BubbleChartIcon fontSize="small" />}
-              iconPosition="start"
-              label={t('mediaDetail.similar.tabGraph')}
-              sx={{ minHeight: 36, py: 0 }}
-            />
-          </Tabs>
-
-        </Box>
-      </Box>
-
       {viewMode === 'list' ? (
         // Tracks come from the container, not the viewport. MUI's breakpoints
         // are window media queries, and this column is routinely much narrower

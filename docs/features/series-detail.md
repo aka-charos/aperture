@@ -73,7 +73,7 @@ A **Series Analysis** may also be available — see [Title Analysis](title-analy
 
 ## Related Series
 
-The right column shows similar series from your library as **Related Series**, with **List** and **Graph** tabs and connection-reason chips. See [Related-Content Graphs](similarity-graphs.md).
+The right column has two tabs. **Related Series** shows similar series from your library, as a **List** or a **Graph**, with connection-reason chips; see [Related-Content Graphs](similarity-graphs.md). **Next from here** shows the best few titles to watch after this one, each with its reason, and a link to the full [Next from here](next-from-here.md) page.
 
 ---
 

@@ -1708,6 +1708,8 @@
       "titleSeries": "Related Series",
       "tabList": "List",
       "tabGraph": "Graph",
+      "sectionsLabel": "Related titles and what to watch next",
+      "viewLabel": "Show related titles as",
       "tooltipFullscreen": "Fullscreen",
       "tooltipStartOver": "Start over",
       "graphHintOpen": "Click a poster for details • Shift+click to explore from it",
@@ -6920,7 +6922,7 @@
         },
         "similar": {
           "title": "More like this",
-          "body": "The titles in your library closest to this one. Switch to the graph to see how they connect."
+          "body": "The titles in your library closest to this one. Switch to the graph to see how they connect, or open Next from here for what to watch after it."
         }
       },
       "recommendations": {
@@ -7177,7 +7179,10 @@
       "whatNextTooltip": "What to watch after this: what feels closest to it, and the people behind it",
       "title": "Next from here",
       "description": "The best of what to watch next, from how close it feels and who made it.",
-      "seeAll": "See more"
+      "seeAll": "See more",
+      "open": "Open Next from here",
+      "empty": "Nothing to suggest after this title yet.",
+      "failed": "Suggestions didn't load. Next from here may still have some."
     },
     "roles": {
       "franchise": "Franchise",

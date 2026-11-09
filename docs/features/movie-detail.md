@@ -66,12 +66,14 @@ Many titles also carry a **Film Analysis** — a grounded critical essay about t
 
 ## Related Movies
 
-The right column lists similar titles from your library as **Related Movies**, with two tabs:
+The right column has two tabs. **Related Movies** lists similar titles from your library, shown two ways:
 
 - **List** — poster cards with watch-state badges, your ratings, and chips naming the connection (shared cast, genre, theme...)
 - **Graph** — the same relationships drawn as an explorable graph; open it fullscreen to go deeper
 
 See [Related-Content Graphs](similarity-graphs.md).
+
+**Next from here** shows the best few titles to watch after this one, each with the reason it was chosen, and a link to the full [Next from here](next-from-here.md) page for more.
 
 ---
 
