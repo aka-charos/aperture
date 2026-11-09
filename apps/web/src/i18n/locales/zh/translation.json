@@ -1771,8 +1771,18 @@
       "completed": "完全的",
       "episodePlays": "剧集播放",
       "averageViewerProgress": "平均观看进度（{{count}} 集）",
-      "userReach": "用户覆盖范围",
-      "movieWatchersTooltip": "您的 {{total}} 用户的 {{pct}}%",
+      "reachLevel": {
+        "niche": "小众",
+        "familiar": "熟知",
+        "popular": "热门",
+        "mostWatched": "最多观看"
+      },
+      "reachHint": {
+        "niche": "这里观看较少的作品之一。",
+        "familiar": "这里看过它的人比大多数作品都多。",
+        "popular": "这里观看较多的作品之一。",
+        "mostWatched": "这里观看最多的作品之一。"
+      },
       "criticRatings": "评论家评级",
       "scoreTooltipTomatometer": "番茄计：{{pct}}%",
       "scoreTooltipAudience": "观众：{{pct}}%",

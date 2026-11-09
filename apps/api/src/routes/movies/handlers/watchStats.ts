@@ -4,10 +4,10 @@
  * GET /api/movies/:id/watch-stats - Get comprehensive watch statistics for a movie
  */
 import type { FastifyInstance } from 'fastify'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, getHouseholdReach } from '@aperture/core'
 import { queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { titleInScope } from '../../../lib/viewerScope.js'
+import { titleInScope, viewerScope } from '../../../lib/viewerScope.js'
 import {
   audienceLabel,
   watcherAudienceFor,
@@ -75,17 +75,13 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
         [id]
       )
 
-      // Get total user count for percentage calculation
-      const userCount = await queryOne<{ count: string }>(
-        `SELECT COUNT(*) as count FROM users`
-      )
-      const totalUsers = parseInt(userCount?.count || '1', 10)
       const watchers = parseInt(watchStats?.total_watchers || '0', 10)
 
       // Names ride the same response as the counts, decided here rather than
       // filtered in the client: a viewer with no visibility never receives them.
       const audience = await watcherAudienceFor(currentUser)
       const watcherList = await fetchMovieWatchers(id, audience)
+      const reach = await getHouseholdReach('movie', id, await viewerScope(request))
 
       return reply.send({
         totalWatchers: watchers,
@@ -97,9 +93,9 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
         // User ratings
         averageUserRating: ratingStats?.avg_rating ? parseFloat(ratingStats.avg_rating) : null,
         totalRatings: parseInt(ratingStats?.rating_count || '0', 10),
-        // Percentage of users who watched
-        watchPercentage: totalUsers > 0 ? Math.round((watchers / totalUsers) * 100) : 0,
-        totalUsers,
+        // A level, never a share of users: beside the count, a share gives away
+        // how many accounts exist (core watching/householdReach.ts).
+        ...(reach ? { householdReach: reach } : {}),
       })
     }
   )

@@ -9,7 +9,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test:routes": "node --import tsx --test src/lib/afterRestore.test.ts src/routes/backup/handlers/upload.test.ts src/routes/media-proxy/images.test.ts src/routes/routeGuards.test.ts src/routes/annSettingsCallSites.test.ts src/routes/libraryScopeCallSites.test.ts src/routes/displayRatingCallSites.test.ts src/lib/scoreBreakdown.test.ts src/lib/qualityRating.test.ts src/lib/countryFilter.test.ts src/lib/watcherFilter.test.ts src/routes/listQuerystrings.test.ts src/routes/media-proxy/imageSize.test.ts src/routes/analysis/provenance.test.ts src/routes/inputContracts.test.ts",
-    "test:security": "node --import tsx --test src/config/security.test.ts src/config/cors.test.ts",
+    "test:security": "node --import tsx --test src/config/security.test.ts src/config/cors.test.ts src/routes/watchStatsPayload.test.ts",
     "test:boot": "node --import tsx --test --test-force-exit src/serverBoot.test.ts src/plugins/static.test.ts src/lib/restoreGate.server.test.ts",
     "test:auth": "node --import tsx --test src/lib/impersonation.test.ts src/lib/providerCredentials.test.ts src/lib/accountEnabled.test.ts src/lib/permissions.test.ts src/lib/watcherAudience.test.ts src/lib/secretExposure.test.ts src/lib/jobProgressToken.test.ts src/lib/restoreGate.test.ts",
     "test:schemas": "node --import tsx --test src/routes/aiFunctionSchemas.test.ts src/routes/settings/dislikeBehaviorSchema.test.ts src/routes/settings/librarySchema.test.ts",

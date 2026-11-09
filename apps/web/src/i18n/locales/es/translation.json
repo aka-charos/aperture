@@ -1154,8 +1154,18 @@
       "completed": "Terminada",
       "episodePlays": "Reproducciones de episodios",
       "averageViewerProgress": "Progreso promedio de espectadores ({{count}} episodios)",
-      "userReach": "Alcance del usuario",
-      "movieWatchersTooltip": "{{pct}}% de tus {{total}} usuarios",
+      "reachLevel": {
+        "niche": "Minoritario",
+        "familiar": "Conocido",
+        "popular": "Popular",
+        "mostWatched": "Lo más visto"
+      },
+      "reachHint": {
+        "niche": "Uno de los títulos menos vistos aquí.",
+        "familiar": "Más personas lo han visto aquí que la mayoría de los títulos.",
+        "popular": "Uno de los títulos bastante vistos aquí.",
+        "mostWatched": "Uno de los títulos más vistos aquí."
+      },
       "criticRatings": "Calificaciones de críticos",
       "scoreTooltipTomatometer": "Tomatómetro: {{pct}}%",
       "scoreTooltipAudience": "Audiencia: {{pct}}%",

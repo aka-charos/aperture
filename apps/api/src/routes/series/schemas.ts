@@ -6,6 +6,7 @@
  */
 
 import { schemas as globalSchemas } from '../../config/openapi.js'
+import { WATCHER_RESPONSE_SCHEMA } from '../../lib/watcherAudience.js'
 
 // =============================================================================
 // Export Component Schemas for Registration
@@ -111,6 +112,29 @@ export const watchStatsSchema = {
       id: { type: 'string' as const, format: 'uuid', description: 'Series ID' },
     },
     required: ['id'] as string[],
+  },
+  // A fixed list, because a field not named here is not sent: nothing in this
+  // response may give away how many accounts exist (watchStatsPayload.test.ts).
+  response: {
+    200: {
+      type: 'object' as const,
+      properties: {
+        currentlyWatching: { type: 'number' as const },
+        totalViewers: { type: 'number' as const },
+        completedViewers: { type: 'number' as const },
+        totalEpisodes: { type: 'number' as const },
+        totalEpisodePlays: { type: 'number' as const },
+        favoritedEpisodes: { type: 'number' as const },
+        firstWatched: {},
+        lastWatched: {},
+        averageUserRating: { type: ['number', 'null'] as ('number' | 'null')[] },
+        totalRatings: { type: 'number' as const },
+        averageProgress: { type: 'number' as const },
+        householdReach: { type: 'string' as const },
+        watchers: { type: 'array' as const, items: WATCHER_RESPONSE_SCHEMA },
+        watcherAudience: { type: 'string' as const },
+      },
+    },
   },
 }
 

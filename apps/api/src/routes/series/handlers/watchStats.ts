@@ -4,10 +4,10 @@
  * GET /api/series/:id/watch-stats - Get comprehensive watch statistics for a series
  */
 import type { FastifyInstance } from 'fastify'
-import { WATCH_HISTORY_PLAYED_SQL } from '@aperture/core'
+import { WATCH_HISTORY_PLAYED_SQL, getHouseholdReach } from '@aperture/core'
 import { query, queryOne } from '../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../plugins/auth.js'
-import { titleInScope } from '../../../lib/viewerScope.js'
+import { titleInScope, viewerScope } from '../../../lib/viewerScope.js'
 import {
   audienceLabel,
   watcherAudienceFor,
@@ -108,12 +108,6 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
           )
         : 0
 
-      // Get total user count for percentage calculation  
-      const userCount = await queryOne<{ count: string }>(
-        `SELECT COUNT(*) as count FROM users`
-      )
-      const totalUsers = parseInt(userCount?.count || '1', 10)
-
       // Sum favorites across all users
       const totalFavorites = watchStats.rows.reduce(
         (sum, s) => sum + parseInt(s.favorites_count, 10), 0
@@ -123,6 +117,7 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
       // viewer with no visibility never receives them. Mirrors the movie handler.
       const audience = await watcherAudienceFor(currentUser)
       const watcherList = await fetchSeriesWatchers(id, audience)
+      const reach = await getHouseholdReach('series', id, await viewerScope(request))
 
       return reply.send({
         currentlyWatching: parseInt(watchingCount?.count || '0', 10),
@@ -143,8 +138,9 @@ export function registerWatchStatsHandler(fastify: FastifyInstance) {
         totalRatings: parseInt(ratingStats?.rating_count || '0', 10),
         // Progress metrics
         averageProgress: avgProgress,
-        watchPercentage: totalUsers > 0 ? Math.round((viewerRows.length / totalUsers) * 100) : 0,
-        totalUsers,
+        // A level, never a share of users: beside the count, a share gives away
+        // how many accounts exist (core watching/householdReach.ts).
+        ...(reach ? { householdReach: reach } : {}),
       })
     }
   )

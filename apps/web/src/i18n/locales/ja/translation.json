@@ -1771,8 +1771,18 @@
       "completed": "完了",
       "episodePlays": "エピソードの再生",
       "averageViewerProgress": "平均視聴者の進行状況 ({{count}} エピソード)",
-      "userReach": "ユーザーリーチ",
-      "movieWatchersTooltip": "{{total}} ユーザーの {{pct}}%",
+      "reachLevel": {
+        "niche": "ニッチ",
+        "familiar": "おなじみ",
+        "popular": "人気",
+        "mostWatched": "最多視聴"
+      },
+      "reachHint": {
+        "niche": "ここではあまり視聴されていない作品の一つです。",
+        "familiar": "ここでは多くの作品より視聴した人が多い作品です。",
+        "popular": "ここで比較的よく視聴されている作品です。",
+        "mostWatched": "ここで最もよく視聴されている作品の一つです。"
+      },
       "criticRatings": "批評家の評価",
       "scoreTooltipTomatometer": "トマトメーター: {{pct}}%",
       "scoreTooltipAudience": "視聴者: {{pct}}%",

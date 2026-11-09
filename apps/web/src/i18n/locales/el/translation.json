@@ -3281,8 +3281,18 @@
       "completed": "Το ολοκλήρωσαν",
       "episodePlays": "Αναπαραγωγές επεισοδίων",
       "averageViewerProgress": "Μέση πρόοδος θεατών ({{count}} επεισόδια)",
-      "userReach": "Απήχηση στους χρήστες",
-      "movieWatchersTooltip": "{{pct}}% από τους {{total}} χρήστες σας",
+      "reachLevel": {
+        "niche": "Για λίγους",
+        "familiar": "Γνωστό",
+        "popular": "Δημοφιλές",
+        "mostWatched": "Από τα πιο δημοφιλή"
+      },
+      "reachHint": {
+        "niche": "Ένας από τους τίτλους που έχουν δει λιγότεροι εδώ.",
+        "familiar": "Το έχουν δει περισσότεροι εδώ απ' ό,τι τους περισσότερους τίτλους.",
+        "popular": "Ένας από τους τίτλους που έχουν δει αρκετοί εδώ.",
+        "mostWatched": "Ένας από τους τίτλους που έχουν δει οι περισσότεροι εδώ."
+      },
       "criticRatings": "Κριτικές",
       "scoreTooltipTomatometer": "Tomatometer: {{pct}}%",
       "scoreTooltipAudience": "Κοινό: {{pct}}%",

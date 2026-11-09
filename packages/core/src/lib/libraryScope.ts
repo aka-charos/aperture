@@ -167,6 +167,19 @@ export function libraryScopeSql(scope: LibraryScope, alias: string, bind: BindPa
     ), 0) <= ${rating}::int))`
 }
 
+/**
+ * A cache key for anything a scope shapes: everything `libraryScopeSql` binds. Ids
+ * are sorted because their order means nothing, and JSON keeps a null list apart
+ * from an empty one (no restriction, against no library at all). `hasMovies` and
+ * `hasSeries` are left out: they follow from the ids, and the SQL never reads them.
+ */
+export function libraryScopeKey(scope: LibraryScope): string {
+  return JSON.stringify([
+    scope.libraryIds ? [...scope.libraryIds].sort() : null,
+    scope.maxParentalRating,
+  ])
+}
+
 interface ScopeUserRow {
   library_access: string[] | null
   max_parental_rating: number | null
