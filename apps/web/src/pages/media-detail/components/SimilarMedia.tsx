@@ -16,13 +16,9 @@ import {
   Skeleton,
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
-import { MoviePoster } from '@aperture/ui'
 import HomeIcon from '@mui/icons-material/Home'
 import NavigateNextIcon from '@mui/icons-material/NavigateNext'
 import FullscreenOutlinedIcon from '@mui/icons-material/FullscreenOutlined'
-import { useUserRatings } from '../../../hooks/useUserRatings'
-import { useWatchStatus } from '../../../hooks/useWatchStatus'
-import { useWatching } from '../../../hooks/useWatching'
 import {
   SimilarityGraph,
   GraphLegend,
@@ -33,6 +29,7 @@ import type { GraphNode, ConnectionReason, ConnectionType } from '../../../compo
 import { connectionTypeLabel } from '../../../i18n/connectionTypeLabel'
 import { GraphExplorer } from '../../../components/GraphExplorer'
 import type { MediaType, SimilarItem } from '../types'
+import { TitlePosterCard, TITLE_POSTER_GRID_SX } from './TitlePosterCard'
 import {
   DEFAULT_SIMILAR_MEDIA_LIMIT,
   FULLSCREEN_SIMILAR_GRAPH_LIMIT,
@@ -105,9 +102,6 @@ export function SimilarMedia({
 }: SimilarMediaProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { getRating, setRating } = useUserRatings()
-  const { isWatched, getEpisodeProgress } = useWatchStatus()
-  const { isWatching, toggleWatching } = useWatching()
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -146,17 +140,6 @@ export function SimilarMedia({
   // Get current center node title
   const currentTitle =
     graphData?.nodes.find((n) => n.isCenter)?.title || mediaTitle || t('mediaDetail.similar.fallbackCenterTitle')
-
-  const handleRate = useCallback(
-    async (itemId: string, rating: number | null) => {
-      try {
-        await setRating(mediaType === 'movie' ? 'movie' : 'series', itemId, rating)
-      } catch (err) {
-        console.error('Failed to rate:', err)
-      }
-    },
-    [setRating, mediaType]
-  )
 
   const openMedia = (type: MediaType, id: string) => {
     if (onOpenMedia) {
@@ -200,23 +183,7 @@ export function SimilarMedia({
   return (
     <Box>
       {viewMode === 'list' ? (
-        // Tracks come from the container, not the viewport. MUI's breakpoints
-        // are window media queries, and this column is routinely much narrower
-        // than the window implies — the docked assistant takes its width off
-        // the main pane without touching the window, and MediaDetailModal
-        // renders this page inside a dialog. `md={3}` kept four posters across
-        // a half-width column and shrank them to ~110px; auto-fill measures the
-        // space it actually has. The 150px floor reproduces the old column
-        // counts where they were right (2 on a phone, 4 at full desktop width).
-        <Box
-          sx={{
-            display: 'grid',
-            // 130, not 150: two 150px tracks plus the gap did not fit a phone,
-            // which then showed one full-width poster per row.
-            gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-            gap: 2,
-          }}
-        >
+        <Box sx={TITLE_POSTER_GRID_SX}>
           {loading &&
             similar.length === 0 &&
             Array.from({ length: DEFAULT_SIMILAR_MEDIA_LIMIT }, (_, i) => (
@@ -229,26 +196,18 @@ export function SimilarMedia({
               </Box>
             ))}
           {similar.map((item) => (
-            <Box key={item.id}>
-              <MoviePoster
-                title={item.title}
-                year={item.year}
-                posterUrl={item.poster_url}
-                genres={item.genres}
-                userRating={getRating(mediaType === 'movie' ? 'movie' : 'series', item.id)}
-                watched={isWatched(mediaType === 'movie' ? 'movie' : 'series', item.id)}
-                episodeProgress={getEpisodeProgress(mediaType === 'movie' ? 'movie' : 'series', item.id)}
-                onRate={(rating) => handleRate(item.id, rating)}
-                isWatching={mediaType === 'series' ? isWatching(item.id) : undefined}
-                onWatchingToggle={
-                  mediaType === 'series' ? () => toggleWatching(item.id) : undefined
-                }
-                hideWatchingToggle={mediaType === 'movie'}
-                responsive
-                onClick={() => openMedia(mediaType, item.id)}
-              />
+            <TitlePosterCard
+              key={item.id}
+              mediaType={mediaType}
+              id={item.id}
+              title={item.title}
+              year={item.year}
+              posterUrl={item.poster_url}
+              genres={item.genres}
+              onOpen={() => openMedia(mediaType, item.id)}
+            >
               <ConnectionReasonChips reasons={item.reasons} />
-            </Box>
+            </TitlePosterCard>
           ))}
         </Box>
       ) : (

@@ -2,13 +2,14 @@ import { useTranslation } from 'react-i18next'
 import { Link as RouterLink } from 'react-router-dom'
 import { Box, Button, CircularProgress, Typography } from '@mui/material'
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined'
-import { TitleTile } from '../../next/TitleTile'
 import { orderReasons, reasonText } from '../../next/reasons'
 import { useReasonText } from '../../next/useReasonText'
 import type { TrailTitle } from '../../next/types'
 import type { NextSummaryState } from '../hooks/useNextSummary'
+import { TitlePosterCard, TITLE_POSTER_GRID_SX } from './TitlePosterCard'
 
-const TILE_WIDTH = 72
+/** Lines a reason may take under its poster; the whole sentence is in its tooltip. */
+const REASON_LINES = 3
 
 interface NextFromHereTabProps {
   state: NextSummaryState
@@ -21,9 +22,11 @@ interface NextFromHereTabProps {
 
 /**
  * The Next from here tab beside Related on a title's page: the best few things
- * to watch after this title, each with the reason that says most, and a way
- * into the page for the rest. The tab is always offered, so it says when it is
- * loading, when it failed and when there is nothing to suggest.
+ * to watch after this title, drawn as Related draws its titles, each with the
+ * reason that says most under its poster where Related puts its connection
+ * chips, and a way into the page for the rest. The tab is always offered, so
+ * it says when it is loading, when it failed and when there is nothing to
+ * suggest.
  */
 export function NextFromHereTab({ state, title, nextPath, onOpen }: NextFromHereTabProps) {
   const { t } = useTranslation()
@@ -58,28 +61,38 @@ export function NextFromHereTab({ state, title, nextPath, onOpen }: NextFromHere
         </Typography>
       ) : (
         <>
-          <Box sx={{ display: 'grid', gap: 2, mb: 1.5 }}>
+          <Box sx={{ ...TITLE_POSTER_GRID_SX, mb: 2 }}>
             {items.map((item) => {
               const reason = orderReasons(item.reasons)[0]
+              const sentence = reason ? say(reasonText(reason, title, item.title.type)) : null
               return (
-                <Box key={item.title.ref} sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', minWidth: 0 }}>
-                  <TitleTile title={item.title} onOpen={onOpen} width={TILE_WIDTH} />
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="subtitle2" sx={{ lineHeight: 1.3 }}>
-                      {item.title.title}
-                      {item.title.year ? (
-                        <Typography component="span" variant="body2" color="text.secondary">
-                          {` (${item.title.year})`}
-                        </Typography>
-                      ) : null}
+                <TitlePosterCard
+                  key={item.title.ref}
+                  mediaType={item.title.type}
+                  id={item.title.id}
+                  title={item.title.title}
+                  year={item.title.year}
+                  posterUrl={item.title.posterUrl}
+                  onOpen={() => onOpen(item.title)}
+                >
+                  {sentence && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      title={sentence}
+                      sx={{
+                        mt: 0.75,
+                        display: '-webkit-box',
+                        WebkitLineClamp: REASON_LINES,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {sentence}
                     </Typography>
-                    {reason && (
-                      <Typography variant="body2" color="text.secondary">
-                        {say(reasonText(reason, title, item.title.type))}
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
+                  )}
+                </TitlePosterCard>
               )
             })}
           </Box>
