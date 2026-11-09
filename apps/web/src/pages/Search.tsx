@@ -1,4 +1,3 @@
-import { useIsPhone } from '@/hooks/useIsPhone'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useLocation, useNavigate, useNavigationType, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -20,7 +19,6 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   CircularProgress,
-  Pagination,
 } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import MovieIcon from '@mui/icons-material/Movie'
@@ -37,6 +35,13 @@ import { MissingTitlesBanner } from '@/components/MissingTitlesBanner'
 import { useMissingTitles } from '@/hooks/useMissingTitles'
 import { genreLabel } from '@/lib/genreLabel'
 import { runSearchPasses, type ReadResult } from './searchPasses'
+import {
+  adoptsAddress,
+  readSearchState,
+  searchStateParams,
+  type SearchType,
+  type SearchUrlState,
+} from '@/lib/searchUrlState'
 
 interface SearchResult {
   id: string
@@ -62,15 +67,41 @@ interface FilterOptions {
 
 export function SearchPage() {
   const { t } = useTranslation()
-  const isPhone = useIsPhone()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { getRating, setRating } = useUserRatings()
   const { isWatched, getEpisodeProgress } = useWatchStatus()
   const { isWatching, toggleWatching } = useWatching()
 
-  // Search state
-  const [query, setQuery] = useState(searchParams.get('q') || '')
+  /**
+   * The query and every filter, as the address holds them
+   * (`lib/searchUrlState.ts`). Read on mount, and again whenever a search
+   * started elsewhere arrives while this page is open (the search dialog's
+   * "view all", back/forward). The page's own writes are replace navigations
+   * and are never read back: they hold what is already here, and one landing
+   * late would undo a keystroke. Taken over during render, so no effect ever
+   * runs with the new address and the old search.
+   */
+  const location = useLocation()
+  const navigationType = useNavigationType()
+  const [search, setSearch] = useState<SearchUrlState>(() => readSearchState(searchParams))
+  const [adoptedKey, setAdoptedKey] = useState(location.key)
+  if (adoptedKey !== location.key) {
+    setAdoptedKey(location.key)
+    if (adoptsAddress(navigationType)) setSearch(readSearchState(searchParams))
+  }
+  const update = useCallback((patch: Partial<SearchUrlState>) => setSearch((prev) => ({ ...prev, ...patch })), [])
+  const {
+    q: query,
+    type,
+    genre,
+    collection,
+    network,
+    minRtScore,
+    semantic: useSemantic,
+    yearMin,
+    yearMax,
+  } = search
   // Its own request; the library results never wait for it.
   const missing = useMissingTitles(query)
   const [results, setResults] = useState<SearchResult[]>([])
@@ -90,49 +121,14 @@ export function SearchPage() {
     if (resultsGridRef.current) resultsGridRef.current.inert = provisional
   }, [provisional, results])
   const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
   const [totalResults, setTotalResults] = useState(0)
+  // The API answers one list of at most this many, best first; there is no
+  // second page to ask for.
   const pageSize = 24
 
-  // Filter state
+  // Filter options the library offers
   const [filters, setFilters] = useState<FilterOptions | null>(null)
-  const [type, setType] = useState<'all' | 'movie' | 'series'>(
-    (searchParams.get('type') as 'all' | 'movie' | 'series') || 'all'
-  )
-  const [genre, setGenre] = useState(searchParams.get('genre') || '')
-  const [collection, setCollection] = useState(searchParams.get('collection') || '')
-  const [network, setNetwork] = useState(searchParams.get('network') || '')
-  const [yearRange, setYearRange] = useState<[number, number]>([1900, new Date().getFullYear()])
-  const [minRtScore, setMinRtScore] = useState<number>(
-    parseInt(searchParams.get('minRtScore') || '0', 10)
-  )
-  const [useSemantic, setUseSemantic] = useState(searchParams.get('semantic') === 'true')
   const [showFilters, setShowFilters] = useState(false)
-
-  /**
-   * The state above is read from the address once, on mount. A search started
-   * elsewhere while this page is open (the search dialog's "view all", or
-   * back/forward) arrives as a new address on the same page instance, so it is
-   * taken over here. The page's own writes below are replace navigations and
-   * are skipped: they hold what is already in the state, and reading them back
-   * could land a moment late and undo a keystroke.
-   */
-  const location = useLocation()
-  const navigationType = useNavigationType()
-  const adoptedKeyRef = useRef(location.key)
-  useEffect(() => {
-    if (adoptedKeyRef.current === location.key) return
-    adoptedKeyRef.current = location.key
-    if (navigationType === 'REPLACE') return
-    setQuery(searchParams.get('q') || '')
-    setType((searchParams.get('type') as 'all' | 'movie' | 'series') || 'all')
-    setGenre(searchParams.get('genre') || '')
-    setCollection(searchParams.get('collection') || '')
-    setNetwork(searchParams.get('network') || '')
-    setMinRtScore(parseInt(searchParams.get('minRtScore') || '0', 10))
-    setUseSemantic(searchParams.get('semantic') === 'true')
-    setPage(1)
-  }, [location.key, navigationType, searchParams])
 
   // Fetch filter options
   useEffect(() => {
@@ -142,9 +138,6 @@ export function SearchPage() {
         if (response.ok) {
           const data = await response.json()
           setFilters(data)
-          if (data.yearRange) {
-            setYearRange([data.yearRange.min, data.yearRange.max])
-          }
         }
       } catch {
         // Ignore filter fetch errors
@@ -182,10 +175,8 @@ export function SearchPage() {
       if (collection) params.set('collection', collection)
       if (network) params.set('network', network)
       if (minRtScore > 0) params.set('minRtScore', String(minRtScore))
-      if (filters?.yearRange) {
-        if (yearRange[0] > filters.yearRange.min) params.set('yearMin', String(yearRange[0]))
-        if (yearRange[1] < filters.yearRange.max) params.set('yearMax', String(yearRange[1]))
-      }
+      if (yearMin != null) params.set('yearMin', String(yearMin))
+      if (yearMax != null) params.set('yearMax', String(yearMax))
 
       type Answer = { results: SearchResult[]; total: number }
       // 'failed' is an answer that came back refused; 'unreachable' never came.
@@ -221,7 +212,7 @@ export function SearchPage() {
       setProvisional(false)
       setLoading(false)
     },
-    [query, type, genre, collection, network, minRtScore, useSemantic, yearRange, filters, t]
+    [query, type, genre, collection, network, minRtScore, useSemantic, yearMin, yearMax, t]
   )
 
   // Debounced search
@@ -234,18 +225,11 @@ export function SearchPage() {
     }
   }, [performSearch, query])
 
-  // Update URL params
+  // Write the search back into the address, in place, only when it differs.
   useEffect(() => {
-    const params = new URLSearchParams()
-    if (query) params.set('q', query)
-    if (type !== 'all') params.set('type', type)
-    if (genre) params.set('genre', genre)
-    if (collection) params.set('collection', collection)
-    if (network) params.set('network', network)
-    if (minRtScore > 0) params.set('minRtScore', String(minRtScore))
-    if (useSemantic) params.set('semantic', 'true')
-    setSearchParams(params, { replace: true })
-  }, [query, type, genre, collection, network, minRtScore, useSemantic, setSearchParams])
+    const next = searchStateParams(search)
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true })
+  }, [search, searchParams, setSearchParams])
 
   const handleRate = useCallback(
     async (itemId: string, itemType: 'movie' | 'series', rating: number | null) => {
@@ -258,17 +242,10 @@ export function SearchPage() {
     [setRating]
   )
 
-  const clearFilters = () => {
-    setType('all')
-    setGenre('')
-    setCollection('')
-    setNetwork('')
-    setMinRtScore(0)
-    setUseSemantic(false)
-    if (filters?.yearRange) {
-      setYearRange([filters.yearRange.min, filters.yearRange.max])
-    }
-  }
+  const clearFilters = () =>
+    setSearch((prev) => ({ ...readSearchState(new URLSearchParams()), q: prev.q }))
+
+  const hasYearFilter = yearMin != null || yearMax != null
 
   const hasActiveFilters =
     type !== 'all' ||
@@ -277,13 +254,14 @@ export function SearchPage() {
     network ||
     minRtScore > 0 ||
     useSemantic ||
-    (filters?.yearRange && (yearRange[0] > filters.yearRange.min || yearRange[1] < filters.yearRange.max))
+    hasYearFilter
 
   const filterPanelCount = useMemo(
     () =>
-      [type !== 'all', genre, collection, network, minRtScore > 0, useSemantic].filter(Boolean)
-        .length,
-    [type, genre, collection, network, minRtScore, useSemantic]
+      [type !== 'all', genre, collection, network, minRtScore > 0, useSemantic, hasYearFilter].filter(
+        Boolean
+      ).length,
+    [type, genre, collection, network, minRtScore, useSemantic, hasYearFilter]
   )
 
   return (
@@ -300,10 +278,7 @@ export function SearchPage() {
           fullWidth
           placeholder={t('search.placeholder')}
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setPage(1)
-          }}
+          onChange={(e) => update({ q: e.target.value })}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -343,7 +318,7 @@ export function SearchPage() {
         <ToggleButtonGroup
           value={type}
           exclusive
-          onChange={(_, value) => value && setType(value)}
+          onChange={(_, value: SearchType | null) => value && update({ type: value })}
           size="small"
         >
           <ToggleButton value="all">{t('search.typeAll')}</ToggleButton>
@@ -359,7 +334,7 @@ export function SearchPage() {
           variant={useSemantic ? 'contained' : 'outlined'}
           color={useSemantic ? 'secondary' : 'inherit'}
           startIcon={<AutoAwesomeIcon />}
-          onClick={() => setUseSemantic(!useSemantic)}
+          onClick={() => update({ semantic: !useSemantic })}
           size="small"
         >
           {t('search.aiSearch')}
@@ -387,7 +362,7 @@ export function SearchPage() {
                 <Select
                   value={genre}
                   label={t('browse.labels.genre')}
-                  onChange={(e) => setGenre(e.target.value)}
+                  onChange={(e) => update({ genre: e.target.value })}
                 >
                   <MenuItem value="">{t('browse.labels.allGenres')}</MenuItem>
                   {filters.genres.map((g) => (
@@ -405,7 +380,7 @@ export function SearchPage() {
                 <Select
                   value={collection}
                   label={t('browse.labels.franchise')}
-                  onChange={(e) => setCollection(e.target.value)}
+                  onChange={(e) => update({ collection: e.target.value })}
                   disabled={type === 'series'}
                 >
                   <MenuItem value="">{t('browse.labels.allFranchises')}</MenuItem>
@@ -424,7 +399,7 @@ export function SearchPage() {
                 <Select
                   value={network}
                   label={t('browse.labels.network')}
-                  onChange={(e) => setNetwork(e.target.value)}
+                  onChange={(e) => update({ network: e.target.value })}
                   disabled={type === 'movie'}
                 >
                   <MenuItem value="">{t('browse.labels.allNetworks')}</MenuItem>
@@ -445,7 +420,7 @@ export function SearchPage() {
               </Typography>
               <Slider
                 value={minRtScore}
-                onChange={(_, value) => setMinRtScore(value as number)}
+                onChange={(_, value) => update({ minRtScore: value as number })}
                 min={0}
                 max={100}
                 step={10}
@@ -455,11 +430,21 @@ export function SearchPage() {
 
             <Grid item xs={12} md={6}>
               <Typography variant="caption" color="text.secondary" gutterBottom display="block">
-                {t('search.yearRangeCaption', { min: yearRange[0], max: yearRange[1] })}
+                {t('search.yearRangeCaption', {
+                  min: yearMin ?? filters.yearRange.min,
+                  max: yearMax ?? filters.yearRange.max,
+                })}
               </Typography>
               <Slider
-                value={yearRange}
-                onChange={(_, value) => setYearRange(value as [number, number])}
+                value={[yearMin ?? filters.yearRange.min, yearMax ?? filters.yearRange.max]}
+                onChange={(_, value) => {
+                  // At the library's own end of the range, that side is no limit.
+                  const [min, max] = value as [number, number]
+                  update({
+                    yearMin: min > filters.yearRange.min ? min : null,
+                    yearMax: max < filters.yearRange.max ? max : null,
+                  })
+                }}
                 min={filters.yearRange.min}
                 max={filters.yearRange.max}
                 valueLabelDisplay="auto"
@@ -476,28 +461,38 @@ export function SearchPage() {
           {genre && (
             <Chip
               label={t('search.chipGenre', { value: genre })}
-              onDelete={() => setGenre('')}
+              onDelete={() => update({ genre: '' })}
               size="small"
             />
           )}
           {collection && (
             <Chip
               label={t('search.chipFranchise', { value: collection })}
-              onDelete={() => setCollection('')}
+              onDelete={() => update({ collection: '' })}
               size="small"
             />
           )}
           {network && (
             <Chip
               label={t('search.chipNetwork', { value: network })}
-              onDelete={() => setNetwork('')}
+              onDelete={() => update({ network: '' })}
+              size="small"
+            />
+          )}
+          {hasYearFilter && (
+            <Chip
+              label={t('search.yearRangeCaption', {
+                min: yearMin ?? filters?.yearRange.min ?? '…',
+                max: yearMax ?? filters?.yearRange.max ?? '…',
+              })}
+              onDelete={() => update({ yearMin: null, yearMax: null })}
               size="small"
             />
           )}
           {minRtScore > 0 && (
             <Chip
               label={t('search.chipRt', { value: minRtScore })}
-              onDelete={() => setMinRtScore(0)}
+              onDelete={() => update({ minRtScore: 0 })}
               size="small"
             />
           )}
@@ -505,7 +500,7 @@ export function SearchPage() {
             <Chip
               icon={<AutoAwesomeIcon />}
               label={t('search.aiSearch')}
-              onDelete={() => setUseSemantic(false)}
+              onDelete={() => update({ semantic: false })}
               size="small"
               color="secondary"
             />
@@ -598,19 +593,6 @@ export function SearchPage() {
               </Grid>
             ))}
           </Grid>
-
-          {totalResults > pageSize && (
-            <Box display="flex" justifyContent="center" mt={4}>
-              <Pagination
-                count={Math.ceil(totalResults / pageSize)}
-                page={page}
-                onChange={(_, value) => setPage(value)}
-                color="primary"
-                size={isPhone ? 'small' : 'medium'}
-                siblingCount={isPhone ? 0 : 1}
-              />
-            </Box>
-          )}
         </>
       )}
     </Box>

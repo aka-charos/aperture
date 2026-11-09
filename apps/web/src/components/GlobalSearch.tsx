@@ -1,6 +1,6 @@
 import { useIsPhone } from '@/hooks/useIsPhone'
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Box,
@@ -33,6 +33,7 @@ import { genreLabel } from '@/lib/genreLabel'
 import { MissingTitlesBanner } from './MissingTitlesBanner'
 import { useMissingTitles } from '@/hooks/useMissingTitles'
 import { CONTENT_SEARCH_MIN_QUERY, requestSearchPath } from '@/lib/missingTitles'
+import { viewAllPath } from '@/lib/searchUrlState'
 
 interface SearchResult {
   id: string
@@ -66,6 +67,7 @@ export function GlobalSearch() {
   const fullScreen = useIsPhone()
   const theme = useTheme()
   const navigate = useNavigate()
+  const location = useLocation()
   const searchShortcutTooltip = useMemo(
     () =>
       typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform)
@@ -182,12 +184,13 @@ export function GlobalSearch() {
     [navigate, handleClose]
   )
 
+  // From the Search page itself the filters chosen there stay.
   const handleViewAllResults = useCallback(() => {
     if (query.trim()) {
-      navigate(`/search?q=${encodeURIComponent(query)}`)
+      navigate(viewAllPath(query, location))
       handleClose()
     }
-  }, [navigate, handleClose, query])
+  }, [navigate, handleClose, query, location])
 
   const handleRequestMissing = useCallback(() => {
     if (!missing) return
