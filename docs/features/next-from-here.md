@@ -51,7 +51,7 @@ The **corner button** on any suggestion's poster (in the list, a row or the map)
 
 - **Start from** lets you pick any title in your library. **Recently watched** offers your latest finished titles as one-click starts.
 - **Surprise me** starts from a title chosen for you, one with plenty of people linking it to the rest of your library.
-- A title's page has an **After this** card with the best few suggestions and the reason for each, and a **What next** button. Both open this page from that title.
+- A title's page has a **Next from here** card with the best few suggestions and the reason for each, and a **What next** button. Both open this page from that title.
 - Links to the old Trails page open here, on the same trail.
 - The start, your trail and the view are kept in the page's address, so **Back** and a shared link return to the same page.
 

@@ -7165,9 +7165,9 @@
     "detail": {
       "whatNext": "What next",
       "whatNextTooltip": "What to watch after this: what feels closest to it, and the people behind it",
-      "title": "After this",
+      "title": "Next from here",
       "description": "The best of what to watch next, from how close it feels and who made it.",
-      "seeAll": "See more in Next from here"
+      "seeAll": "See more"
     },
     "roles": {
       "franchise": "Franchise",
