@@ -56,6 +56,8 @@ Choose with the **Seasons** filter:
 
 A show in two libraries is one show, and an episode held in both counts once.
 
+Each row shows the missing and partly held seasons, the show's networks, its rating and genres, and how many of its aired seasons are here. The rating is the one the show carries everywhere else in the app, read from the library each time the list loads, so it is current without a new scan; a dash means it has none. Up to three genres are shown, and a **+N** chip names the rest (hover over it, tab to it or tap it).
+
 The caption under the snapshot says how many shows could not be compared: TMDb didn't answer, the show isn't on TMDb, or it has no TMDb id.
 
 ### Filtering by Network

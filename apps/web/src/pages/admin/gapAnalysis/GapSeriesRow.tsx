@@ -10,6 +10,21 @@ import type { SeriesGapShow } from './seriesListing'
 const TMDB_THUMB = 'https://image.tmdb.org/t/p/w154'
 /** Genres drawn as chips; the rest go into a "+N" chip whose tooltip names them. */
 const GENRES_SHOWN = 3
+/**
+ * The row's own width, not the window's: the sidebar and a docked assistant narrow
+ * the pane. Past this the title, the rating column at a fixed width and the season
+ * bar fit on one line, so the column can line up down the list.
+ */
+const ROW_ROOMY = '@container gapSeriesRow (min-width: 1080px)'
+/** Read by screen readers, not drawn. */
+const visuallyHidden = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+} as const
 
 interface GapSeriesRowProps {
   show: SeriesGapShow
@@ -46,7 +61,8 @@ export function GapSeriesRow({
     show.rating != null
       ? show.rating.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
       : null
-  const genres = show.genres.map(genreLabel)
+  // Two stored names can read the same once translated, and a server can repeat one.
+  const genres = [...new Set(show.genres.map(genreLabel))]
   const hiddenGenres = genres.slice(GENRES_SHOWN)
   const ownedPct = total > 0 ? (owned / total) * 100 : 0
   const pendingPct = total > 0 ? (pending / total) * 100 : 0
@@ -57,7 +73,10 @@ export function GapSeriesRow({
   const stop = (e: MouseEvent | KeyboardEvent) => e.stopPropagation()
 
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+    <Paper
+      variant="outlined"
+      sx={{ borderRadius: 2, overflow: 'hidden', containerType: 'inline-size', containerName: 'gapSeriesRow' }}
+    >
       {/* The whole row toggles for a mouse; the chevron is the accessible control. */}
       <Box
         onClick={onToggleExpand}
@@ -161,14 +180,14 @@ export function GapSeriesRow({
         </Box>
 
         {/* A fixed width once the row has room, so ratings and genres line up down the
-            list; narrower, it takes its own line under the title. */}
+            list; narrower, it sizes to its content and wraps with the rest. */}
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
             gap: 1.5,
             minWidth: 0,
-            width: { xs: '100%', sm: 'auto', lg: '22rem' },
+            [ROW_ROOMY]: { width: '22rem' },
           }}
         >
           <Box
@@ -188,12 +207,22 @@ export function GapSeriesRow({
                 <Chip key={genre} size="small" variant="outlined" label={genre} sx={{ flexShrink: 1, minWidth: 0 }} />
               ))}
               {hiddenGenres.length > 0 && (
-                <Tooltip title={hiddenGenres.join(', ')}>
+                // Focusable so the tooltip opens from the keyboard, opens at a tap, and
+                // a tap does not also expand the row; screen readers read the names.
+                <Tooltip title={hiddenGenres.join(', ')} enterTouchDelay={0}>
                   <Chip
                     size="small"
                     variant="outlined"
-                    label={t('admin.gaps.series.moreGenres', { count: hiddenGenres.length })}
-                    aria-label={hiddenGenres.join(', ')}
+                    tabIndex={0}
+                    onClick={stop}
+                    label={
+                      <>
+                        <span aria-hidden>{t('admin.gaps.series.moreGenres', { count: hiddenGenres.length })}</span>
+                        <Box component="span" sx={visuallyHidden}>
+                          {hiddenGenres.join(', ')}
+                        </Box>
+                      </>
+                    }
                     sx={{ flexShrink: 0 }}
                   />
                 </Tooltip>
