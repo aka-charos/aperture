@@ -1,15 +1,12 @@
 import { useTranslation } from 'react-i18next'
 import { Link as RouterLink } from 'react-router-dom'
-import { Box, Button, CircularProgress, Typography } from '@mui/material'
+import { Box, Button, Typography } from '@mui/material'
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined'
 import { orderReasons, reasonText } from '../../next/reasons'
 import { useReasonText } from '../../next/useReasonText'
 import type { TrailTitle } from '../../next/types'
 import type { NextSummaryState } from '../hooks/useNextSummary'
-import { TitlePosterCard, TITLE_POSTER_GRID_SX } from './TitlePosterCard'
-
-/** Lines a reason may take under its poster; the whole sentence is in its tooltip. */
-const REASON_LINES = 3
+import { TitlePosterCard, TitlePosterPlaceholderRow, TITLE_POSTER_GRID_SX } from './TitlePosterCard'
 
 interface NextFromHereTabProps {
   state: NextSummaryState
@@ -49,10 +46,9 @@ export function NextFromHereTab({ state, title, nextPath, onOpen }: NextFromHere
           </Button>
         </Box>
       ) : items == null ? (
-        // No count to promise: how many the summary answers is the server's.
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }} aria-busy>
-          <CircularProgress size={28} />
-        </Box>
+        // One row of placeholder cards, as Related shows while it loads. How
+        // many the summary answers is the server's, so no count is promised.
+        <TitlePosterPlaceholderRow />
       ) : items.length === 0 ? (
         // No link here: the page shows every kind of suggestion this summary
         // draws from, so it would be just as empty.
@@ -75,20 +71,11 @@ export function NextFromHereTab({ state, title, nextPath, onOpen }: NextFromHere
                   posterUrl={item.title.posterUrl}
                   onOpen={() => onOpen(item.title)}
                 >
+                  {/* Drawn whole: the reason is the point of this tab, and a
+                      clipped one can only be finished by hovering, which a
+                      touch screen cannot do. Cards in a row grow together. */}
                   {sentence && (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      title={sentence}
-                      sx={{
-                        mt: 0.75,
-                        display: '-webkit-box',
-                        WebkitLineClamp: REASON_LINES,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        lineHeight: 1.35,
-                      }}
-                    >
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75, lineHeight: 1.35 }}>
                       {sentence}
                     </Typography>
                   )}

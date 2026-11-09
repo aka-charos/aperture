@@ -18,6 +18,35 @@ export const TITLE_POSTER_GRID_SX = {
   gap: 2,
 } as const
 
+/**
+ * A card still loading, drawn by the poster itself so its title lines always
+ * match the loaded card's.
+ */
+export function TitlePosterPlaceholder() {
+  return <MoviePoster title="" loading responsive />
+}
+
+/**
+ * Placeholder cards for a grid whose count is not known yet: only the first
+ * row shows (later rows collapse to nothing), so it fills as many cards as the
+ * row fits and promises no number. Enough cards for the widest column.
+ */
+export function TitlePosterPlaceholderRow() {
+  return (
+    <Box
+      aria-busy
+      sx={{ ...TITLE_POSTER_GRID_SX, rowGap: 0, gridAutoRows: 0, gridTemplateRows: 'auto', overflow: 'hidden' }}
+    >
+      {Array.from({ length: PLACEHOLDER_ROW_FILL }, (_, i) => (
+        <TitlePosterPlaceholder key={i} />
+      ))}
+    </Box>
+  )
+}
+
+/** More than the widest right column fits in a row (half of a very wide window at 130px a card). */
+const PLACEHOLDER_ROW_FILL = 12
+
 interface TitlePosterCardProps {
   mediaType: MediaType
   id: string

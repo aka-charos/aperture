@@ -13,7 +13,6 @@ import {
   Alert,
   Chip,
   Stack,
-  Skeleton,
 } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
 import HomeIcon from '@mui/icons-material/Home'
@@ -29,7 +28,7 @@ import type { GraphNode, ConnectionReason, ConnectionType } from '../../../compo
 import { connectionTypeLabel } from '../../../i18n/connectionTypeLabel'
 import { GraphExplorer } from '../../../components/GraphExplorer'
 import type { MediaType, SimilarItem } from '../types'
-import { TitlePosterCard, TITLE_POSTER_GRID_SX } from './TitlePosterCard'
+import { TitlePosterCard, TitlePosterPlaceholder, TITLE_POSTER_GRID_SX } from './TitlePosterCard'
 import {
   DEFAULT_SIMILAR_MEDIA_LIMIT,
   FULLSCREEN_SIMILAR_GRAPH_LIMIT,
@@ -186,15 +185,7 @@ export function SimilarMedia({
         <Box sx={TITLE_POSTER_GRID_SX}>
           {loading &&
             similar.length === 0 &&
-            Array.from({ length: DEFAULT_SIMILAR_MEDIA_LIMIT }, (_, i) => (
-              <Box key={i}>
-                <Skeleton variant="rounded" sx={{ width: '100%', height: 'auto', aspectRatio: '2 / 3' }} />
-                {/* Two title lines and the genre line, as the loaded card reserves. */}
-                <Skeleton variant="text" sx={{ mt: 1, width: '80%' }} />
-                <Skeleton variant="text" sx={{ width: '60%' }} />
-                <Skeleton variant="text" sx={{ width: '40%' }} />
-              </Box>
-            ))}
+            Array.from({ length: DEFAULT_SIMILAR_MEDIA_LIMIT }, (_, i) => <TitlePosterPlaceholder key={i} />)}
           {similar.map((item) => (
             <TitlePosterCard
               key={item.id}
