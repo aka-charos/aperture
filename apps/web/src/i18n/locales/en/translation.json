@@ -7180,9 +7180,9 @@
       "title": "Next from here",
       "description": "The best of what to watch next, from how close it feels and who made it.",
       "seeAll": "See more",
-      "open": "Open Next from here",
+      "retry": "Try again",
       "empty": "Nothing to suggest after this title yet.",
-      "failed": "Suggestions didn't load. Next from here may still have some."
+      "failed": "Suggestions didn't load."
     },
     "roles": {
       "franchise": "Franchise",

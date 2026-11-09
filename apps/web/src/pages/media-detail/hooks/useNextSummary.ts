@@ -1,66 +1,55 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchNext } from '../../next/api'
 import type { NextItem, NextSummaryResponse } from '../../next/types'
 
-/** How far below the screen the request starts, so the tab opens ready. */
-const PRELOAD_MARGIN = '300px'
+export type NextSummaryStatus = 'idle' | 'loading' | 'ready' | 'failed'
 
 export interface NextSummaryState {
-  /** The best few suggestions after this title; null while unasked, loading or after a failure. */
+  status: NextSummaryStatus
+  /** The best few suggestions after this title; only when `status` is `ready`. */
   items: NextItem[] | null
-  /** The request for this title failed. Opening another title asks again. */
-  failed: boolean
-  /** Attach to the element whose arrival on screen should start the request. */
-  watch: (element: HTMLElement | null) => void
+  /** Ask, unless an answer is already here or on its way. After a failure it asks again. */
+  load: () => void
 }
 
+type Entry = { ref: string; status: 'loading' | 'failed' } | { ref: string; status: 'ready'; items: NextItem[] }
+
 /**
- * The few best suggestions after one title, from Next from here. Asked only
- * once the related-titles column comes near the screen: the request can be the
- * one that builds the credits index, and most people opening a title never
- * scroll that far. Asked before its tab is opened, so the tab opens ready.
+ * The few best suggestions after one title, from Next from here, asked only
+ * when someone points at or opens the tab: the request can be the one that
+ * builds the credits index, and most people opening a title never look.
+ * Keyed by title, so an answer for the title shown before is never shown for
+ * this one, and a later success replaces an earlier failure.
  */
 export function useNextSummary(titleRef: string | null): NextSummaryState {
-  const [element, setElement] = useState<HTMLElement | null>(null)
-  // The title whose column has come near the screen; a new title asks again.
-  const [reached, setReached] = useState<string | null>(null)
-  const [answer, setAnswer] = useState<{ ref: string; items: NextItem[] } | null>(null)
-  const [failedRef, setFailedRef] = useState<string | null>(null)
+  const [entry, setEntry] = useState<Entry | null>(null)
+  const controllerRef = useRef<AbortController | null>(null)
 
-  useEffect(() => {
-    if (!titleRef || reached === titleRef) return
-    if (typeof IntersectionObserver === 'undefined') {
-      setReached(titleRef)
-      return
-    }
-    if (!element) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setReached(titleRef)
-      },
-      { rootMargin: PRELOAD_MARGIN }
-    )
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [element, titleRef, reached])
+  // Leaving the title (or the page) ends its request.
+  useEffect(() => () => controllerRef.current?.abort(), [titleRef])
 
-  useEffect(() => {
-    if (!titleRef || reached !== titleRef) return
+  const current = entry != null && entry.ref === titleRef ? entry : null
+
+  const load = useCallback(() => {
+    if (!titleRef) return
+    if (current && current.status !== 'failed') return
+    controllerRef.current?.abort()
     const controller = new AbortController()
+    controllerRef.current = controller
+    setEntry({ ref: titleRef, status: 'loading' })
     fetchNext<NextSummaryResponse>(`summary?title=${encodeURIComponent(titleRef)}`, controller.signal)
-      .then((response) => setAnswer({ ref: titleRef, items: response.items }))
+      .then((response) => {
+        if (!controller.signal.aborted) setEntry({ ref: titleRef, status: 'ready', items: response.items })
+      })
       .catch(() => {
         // An abort is this title being left, not a failure to report.
-        if (!controller.signal.aborted) setFailedRef(titleRef)
+        if (!controller.signal.aborted) setEntry({ ref: titleRef, status: 'failed' })
       })
-    return () => controller.abort()
-  }, [titleRef, reached])
+  }, [titleRef, current])
 
-  const watch = useCallback((node: HTMLElement | null) => setElement(node), [])
-  // An answer for the title shown before is not one for this title.
   return {
-    items: answer != null && answer.ref === titleRef ? answer.items : null,
-    failed: titleRef != null && failedRef === titleRef,
-    watch,
+    status: current?.status ?? 'idle',
+    items: current?.status === 'ready' ? current.items : null,
+    load,
   }
 }

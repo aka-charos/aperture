@@ -176,10 +176,17 @@ const SimilarityGraphCanvas = memo(function SimilarityGraphCanvas({
     const updateDimensions = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect()
-        setDimensions({
+        // A hidden graph (an inactive tab) measures 0×0. Keeping its last size
+        // means showing it again does not lay it out afresh, which would throw
+        // away where the viewer had panned and zoomed.
+        if (!propWidth && !propHeight && rect.width === 0 && rect.height === 0) return
+        const next = {
           width: propWidth || rect.width || 800,
           height: propHeight || rect.height || 600,
-        })
+        }
+        // The layout effect keys on this object: an unchanged size keeps the
+        // same object, so it does not run the layout again.
+        setDimensions((prev) => (prev.width === next.width && prev.height === next.height ? prev : next))
       }
     }
 

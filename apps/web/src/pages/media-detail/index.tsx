@@ -8,7 +8,6 @@ import { useWatching } from '../../hooks/useWatching'
 import { useConnections } from '../../hooks/useConnections'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useMediaDetail } from './hooks'
-import { useNextSummary } from './hooks/useNextSummary'
 import {
   MediaBackdrop,
   MediaHero,
@@ -97,7 +96,6 @@ export function MediaDetailPage({
   // tab beside Related.
   const titleRef = id ? titleRefFor(mediaType, id) : null
   const nextPath = titleRef ? nextPathFor(titleRef) : null
-  const nextSummary = useNextSummary(titleRef)
 
   // Reading why a title was scored is one of the getting-started steps, and
   // only the browser sees it happen. The panel draws only for a scored title
@@ -287,7 +285,6 @@ export function MediaDetailPage({
               similarLoading={similarLoading}
               onOpenMedia={onOpenMedia}
               nextPath={nextPath}
-              nextSummary={nextSummary}
               onOpenNext={(title) =>
                 onOpenMedia
                   ? onOpenMedia(title.type, title.id)

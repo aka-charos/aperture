@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Box, Tab, Tabs, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
 import GridViewIcon from '@mui/icons-material/GridView'
 import BubbleChartIcon from '@mui/icons-material/BubbleChart'
 import { SimilarMedia, type SimilarViewMode } from './SimilarMedia'
 import { NextFromHereTab } from './NextFromHereTab'
-import type { NextSummaryState } from '../hooks/useNextSummary'
+import { useNextSummary } from '../hooks/useNextSummary'
+import { titleRefFor } from '../../next/trail'
 import type { TrailTitle } from '../../next/types'
 import type { MediaType, SimilarItem } from '../types'
 
@@ -20,7 +21,6 @@ interface RelatedPanelProps {
   onOpenMedia?: (mediaType: MediaType, id: string) => void
   /** Next from here, starting at this title; null offers no Next from here tab. */
   nextPath: string | null
-  nextSummary: NextSummaryState
   onOpenNext: (title: TrailTitle) => void
 }
 
@@ -29,6 +29,9 @@ interface RelatedPanelProps {
  * from here (what to watch after it), as two tabs of one panel. Mounted once
  * per title (the page keys it by id), so every title opens on Related, as a
  * list: the graph and the other tab are per-visit choices, never remembered.
+ *
+ * Both tabs stay mounted and the inactive one is hidden, so a graph the viewer
+ * has explored is still there when they come back to it.
  */
 export function RelatedPanel({
   mediaType,
@@ -38,49 +41,77 @@ export function RelatedPanel({
   similarLoading,
   onOpenMedia,
   nextPath,
-  nextSummary,
   onOpenNext,
 }: RelatedPanelProps) {
   const { t } = useTranslation()
+  const ids = useId()
   const [section, setSection] = useState<Section>('related')
   const [viewMode, setViewMode] = useState<SimilarViewMode>('list')
+  // Asked only when someone points at or opens the tab, never on page load.
+  const nextSummary = useNextSummary(mediaId ? titleRefFor(mediaType, mediaId) : null)
 
   const relatedLabel =
     mediaType === 'movie' ? t('mediaDetail.similar.titleMovies') : t('mediaDetail.similar.titleSeries')
   const shown: Section = nextPath ? section : 'related'
+  const tabId = (value: Section) => `${ids}-tab-${value}`
+  const panelId = (value: Section) => `${ids}-panel-${value}`
 
   return (
-    // Its arrival near the screen starts the Next from here request, so the
-    // tab is ready by the time anyone opens it.
-    <Box ref={nextSummary.watch}>
+    <Box component="section" aria-labelledby={`${ids}-heading`}>
+      {/* The tabs stand where the heading stood; the heading stays for
+          anyone moving through the page by headings. */}
+      <Typography
+        id={`${ids}-heading`}
+        component="h2"
+        sx={nextPath ? visuallyHidden : { typography: 'h6', fontWeight: 600, mb: 2 }}
+      >
+        {nextPath ? t('mediaDetail.similar.sectionsLabel') : relatedLabel}
+      </Typography>
+
       <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: nextPath ? 'space-between' : 'flex-end',
           flexWrap: 'wrap',
           columnGap: 2,
           rowGap: 1,
           mb: 2,
+          '&:empty': { display: 'none' },
         }}
       >
-        {nextPath ? (
+        {nextPath && (
           <Tabs
             value={shown}
-            onChange={(_, value: Section) => setSection(value)}
+            onChange={(_, value: Section) => {
+              if (value === 'next') nextSummary.load()
+              setSection(value)
+            }}
             variant="scrollable"
             scrollButtons="auto"
             allowScrollButtonsMobile
             aria-label={t('mediaDetail.similar.sectionsLabel')}
             sx={{ minHeight: 40, minWidth: 0 }}
           >
-            <Tab value="related" label={relatedLabel} sx={sectionTabSx} />
-            <Tab value="next" label={t('next.detail.title')} sx={sectionTabSx} />
+            <Tab
+              value="related"
+              label={relatedLabel}
+              id={tabId('related')}
+              aria-controls={panelId('related')}
+              sx={sectionTabSx}
+            />
+            <Tab
+              value="next"
+              label={t('next.detail.title')}
+              id={tabId('next')}
+              aria-controls={panelId('next')}
+              // Pointing at the tab is enough of a sign to start asking, so
+              // the answer is usually there by the time it opens.
+              onMouseEnter={nextSummary.load}
+              onFocus={nextSummary.load}
+              sx={sectionTabSx}
+            />
           </Tabs>
-        ) : (
-          <Typography variant="h6" component="h2" fontWeight={600}>
-            {relatedLabel}
-          </Typography>
         )}
 
         {shown === 'related' && (
@@ -106,7 +137,12 @@ export function RelatedPanel({
         )}
       </Box>
 
-      {shown === 'related' ? (
+      <Box
+        role={nextPath ? 'tabpanel' : undefined}
+        id={panelId('related')}
+        aria-labelledby={nextPath ? tabId('related') : undefined}
+        hidden={shown !== 'related'}
+      >
         <SimilarMedia
           mediaType={mediaType}
           viewMode={viewMode}
@@ -116,10 +152,12 @@ export function RelatedPanel({
           loading={similarLoading}
           onOpenMedia={onOpenMedia}
         />
-      ) : (
-        nextPath && (
+      </Box>
+
+      {nextPath && (
+        <Box role="tabpanel" id={panelId('next')} aria-labelledby={tabId('next')} hidden={shown !== 'next'}>
           <NextFromHereTab state={nextSummary} title={mediaTitle} nextPath={nextPath} onOpen={onOpenNext} />
-        )
+        </Box>
       )}
     </Box>
   )
@@ -129,3 +167,16 @@ export function RelatedPanel({
 const sectionTabSx = { minHeight: 40, px: 1.5, fontSize: '1rem', fontWeight: 600 } as const
 
 const viewButtonSx = { gap: 0.75, px: 1.25, py: 0.5, textTransform: 'none' } as const
+
+/** Read by screen readers, not drawn. */
+const visuallyHidden = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  p: 0,
+  m: '-1px',
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+} as const
