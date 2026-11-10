@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import type { UIMessage } from 'ai'
@@ -24,6 +24,7 @@ import StopIcon from '@mui/icons-material/Stop'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { readStreamError } from '../../../../components/assistant/streamErrors'
 import {
+  newTitleCount,
   proposalFrom,
   reachFrom,
   titleCardNode,
@@ -61,6 +62,7 @@ function TitleChoices({ choices, host }: { choices: TitleChoice[]; host: Newslet
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const shown = expanded ? choices : choices.slice(0, CHOICES_SHOWN)
+  const full = host.titlesInNewsletter.size >= host.maxTitles
   return (
     <Stack spacing={0.75} sx={{ my: 1 }}>
       {shown.map((choice) => {
@@ -82,14 +84,18 @@ function TitleChoices({ choices, host }: { choices: TitleChoice[]; host: Newslet
             {added ? (
               <Chip size="small" icon={<CheckIcon />} label={t('admin.newsletters.assistant.inNewsletter')} />
             ) : (
-              <Button
-                size="small"
-                startIcon={<AddIcon />}
-                disabled={!host.editable}
-                onClick={() => host.insertNodes([titleCardNode(choice, host.defaultFields)])}
-              >
-                {t('admin.newsletters.assistant.add')}
-              </Button>
+              <Tooltip title={full ? t('admin.newsletters.assistant.full', { max: host.maxTitles }) : ''}>
+                <span>
+                  <Button
+                    size="small"
+                    startIcon={<AddIcon />}
+                    disabled={!host.editable || full}
+                    onClick={() => host.insertNodes([titleCardNode(choice, host.defaultFields)])}
+                  >
+                    {t('admin.newsletters.assistant.add')}
+                  </Button>
+                </span>
+              </Tooltip>
             )}
           </Stack>
         )
@@ -206,6 +212,19 @@ function ProposalCard({ proposal, host }: { proposal: Proposal; host: Newsletter
     )
   }
 
+  // Inserting must leave a newsletter that still saves. Titles are checked
+  // against the newsletter as it is now; the server's answer covers the rest
+  // (blocks, length) as it was when the draft was proposed. Replace is the
+  // proposal alone, which the server already checked.
+  const current = host.titlesInNewsletter.size
+  const adding = newTitleCount(proposal, host.titlesInNewsletter)
+  const insertBlocked =
+    current + adding > host.maxTitles
+      ? t('admin.newsletters.assistant.tooManyTitles', { max: host.maxTitles, count: adding, current })
+      : proposal.insertProblem
+        ? t('admin.newsletters.assistant.cannotInsert', { reason: proposal.insertProblem })
+        : null
+
   const line = (kind: 'subject' | 'preheader', value: string, apply: (v: string) => void) => (
     <Stack direction="row" spacing={1} alignItems="center">
       <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>
@@ -270,11 +289,16 @@ function ProposalCard({ proposal, host }: { proposal: Proposal; host: Newsletter
               </Button>
             </Stack>
           ) : (
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+              {insertBlocked && (
+                <Typography variant="caption" color="warning.main" component="p" sx={{ width: '100%' }}>
+                  {insertBlocked}
+                </Typography>
+              )}
               <Button
                 size="small"
                 variant="contained"
-                disabled={!host.editable}
+                disabled={!host.editable || insertBlocked !== null}
                 onClick={() => {
                   host.insertNodes(proposal.content)
                   setDone('inserted')
@@ -359,7 +383,11 @@ function ToolPartView({ part, host }: { part: ToolPart; host: NewsletterAssistan
   )
 }
 
-function MessageView({ message, host }: { message: UIMessage; host: NewsletterAssistantHost }) {
+// Memoized: a turn streaming in republishes only its own message object, and
+// the host changes only when the newsletter's titles or editability do, so
+// earlier messages (markdown, card lists) are not re-rendered on every chunk
+// or every keystroke in the editor.
+const MessageView = memo(function MessageView({ message, host }: { message: UIMessage; host: NewsletterAssistantHost }) {
   if (message.role === 'user') {
     const text = message.parts.map((part) => (part.type === 'text' ? part.text : '')).join('')
     return (
@@ -388,7 +416,7 @@ function MessageView({ message, host }: { message: UIMessage; host: NewsletterAs
       })}
     </Box>
   )
-}
+})
 
 /** The newsletter writing assistant, beside the editor. */
 export default function NewsletterAssistantPanel({ host }: { host: NewsletterAssistantHost }) {

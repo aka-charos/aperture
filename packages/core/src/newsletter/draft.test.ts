@@ -9,6 +9,7 @@ import {
   draftCardFields,
   draftTitleRefs,
   inlineNodes,
+  insertProblem,
   type DraftTitleInfo,
 } from './draft.js'
 import { DEFAULT_TITLE_FIELDS, NEWSLETTER_MAX_TITLES, readNewsletterDocument, titleKey } from './document.js'
@@ -33,9 +34,16 @@ test('inline styling: bold, italic, http(s) links; other markers stay literal', 
     { type: 'text', text: 'e', marks: [{ type: 'link', attrs: { href: 'https://x.test/y' } }] },
   ])
   // A link that is not http(s) keeps its label and loses the link.
-  assert.deepEqual(inlineNodes('[click](javascript:alert(1))'), [
-    { type: 'text', text: 'click' },
-    { type: 'text', text: ')' },
+  assert.deepEqual(inlineNodes('[click](javascript:alert(1))'), [{ type: 'text', text: 'click' }])
+  // An address holding brackets, as Wikipedia film titles do, is not cut at the first `)`.
+  assert.deepEqual(inlineNodes('See [Heat](https://en.wikipedia.org/wiki/Heat_(1995_film)).'), [
+    { type: 'text', text: 'See ' },
+    {
+      type: 'text',
+      text: 'Heat',
+      marks: [{ type: 'link', attrs: { href: 'https://en.wikipedia.org/wiki/Heat_(1995_film)' } }],
+    },
+    { type: 'text', text: '.' },
   ])
   // An unclosed marker and snake_case words are plain text.
   assert.deepEqual(inlineNodes('**open and snake_case_name'), [{ type: 'text', text: '**open and snake_case_name' }])
@@ -158,6 +166,21 @@ test('more titles than a newsletter may show are dropped past the limit', () => 
   assert.equal(result.titles.length, NEWSLETTER_MAX_TITLES)
   assert.equal(result.dropped.filter((d) => d.reason === 'tooManyTitles').length, 2)
   assert.equal(result.problem, null)
+})
+
+test('inserting next to what is there is checked against the limits as one document', () => {
+  const card = (i: number) => ({
+    type: 'titleCard',
+    attrs: { mediaType: 'movie', id: `55555555-5555-4555-8555-${String(i).padStart(12, '0')}` },
+  })
+  const current = { type: 'doc', content: Array.from({ length: NEWSLETTER_MAX_TITLES - 1 }, (_, i) => card(i)) }
+  assert.equal(insertProblem(current, [card(100)]), null)
+  assert.match(insertProblem(current, [card(100), card(101)]) ?? '', /at most/)
+  assert.equal(insertProblem(current, []), null)
+  // Anything that is not a document counts as empty.
+  assert.equal(insertProblem(null, [card(1)]), null)
+  const result = buildDraftContent([{ kind: 'paragraph', text: 'x' }], known)
+  assert.match(describeDraftForModel(result, null, 'too many titles'), /only Replace is offered/)
 })
 
 test('the model is told the draft is a preview, not inserted', () => {

@@ -79,7 +79,8 @@ export interface TitleFacts {
   posterUrl: string | null
 }
 
-const num = (value: unknown): number | null => {
+/** A NUMERIC column as a number: it arrives as text, and NULL stays null, never 0. */
+export const numericOrNull = (value: unknown): number | null => {
   // NUMERIC arrives as text; NULL must stay absent, never become 0.
   if (value == null) return null
   const n = typeof value === 'number' ? value : Number.parseFloat(String(value))
@@ -120,15 +121,15 @@ export async function loadTitleFacts(refs: readonly TitleRef[]): Promise<Map<str
       : Promise.resolve({ rows: [] as Row[] }),
   ])
   const add = (mediaType: 'movie' | 'series', row: Row) => {
-    const imdb = num(row.imdb_rating)
-    const community = num(row.community_rating)
+    const imdb = numericOrNull(row.imdb_rating)
+    const community = numericOrNull(row.community_rating)
     const ref = { mediaType, id: row.id }
     facts.set(titleKey(ref), {
       ref,
       title: row.title,
-      year: num(row.year),
-      endYear: num(row.end_year),
-      runtimeMinutes: num(row.runtime_minutes),
+      year: numericOrNull(row.year),
+      endYear: numericOrNull(row.end_year),
+      runtimeMinutes: numericOrNull(row.runtime_minutes),
       genres: names(row.genres),
       rating:
         imdb != null && imdb > 0

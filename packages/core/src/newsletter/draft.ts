@@ -123,7 +123,9 @@ function textNode(text: string, marks: Mark[]): EditorNode {
 export function inlineNodes(line: string, outer: Mark[] = []): EditorNode[] {
   const nodes: EditorNode[] = []
   // Link, bold, italic (* or _), in the order they are tried at each position.
-  const pattern = /\[([^\]\n]+)\]\(([^)\s]+)\)|\*\*([^*\n]+?)\*\*|\*([^*\n]+?)\*|(?<![\w])_([^_\n]+?)_(?![\w])/g
+  // A link address may hold one level of brackets (`Heat_(1995_film)`), as
+  // Wikipedia titles do; the first `)` must not end it.
+  const pattern = /\[([^\]\n]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)|\*\*([^*\n]+?)\*\*|\*([^*\n]+?)\*|(?<![\w])_([^_\n]+?)_(?![\w])/g
   let last = 0
   for (const match of line.matchAll(pattern)) {
     const at = match.index ?? 0
@@ -306,7 +308,11 @@ export function buildDraftContent(
  * What the model reads back after proposing: counts and the titles placed, not
  * the nodes (they are for the editor, and would be resent every turn).
  */
-export function describeDraftForModel(result: DraftResult, subject: string | null): string {
+export function describeDraftForModel(
+  result: DraftResult,
+  subject: string | null,
+  insertRefusal: string | null = null
+): string {
   if (result.problem) return `The draft was refused and nothing was shown: ${result.problem}`
   if (result.content.length === 0) {
     return 'Nothing in the draft could be shown to the admin. Check the blocks: every title needs an id and type from a search result.'
@@ -316,6 +322,11 @@ export function describeDraftForModel(result: DraftResult, subject: string | nul
   const parts = [...counts].map(([type, n]) => `${n} ${type}`).join(', ')
   const lines = [`Draft shown to the admin as a preview with Insert buttons (${parts}). It is NOT in the newsletter until they insert it.`]
   if (subject) lines.push(`Suggested subject: ${subject}`)
+  if (insertRefusal) {
+    lines.push(
+      `It cannot be inserted next to what the newsletter already holds (${insertRefusal}); only Replace is offered. Say so, or propose something shorter.`
+    )
+  }
   if (result.titles.length > 0) lines.push(`Title cards: ${result.titles.map((t) => t.title).join('; ')}`)
   const unknown = result.dropped.filter((d) => d.reason === 'unknownTitle').map((d) => d.detail)
   if (unknown.length > 0) {
@@ -326,4 +337,18 @@ export function describeDraftForModel(result: DraftResult, subject: string | nul
   const other = result.dropped.filter((d) => d.reason !== 'unknownTitle')
   if (other.length > 0) lines.push(`Also dropped: ${other.map((d) => `block ${d.index + 1} (${d.reason})`).join(', ')}.`)
   return lines.join('\n')
+}
+
+/**
+ * Why inserting `content` into the newsletter as it stands would make a
+ * document the editor cannot save (too many titles, blocks or characters), or
+ * null. The proposal alone may be fine, so Replace can still be offered.
+ */
+export function insertProblem(currentDoc: unknown, content: readonly EditorNode[]): string | null {
+  if (content.length === 0) return null
+  const current =
+    currentDoc && typeof currentDoc === 'object' && Array.isArray((currentDoc as { content?: unknown }).content)
+      ? ((currentDoc as { content: unknown[] }).content)
+      : []
+  return newsletterDocumentProblem({ type: 'doc', content: [...current, ...content] })
 }

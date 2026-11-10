@@ -1065,7 +1065,11 @@
           "pastIssues": "Reading earlier newsletters…",
           "readingDraft": "Reading the newsletter…",
           "drafting": "Drafting…"
-        }
+        },
+        "full": "The newsletter already holds {{max}} titles, the most one can show.",
+        "tooManyTitles_one": "Inserting this adds {{count}} title to the {{current}} already there, past the limit of {{max}}. Remove some first, or use Replace.",
+        "tooManyTitles_other": "Inserting this adds {{count}} titles to the {{current}} already there, past the limit of {{max}}. Remove some first, or use Replace.",
+        "cannotInsert": "Inserting this beside what is there would not save: {{reason}}. Use Replace, or ask for something shorter."
       }
     },
     "common": {

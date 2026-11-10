@@ -47,12 +47,12 @@ The **Writing assistant** tab beside **Preview** opens a chat that helps with th
 
 Ask it for titles to feature, a whole issue, an intro for what you already have, or subject lines. It searches the library the way the main assistant does, and it can also see:
 
-- **Recently added**: films and shows that arrived lately, and shows that got new episodes ("added" means first seen by the app).
+- **Recently added**: films and shows that arrived lately, and shows that got new episodes ("added" means first seen by the app). What a library brought with it when it was first imported is not counted as new; the assistant is told how many titles that left out.
 - **Most played here** and **hidden gems**: what the household has been playing, and well-rated titles almost nobody has played. These are counts; it never names who watched what.
 - **Who can open these**: how many of this newsletter's recipients can open each title, from the send groups you chose. A reader whose libraries lack a title gets the email without that card.
 - **Earlier newsletters**, so it does not feature the same titles again, and **the newsletter as it stands**, unsaved edits included.
 
-Titles it finds appear as a list with an **Add** button that inserts a title card with the default fields. Text it writes appears as a proposal with **Insert at cursor** and **Replace newsletter** (Undo brings the old text back), and a suggested subject or preview line has its own **Use** button. Nothing reaches the newsletter until you press one of them, and nothing is sent until you send it.
+Titles it finds appear as a list with an **Add** button that inserts a title card with the default fields. Text it writes appears as a proposal with **Insert at cursor** and **Replace newsletter** (Undo brings the old text back), and a suggested subject or preview line has its own **Use** button. Nothing reaches the newsletter until you press one of them, and nothing is sent until you send it. Insert and Add are switched off, with the reason, when the result would go past the most titles a newsletter can show; Replace stays available.
 
 It writes only from what the library holds about a title, avoids spoilers, and writes in your AI language unless you ask for another. The conversation is not saved: it ends when you leave the editor, and **New conversation** starts over.
 

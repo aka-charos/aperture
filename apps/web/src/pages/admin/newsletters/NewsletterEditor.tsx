@@ -124,6 +124,12 @@ export function NewsletterEditor({
     })
   }, [])
 
+  // The titles in the newsletter, as a set that changes only when a title card
+  // is added or removed: typing text must not hand the panel a new host and
+  // re-render the conversation.
+  const titleKeys = useMemo(() => [...titleIdsIn(content)].sort().join(' '), [content])
+  const titlesInNewsletter = useMemo(() => new Set(titleKeys ? titleKeys.split(' ') : []), [titleKeys])
+
   const assistantHost = useMemo<NewsletterAssistantHost>(
     () => ({
       editable,
@@ -133,7 +139,8 @@ export function NewsletterEditor({
         content: latest.current.content ?? {},
         groupIds: latest.current.groupIds,
       }),
-      titlesInNewsletter: titleIdsIn(content),
+      titlesInNewsletter,
+      maxTitles: options.maxTitles,
       defaultFields: options.defaultTitleFields,
       insertNodes: (nodes: EditorNode[]) => {
         const editor = editorRef.current
@@ -157,7 +164,7 @@ export function NewsletterEditor({
         setDirty(true)
       },
     }),
-    [content, editable, options.defaultTitleFields]
+    [editable, options.defaultTitleFields, options.maxTitles, titlesInNewsletter]
   )
 
   const load = useCallback(async () => {
@@ -242,10 +249,14 @@ export function NewsletterEditor({
     }
   }, [content, groupIds, preheader, previewLanguage, subject])
 
+  // Not while the writing assistant covers the preview: nobody would see it.
+  // Switching back changes `previewHidden`, which brings it up to date.
+  const previewHidden = editable && pane === 'assistant'
   useEffect(() => {
+    if (previewHidden) return
     const timer = setTimeout(() => void refreshPreview(), PREVIEW_DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [refreshPreview])
+  }, [previewHidden, refreshPreview])
 
   const save = useCallback(async (): Promise<boolean> => {
     if (!content) return false

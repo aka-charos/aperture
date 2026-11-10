@@ -148,3 +148,15 @@ test('the prompt carries the rules that must hold', () => {
   })
   assert.match(noGroups, /No send groups are chosen yet/)
 })
+
+test('the history cut always opens with a question', async () => {
+  const { recentHistory } = await import('./history.js')
+  const turns = (n: number) => Array.from({ length: n }, (_, i) => ({ role: i % 2 === 0 ? 'user' : 'assistant', i }))
+  // 25 messages (u,a,…,u): a plain cut to 24 would open on an answer.
+  const cut = recentHistory(turns(25), 24)
+  assert.equal(cut[0].role, 'user')
+  assert.equal(cut.length, 23)
+  assert.equal(cut.at(-1)?.i, 24)
+  assert.equal(recentHistory(turns(5), 24).length, 5)
+  assert.deepEqual(recentHistory([{ role: 'assistant' }], 24), [])
+})

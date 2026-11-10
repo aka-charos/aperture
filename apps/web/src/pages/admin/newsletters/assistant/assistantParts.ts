@@ -36,6 +36,8 @@ export interface Proposal {
   /** How many blocks the server could not use. */
   droppedCount: number
   problem: string | null
+  /** Why inserting it beside what the newsletter held when it was proposed would not save. */
+  insertProblem: string | null
 }
 
 export interface ReachRow {
@@ -111,6 +113,7 @@ export function proposalFrom(output: unknown): Proposal | null {
     titles,
     droppedCount: Array.isArray(p.dropped) ? p.dropped.length : 0,
     problem: str(p.problem),
+    insertProblem: str(p.insertProblem),
   }
 }
 
@@ -182,9 +185,16 @@ export interface NewsletterAssistantHost {
   getDraft: () => AssistantDraft
   /** `movie:<id>` / `series:<id>` keys of the title cards in the newsletter now. */
   titlesInNewsletter: ReadonlySet<string>
+  /** The most title cards a newsletter may hold (decided by the server). */
+  maxTitles: number
   defaultFields: readonly string[]
   insertNodes: (nodes: EditorNode[]) => void
   replaceContent: (nodes: EditorNode[]) => void
   setSubject: (value: string) => void
   setPreheader: (value: string) => void
+}
+
+/** How many of a proposal's titles are not in the newsletter yet, so inserting adds a card for each. */
+export function newTitleCount(proposal: Pick<Proposal, 'titles'>, inNewsletter: ReadonlySet<string>): number {
+  return proposal.titles.filter((title) => !inNewsletter.has(`${title.mediaType}:${title.id}`)).length
 }

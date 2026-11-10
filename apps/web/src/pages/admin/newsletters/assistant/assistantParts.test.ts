@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { proposalFrom, reachFrom, titleCardNode, titleChoicesFrom, titleIdsIn, toolErrorFrom } from './assistantParts'
+import { newTitleCount, proposalFrom, reachFrom, titleCardNode, titleChoicesFrom, titleIdsIn, toolErrorFrom } from './assistantParts'
 
 const A = '11111111-1111-4111-8111-111111111111'
 const B = '22222222-2222-4222-8222-222222222222'
@@ -53,6 +53,7 @@ test('a proposal is read defensively; anything else is not one', () => {
     titles: [{ id: A, mediaType: 'movie', title: 'Heat' }],
     droppedCount: 1,
     problem: null,
+    insertProblem: null,
   })
   assert.equal(proposalFrom({ items: [] }), null)
 })
@@ -77,4 +78,17 @@ test('the titles already in a document are found at any depth', () => {
     ],
   })
   assert.deepEqual([...ids], [`movie:${A}`, `series:${B}`])
+})
+
+test('only titles not already in the newsletter count toward its limit', () => {
+  const proposal = {
+    titles: [
+      { id: A, mediaType: 'movie' as const, title: 'Heat' },
+      { id: B, mediaType: 'series' as const, title: 'Dark' },
+    ],
+  }
+  assert.equal(newTitleCount(proposal, new Set([`movie:${A}`])), 1)
+  assert.equal(newTitleCount(proposal, new Set()), 2)
+  // Same id, other media type: a different title.
+  assert.equal(newTitleCount(proposal, new Set([`series:${A}`, `series:${B}`])), 1)
 })

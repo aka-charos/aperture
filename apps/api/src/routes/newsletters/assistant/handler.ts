@@ -29,6 +29,7 @@ import {
   TITLE_FIELDS,
   analysisPartsFor,
   buildAiLanguageInstruction,
+  describeAiError,
   getAppName,
   getChatModelInstance,
   getEmbeddingInvocation,
@@ -50,6 +51,7 @@ import type { ToolContext } from '../../assistant/types.js'
 import { buildNewsletterToolCatalog } from './catalog.js'
 import { newsletterSystemPrompt } from './prompt.js'
 import type { NewsletterDraftContext } from './draftSummary.js'
+import { recentHistory } from './history.js'
 
 /**
  * Model round trips per turn. More than the chat's five: a whole issue is
@@ -57,9 +59,6 @@ import type { NewsletterDraftContext } from './draftSummary.js'
  * so the turn always ends in prose.
  */
 export const NEWSLETTER_MAX_STEPS = 8
-
-/** Only the latest messages go to the model: older card lists are dead weight. */
-export const NEWSLETTER_HISTORY_MESSAGES = 24
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -113,7 +112,8 @@ export function registerNewsletterAssistant(fastify: FastifyInstance) {
     async (request, reply) => {
       const user = request.user as SessionUser
       const draft = readDraftContext(request.body.draft)
-      const messages = request.body.messages.slice(-NEWSLETTER_HISTORY_MESSAGES)
+      const messages = recentHistory(request.body.messages)
+      if (messages.length === 0) return reply.status(400).send({ error: 'The conversation has no question in it' })
 
       // Closing the panel or the page ends the model call: there is nowhere
       // to save an answer nobody is reading. `close` on the RESPONSE, never the
@@ -124,7 +124,9 @@ export function registerNewsletterAssistant(fastify: FastifyInstance) {
       })
 
       const onStreamError = (error: unknown) => {
-        if (!stop.signal.aborted) fastify.log.error({ err: error }, 'Newsletter assistant stream error')
+        // Described, never a bare { err }: a provider error serialises the whole
+        // prompt, the admin's draft included (core lib/aiErrors.ts).
+        if (!stop.signal.aborted) fastify.log.error({ ai: describeAiError(error) }, 'Newsletter assistant stream error')
         return assistantErrorText(error)
       }
 

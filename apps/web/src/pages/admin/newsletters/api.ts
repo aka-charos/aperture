@@ -45,6 +45,8 @@ export interface NewsletterOptions {
   defaultTitleFields: string[]
   /** Decided by the server: the analysis parts a card may choose, per media type. */
   analysisParts: { movie: string[]; series: string[] }
+  /** Decided by the server: the most title cards one newsletter may hold. */
+  maxTitles: number
   sendingProblem: string | null
   sendingProblemText: string | null
 }

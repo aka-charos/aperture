@@ -31,6 +31,7 @@ import {
   APP_LOCALE_OPTIONS,
   DEFAULT_TITLE_FIELDS,
   GROUP_ROLES,
+  NEWSLETTER_MAX_TITLES,
   TITLE_FIELDS,
   analysisPartsFor,
   createNewsletter,
@@ -183,6 +184,8 @@ const newslettersRoutes: FastifyPluginAsync = async (fastify) => {
       defaultTitleFields: DEFAULT_TITLE_FIELDS,
       // The parts a card's analysis can be limited to, as the current prompt asks them.
       analysisParts: { movie: analysisPartsFor('movie'), series: analysisPartsFor('series') },
+      // Decided here so the editor never carries its own copy of the limit.
+      maxTitles: NEWSLETTER_MAX_TITLES,
       sendingProblem,
       sendingProblemText: sendingProblem ? SENDING_PROBLEM_TEXT[sendingProblem] : null,
     }
