@@ -99,6 +99,7 @@ export const ADMIN_ONLY_NAMESPACES: readonly string[] = [
   'settingsAiSetup',
   'settingsApiKeys',
   'settingsBackup',
+  'settingsBitwarden',
   'settingsBranding',
   'settingsChannelsWebExpand',
   'settingsCostEstimator',

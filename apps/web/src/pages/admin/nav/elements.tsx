@@ -21,6 +21,7 @@ import GTranslateIcon from '@mui/icons-material/GTranslate'
 import HealingIcon from '@mui/icons-material/Healing'
 import HomeIcon from '@mui/icons-material/Home'
 import ImageIcon from '@mui/icons-material/Image'
+import KeyIcon from '@mui/icons-material/Key'
 import LiveTvIcon from '@mui/icons-material/LiveTv'
 import LocalMoviesIcon from '@mui/icons-material/LocalMovies'
 import ManageSearchIcon from '@mui/icons-material/ManageSearch'
@@ -167,6 +168,13 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
     Component: section(
       () => import('@/pages/settings/components/TavilyConfigSection'),
       'TavilyConfigSection'
+    ),
+  },
+  bitwarden: {
+    icon: <KeyIcon />,
+    Component: section(
+      () => import('@/pages/settings/components/BitwardenSecretsSection'),
+      'BitwardenSecretsSection'
     ),
   },
   crw: {

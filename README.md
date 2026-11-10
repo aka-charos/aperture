@@ -746,7 +746,8 @@ User settings: [Recommendations](docs/features/user-settings/recommendations.md)
 [Tavily](docs/admin/tavily.md) ·
 [fastCRW](docs/admin/crw.md) ·
 [Streaming (JustWatch)](docs/admin/streaming.md) ·
-[Ratings refresh](docs/admin/ratings-refresh.md)
+[Ratings refresh](docs/admin/ratings-refresh.md) ·
+[Bitwarden secrets](docs/admin/bitwarden.md)
 
 **AI** —
 [AI providers](docs/admin/ai-providers.md) ·

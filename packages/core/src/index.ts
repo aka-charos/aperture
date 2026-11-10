@@ -797,6 +797,24 @@ export {
 
 export { validateServerUrl, InvalidServerUrlError } from './settings/validateServerUrl.js'
 
+// Bitwarden Secrets Manager (credentials read from the operator's project)
+export {
+  refreshBitwardenSecrets,
+  getBitwardenSecretsStatus,
+  getBitwardenSecretNames,
+  type SecretsStatus,
+} from './secrets/bitwarden.js'
+export {
+  getSecretBindings,
+  isCredentialLinked,
+  bindSecret,
+  unbindSecret,
+  type SecretBinding,
+  type BindSecretResult,
+  type UnbindSecretResult,
+} from './secrets/bindings.js'
+export { BINDABLE_SECRETS, type BindableSecretId } from './secrets/rules.js'
+
 // Top Picks
 export {
   getTopPicksConfig,

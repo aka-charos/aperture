@@ -1338,6 +1338,10 @@
     "newsletterGroups": {
       "title": "Send groups",
       "blurb": "Who a newsletter goes to: by language, role, or hand-picked."
+    },
+    "bitwarden": {
+      "title": "Bitwarden secrets",
+      "blurb": "Read API keys from Bitwarden Secrets Manager"
     }
   },
   "home": {
@@ -7370,5 +7374,63 @@
   "mediaServerTypeMismatch": {
     "message": "This server identifies itself as {{detected}}, but {{appName}} is set to {{selected}}. Features that differ between the two servers will not behave correctly.",
     "useDetected": "Switch to {{detected}}"
+  },
+  "settingsBitwarden": {
+    "title": "Bitwarden Secrets Manager",
+    "description": "Keep API keys in your Bitwarden project and have {{appName}} read them from there. A linked key is held in memory only: it is not saved in the database and does not end up in backups.",
+    "chipConnected": "Connected",
+    "chipProblem": "Needs attention",
+    "chipOff": "Not set up",
+    "requestError": "The request failed",
+    "setup": "Set these on the {{appName}} container and restart it. The access token belongs to a Bitwarden machine account with read access to one project.",
+    "setupServerNote": "The server address is only needed outside Bitwarden’s US cloud: https://vault.bitwarden.eu for the EU cloud, or the address of your own server.",
+    "problems": {
+      "missingToken": "A project is set, but there is no access token (BWS_ACCESS_TOKEN).",
+      "missingProject": "An access token is set, but there is no project (BWS_PROJECT_ID).",
+      "invalidProject": "BWS_PROJECT_ID must be the project’s id (a UUID), not its name.",
+      "invalidServerUrl": "BWS_SERVER_URL must be a full address starting with http:// or https://."
+    },
+    "project": "Project: {{projectId}}",
+    "server": "Server: {{serverUrl}}",
+    "serverCloud": "Server: Bitwarden cloud (US)",
+    "lastRead_one": "{{count}} secret, last read {{when}}",
+    "lastRead_other": "{{count}} secrets, last read {{when}}",
+    "neverRead": "The project has not been read yet.",
+    "refresh": "Read again",
+    "staleNote": "The values from the last successful read are still in use.",
+    "failures": {
+      "notInstalled": "The Bitwarden CLI (bws) was not found on this server.",
+      "timeout": "Bitwarden did not answer in time.",
+      "unauthorized": "Bitwarden refused the access token.",
+      "unreadable": "The answer from the Bitwarden CLI could not be read.",
+      "failed": "The Bitwarden project could not be read."
+    },
+    "ambiguousNames": "These names are used by more than one secret and cannot be linked: {{names}}",
+    "credentialsTitle": "Credentials",
+    "credentialsDescription": "Choose a secret for each key you want read from Bitwarden. The others keep working as they are.",
+    "credentials": {
+      "mediaServer": "Media server API key",
+      "tmdb": "TMDb API key",
+      "omdb": "OMDb API key",
+      "mdblist": "MDBList API key",
+      "seerr": "Seerr API key",
+      "traktClientSecret": "Trakt client secret",
+      "lldapPassword": "LLDAP admin password"
+    },
+    "sourceNone": "Not set",
+    "sourceStored": "Saved in the database",
+    "sourceBitwarden": "Read from Bitwarden: {{name}}",
+    "states": {
+      "missing": "Linked to “{{name}}”, which is no longer in the project. This integration has no key.",
+      "ambiguous": "Linked to “{{name}}”, a name two secrets share. This integration has no key.",
+      "empty": "Linked to “{{name}}”, which holds no value. This integration has no key.",
+      "unreachable": "Linked to “{{name}}”, but Bitwarden cannot be read. This integration has no key."
+    },
+    "pickSecret": "Bitwarden secret",
+    "noSecrets": "No secrets",
+    "link": "Link",
+    "unlink": "Unlink",
+    "linkNote": "Linking replaces the key saved for that integration. Unlinking leaves it without a key until you enter one on its own page.",
+    "connectionTitle": "Bitwarden connection"
   }
 }

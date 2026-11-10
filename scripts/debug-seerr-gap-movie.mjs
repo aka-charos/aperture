@@ -104,7 +104,15 @@ async function loadSeerrFromDb() {
     )
     const map = Object.fromEntries(r.rows.map((row) => [row.key, row.value]))
     const url = map.seerr_url?.replace(/\/$/, '') || null
-    const apiKey = map.seerr_api_key || null
+    // A key read from Bitwarden is stored as a reference (`bws:<name>`), which
+    // only the app can turn into the key. Treated as absent here, so the
+    // SEERR_API_KEY variable is used instead of sending the reference to Seerr.
+    const storedKey = map.seerr_api_key || null
+    const linkedToBitwarden = !!storedKey && storedKey.trim().startsWith('bws:')
+    if (linkedToBitwarden) {
+      console.warn('The Seerr key is read from Bitwarden; set SEERR_API_KEY to run this script.')
+    }
+    const apiKey = linkedToBitwarden ? null : storedKey
     const enabled = map.seerr_enabled === 'true'
     return { url, apiKey, enabled, source: 'system_settings' }
   } catch (err) {

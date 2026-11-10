@@ -13,6 +13,7 @@ import {
   getLibraryConfigs,
   getTopPicksConfig,
   hasOpenAIApiKey,
+  isCredentialLinked,
 } from '@aperture/core'
 import { requireAdmin } from '../../../plugins/auth.js'
 import { startJob } from '../../jobs/startJob.js'
@@ -114,7 +115,9 @@ export async function registerAdminHandlers(fastify: FastifyInstance) {
         progress,
         snapshot: {
           // The media server admin key never leaves the server; the wizard shows a hint.
-          mediaServer: publicMediaServerConfig(mediaServerConfig),
+          mediaServer: publicMediaServerConfig(mediaServerConfig, {
+            linked: await isCredentialLinked('mediaServer'),
+          }),
           openai: { configured: hasOpenAI },
           libraries,
           topPicks,

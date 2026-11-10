@@ -35,6 +35,7 @@ import {
   registerDiscoveryGenreStripsSettingsHandlers,
   registerN8nHandlers,
   registerTavilyHandlers,
+  registerSecretsHandlers,
   registerCrwHandlers,
   registerDecisionModelHandlers,
   registerSynopsisTranslationHandlers,
@@ -67,6 +68,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   registerLegacyAiModelsHandlers(fastify)
   registerN8nHandlers(fastify)
   registerTavilyHandlers(fastify)
+  registerSecretsHandlers(fastify)
   registerCrwHandlers(fastify)
   registerDecisionModelHandlers(fastify)
   registerSynopsisTranslationHandlers(fastify)

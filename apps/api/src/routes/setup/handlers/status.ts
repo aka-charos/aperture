@@ -14,6 +14,7 @@ import {
   getLibraryConfigs,
   getTopPicksConfig,
   hasOpenAIApiKey,
+  isCredentialLinked,
 } from '@aperture/core'
 import { setupSchemas } from '../schemas.js'
 import { publicMediaServerConfig } from '../../../lib/secretExposure.js'
@@ -98,7 +99,9 @@ export async function registerStatusHandlers(fastify: FastifyInstance) {
         progress,
         snapshot: {
           // The media server admin key never leaves the server; the wizard shows a hint.
-          mediaServer: publicMediaServerConfig(mediaServerConfig),
+          mediaServer: publicMediaServerConfig(mediaServerConfig, {
+            linked: await isCredentialLinked('mediaServer'),
+          }),
           openai: { configured: hasOpenAI },
           libraries,
           topPicks,

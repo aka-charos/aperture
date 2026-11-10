@@ -235,7 +235,16 @@ export type PublicMediaServerConfig<T extends MediaServerSecret> = Omit<T, 'apiK
   apiKeyHint: string | null
 }
 
-export function publicMediaServerConfig<T extends MediaServerSecret>(config: T): PublicMediaServerConfig<T> {
+/**
+ * `linked`: the key is read from the operator's Bitwarden project. No hint
+ * then. Any secret in that project can be linked to this credential, so a hint
+ * would read out the last four characters of whichever secret an admin
+ * session chose to point it at.
+ */
+export function publicMediaServerConfig<T extends MediaServerSecret>(
+  config: T,
+  options: { linked: boolean }
+): PublicMediaServerConfig<T> {
   const { apiKey, ...rest } = config
-  return { ...rest, hasApiKey: !!apiKey?.trim(), apiKeyHint: keyHint(apiKey) }
+  return { ...rest, hasApiKey: !!apiKey?.trim(), apiKeyHint: options.linked ? null : keyHint(apiKey) }
 }

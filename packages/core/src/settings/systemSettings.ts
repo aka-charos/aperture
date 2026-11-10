@@ -10,6 +10,8 @@ import {
   type AppLocaleCode,
 } from '../lib/locales.js'
 import { describeDetection, detectMediaServerType } from '../media/detect.js'
+import { resolveStoredSecret } from '../secrets/bitwarden.js'
+import { isBindableSettingKey } from '../secrets/rules.js'
 
 const logger = createChildLogger('system-settings')
 
@@ -21,14 +23,46 @@ export interface SystemSetting {
 }
 
 /**
- * Get a system setting by key
+ * Get a system setting by key.
+ *
+ * A credential setting may hold a reference to a Bitwarden secret instead of
+ * the credential (`secrets/rules.ts`, `BINDABLE_SECRETS`). This is where the
+ * reference becomes the value, so every reader of those keys gets the
+ * credential without knowing where it is kept. A reference that cannot be
+ * honoured reads as null here, as an unset key does; what tells the two apart
+ * is `getSecretBindings` (the Bitwarden card), and the warning the store logs.
  */
 export async function getSystemSetting(key: string): Promise<string | null> {
+  const stored = await getSystemSettingRaw(key)
+  return isBindableSettingKey(key) ? resolveStoredSecret(stored) : stored
+}
+
+/**
+ * A setting exactly as stored: for a credential setting, the reference itself
+ * rather than the secret it names. Only for code that manages the link.
+ */
+export async function getSystemSettingRaw(key: string): Promise<string | null> {
   const result = await queryOne<{ value: string }>(
     'SELECT value FROM system_settings WHERE key = $1',
     [key]
   )
   return result?.value ?? null
+}
+
+/** Several settings exactly as stored, in one read. A key with no row is absent. */
+export async function getSystemSettingsRaw(keys: readonly string[]): Promise<Map<string, string>> {
+  if (keys.length === 0) return new Map()
+  const result = await query<{ key: string; value: string }>(
+    'SELECT key, value FROM system_settings WHERE key = ANY($1::text[])',
+    [keys]
+  )
+  return new Map(result.rows.map((row) => [row.key, row.value]))
+}
+
+/** Remove a setting, so it reads as never set. */
+export async function deleteSystemSetting(key: string): Promise<void> {
+  await query('DELETE FROM system_settings WHERE key = $1', [key])
+  logger.info({ key }, 'System setting removed')
 }
 
 /**

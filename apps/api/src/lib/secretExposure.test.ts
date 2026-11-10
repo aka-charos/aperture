@@ -123,9 +123,19 @@ test('a left-out header value is carried over to the same URL under the same nam
 })
 
 test('the media server snapshot carries a hint, not the key', () => {
-  const pub = publicMediaServerConfig({ type: 'emby', baseUrl: 'http://emby:8096', apiKey: 'emby-admin-key-0123456789abcd', isConfigured: true })
+  const config = { type: 'emby', baseUrl: 'http://emby:8096', apiKey: 'emby-admin-key-0123456789abcd', isConfigured: true }
+  const pub = publicMediaServerConfig(config, { linked: false })
   assert.ok(!JSON.stringify(pub).includes('emby-admin-key'))
   assert.equal(pub.hasApiKey, true)
   assert.equal(pub.apiKeyHint, '…abcd')
-  assert.equal(publicMediaServerConfig({ apiKey: null }).hasApiKey, false)
+  assert.equal(publicMediaServerConfig({ apiKey: null }, { linked: false }).hasApiKey, false)
+})
+
+test('a key read from Bitwarden is reported as present, with no part of it shown', () => {
+  // Any secret in the project can be linked to this credential, so a hint
+  // would read out the tail of whichever one an admin session picked.
+  const pub = publicMediaServerConfig({ apiKey: 'some-other-secret-0123456789wxyz' }, { linked: true })
+  assert.equal(pub.hasApiKey, true)
+  assert.equal(pub.apiKeyHint, null)
+  assert.ok(!JSON.stringify(pub).includes('wxyz'))
 })

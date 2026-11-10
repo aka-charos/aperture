@@ -5912,6 +5912,10 @@
     "newsletterGroups": {
       "title": "Ομάδες αποστολής",
       "blurb": "Σε ποιους πηγαίνει ένα δελτίο: ανά γλώσσα, ρόλο ή με το χέρι."
+    },
+    "bitwarden": {
+      "title": "Μυστικά Bitwarden",
+      "blurb": "Ανάγνωση κλειδιών API από το Bitwarden Secrets Manager"
     }
   },
   "settingsEvaluation": {
@@ -7413,5 +7417,63 @@
   "mediaServerTypeMismatch": {
     "message": "This server identifies itself as {{detected}}, but {{appName}} is set to {{selected}}. Features that differ between the two servers will not behave correctly.",
     "useDetected": "Switch to {{detected}}"
+  },
+  "settingsBitwarden": {
+    "title": "Bitwarden Secrets Manager",
+    "description": "Κρατήστε τα κλειδιά API στο έργο σας στο Bitwarden και το {{appName}} θα τα διαβάζει από εκεί. Ένα συνδεδεμένο κλειδί μένει μόνο στη μνήμη: δεν αποθηκεύεται στη βάση δεδομένων και δεν καταλήγει στα αντίγραφα ασφαλείας.",
+    "chipConnected": "Συνδεδεμένο",
+    "chipProblem": "Χρειάζεται προσοχή",
+    "chipOff": "Δεν έχει ρυθμιστεί",
+    "requestError": "Το αίτημα απέτυχε",
+    "setup": "Ορίστε τα παρακάτω στο container του {{appName}} και επανεκκινήστε το. Το διακριτικό πρόσβασης ανήκει σε λογαριασμό μηχανής του Bitwarden με δικαίωμα ανάγνωσης σε ένα έργο.",
+    "setupServerNote": "Η διεύθυνση διακομιστή χρειάζεται μόνο εκτός του αμερικανικού cloud του Bitwarden: https://vault.bitwarden.eu για το ευρωπαϊκό cloud, ή η διεύθυνση του δικού σας διακομιστή.",
+    "problems": {
+      "missingToken": "Έχει οριστεί έργο, αλλά όχι διακριτικό πρόσβασης (BWS_ACCESS_TOKEN).",
+      "missingProject": "Έχει οριστεί διακριτικό πρόσβασης, αλλά όχι έργο (BWS_PROJECT_ID).",
+      "invalidProject": "Το BWS_PROJECT_ID πρέπει να είναι το αναγνωριστικό του έργου (UUID), όχι το όνομά του.",
+      "invalidServerUrl": "Το BWS_SERVER_URL πρέπει να είναι πλήρης διεύθυνση που ξεκινά με http:// ή https://."
+    },
+    "project": "Έργο: {{projectId}}",
+    "server": "Διακομιστής: {{serverUrl}}",
+    "serverCloud": "Διακομιστής: Bitwarden cloud (ΗΠΑ)",
+    "lastRead_one": "{{count}} μυστικό, τελευταία ανάγνωση {{when}}",
+    "lastRead_other": "{{count}} μυστικά, τελευταία ανάγνωση {{when}}",
+    "neverRead": "Το έργο δεν έχει διαβαστεί ακόμη.",
+    "refresh": "Νέα ανάγνωση",
+    "staleNote": "Χρησιμοποιούνται ακόμη οι τιμές της τελευταίας επιτυχημένης ανάγνωσης.",
+    "failures": {
+      "notInstalled": "Το Bitwarden CLI (bws) δεν βρέθηκε σε αυτόν τον διακομιστή.",
+      "timeout": "Το Bitwarden δεν απάντησε εγκαίρως.",
+      "unauthorized": "Το Bitwarden απέρριψε το διακριτικό πρόσβασης.",
+      "unreadable": "Η απάντηση του Bitwarden CLI δεν μπόρεσε να διαβαστεί.",
+      "failed": "Το έργο στο Bitwarden δεν μπόρεσε να διαβαστεί."
+    },
+    "ambiguousNames": "Αυτά τα ονόματα χρησιμοποιούνται από περισσότερα από ένα μυστικά και δεν μπορούν να συνδεθούν: {{names}}",
+    "credentialsTitle": "Διαπιστευτήρια",
+    "credentialsDescription": "Επιλέξτε ένα μυστικό για κάθε κλειδί που θέλετε να διαβάζεται από το Bitwarden. Τα υπόλοιπα συνεχίζουν να λειτουργούν όπως είναι.",
+    "credentials": {
+      "mediaServer": "Κλειδί API διακομιστή πολυμέσων",
+      "tmdb": "Κλειδί API TMDb",
+      "omdb": "Κλειδί API OMDb",
+      "mdblist": "Κλειδί API MDBList",
+      "seerr": "Κλειδί API Seerr",
+      "traktClientSecret": "Μυστικό πελάτη Trakt",
+      "lldapPassword": "Κωδικός διαχειριστή LLDAP"
+    },
+    "sourceNone": "Δεν έχει οριστεί",
+    "sourceStored": "Αποθηκευμένο στη βάση δεδομένων",
+    "sourceBitwarden": "Διαβάζεται από το Bitwarden: {{name}}",
+    "states": {
+      "missing": "Συνδεδεμένο με το «{{name}}», που δεν υπάρχει πια στο έργο. Αυτή η ενσωμάτωση δεν έχει κλειδί.",
+      "ambiguous": "Συνδεδεμένο με το «{{name}}», όνομα που μοιράζονται δύο μυστικά. Αυτή η ενσωμάτωση δεν έχει κλειδί.",
+      "empty": "Συνδεδεμένο με το «{{name}}», που δεν έχει τιμή. Αυτή η ενσωμάτωση δεν έχει κλειδί.",
+      "unreachable": "Συνδεδεμένο με το «{{name}}», αλλά το Bitwarden δεν μπορεί να διαβαστεί. Αυτή η ενσωμάτωση δεν έχει κλειδί."
+    },
+    "pickSecret": "Μυστικό Bitwarden",
+    "noSecrets": "Κανένα μυστικό",
+    "link": "Σύνδεση",
+    "unlink": "Αποσύνδεση",
+    "linkNote": "Η σύνδεση αντικαθιστά το κλειδί που είχε αποθηκευτεί για την ενσωμάτωση. Η αποσύνδεση την αφήνει χωρίς κλειδί μέχρι να εισαγάγετε ένα στη δική της σελίδα.",
+    "connectionTitle": "Σύνδεση με το Bitwarden"
   }
 }

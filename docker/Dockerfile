@@ -51,6 +51,46 @@ RUN pnpm install --prod --frozen-lockfile --ignore-scripts && \
     pnpm rebuild sharp
 
 # ===================================================================
+# Stage 3b: Bitwarden Secrets Manager CLI
+#
+# `bws` reads the operator's Bitwarden project when BWS_ACCESS_TOKEN and
+# BWS_PROJECT_ID are set (packages/core/src/secrets/). The Node SDK
+# (@bitwarden/sdk-napi) ships no musl build, so the CLI's static musl binary is
+# what runs on Alpine.
+#
+# Pinned to a release and checked against the checksums Bitwarden publishes
+# with it (bws-sha256-checksums-<version>.txt): a different file stops the
+# build. Raising BWS_VERSION means replacing both sums from that release's file.
+#
+# Checked by hand for 2.1.0: both zips download from this address (one
+# redirect, which curl -L follows), match the sums below, and hold a single
+# file named `bws` at their root. curl rather than BusyBox wget because that
+# is the client the download was checked with; it stays in this stage. The
+# stage fails the build if anything differs, on purpose: an image that quietly
+# shipped without the CLI would report every linked key as unavailable.
+FROM alpine:3 AS bws
+ARG BWS_VERSION=2.1.0
+ARG BWS_SHA256_X86_64=f59ee150e42b82128d437087e9bac920053c6bfddcb960d20ce9386e5ac9bba6
+ARG BWS_SHA256_AARCH64=eb0f1ae61d1c3b74244d2841233276e05c77e8be4da197ed90fc6248387005e1
+RUN set -eu; \
+    apk add --no-cache curl; \
+    arch="$(uname -m)"; \
+    case "$arch" in \
+      x86_64) sum="$BWS_SHA256_X86_64" ;; \
+      aarch64) sum="$BWS_SHA256_AARCH64" ;; \
+      *) echo "No bws build for $arch"; exit 1 ;; \
+    esac; \
+    file="bws-${arch}-unknown-linux-musl-${BWS_VERSION}.zip"; \
+    curl -fsSL --retry 3 --retry-delay 2 -o "/tmp/$file" \
+      "https://github.com/bitwarden/sdk-sm/releases/download/bws-v${BWS_VERSION}/$file"; \
+    echo "$sum  /tmp/$file" | sha256sum -c -; \
+    mkdir /out; \
+    unzip -j "/tmp/$file" bws -d /out; \
+    test -f /out/bws; \
+    chmod 0755 /out/bws; \
+    /out/bws --version
+
+# ===================================================================
 # Stage 4: Runtime
 FROM node:24-alpine AS runner
 WORKDIR /app
@@ -90,6 +130,9 @@ RUN for tool in pg_dump pg_restore psql; do \
       "$tool" --version | grep -q '(PostgreSQL) 18\.' || \
         { echo "$tool is not PostgreSQL 18: $("$tool" --version)"; exit 1; }; \
     done
+
+# Bitwarden Secrets Manager CLI (stage 3b). Unused unless BWS_ACCESS_TOKEN is set.
+COPY --from=bws --chown=root:root /out/bws /usr/local/bin/bws
 
 # Add non-root user
 RUN addgroup --system --gid 1001 nodejs && \

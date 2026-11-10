@@ -337,6 +337,19 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     docs: ['ratings-refresh'],
     aliases: ['ratings', 'imdb dataset', 'refresh', 'vote count', 'tsv'],
   },
+  {
+    id: 'bitwarden',
+    group: 'integrations',
+    segment: 'bitwarden',
+    titleKey: 'adminNav.bitwarden.title',
+    blurbKey: 'adminNav.bitwarden.blurb',
+    docs: ['bitwarden'],
+    aliases: ['bitwarden', 'bws', 'secrets manager', 'secret', 'vault', 'api key', 'credentials', 'access token'],
+    fields: [
+      { anchor: 'bitwarden-connection', labelKey: 'settingsBitwarden.connectionTitle', aliases: ['project', 'server', 'access token'] },
+      { anchor: 'bitwarden-credentials', labelKey: 'settingsBitwarden.credentialsTitle', aliases: ['link', 'unlink'] },
+    ],
+  },
 
   // ---------------------------------------------------------------- ai models
   {

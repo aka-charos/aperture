@@ -20,6 +20,7 @@ Admin console → **Integrations** — one page per service:
 | **fastCRW** | `/admin/integrations/crw` | Self-hosted search/scrape for Title Analysis |
 | **Streaming (JustWatch)** | `/admin/integrations/streaming` | Streaming-chart discovery tab |
 | **Ratings Refresh** | `/admin/integrations/ratings` | Ongoing IMDb rating freshness |
+| **Bitwarden secrets** | `/admin/integrations/bitwarden` | Reads API keys from a [Bitwarden Secrets Manager](bitwarden.md) project instead of saving them here |
 
 Each card shows a green **Configured** chip once saved; most have an **enable switch**, so an integration is turned off by toggling — the key stays saved.
 
