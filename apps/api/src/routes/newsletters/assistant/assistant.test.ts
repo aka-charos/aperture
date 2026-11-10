@@ -160,3 +160,73 @@ test('the history cut always opens with a question', async () => {
   assert.equal(recentHistory(turns(5), 24).length, 5)
   assert.deepEqual(recentHistory([{ role: 'assistant' }], 24), [])
 })
+
+const lists = await import('./lists.js')
+const SCOPE = { libraryIds: ['lib-a'], maxParentalRating: 13, hasMovies: true, hasSeries: true } as unknown as Parameters<
+  typeof lists.recentMoviesQuery
+>[0]['scope']
+
+test('recently added: one query per kind, imports grouped once, import rows left out but counted', () => {
+  for (const build of [lists.recentMoviesQuery, lists.recentSeriesQuery]) {
+    const { sql, params } = build({ days: 30, genre: 'Horror', scope: SCOPE, limit: 500 })
+    assert.equal(sql.match(/GROUP BY provider_library_id/g)?.length, 1, 'imports grouped once')
+    assert.match(sql, /MIN\(created_at\) \+ interval '1 day' AS import_end/)
+    assert.match(sql, /created_at > i\.import_end/)
+    assert.match(sql, /COUNT\(\*\) FILTER/)
+    // The summary survives an empty pick: a LEFT JOIN from its one row.
+    assert.match(sql, /FROM summary s LEFT JOIN picked p ON TRUE/)
+    // The limit is interpolated, so it is held to the list range.
+    assert.match(sql, /LIMIT 40\b/)
+    assert.equal(params[0], 30)
+    // Every bound value is used, and nothing past them.
+    const used = new Set([...sql.matchAll(/\$(\d+)/g)].map((m) => Number(m[1])))
+    assert.deepEqual([...used].sort((a, b) => a - b), params.map((_, i) => i + 1))
+  }
+  const series = lists.recentSeriesQuery({ days: 7, scope: SCOPE, limit: 5 }).sql
+  // Episodes from the import are not new episodes, and specials never are.
+  assert.match(series, /e\.created_at > ei\.import_end/)
+  assert.match(series, /e\.season_number > 0/)
+  // A show from the import listed for new episodes is not "left out".
+  assert.match(series, /AND f\.series_id IS NULL\) AS from_import/)
+})
+
+test('recently added says what it left out, and that nothing came', () => {
+  const until = new Date('2026-09-02T10:00:00Z')
+  assert.equal(lists.recentlyAddedNote({ days: 30, count: 3, skipped: 0, importUntil: null }), null)
+  assert.match(lists.recentlyAddedNote({ days: 30, count: 0, skipped: 0, importUntil: null }) ?? '', /last 30 days/)
+  const note = lists.recentlyAddedNote({ days: 30, count: 2, skipped: 812, importUntil: until }) ?? ''
+  assert.match(note, /812 titles .* \(until 2026-09-02\) are left out/)
+})
+
+test('two kinds merge into one list of at most limit, best first, ties in given order', () => {
+  const entries = [
+    { score: 5, item: 'm1' },
+    { score: 3, item: 'm2' },
+    { score: 5, item: 's1' },
+    { score: 4, item: 's2' },
+  ]
+  assert.deepEqual(lists.mergeRanked(entries, 3), ['m1', 's1', 's2'])
+  assert.deepEqual(lists.mergeRanked(entries, 10), ['m1', 's1', 's2', 'm2'])
+  assert.equal(lists.mergeRanked(Array.from({ length: 90 }, (_, i) => ({ score: i, item: i })), 500).length, 40)
+})
+
+test('past issues: anything that reached someone, newest first, a partial send dated by its start', () => {
+  const issue = (id: string, sentCount: number, sentAt: string | null, sendStartedAt: string | null) => ({
+    id,
+    sentCount,
+    sentAt,
+    sendStartedAt,
+    updatedAt: '2026-01-01T00:00:00Z',
+  })
+  const sent = lists.sentIssues(
+    [
+      issue('draft', 0, null, null),
+      issue('old', 10, '2026-03-01T00:00:00Z', '2026-03-01T00:00:00Z'),
+      issue('partial', 4, null, '2026-05-01T00:00:00Z'),
+      issue('new', 10, '2026-04-01T00:00:00Z', '2026-04-01T00:00:00Z'),
+    ],
+    2
+  )
+  assert.deepEqual(sent.map((n) => n.id), ['partial', 'new'])
+  assert.equal(lists.issueSentOn(sent[0]), '2026-05-01T00:00:00Z')
+})

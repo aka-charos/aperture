@@ -23,6 +23,7 @@ import SendIcon from '@mui/icons-material/Send'
 import StopIcon from '@mui/icons-material/Stop'
 import { getProxiedImageUrl } from '@aperture/ui'
 import { readStreamError } from '../../../../components/assistant/streamErrors'
+import { checkAssistantInsert } from '../api'
 import {
   newTitleCount,
   proposalFrom,
@@ -203,6 +204,8 @@ function ProposalCard({ proposal, host }: { proposal: Proposal; host: Newsletter
   const [done, setDone] = useState<'inserted' | 'replaced' | null>(null)
   const [confirmReplace, setConfirmReplace] = useState(false)
   const [used, setUsed] = useState<{ subject?: boolean; preheader?: boolean }>({})
+  const [checking, setChecking] = useState(false)
+  const [refused, setRefused] = useState<{ problem: string } | { failure: string } | null>(null)
 
   if (proposal.problem) {
     return (
@@ -212,18 +215,42 @@ function ProposalCard({ proposal, host }: { proposal: Proposal; host: Newsletter
     )
   }
 
-  // Inserting must leave a newsletter that still saves. Titles are checked
-  // against the newsletter as it is now; the server's answer covers the rest
-  // (blocks, length) as it was when the draft was proposed. Replace is the
-  // proposal alone, which the server already checked.
+  // Inserting must leave a newsletter that still saves. Titles are counted
+  // live, so Insert switches off (and back on) as cards come and go; the rest
+  // (blocks, length) is asked of the server when Insert is pressed, against
+  // the newsletter as it is at that moment. Replace is the proposal alone,
+  // which the server already checked.
   const current = host.titlesInNewsletter.size
   const adding = newTitleCount(proposal, host.titlesInNewsletter)
-  const insertBlocked =
+  const tooManyTitles =
     current + adding > host.maxTitles
       ? t('admin.newsletters.assistant.tooManyTitles', { max: host.maxTitles, count: adding, current })
-      : proposal.insertProblem
-        ? t('admin.newsletters.assistant.cannotInsert', { reason: proposal.insertProblem })
-        : null
+      : null
+  const insertNote =
+    tooManyTitles ??
+    (refused == null
+      ? null
+      : 'problem' in refused
+        ? t('admin.newsletters.assistant.cannotInsert', { reason: refused.problem })
+        : t('admin.newsletters.assistant.checkFailed', { reason: refused.failure }))
+
+  const insert = async () => {
+    setChecking(true)
+    setRefused(null)
+    try {
+      const problem = await checkAssistantInsert(host.getDraft().content, proposal.content)
+      if (problem) {
+        setRefused({ problem })
+        return
+      }
+      host.insertNodes(proposal.content)
+      setDone('inserted')
+    } catch (err) {
+      setRefused({ failure: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setChecking(false)
+    }
+  }
 
   const line = (kind: 'subject' | 'preheader', value: string, apply: (v: string) => void) => (
     <Stack direction="row" spacing={1} alignItems="center">
@@ -290,19 +317,17 @@ function ProposalCard({ proposal, host }: { proposal: Proposal; host: Newsletter
             </Stack>
           ) : (
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
-              {insertBlocked && (
+              {insertNote && (
                 <Typography variant="caption" color="warning.main" component="p" sx={{ width: '100%' }}>
-                  {insertBlocked}
+                  {insertNote}
                 </Typography>
               )}
               <Button
                 size="small"
                 variant="contained"
-                disabled={!host.editable || insertBlocked !== null}
-                onClick={() => {
-                  host.insertNodes(proposal.content)
-                  setDone('inserted')
-                }}
+                disabled={!host.editable || tooManyTitles !== null || checking}
+                startIcon={checking ? <CircularProgress size={14} color="inherit" /> : undefined}
+                onClick={() => void insert()}
               >
                 {t('admin.newsletters.assistant.insert')}
               </Button>
@@ -421,7 +446,7 @@ const MessageView = memo(function MessageView({ message, host }: { message: UIMe
 /** The newsletter writing assistant, beside the editor. */
 export default function NewsletterAssistantPanel({ host }: { host: NewsletterAssistantHost }) {
   const { t } = useTranslation()
-  const { messages, running, phase, error, send, stop, reset } = useNewsletterAssistant(host.getDraft)
+  const { messages, running, phase, error, send, stop, reset } = useNewsletterAssistant(host.getDraft, host.historyMessages)
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DefaultChatTransport, readUIMessageStream, type UIMessage, type UIMessageChunk } from 'ai'
 
-import type { AssistantDraft } from './assistantParts'
+import { recentHistory, type AssistantDraft } from './assistantParts'
 
 const ENDPOINT = '/api/newsletters/assistant'
 
@@ -26,8 +26,9 @@ function requestFailure(err: unknown): string {
 /**
  * The newsletter writing assistant's conversation, held in the page.
  *
- * Nothing is stored server-side: the whole conversation goes up with each turn
- * (the server keeps the latest messages), together with the newsletter as the
+ * Nothing is stored server-side: the latest `historyMessages` of the
+ * conversation go up with each turn (the page keeps all of it, the server cuts
+ * the same way again), together with the newsletter as the
  * editor holds it right now, so the assistant reads unsaved edits. Closing the
  * page ends the conversation; Stop ends the turn (the server's model call
  * stops with it).
@@ -36,7 +37,7 @@ function requestFailure(err: unknown): string {
  * `error` chunks; both are taken off the stream here, so the message only ever
  * holds what the assistant said and the tools it used.
  */
-export function useNewsletterAssistant(getDraft: () => AssistantDraft) {
+export function useNewsletterAssistant(getDraft: () => AssistantDraft, historyMessages: number) {
   const [messages, setMessages] = useState<UIMessage[]>([])
   const [running, setRunning] = useState(false)
   const [phase, setPhase] = useState<string | null>(null)
@@ -45,6 +46,8 @@ export function useNewsletterAssistant(getDraft: () => AssistantDraft) {
   const abortRef = useRef<AbortController | null>(null)
   const draftRef = useRef(getDraft)
   draftRef.current = getDraft
+  const historyRef = useRef(historyMessages)
+  historyRef.current = historyMessages
 
   // Leaving the editor ends a turn still running.
   useEffect(() => () => abortRef.current?.abort(), [])
@@ -77,7 +80,7 @@ export function useNewsletterAssistant(getDraft: () => AssistantDraft) {
       })
       const stream = await transport.sendMessages({
         chatId: 'newsletter-assistant',
-        messages: history,
+        messages: recentHistory(history, historyRef.current),
         abortSignal: controller.signal,
         trigger: 'submit-message',
         messageId: undefined,

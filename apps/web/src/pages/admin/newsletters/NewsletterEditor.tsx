@@ -141,6 +141,7 @@ export function NewsletterEditor({
       }),
       titlesInNewsletter,
       maxTitles: options.maxTitles,
+      historyMessages: options.assistantHistoryMessages,
       defaultFields: options.defaultTitleFields,
       insertNodes: (nodes: EditorNode[]) => {
         const editor = editorRef.current
@@ -164,7 +165,7 @@ export function NewsletterEditor({
         setDirty(true)
       },
     }),
-    [editable, options.defaultTitleFields, options.maxTitles, titlesInNewsletter]
+    [editable, options.assistantHistoryMessages, options.defaultTitleFields, options.maxTitles, titlesInNewsletter]
   )
 
   const load = useCallback(async () => {

@@ -1,6 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { newTitleCount, proposalFrom, reachFrom, titleCardNode, titleChoicesFrom, titleIdsIn, toolErrorFrom } from './assistantParts'
+import {
+  newTitleCount,
+  proposalFrom,
+  reachFrom,
+  recentHistory,
+  titleCardNode,
+  titleChoicesFrom,
+  titleIdsIn,
+  toolErrorFrom,
+} from './assistantParts'
 
 const A = '11111111-1111-4111-8111-111111111111'
 const B = '22222222-2222-4222-8222-222222222222'
@@ -53,7 +62,6 @@ test('a proposal is read defensively; anything else is not one', () => {
     titles: [{ id: A, mediaType: 'movie', title: 'Heat' }],
     droppedCount: 1,
     problem: null,
-    insertProblem: null,
   })
   assert.equal(proposalFrom({ items: [] }), null)
 })
@@ -91,4 +99,26 @@ test('only titles not already in the newsletter count toward its limit', () => {
   assert.equal(newTitleCount(proposal, new Set()), 2)
   // Same id, other media type: a different title.
   assert.equal(newTitleCount(proposal, new Set([`series:${A}`, `series:${B}`])), 1)
+})
+
+test('a title shown twice in a proposal adds one title', () => {
+  const proposal = {
+    titles: [
+      { id: A, mediaType: 'movie' as const, title: 'Heat' },
+      { id: A, mediaType: 'movie' as const, title: 'Heat' },
+      { id: B, mediaType: 'series' as const, title: 'Dark' },
+    ],
+  }
+  assert.equal(newTitleCount(proposal, new Set()), 2)
+  assert.equal(newTitleCount(proposal, new Set([`series:${B}`])), 1)
+})
+
+test('the conversation sent up is the latest messages, opening on a question', () => {
+  const turns = (n: number) => Array.from({ length: n }, (_, i) => ({ role: i % 2 === 0 ? 'user' : 'assistant', i }))
+  const cut = recentHistory(turns(301), 24)
+  assert.equal(cut[0].role, 'user')
+  assert.equal(cut.length, 23)
+  assert.equal(cut.at(-1)?.i, 300)
+  assert.equal(recentHistory(turns(3), 24).length, 3)
+  assert.deepEqual(recentHistory([{ role: 'assistant' }], 24), [])
 })

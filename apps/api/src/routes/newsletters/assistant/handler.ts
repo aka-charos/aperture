@@ -34,6 +34,7 @@ import {
   getChatModelInstance,
   getEmbeddingInvocation,
   getLibraryScopeForUser,
+  insertProblem,
   resolveEffectiveAiLanguage,
   summarizeAudience,
   withInferenceContext,
@@ -82,6 +83,32 @@ function readDraftContext(body: AssistantBody['draft']): NewsletterDraftContext 
 }
 
 export function registerNewsletterAssistant(fastify: FastifyInstance) {
+  // Would inserting a proposal next to the newsletter as the editor holds it
+  // NOW still make a document that saves? Asked at the moment of inserting:
+  // the answer given with the proposal goes stale as soon as the admin edits.
+  fastify.post<{ Body: { content: unknown; insert: unknown[] } }>(
+    '/api/newsletters/assistant/insert-check',
+    {
+      preHandler: requireAdmin,
+      bodyLimit: 2 * 1024 * 1024,
+      schema: {
+        tags: ['newsletters'],
+        summary: 'Check that an assistant proposal can be inserted into a newsletter',
+        body: {
+          type: 'object',
+          required: ['content', 'insert'],
+          properties: {
+            content: { type: 'object', additionalProperties: true },
+            insert: { type: 'array', maxItems: 2000, items: { type: 'object', additionalProperties: true } },
+          },
+        },
+      },
+    },
+    async (request) => ({
+      problem: insertProblem(request.body.content, request.body.insert as Parameters<typeof insertProblem>[1]),
+    })
+  )
+
   fastify.post<{ Body: AssistantBody }>(
     '/api/newsletters/assistant',
     {
@@ -124,9 +151,16 @@ export function registerNewsletterAssistant(fastify: FastifyInstance) {
       })
 
       const onStreamError = (error: unknown) => {
-        // Described, never a bare { err }: a provider error serialises the whole
-        // prompt, the admin's draft included (core lib/aiErrors.ts).
-        if (!stop.signal.aborted) fastify.log.error({ ai: describeAiError(error) }, 'Newsletter assistant stream error')
+        if (!stop.signal.aborted) {
+          // A provider error is described, never logged bare: it serialises the
+          // whole prompt, the admin's draft included (core lib/aiErrors.ts).
+          // Anything else (a tool's database error, a bug) keeps its stack.
+          const described = describeAiError(error)
+          fastify.log.error(
+            described.isProviderError ? { ai: described } : { err: error },
+            'Newsletter assistant stream error'
+          )
+        }
         return assistantErrorText(error)
       }
 

@@ -168,6 +168,21 @@ test('more titles than a newsletter may show are dropped past the limit', () => 
   assert.equal(result.problem, null)
 })
 
+test('a title shown twice is one title: it is listed once and never pushes another past the limit', () => {
+  const many = new Map<string, DraftTitleInfo>()
+  const blocks = Array.from({ length: NEWSLETTER_MAX_TITLES }, (_, i) => {
+    const id = `66666666-6666-4666-8666-${String(i).padStart(12, '0')}`
+    many.set(titleKey({ mediaType: 'movie', id }), { title: `T${i}`, year: null, posterUrl: null })
+    return { kind: 'title', titleId: id, mediaType: 'movie' }
+  })
+  // The first title again, at the end: still at the limit, still shown.
+  const result = buildDraftContent([...blocks, blocks[0]], many)
+  assert.equal(result.titles.length, NEWSLETTER_MAX_TITLES)
+  assert.equal(result.content.length, NEWSLETTER_MAX_TITLES + 1)
+  assert.deepEqual(result.dropped, [])
+  assert.equal(result.problem, null)
+})
+
 test('inserting next to what is there is checked against the limits as one document', () => {
   const card = (i: number) => ({
     type: 'titleCard',

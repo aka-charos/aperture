@@ -15,6 +15,7 @@
  * - POST   /api/newsletters/:id/send         - start sending; 202, then poll the newsletter
  * - GET    /api/newsletters/:id/deliveries
  * - POST   /api/newsletters/assistant        - the writing assistant, streamed (newsletters/assistant/)
+ * - POST   /api/newsletters/assistant/insert-check - would a proposal still save beside the draft as it is now
  * - GET/POST/PUT/DELETE /api/newsletter-groups[...]   - send groups and their hand-picked members
  *
  * Viewer:
@@ -75,6 +76,7 @@ import {
 import { queryOne } from '../../lib/db.js'
 import { requireAdmin, requireAuth } from '../../plugins/auth.js'
 import { registerNewsletterAssistant } from './assistant/handler.js'
+import { NEWSLETTER_HISTORY_MESSAGES } from './assistant/history.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SUBJECT_MAX = 200
@@ -186,6 +188,8 @@ const newslettersRoutes: FastifyPluginAsync = async (fastify) => {
       analysisParts: { movie: analysisPartsFor('movie'), series: analysisPartsFor('series') },
       // Decided here so the editor never carries its own copy of the limit.
       maxTitles: NEWSLETTER_MAX_TITLES,
+      // How many messages the writing assistant sends up (the server cuts to the same).
+      assistantHistoryMessages: NEWSLETTER_HISTORY_MESSAGES,
       sendingProblem,
       sendingProblemText: sendingProblem ? SENDING_PROBLEM_TEXT[sendingProblem] : null,
     }

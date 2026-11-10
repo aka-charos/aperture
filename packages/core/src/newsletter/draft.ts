@@ -83,7 +83,7 @@ export interface DraftResult {
   /** The nodes to insert, in order. Empty when nothing survived. */
   content: EditorNode[]
   dropped: DraftDrop[]
-  /** Titles the proposal carries, in order, for the summary the model reads back. */
+  /** Each distinct title the proposal carries, first appearance first (a title shown twice is one title, as the save counts it). */
   titles: (TitleRef & { title: string })[]
   /** Set when the editor would refuse to save the result; nothing should be inserted then. */
   problem: string | null
@@ -213,6 +213,7 @@ export function buildDraftContent(
   const content: EditorNode[] = []
   const dropped: DraftDrop[] = []
   const placed: DraftResult['titles'] = []
+  const placedKeys = new Set<string>()
 
   blocks.forEach((block, index) => {
     if (index >= DRAFT_MAX_BLOCKS) {
@@ -275,7 +276,11 @@ export function buildDraftContent(
           dropped.push({ index, reason: 'unknownTitle', detail: String(block.titleId ?? '') })
           return
         }
-        if (placed.length >= NEWSLETTER_MAX_TITLES) {
+        // A repeated card is the same title: `newsletterDocumentProblem` counts
+        // distinct titles, so only a new one can go past the limit.
+        const key = titleKey(ref)
+        const repeat = placedKeys.has(key)
+        if (!repeat && placed.length >= NEWSLETTER_MAX_TITLES) {
           dropped.push({ index, reason: 'tooManyTitles', detail: info.title })
           return
         }
@@ -292,7 +297,10 @@ export function buildDraftContent(
             analysisParts: draftAnalysisParts(ref.mediaType, fields, cleanStrings(block.analysisParts)),
           },
         })
-        placed.push({ ...ref, title: info.title })
+        if (!repeat) {
+          placedKeys.add(key)
+          placed.push({ ...ref, title: info.title })
+        }
         return
       }
       default:

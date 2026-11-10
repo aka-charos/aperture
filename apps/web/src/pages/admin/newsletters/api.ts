@@ -47,6 +47,8 @@ export interface NewsletterOptions {
   analysisParts: { movie: string[]; series: string[] }
   /** Decided by the server: the most title cards one newsletter may hold. */
   maxTitles: number
+  /** Decided by the server: how many recent messages the writing assistant sends up each turn. */
+  assistantHistoryMessages: number
   sendingProblem: string | null
   sendingProblemText: string | null
 }
@@ -99,6 +101,15 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
   const data = (await response.json().catch(() => ({}))) as T & { error?: string }
   if (!response.ok) throw new ApiError(data.error || `Request failed (${response.status})`)
   return data
+}
+
+/** Why inserting `insert` beside the newsletter as the editor holds it now would not save, or null. */
+export async function checkAssistantInsert(content: Record<string, unknown>, insert: unknown[]): Promise<string | null> {
+  const answer = await api<{ problem: string | null }>('/api/newsletters/assistant/insert-check', {
+    method: 'POST',
+    json: { content, insert },
+  })
+  return answer.problem ?? null
 }
 
 export const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] }

@@ -47,11 +47,20 @@ import { nullSafe } from '../../assistant/tools/utils.js'
 import { buildPlayLink } from '../../assistant/helpers/mediaServer.js'
 import type { ToolContext } from '../../assistant/types.js'
 import { summarizeDraft, type NewsletterDraftContext } from './draftSummary.js'
+import {
+  MAX_LIST_LIMIT,
+  TITLE_COLUMNS,
+  genreClause,
+  issueSentOn,
+  mergeRanked,
+  recentMoviesQuery,
+  recentSeriesQuery,
+  recentlyAddedNote,
+  sentIssues,
+  type RecentlyAddedQuery,
+} from './lists.js'
 
 const OVERVIEW_CHARS = 280
-
-/** How long after a library's first row its titles still count as its first import. */
-const IMPORT_GRACE = `interval '1 day'`
 
 /** Accounts that count as the household: anyone who still has access. */
 const HOUSEHOLD_SQL = `u.is_enabled = true AND u.provider_disabled = false`
@@ -99,27 +108,37 @@ function card(ctx: ToolContext, type: 'movie' | 'series', row: TitleRow, subtitl
 
 const typeParam = z.enum(['movies', 'series', 'both']).default('both').describe('Which kind of title')
 const limitParam = (fallback: number) =>
-  z.number().int().min(1).max(40).optional().default(fallback).describe(`How many titles (default ${fallback}, max 40)`)
+  z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_LIST_LIMIT)
+    .optional()
+    .default(fallback)
+    .describe(`How many titles (default ${fallback}, max ${MAX_LIST_LIMIT})`)
 const genreParam = z
   .string()
   .optional()
   .describe('Optional genre as the library names it (see getAvailableGenres), e.g. "Horror"')
-
-/** `EXISTS` over a title's genres, case-insensitive; the pattern is the bound value, never the array. */
-function genreClause(alias: string, genre: string | undefined, params: unknown[]): string {
-  if (!genre?.trim()) return 'TRUE'
-  params.push(genre.trim())
-  return `EXISTS (SELECT 1 FROM unnest(${alias}.genres) g WHERE g ILIKE $${params.length})`
-}
 
 const kinds = (type: 'movies' | 'series' | 'both') => ({
   movies: type !== 'series',
   series: type !== 'movies',
 })
 
-const TITLE_COLUMNS = (alias: string) =>
-  `${alias}.id, ${alias}.title, ${alias}.year, ${alias}.poster_url, ${alias}.provider_item_id, ${alias}.overview,
-   ${alias}.genres, ${displayRatingSql(alias)} AS community_rating`
+/** A recently-added row: a title (NULL columns when none qualified) plus the query's import summary. */
+type RecentRow = TitleRow & {
+  created_at: Date
+  latest: Date | null
+  is_new?: boolean
+  new_episodes?: number | null
+  skipped: number
+  import_until: Date | null
+}
+
+async function runRecent({ sql, params }: RecentlyAddedQuery): Promise<RecentRow[]> {
+  return (await query<RecentRow>(sql, params)).rows
+}
 
 /** Titles from a list of refs that this scope can open, with what a card needs. */
 async function titleInfoInScope(refs: readonly TitleRef[], scope: LibraryScope): Promise<Map<string, DraftTitleInfo>> {
@@ -165,129 +184,43 @@ export function createNewsletterTools(ctx: ToolContext, draft: NewsletterDraftCo
       ),
       execute: async ({ type, days = 30, genre, limit = 20 }) => {
         const want = kinds(type)
-        // Schema-checked already; interpolated, so held to the range here too.
-        const cap = Math.min(40, Math.max(1, Math.trunc(limit)))
-        const found: { at: Date; item: ReturnType<typeof card> }[] = []
-        let importSkipped = 0
+        const input = { days, genre, scope: ctx.scope, limit }
+        const found: { score: number; item: ReturnType<typeof card> }[] = []
+        let skipped = 0
         let importUntil: Date | null = null
-        const noteImport = (row: { n: number; until: Date | null } | undefined) => {
-          if (!row?.n) return
-          importSkipped += row.n
-          if (row.until && (!importUntil || row.until > importUntil)) importUntil = row.until
+        const readSummary = (row: RecentRow | undefined) => {
+          if (!row?.skipped) return
+          skipped += row.skipped
+          if (row.import_until && (!importUntil || row.import_until > importUntil)) importUntil = row.import_until
         }
-        // `created_at` is when the app first saw a row, so a library's first
-        // import reads as one huge arrival. Titles that came within a day of
-        // their library's first row are that import, not news.
-        const importsCte = (table: 'movies' | 'series') =>
-          `imports AS (
-             SELECT provider_library_id, MIN(created_at) + ${IMPORT_GRACE} AS import_end
-               FROM ${table} GROUP BY provider_library_id
-           )`
-        const libraryJoin = (alias: string) =>
-          `JOIN imports i ON i.provider_library_id IS NOT DISTINCT FROM ${alias}.provider_library_id`
+        const day = (date: Date) => date.toISOString().slice(0, 10)
 
-        if (want.movies) {
-          const params: unknown[] = [days]
-          const genreSql = genreClause('m', genre, params)
-          const inScope = libraryScopeSql(ctx.scope, 'm', binderFor(params))
-          const window = `m.created_at >= NOW() - make_interval(days => $1::int) AND ${genreSql} AND ${inScope}`
-          const [rows, skipped] = await Promise.all([
-            query<TitleRow & { created_at: Date }>(
-              `WITH ${importsCte('movies')}
-               SELECT ${TITLE_COLUMNS('m')}, m.created_at
-                 FROM movies m ${libraryJoin('m')}
-                WHERE ${window} AND m.created_at > i.import_end
-                ORDER BY m.created_at DESC, m.id
-                LIMIT ${cap}`,
-              params
-            ),
-            query<{ n: number; until: Date | null }>(
-              `WITH ${importsCte('movies')}
-               SELECT COUNT(*)::int AS n, MAX(i.import_end) AS until
-                 FROM movies m ${libraryJoin('m')}
-                WHERE ${window} AND m.created_at <= i.import_end`,
-              params
-            ),
-          ])
-          noteImport(skipped.rows[0])
-          for (const row of rows.rows) {
-            found.push({
-              at: row.created_at,
-              item: card(ctx, 'movie', row, `New film, added ${row.created_at.toISOString().slice(0, 10)}`),
-            })
-          }
+        const [movies, series] = await Promise.all([
+          want.movies ? runRecent(recentMoviesQuery(input)) : Promise.resolve([]),
+          want.series ? runRecent(recentSeriesQuery(input)) : Promise.resolve([]),
+        ])
+        readSummary(movies[0])
+        readSummary(series[0])
+        for (const row of movies) {
+          if (!row.id || !row.latest) continue
+          found.push({ score: row.latest.getTime(), item: card(ctx, 'movie', row, `New film, added ${day(row.created_at)}`) })
         }
-        if (want.series) {
-          const params: unknown[] = [days]
-          const genreSql = genreClause('s', genre, params)
-          const inScope = libraryScopeSql(ctx.scope, 's', binderFor(params))
-          // Specials (season 0) are not "new episodes" anyone is waiting for,
-          // and episodes that came with their library's first import are not new.
-          const [rows, skipped] = await Promise.all([
-            query<TitleRow & { created_at: Date; is_new: boolean; new_episodes: string | null; latest: Date }>(
-              `WITH ${importsCte('series')},
-               fresh AS (
-                 SELECT e.series_id, COUNT(*)::text AS new_episodes, MAX(e.created_at) AS latest
-                   FROM episodes e
-                   JOIN series es ON es.id = e.series_id
-                   JOIN imports ei ON ei.provider_library_id IS NOT DISTINCT FROM es.provider_library_id
-                  WHERE e.created_at >= NOW() - make_interval(days => $1::int) AND e.season_number > 0
-                    AND e.created_at > ei.import_end
-                  GROUP BY e.series_id
-               )
-               SELECT ${TITLE_COLUMNS('s')}, s.created_at, f.new_episodes,
-                      (s.created_at >= NOW() - make_interval(days => $1::int) AND s.created_at > i.import_end) AS is_new,
-                      GREATEST(
-                        CASE WHEN s.created_at > i.import_end THEN s.created_at END,
-                        f.latest
-                      ) AS latest
-                 FROM series s ${libraryJoin('s')}
-                 LEFT JOIN fresh f ON f.series_id = s.id
-                WHERE ((s.created_at >= NOW() - make_interval(days => $1::int) AND s.created_at > i.import_end)
-                       OR f.series_id IS NOT NULL)
-                  AND ${genreSql} AND ${inScope}
-                ORDER BY latest DESC, s.id
-                LIMIT ${cap}`,
-              params
-            ),
-            query<{ n: number; until: Date | null }>(
-              `WITH ${importsCte('series')}
-               SELECT COUNT(*)::int AS n, MAX(i.import_end) AS until
-                 FROM series s ${libraryJoin('s')}
-                WHERE s.created_at >= NOW() - make_interval(days => $1::int) AND s.created_at <= i.import_end
-                  AND ${genreSql} AND ${inScope}`,
-              params
-            ),
-          ])
-          noteImport(skipped.rows[0])
-          for (const row of rows.rows) {
-            const episodes = row.new_episodes != null ? Number.parseInt(row.new_episodes, 10) : 0
-            const subtitle = row.is_new
-              ? `New show, added ${row.created_at.toISOString().slice(0, 10)}`
-              : `${episodes} new episode${episodes === 1 ? '' : 's'}, latest ${row.latest.toISOString().slice(0, 10)}`
-            found.push({ at: row.latest, item: card(ctx, 'series', row, subtitle) })
-          }
+        for (const row of series) {
+          if (!row.id || !row.latest) continue
+          const episodes = row.new_episodes ?? 0
+          const subtitle = row.is_new
+            ? `New show, added ${day(row.created_at)}`
+            : `${episodes} new episode${episodes === 1 ? '' : 's'}, latest ${day(row.latest)}`
+          found.push({ score: row.latest.getTime(), item: card(ctx, 'series', row, subtitle) })
         }
-        // One list, newest first, at most `limit` however many kinds were asked for.
-        const items = found
-          .sort((a, b) => b.at.getTime() - a.at.getTime())
-          .slice(0, limit)
-          .map((entry) => entry.item)
-        const notes: string[] = []
-        if (items.length === 0) notes.push(`Nothing was added in the last ${days} days.`)
-        if (importSkipped > 0 && importUntil) {
-          notes.push(
-            `${importSkipped} titles first seen when their library was imported (until ${(importUntil as Date)
-              .toISOString()
-              .slice(0, 10)}) are left out: they were already there, not newly added.`
-          )
-        }
+        const items = mergeRanked(found, limit)
+        const note = recentlyAddedNote({ days, count: items.length, skipped, importUntil })
         return {
           id: `recently-added-${Date.now()}`,
           days,
           count: items.length,
           items,
-          ...(notes.length > 0 ? { note: notes.join(' ') } : {}),
+          ...(note ? { note } : {}),
         }
       },
     }),
@@ -304,7 +237,7 @@ export function createNewsletterTools(ctx: ToolContext, draft: NewsletterDraftCo
       ),
       execute: async ({ type, days = 30, limit = 15 }) => {
         const want = kinds(type)
-        const ranked: { viewers: number; item: ReturnType<typeof card> }[] = []
+        const ranked: { score: number; item: ReturnType<typeof card> }[] = []
         const people = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`
         // An approximately dated watch has no place on a time axis (F-108).
         const recent = `wh.last_played_at >= NOW() - make_interval(days => $1::int) AND wh.approximate_played_at IS NULL`
@@ -326,7 +259,7 @@ export function createNewsletterTools(ctx: ToolContext, draft: NewsletterDraftCo
           )
           for (const row of rows.rows) {
             const viewers = Number.parseInt(row.viewers, 10)
-            ranked.push({ viewers, item: card(ctx, 'movie', row, `Played by ${people(viewers)}`) })
+            ranked.push({ score: viewers, item: card(ctx, 'movie', row, `Played by ${people(viewers)}`) })
           }
         }
         if (want.series) {
@@ -349,15 +282,11 @@ export function createNewsletterTools(ctx: ToolContext, draft: NewsletterDraftCo
           )
           for (const row of rows.rows) {
             const viewers = Number.parseInt(row.viewers, 10)
-            ranked.push({ viewers, item: card(ctx, 'series', row, `Watched by ${people(viewers)}`) })
+            ranked.push({ score: viewers, item: card(ctx, 'series', row, `Watched by ${people(viewers)}`) })
           }
         }
-        // One list of at most `limit`, whichever kinds were asked for. Stable:
-        // films and shows tied on viewers keep their own order.
-        const items = ranked
-          .sort((a, b) => b.viewers - a.viewers)
-          .slice(0, limit)
-          .map((r) => r.item)
+        // One list of at most `limit`, most played first, whichever kinds were asked for.
+        const items = mergeRanked(ranked, limit)
         return {
           id: `household-favourites-${Date.now()}`,
           days,
@@ -389,10 +318,10 @@ export function createNewsletterTools(ctx: ToolContext, draft: NewsletterDraftCo
       ),
       execute: async ({ type, minRating = 7.5, maxViewers = 1, genre, limit = 15 }) => {
         const want = kinds(type)
-        const ranked: { rating: number; item: ReturnType<typeof card> }[] = []
-        const push = (type: 'movie' | 'series', row: TitleRow & { viewers: string }, subtitle: string) => {
-          const item = card(ctx, type, row, subtitle)
-          ranked.push({ rating: item.rating ?? 0, item })
+        const ranked: { score: number; item: ReturnType<typeof card> }[] = []
+        const push = (mediaType: 'movie' | 'series', row: TitleRow & { viewers: string }, subtitle: string) => {
+          const item = card(ctx, mediaType, row, subtitle)
+          ranked.push({ score: item.rating ?? 0, item })
         }
         if (want.movies) {
           const params: unknown[] = [minRating, maxViewers]
@@ -437,10 +366,7 @@ export function createNewsletterTools(ctx: ToolContext, draft: NewsletterDraftCo
           for (const row of rows.rows) push('series', row, `Watched by ${row.viewers}`)
         }
         // One list of at most `limit`, best rated first, whichever kinds were asked for.
-        const items = ranked
-          .sort((a, b) => b.rating - a.rating)
-          .slice(0, limit)
-          .map((r) => r.item)
+        const items = mergeRanked(ranked, limit)
         return { id: `hidden-gems-${Date.now()}`, count: items.length, items }
       },
     }),
@@ -494,22 +420,16 @@ export function createNewsletterTools(ctx: ToolContext, draft: NewsletterDraftCo
         z.object({ count: z.number().int().min(1).max(12).optional().default(5).describe('How many issues (default 5)') })
       ),
       execute: async ({ count = 5 }) => {
-        // Anything that reached anyone, a send that failed partway included: its
-        // readers have seen those titles. A failed send has no `sentAt`, so it
-        // is dated by when sending started. ISO strings sort as dates.
-        const sentOn = (n: { sentAt: string | null; sendStartedAt: string | null; updatedAt: string }) =>
-          n.sentAt ?? n.sendStartedAt ?? n.updatedAt
-        const sent = (await listNewsletters())
-          .filter((n) => n.sentCount > 0)
-          .sort((a, b) => sentOn(b).localeCompare(sentOn(a)))
-          .slice(0, count)
+        // Anything that reached anyone, a send that failed partway included:
+        // its readers have seen those titles (`sentIssues`, lists.ts).
+        const sent = sentIssues(await listNewsletters(), count)
         const perIssue = sent.map((issue) => ({ issue, refs: titleRefsIn(readNewsletterDocument(issue.content)) }))
         const facts = await loadTitleFacts(perIssue.flatMap((p) => p.refs))
         return {
           id: `past-issues-${Date.now()}`,
           issues: perIssue.map(({ issue, refs }) => ({
             subject: issue.subject,
-            sentAt: sentOn(issue),
+            sentAt: issueSentOn(issue),
             ...(issue.status === 'failed' ? { partlySent: true } : {}),
             titles: refs.map((ref) => {
               const fact = facts.get(titleKey(ref))
@@ -570,8 +490,10 @@ export function createNewsletterTools(ctx: ToolContext, draft: NewsletterDraftCo
             titles: result.titles,
             dropped: result.dropped,
             problem: result.problem,
-            // Inserted beside what the newsletter holds now, would it still save?
-            // The panel checks titles again at the moment of inserting.
+            // For the model (toModelOutput): beside the newsletter as it was sent
+            // with this turn, would it still save? The panel never relies on it,
+            // since it goes stale with the first edit: it asks
+            // /api/newsletters/assistant/insert-check when Insert is pressed.
             insertProblem: insertProblem(draft.content, result.content),
           },
         }

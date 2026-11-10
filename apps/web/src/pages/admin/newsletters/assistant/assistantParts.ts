@@ -36,8 +36,6 @@ export interface Proposal {
   /** How many blocks the server could not use. */
   droppedCount: number
   problem: string | null
-  /** Why inserting it beside what the newsletter held when it was proposed would not save. */
-  insertProblem: string | null
 }
 
 export interface ReachRow {
@@ -113,7 +111,6 @@ export function proposalFrom(output: unknown): Proposal | null {
     titles,
     droppedCount: Array.isArray(p.dropped) ? p.dropped.length : 0,
     problem: str(p.problem),
-    insertProblem: str(p.insertProblem),
   }
 }
 
@@ -187,6 +184,8 @@ export interface NewsletterAssistantHost {
   titlesInNewsletter: ReadonlySet<string>
   /** The most title cards a newsletter may hold (decided by the server). */
   maxTitles: number
+  /** How many recent messages go up with each turn (decided by the server). */
+  historyMessages: number
   defaultFields: readonly string[]
   insertNodes: (nodes: EditorNode[]) => void
   replaceContent: (nodes: EditorNode[]) => void
@@ -194,7 +193,26 @@ export interface NewsletterAssistantHost {
   setPreheader: (value: string) => void
 }
 
-/** How many of a proposal's titles are not in the newsletter yet, so inserting adds a card for each. */
+/**
+ * How many titles inserting a proposal adds to the newsletter: each distinct
+ * title it carries that the newsletter does not hold yet. A title shown twice
+ * is one title, as the save counts it.
+ */
 export function newTitleCount(proposal: Pick<Proposal, 'titles'>, inNewsletter: ReadonlySet<string>): number {
-  return proposal.titles.filter((title) => !inNewsletter.has(`${title.mediaType}:${title.id}`)).length
+  const keys = new Set(proposal.titles.map((title) => `${title.mediaType}:${title.id}`))
+  let count = 0
+  for (const key of keys) if (!inNewsletter.has(key)) count += 1
+  return count
+}
+
+/**
+ * The part of the conversation sent with a turn: the latest `max` messages,
+ * opening on a question. A copy of the server's own cut (routes/newsletters/
+ * assistant/history.ts), so a long conversation never outgrows the request
+ * limits; the server cuts again whatever arrives.
+ */
+export function recentHistory<M extends { role: string }>(messages: readonly M[], max: number): M[] {
+  const kept = messages.slice(-Math.max(1, max))
+  const firstQuestion = kept.findIndex((message) => message.role === 'user')
+  return firstQuestion < 0 ? [] : kept.slice(firstQuestion)
 }

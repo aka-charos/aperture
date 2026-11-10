@@ -33,6 +33,7 @@ import { getStoredAnalysis } from '../analysis/generate.js'
 import { splitAnalysisParagraphs } from '../analysis/paragraphMap.js'
 import { buildAnalysisSegments, type AnalysisSegment } from '../analysis/segments.js'
 import { query } from '../lib/db.js'
+import { numericOrNull } from '../lib/numeric.js'
 import {
   binderFor,
   getLibraryScopeForUser,
@@ -77,14 +78,6 @@ export interface TitleFacts {
   overview: string | null
   plotFull: string | null
   posterUrl: string | null
-}
-
-/** A NUMERIC column as a number: it arrives as text, and NULL stays null, never 0. */
-export const numericOrNull = (value: unknown): number | null => {
-  // NUMERIC arrives as text; NULL must stay absent, never become 0.
-  if (value == null) return null
-  const n = typeof value === 'number' ? value : Number.parseFloat(String(value))
-  return Number.isFinite(n) ? n : null
 }
 
 const names = (value: unknown): string[] =>
