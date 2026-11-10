@@ -16,7 +16,7 @@
  * scope and the panel draws it with an Add button. The SQL applies the scope
  * as well, so a limit counts titles the admin can actually see.
  */
-import { tool } from 'ai'
+import { tool, type ToolSet } from 'ai'
 import { z } from 'zod'
 import {
   WATCH_HISTORY_PLAYED_SQL,
@@ -169,7 +169,7 @@ async function currentRecipients(groupIds: readonly string[]) {
   return resolveRecipients(users, groups)
 }
 
-export function createNewsletterTools(ctx: ToolContext, draft: NewsletterDraftContext) {
+export function createNewsletterTools(ctx: ToolContext, draft: NewsletterDraftContext): ToolSet {
   return {
     getRecentlyAdded: tool({
       description:
