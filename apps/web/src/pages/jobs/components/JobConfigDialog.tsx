@@ -33,7 +33,7 @@ import {
   scheduleTakesMinute,
   scheduleTimingPayload,
 } from '../scheduleForm'
-import { describeSchedule, INTERVAL_META, WEEKDAY_KEYS } from '../scheduleText'
+import { describeSchedule, INTERVAL_META, scheduleTextValues, WEEKDAY_KEYS } from '../scheduleText'
 
 type JobConfigSaveParams = UpdateJobConfigParams & {
   scheduleType: ScheduleType
@@ -126,21 +126,15 @@ export function JobConfigDialog({
 
   useEffect(() => {
     if (open && !initialized && currentSchedule) {
-      setScheduleType(currentSchedule.type)
-      setHour(currentSchedule.hour ?? 3)
-      setMinuteText(String(currentSchedule.minute ?? 0))
-      setDayOfWeek(currentSchedule.dayOfWeek ?? 0)
-      // A schedule saved before multi-day existed carries only the scalar.
-      setDaysOfWeek(
-        currentSchedule.daysOfWeek?.length
-          ? currentSchedule.daysOfWeek
-          : [currentSchedule.dayOfWeek ?? 0]
-      )
-      setIntervalMinutesTotal(
-        currentSchedule.intervalMinutes ??
-          (currentSchedule.intervalHours != null ? currentSchedule.intervalHours * 60 : 360)
-      )
-      setIsEnabled(currentSchedule.isEnabled)
+      // Read the way the scheduler reads it, so the form opens on what runs.
+      const stored = scheduleTextValues(currentSchedule)
+      setScheduleType(stored.type)
+      setHour(stored.hour)
+      setMinuteText(String(stored.minute))
+      setDayOfWeek(stored.dayOfWeek)
+      setDaysOfWeek(stored.daysOfWeek)
+      setIntervalMinutesTotal(stored.intervalMinutes)
+      setIsEnabled(stored.isEnabled)
       setRunLimitText(
         currentSchedule.maxItemsPerRun != null ? String(currentSchedule.maxItemsPerRun) : ''
       )

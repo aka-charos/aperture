@@ -1,7 +1,8 @@
 /**
  * A schedule in words, in the reader's language. One function for the schedule
- * dialog's preview and for any page that says when its job runs (the backup
- * page), so the two cannot describe one setting two ways. Pure, pinned by
+ * dialog's preview, the Jobs page's cards and table, and any page that says
+ * when its job runs (the backup page), so no two of them describe one setting
+ * two ways. The API's `formatted` string is English only and is not shown. Pure, pinned by
  * scheduleText.test.ts.
  */
 
@@ -44,21 +45,33 @@ export interface ScheduleTextValues {
 }
 
 /**
- * A stored schedule as the dialog reads it, with the dialog's defaults for
- * fields the row leaves empty (a schedule saved before multi-day existed
- * carries only the scalar day).
+ * A stored schedule read the way the scheduler reads it (core
+ * `scheduleToCron` and `resolveScheduleDays`): a missing hour or minute is 0,
+ * and the days come from the list first, then the scalar a schedule saved
+ * before multi-day existed carries. The dialog seeds its form from this too,
+ * so it opens on the schedule that actually runs.
  */
 export function scheduleTextValues(schedule: JobSchedule): ScheduleTextValues {
+  const days = schedule.daysOfWeek?.length ? schedule.daysOfWeek : [schedule.dayOfWeek ?? 0]
   return {
     type: schedule.type,
     isEnabled: schedule.isEnabled,
-    hour: schedule.hour ?? 3,
+    hour: schedule.hour ?? 0,
     minute: schedule.minute ?? 0,
-    daysOfWeek: schedule.daysOfWeek?.length ? schedule.daysOfWeek : [schedule.dayOfWeek ?? 0],
-    dayOfWeek: schedule.dayOfWeek ?? 0,
+    daysOfWeek: days,
+    // Biweekly keeps one day; the scheduler takes the first of the list.
+    dayOfWeek: days[0] ?? 0,
     intervalMinutes:
       schedule.intervalMinutes ?? (schedule.intervalHours != null ? schedule.intervalHours * 60 : 360),
   }
+}
+
+/** Wording a caller may put in place of the dialog's for a job that does not run on its own. */
+export interface ScheduleTextOptions {
+  /** A schedule that is switched off. */
+  disabled?: string
+  /** A manual-only schedule. */
+  manual?: string
 }
 
 const ui = (t: TFunction, key: string, options?: Record<string, unknown>): string =>
@@ -69,8 +82,13 @@ function weekdayLabel(t: TFunction, day: number): string {
   return key ? ui(t, key) : ''
 }
 
-export function describeSchedule(values: ScheduleTextValues, t: TFunction, language: string): string {
-  if (!values.isEnabled) return ui(t, 'configPreviewDisabled')
+export function describeSchedule(
+  values: ScheduleTextValues,
+  t: TFunction,
+  language: string,
+  options: ScheduleTextOptions = {}
+): string {
+  if (!values.isEnabled) return options.disabled ?? ui(t, 'configPreviewDisabled')
 
   const time = formatTimeOfDay(language, values.hour, values.minute)
   switch (values.type) {
@@ -97,8 +115,19 @@ export function describeSchedule(values: ScheduleTextValues, t: TFunction, langu
         : ui(t, 'configPreviewIntervalAt', { interval, minute: String(values.minute).padStart(2, '0') })
     }
     case 'manual':
-      return ui(t, 'configPreviewManualRuns')
+      return options.manual ?? ui(t, 'configPreviewManualRuns')
     default:
       return ''
   }
+}
+
+/** A stored schedule in words, or null when the job has none. */
+export function describeStoredSchedule(
+  schedule: JobSchedule | null | undefined,
+  t: TFunction,
+  language: string,
+  options?: ScheduleTextOptions
+): string | null {
+  if (!schedule) return null
+  return describeSchedule(scheduleTextValues(schedule), t, language, options)
 }

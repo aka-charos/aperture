@@ -36,6 +36,7 @@ import {
   formatJobDurationMsOrDash,
 } from '../constants'
 import type { Job, JobSchedule } from '../types'
+import { describeStoredSchedule } from '../scheduleText'
 
 interface ScheduleTableProps {
   jobs: Job[]
@@ -99,7 +100,13 @@ export function ScheduleTable({
   onRunJob,
   onToggleEnabled,
 }: ScheduleTableProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  // In the reader's language, worded as the schedule dialog words it.
+  const scheduleText = (job: Job): string =>
+    describeStoredSchedule(job.schedule, t, i18n.language, {
+      disabled: t('admin.jobsPage.ui.disabledShort'),
+      manual: t('admin.jobsPage.ui.manualOnlyShort'),
+    }) ?? t('admin.jobsPage.ui.manualOnlyShort')
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   
@@ -165,7 +172,7 @@ export function ScheduleTable({
                         {formatJobName(job.name, t)}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {job.schedule?.formatted || t('admin.jobsPage.ui.manualOnlyShort')}
+                        {scheduleText(job)}
                       </Typography>
                     </Box>
                   </Stack>
@@ -373,7 +380,7 @@ export function ScheduleTable({
                   <Typography variant="body2" color={isManualOnly ? 'warning.main' : 'text.secondary'}>
                     {isManualOnly
                       ? t('admin.jobsPage.ui.manualOnlyCaption')
-                      : job.schedule?.formatted || t('admin.jobsPage.ui.manualOnlyShort')}
+                      : scheduleText(job)}
                   </Typography>
                 </TableCell>
                 

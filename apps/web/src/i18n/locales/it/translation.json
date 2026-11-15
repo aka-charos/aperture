@@ -2685,7 +2685,6 @@
     "cancel": "Cancellare",
     "uploadBackup": "Carica backup",
     "uploading": "Caricamento…",
-    "scheduleNote": "I backup automatici vengono eseguiti ogni giorno alle 2:00",
     "jobCreatingBackup": "Creazione del backup",
     "jobRestoring": "Ripristino della banca dati",
     "hideLogs": "Nascondi registri",

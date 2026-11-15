@@ -2685,7 +2685,6 @@
     "cancel": "Cancelar",
     "uploadBackup": "Cargar copia de seguridad",
     "uploading": "Subiendo…",
-    "scheduleNote": "Las copias de seguridad automáticas se ejecutan diariamente a las 2:00 a. m.",
     "jobCreatingBackup": "Creando copia de seguridad",
     "jobRestoring": "Restaurando la base de datos",
     "hideLogs": "Ocultar registros",

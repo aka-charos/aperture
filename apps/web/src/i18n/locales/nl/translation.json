@@ -2450,7 +2450,6 @@
     "cancel": "Annuleren",
     "uploadBackup": "Back-up uploaden",
     "uploading": "Uploaden…",
-    "scheduleNote": "Automatische back-ups worden dagelijks om 02.00 uur uitgevoerd",
     "jobCreatingBackup": "Back-up maken",
     "jobRestoring": "Database herstellen",
     "hideLogs": "Logboeken verbergen",

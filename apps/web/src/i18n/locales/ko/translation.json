@@ -2681,7 +2681,6 @@
     "cancel": "취소",
     "uploadBackup": "백업 업로드",
     "uploading": "업로드 중…",
-    "scheduleNote": "매일 오전 2시에 자동 백업이 실행됩니다.",
     "jobCreatingBackup": "백업 생성",
     "jobRestoring": "데이터베이스 복원 중",
     "hideLogs": "로그 숨기기",

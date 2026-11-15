@@ -2685,7 +2685,6 @@
     "cancel": "Annuler",
     "uploadBackup": "Télécharger la sauvegarde",
     "uploading": "Téléchargement…",
-    "scheduleNote": "Les sauvegardes automatiques s'exécutent quotidiennement à 2h00 du matin",
     "jobCreatingBackup": "Création d'une sauvegarde",
     "jobRestoring": "Restauration de la base de données",
     "hideLogs": "Masquer les journaux",

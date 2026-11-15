@@ -2681,7 +2681,6 @@
     "cancel": "Abbrechen",
     "uploadBackup": "Backup hochladen",
     "uploading": "Lade hoch…",
-    "scheduleNote": "Automatische Backups laufen täglich um 2:00 Uhr",
     "jobCreatingBackup": "Backup wird erstellt",
     "jobRestoring": "Datenbank wird wiederhergestellt",
     "hideLogs": "Protokolle ausblenden",

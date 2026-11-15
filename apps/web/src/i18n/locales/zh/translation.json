@@ -2681,7 +2681,6 @@
     "cancel": "取消",
     "uploadBackup": "上传备份",
     "uploading": "正在上传...",
-    "scheduleNote": "自动备份每天凌晨 2:00 运行",
     "jobCreatingBackup": "创建备份",
     "jobRestoring": "恢复数据库",
     "hideLogs": "隐藏日志",

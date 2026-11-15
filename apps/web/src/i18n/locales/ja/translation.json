@@ -2681,7 +2681,6 @@
     "cancel": "キャンセル",
     "uploadBackup": "バックアップのアップロード",
     "uploading": "アップロード中…",
-    "scheduleNote": "自動バックアップは毎日午前 2 時に実行されます",
     "jobCreatingBackup": "バックアップの作成",
     "jobRestoring": "データベースの復元",
     "hideLogs": "ログを非表示にする",

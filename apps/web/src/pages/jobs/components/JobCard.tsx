@@ -15,6 +15,7 @@ import { jobAnchor } from '../registry'
 import { JobProgressSection } from './JobProgressSection'
 import { JobResult } from './JobResult'
 import type { Job, JobProgress } from '../types'
+import { describeStoredSchedule } from '../scheduleText'
 
 interface JobCardProps {
   job: Job
@@ -52,7 +53,11 @@ export function JobCard({
   disabledMessage,
   runBlockedMessage,
 }: JobCardProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const scheduleText = describeStoredSchedule(job.schedule, t, i18n.language, {
+    disabled: t('admin.jobsPage.ui.disabledShort'),
+    manual: t('admin.jobsPage.ui.manualOnlyShort'),
+  })
   const isRunning = job.status === 'running' || progress?.status === 'running'
   // The live record says Queued as soon as the turn comes; the list's copy
   // is only as fresh as its last poll.
@@ -220,7 +225,7 @@ export function JobCard({
               <Stack direction="row" alignItems="center" spacing={0.5}>
                 <ScheduleIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
                 <Typography variant="caption" color="text.disabled">
-                  {job.schedule?.formatted || t('admin.jobsPage.ui.notConfigured')}
+                  {scheduleText ?? t('admin.jobsPage.ui.notConfigured')}
                   {job.runLimit &&
                     ` · ${t('admin.jobsPage.ui.runLimitCaption', {
                       context: job.runLimit.unit,

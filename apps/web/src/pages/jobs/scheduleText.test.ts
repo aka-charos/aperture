@@ -2,7 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import type { TFunction } from 'i18next'
 import en from '../../i18n/locales/en/translation.json' with { type: 'json' }
-import { describeSchedule, scheduleTextValues } from './scheduleText'
+import { describeSchedule, describeStoredSchedule, scheduleTextValues } from './scheduleText'
 import type { JobSchedule } from './types'
 
 const ui = (en as { admin: { jobsPage: { ui: Record<string, string> } } }).admin.jobsPage.ui
@@ -49,5 +49,25 @@ describe('describeSchedule', () => {
 
   it('says a switched-off schedule is off', () => {
     assert.equal(say({ isEnabled: false }), ui.configPreviewDisabled)
+  })
+
+  // core scheduleToCron reads a missing hour as 0; a page must not name another time.
+  it('reads a missing hour as midnight, as the scheduler does', () => {
+    assert.equal(say({ type: 'daily', hour: null, minute: null }), 'Runs daily at 12:00 AM')
+  })
+
+  // core resolveScheduleDays: the list first, then the scalar.
+  it('takes a biweekly day from the list before the scalar', () => {
+    assert.equal(
+      say({ type: 'biweekly', hour: 4, daysOfWeek: [3], dayOfWeek: null }),
+      'Runs every other Wednesday at 4:00 AM'
+    )
+  })
+
+  it('lets a caller word the off states its own way', () => {
+    const options = { disabled: 'off', manual: 'by hand' }
+    assert.equal(describeStoredSchedule(schedule({ isEnabled: false }), t, 'en-US', options), 'off')
+    assert.equal(describeStoredSchedule(schedule({ type: 'manual' }), t, 'en-US', options), 'by hand')
+    assert.equal(describeStoredSchedule(null, t, 'en-US', options), null)
   })
 })

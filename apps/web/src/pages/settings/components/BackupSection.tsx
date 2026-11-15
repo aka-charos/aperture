@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link as RouterLink } from 'react-router-dom'
 import { jobConsoleLink } from '../../jobs/registry'
-import { describeSchedule, scheduleTextValues } from '../../jobs/scheduleText'
+import { describeStoredSchedule } from '../../jobs/scheduleText'
 import type { JobSchedule } from '../../jobs/types'
 import { useBackupJobProgress, type JobFinishedReason, type JobProgress } from '../hooks/useBackupJobProgress'
 import {
@@ -81,15 +81,23 @@ interface BackupConfig {
   lastBackupSizeFormatted: string | null
 }
 
-/** The backup job's schedule in words, or null when the jobs list did not say. */
+/**
+ * The backup job's schedule in words, with the server's time zone named (the
+ * hours are the container's, not the reader's). Without the jobs list it
+ * still offers the way to the job rather than nothing.
+ */
 function backupScheduleText(
-  schedule: JobSchedule | null | undefined,
+  schedule: JobSchedule | null,
   t: ReturnType<typeof useTranslation>['t'],
   language: string
-): string | null {
-  if (!schedule) return null
-  if (!schedule.isEnabled || schedule.type === 'manual') return t('settingsBackup.scheduleOff')
-  return describeSchedule(scheduleTextValues(schedule), t, language)
+): string {
+  const off = t('settingsBackup.scheduleOff')
+  const text = describeStoredSchedule(schedule, t, language, { disabled: off, manual: off })
+  if (!schedule || text == null) return t('settingsBackup.scheduleUnknown')
+  const runs = schedule.isEnabled && schedule.type !== 'manual'
+  return runs && schedule.timeZone
+    ? t('settingsBackup.scheduleInZone', { schedule: text, timeZone: schedule.timeZone })
+    : text
 }
 
 export function BackupSection() {
@@ -721,27 +729,17 @@ export function BackupSection() {
               <input type="file" hidden accept=".sql,.sql.gz,.dump" onChange={handleUploadBackup} />
             </Button>
 
-            {scheduleText && (
-              <Tooltip
-                title={
-                  backupSchedule?.timeZone
-                    ? t('admin.jobsPage.ui.configTimeZone', { timeZone: backupSchedule.timeZone })
-                    : ''
-                }
-              >
-                <Link
-                  component={RouterLink}
-                  to={jobConsoleLink('backup-database')}
-                  underline="hover"
-                  color="text.secondary"
-                  variant="body2"
-                  sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}
-                >
-                  <ScheduleIcon fontSize="small" color="action" />
-                  {scheduleText}
-                </Link>
-              </Tooltip>
-            )}
+            <Link
+              component={RouterLink}
+              to={jobConsoleLink('backup-database')}
+              underline="hover"
+              color="text.secondary"
+              variant="body2"
+              sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}
+            >
+              <ScheduleIcon fontSize="small" color="action" />
+              {scheduleText}
+            </Link>
           </Box>
 
           {/* Job Progress Section */}
