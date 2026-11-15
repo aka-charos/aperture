@@ -25,7 +25,6 @@ import { applyViewerRowsNow, type InstantOutcome } from './instant.js'
 import { TOP_PICKS_TAGS, friendsTagName, recsTagNames, sectionTagIds } from './plan.js'
 import {
   MAX_SECTION_POSITION,
-  PLACEMENT_FEATURES,
   PLACEMENT_MODES,
   type FeaturePlacement,
   type Placement,
@@ -247,7 +246,9 @@ export async function getUserHomeScreen(userId: string): Promise<UserHomeScreen>
   }
 
   const rows: UserHomeRow[] = await Promise.all(
-    PLACEMENT_FEATURES.map(async (feature) => ({
+    // In the operator's stacking order, so the page lists rows the way they
+    // stack on the home screen.
+    config.stackOrder.map(async (feature) => ({
       feature,
       name: rowName(feature, config),
       state: states[feature],

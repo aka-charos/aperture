@@ -10,8 +10,8 @@ import {
   type HomeSectionsConfig,
   type HomeSectionsConfigUpdate,
 } from './settings.js'
-import { normaliseStackOrder } from './placement.js'
-import { getFeaturePlacements, saveFeaturePlacements } from './placementStore.js'
+import { normaliseStackOrder, stackOrderMovers } from './placement.js'
+import { clearAppliedPlacements, getFeaturePlacements, saveFeaturePlacements } from './placementStore.js'
 
 interface HomeSectionsConfigRow {
   enabled: boolean
@@ -86,10 +86,24 @@ export async function getHomeSectionsConfig(): Promise<HomeSectionsConfig> {
 export async function updateHomeSectionsConfig(
   update: HomeSectionsConfigUpdate
 ): Promise<HomeSectionsConfig> {
+  // An order equal to the stored one is not a change: it is left out, so a
+  // save of anything else never names `stack_order` (absent before 0224).
+  let stackOrderChanged = false
+  if (update.stackOrder) {
+    const current = await getHomeSectionsConfig()
+    const movers = stackOrderMovers(current.stackOrder, update.stackOrder)
+    stackOrderChanged = movers.length > 0
+    // Forgotten BEFORE the order is written. If the write then fails, the
+    // moved rows are placed once more under the old order, which changes
+    // nothing; the other way round, a saved order would never be applied.
+    await clearAppliedPlacements(movers)
+  }
+
   const assignments: string[] = []
   const values: unknown[] = []
   for (const [key, value] of Object.entries(update) as Array<[keyof HomeSectionsConfigUpdate, unknown]>) {
     if (key === 'placements' || value === undefined) continue
+    if (key === 'stackOrder' && !stackOrderChanged) continue
     values.push(value)
     assignments.push(`${COLUMN_FOR[key]} = $${values.length}`)
   }

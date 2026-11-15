@@ -6,7 +6,8 @@
 -- NULL means the order nobody chose: the order of `PLACEMENT_FEATURES`, which
 -- is what every home screen got before this migration. Nothing moves on
 -- anybody's home screen until an order is saved, and then only the rows of the
--- features whose place in the order changed.
+-- features the operator moved in it (their applied placement is forgotten, so
+-- the next sync places them again).
 --
 -- Feature names are not checked here: the vocabulary lives in code (see 0188),
 -- and a stored order is read through `normaliseStackOrder`, which drops a name

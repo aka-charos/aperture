@@ -171,6 +171,15 @@ export async function saveAppliedPlacementKeys(userId: string, keys: ReadonlyMap
 }
 
 /**
+ * Forget what was applied for these features, for every viewer, so the next
+ * write places their rows again. How a change of stacking order is applied.
+ */
+export async function clearAppliedPlacements(features: readonly PlacementFeature[]): Promise<void> {
+  if (features.length === 0) return
+  await query(`DELETE FROM home_sections_applied_placements WHERE feature = ANY($1::text[])`, [[...features]])
+}
+
+/**
  * Each viewer's own row switches (0188), keyed by user id. Only rows a viewer
  * has touched are stored; a kind absent here is on (see rowStates.ts).
  */

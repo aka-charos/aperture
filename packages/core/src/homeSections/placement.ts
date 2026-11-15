@@ -79,7 +79,42 @@ export function sanitizeStackOrder(input: unknown): { order: PlacementFeature[] 
     : { order: null, errors: [`stackOrder must list each of ${PLACEMENT_FEATURES.join(', ')} exactly once`] }
 }
 
-export const PLACEMENT_MODES =['top', 'bottom', 'position', 'after', 'before'] as const
+/**
+ * The fewest features that have to be placed again to turn one stacking order
+ * into another: everything outside a longest run of features that kept their
+ * order relative to each other. Moving one feature any distance names that
+ * feature alone; the ones it passed stay, and it is put on the right side of
+ * them (`planPlacement`). Both orders are read through `normaliseStackOrder`.
+ */
+export function stackOrderMovers(before: unknown, after: unknown): PlacementFeature[] {
+  const from = normaliseStackOrder(before)
+  const to = normaliseStackOrder(after)
+  // Longest common subsequence, by the length of the best run up to each pair.
+  const best: number[][] = from.map(() => to.map(() => 0))
+  const at = (i: number, j: number) => (i >= 0 && j >= 0 ? best[i][j] : 0)
+  for (let i = 0; i < from.length; i++) {
+    for (let j = 0; j < to.length; j++) {
+      best[i][j] = from[i] === to[j] ? at(i - 1, j - 1) + 1 : Math.max(at(i - 1, j), at(i, j - 1))
+    }
+  }
+  const kept = new Set<PlacementFeature>()
+  let i = from.length - 1
+  let j = to.length - 1
+  while (i >= 0 && j >= 0) {
+    if (from[i] === to[j]) {
+      kept.add(from[i])
+      i--
+      j--
+    } else if (at(i - 1, j) >= at(i, j - 1)) {
+      i--
+    } else {
+      j--
+    }
+  }
+  return to.filter((feature) => !kept.has(feature))
+}
+
+export const PLACEMENT_MODES = ['top', 'bottom', 'position', 'after', 'before'] as const
 export type PlacementMode = (typeof PLACEMENT_MODES)[number]
 
 export const FALLBACK_MODES = ['top', 'bottom', 'position'] as const
@@ -255,30 +290,20 @@ export function placementChain(adminDefault: FeaturePlacement, override: Placeme
  * A stable key for a chain, stored per viewer per feature as what was applied.
  * Names are left out: renaming a row somewhere else must not move anybody's.
  *
- * The feature's place in the stacking order is part of the key only where it
- * differs from the default order. So a key written before the order could be
- * chosen still matches (nobody is moved by the upgrade), and a change of order
- * re-places exactly the features whose place in it changed. That is enough:
- * two features that swap sides both change place or one of them does, and a
- * feature placed alone is put on the right side of the rows already at its spot.
+ * The stacking order is deliberately NOT in the key. A key is one feature's
+ * own, so it cannot tell "this feature was moved in the order" from "another
+ * feature was moved past it", and would re-place both. A change of order is
+ * applied by forgetting the applied key of the features that moved
+ * (`stackOrderMovers`), which the save does.
  */
-export function placementKey(
-  chain: readonly Placement[],
-  feature?: PlacementFeature,
-  stackOrder: readonly PlacementFeature[] = PLACEMENT_FEATURES
-): string {
-  const key: unknown[] = [
+export function placementKey(chain: readonly Placement[]): string {
+  return JSON.stringify([
     PLACEMENT_KEY_VERSION,
     chain.map((placement) => {
       const p = normalise(placement)
       return [p.mode, p.position, p.anchor?.id ?? null, p.anchor?.type ?? null]
     }),
-  ]
-  if (feature) {
-    const rank = stackOrder.indexOf(feature)
-    if (rank >= 0 && rank !== PLACEMENT_FEATURES.indexOf(feature)) key.push(rank)
-  }
-  return JSON.stringify(key)
+  ])
 }
 
 /** One row of a viewer's home screen, in the order Emby returns them. */
@@ -391,6 +416,18 @@ export interface PlacementPlan {
   moves: PlacementMove[]
 }
 
+export interface PlacementOptions {
+  /** Which feature leads at a shared spot; the default order when absent. */
+  stackOrder?: readonly PlacementFeature[]
+  /**
+   * The chains of features that are on the screen and NOT being placed. They
+   * say where a row that stays put belongs, which is the only way to tell a row
+   * sharing the spot from one the viewer dragged next to it. A feature absent
+   * here is never stepped back over.
+   */
+  resting?: ReadonlyMap<PlacementFeature, readonly Placement[]>
+}
+
 /**
  * Place the rows of the features in `chains` on one viewer's home screen. Rows
  * of any other feature stay exactly where they are — that is what keeps a
@@ -400,11 +437,15 @@ export interface PlacementPlan {
 export function planPlacement(
   screen: readonly HomeScreenRow[],
   chains: ReadonlyMap<PlacementFeature, readonly Placement[]>,
-  stackOrder: readonly PlacementFeature[] = PLACEMENT_FEATURES
+  options: PlacementOptions = {}
 ): PlacementPlan {
-  const stack = normaliseStackOrder(stackOrder)
+  const stack = normaliseStackOrder(options.stackOrder)
   const featureRank = (feature: PlacementFeature) => stack.indexOf(feature)
   const rows = collapseExpandedRows(screen)
+  // A spot, named apart from Aperture's rows: where a chain lands among the
+  // viewer's own rows. Two chains with the same answer share a spot.
+  const ownRows = rows.filter((row) => row.feature === null)
+  const spotOf = (chain: readonly Placement[]) => resolvePlacementIndex(ownRows, chain)
   const moving = rows.filter((row) => row.feature !== null && chains.has(row.feature))
   const movingIds = new Set(moving.map((row) => row.id))
   const list = rows.filter((row) => !movingIds.has(row.id))
@@ -419,10 +460,14 @@ export function planPlacement(
 
     let index = resolvePlacementIndex(list, chain)
     // Before a row and Bottom resolve to the END of the rows at the spot, so a
-    // later feature that stayed there is stepped back over.
+    // later feature resting at this same spot is stepped back over. A row that
+    // rests here for any other reason (the viewer dragged it) is left above:
+    // Bottom still means below it.
     while (index > 0) {
       const above = list[index - 1].feature
       if (above === null || featureRank(above) <= featureRank(feature)) break
+      const restingChain = options.resting?.get(above)
+      if (!restingChain || spotOf(restingChain) !== spotOf(chain)) break
       index--
     }
     // Rows of an earlier feature already at this spot keep the lead.

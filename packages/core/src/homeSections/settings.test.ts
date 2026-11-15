@@ -63,3 +63,13 @@ test('each sort field has one direction', () => {
   assert.equal(sortOrderFor('DateCreated'), 'Descending')
   assert.equal(sortOrderFor('CommunityRating'), 'Descending')
 })
+
+test('a stacking order must name every row kind exactly once', () => {
+  const order = ['friends', 'recs-series', 'recs-movies', 'playlists', 'top-picks-series', 'top-picks-movies']
+  assert.deepEqual(sanitizeHomeSectionsUpdate({ stackOrder: order }), { update: { stackOrder: order }, errors: [] })
+  for (const bad of [['friends'], [...order.slice(1), 'recs-series'], [...order.slice(1), 'sideways'], 'friends', null]) {
+    const { update, errors } = sanitizeHomeSectionsUpdate({ stackOrder: bad })
+    assert.deepEqual(update, {})
+    assert.equal(errors.length, 1)
+  }
+})

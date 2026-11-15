@@ -10,6 +10,7 @@ import {
   groupsAreContiguous,
   normaliseStackOrder,
   sanitizeStackOrder,
+  stackOrderMovers,
   placementChain,
   placementKey,
   planPlacement,
@@ -249,34 +250,59 @@ describe('planPlacement', () => {
       ['recs-movies', [after(MY_MEDIA)]],
     ])
     assert.deepEqual(planPlacement(rows, chains).order, ['smalllibrarytiles', 'tp', 'rm', 'resume'])
-    const recsFirst: PlacementFeature[] = ['recs-movies', 'top-picks-movies']
-    assert.deepEqual(planPlacement(rows, chains, recsFirst).order, ['smalllibrarytiles', 'rm', 'tp', 'resume'])
+    const stackOrder: PlacementFeature[] = ['recs-movies', 'top-picks-movies']
+    assert.deepEqual(planPlacement(rows, chains, { stackOrder }).order, ['smalllibrarytiles', 'rm', 'tp', 'resume'])
   })
 
-  test('one feature placed alone lands on the right side of a row that stayed, in every mode', () => {
-    const recsFirst: PlacementFeature[] = ['recs-movies', 'top-picks-movies']
-    for (const chain of [[after(MY_MEDIA)], [before({ id: 'resume', type: 'resume', name: null })], [position(1)]]) {
-      const rows = [own('smalllibrarytiles', 'userviews'), ours('tp', 'top-picks-movies'), own('resume'), ours('rm', 'recs-movies')]
-      const lead = planPlacement(rows, new Map([['recs-movies', chain]]), recsFirst)
+  test('one feature placed alone lands on the right side of a row resting at its spot, in every mode', () => {
+    const stackOrder: PlacementFeature[] = ['recs-movies', 'top-picks-movies']
+    const beforeResume = before({ id: 'resume', type: 'resume', name: null })
+    for (const chain of [[after(MY_MEDIA)], [beforeResume], [position(1)]]) {
+      const tpRests = [own('smalllibrarytiles', 'userviews'), ours('tp', 'top-picks-movies'), own('resume'), ours('rm', 'recs-movies')]
+      const lead = planPlacement(tpRests, new Map([['recs-movies', chain]]), {
+        stackOrder,
+        resting: new Map([['top-picks-movies', chain]]),
+      })
       assert.deepEqual(lead.order, ['smalllibrarytiles', 'rm', 'tp', 'resume'], chain[0].mode)
-      const moved = [own('smalllibrarytiles', 'userviews'), ours('rm', 'recs-movies'), own('resume'), ours('tp', 'top-picks-movies')]
-      const follow = planPlacement(moved, new Map([['top-picks-movies', chain]]), recsFirst)
+      const rmRests = [own('smalllibrarytiles', 'userviews'), ours('rm', 'recs-movies'), own('resume'), ours('tp', 'top-picks-movies')]
+      const follow = planPlacement(rmRests, new Map([['top-picks-movies', chain]]), {
+        stackOrder,
+        resting: new Map([['recs-movies', chain]]),
+      })
       assert.deepEqual(follow.order, ['smalllibrarytiles', 'rm', 'tp', 'resume'], chain[0].mode)
     }
     const atBottom = [own('resume'), ours('tp', 'top-picks-movies'), ours('rm', 'recs-movies')]
-    assert.deepEqual(planPlacement(atBottom, new Map([['recs-movies', [bottom]]]), recsFirst).order, ['resume', 'rm', 'tp'])
+    const plan = planPlacement(atBottom, new Map([['recs-movies', [bottom]]]), {
+      stackOrder,
+      resting: new Map([['top-picks-movies', [bottom]]]),
+    })
+    assert.deepEqual(plan.order, ['resume', 'rm', 'tp'])
   })
 
-  test('the stacking order reaches a key only where it differs from the default', () => {
-    const chain = [after(MY_MEDIA)]
-    // Keys written before an order could be chosen still match: nobody moves on upgrade.
-    assert.equal(placementKey(chain, 'recs-movies'), placementKey(chain))
-    assert.equal(placementKey(chain, 'recs-movies', normaliseStackOrder(null)), placementKey(chain))
-    // Swapping the first two re-places those two and nobody else.
-    const swapped = normaliseStackOrder(['top-picks-series', 'top-picks-movies'])
-    assert.notEqual(placementKey(chain, 'top-picks-movies', swapped), placementKey(chain))
-    assert.notEqual(placementKey(chain, 'top-picks-series', swapped), placementKey(chain))
-    assert.equal(placementKey(chain, 'recs-movies', swapped), placementKey(chain))
+  test('two ways of naming one spot share it: Bottom and after the last own row', () => {
+    const stackOrder: PlacementFeature[] = ['recs-movies', 'playlists']
+    const rows = [own('smalllibrarytiles', 'userviews'), own('resume'), ours('pl', 'playlists'), ours('rm', 'recs-movies')]
+    const plan = planPlacement(rows, new Map([['recs-movies', [bottom]]]), {
+      stackOrder,
+      resting: new Map([['playlists', [after({ id: 'resume', type: 'resume', name: null })]]]),
+    })
+    assert.deepEqual(plan.order, ['smalllibrarytiles', 'resume', 'rm', 'pl'])
+  })
+
+  test('Bottom stays below a later row that is only there because the viewer dragged it', () => {
+    // The playlist row belongs at the top; its viewer dragged it to the bottom.
+    const rows = [own('smalllibrarytiles', 'userviews'), own('resume'), ours('pl', 'playlists'), ours('rm', 'recs-movies')]
+    const dragged = planPlacement(rows, new Map([['recs-movies', [bottom]]]), {
+      resting: new Map([['playlists', [top]]]),
+    })
+    assert.deepEqual(dragged.order, ['smalllibrarytiles', 'resume', 'pl', 'rm'])
+    // And a row nothing is known about is never stepped over.
+    const unknown = planPlacement(rows, new Map([['recs-movies', [bottom]]]))
+    assert.deepEqual(unknown.order, ['smalllibrarytiles', 'resume', 'pl', 'rm'])
+  })
+
+  test('the stacking order never reaches a key, so no order re-places a row by itself', () => {
+    assert.equal(placementKey.length, 1)
   })
 
   test('a stored order names every feature once, whatever was stored', () => {
@@ -288,6 +314,7 @@ describe('planPlacement', () => {
       'recs-series',
       'playlists',
     ])
+    assert.deepEqual(normaliseStackOrder(null), normaliseStackOrder(undefined))
     assert.equal(sanitizeStackOrder(['friends']).order, null)
     assert.equal(sanitizeStackOrder(['friends', 'friends', 'recs-movies', 'recs-series', 'playlists', 'top-picks-movies']).order, null)
     assert.deepEqual(sanitizeStackOrder(normaliseStackOrder(['playlists'])).order?.[0], 'playlists')
@@ -317,5 +344,61 @@ describe('planPlacementMoves', () => {
 
   test('refuses an order it could only reach by moving the viewer\'s own rows', () => {
     assert.throws(() => planPlacementMoves(['a', 'b'], ['b', 'a'], new Set()))
+  })
+})
+
+describe('stackOrderMovers', () => {
+  const DEFAULT = normaliseStackOrder(null)
+
+  test('an unchanged order moves nobody, however it was stored', () => {
+    assert.deepEqual(stackOrderMovers(null, DEFAULT), [])
+    assert.deepEqual(stackOrderMovers(DEFAULT, null), [])
+    assert.deepEqual(stackOrderMovers(['top-picks-movies'], DEFAULT), [])
+  })
+
+  test('one feature moved any distance is the only one placed again', () => {
+    const friendsFirst = normaliseStackOrder(['friends'])
+    assert.deepEqual(stackOrderMovers(DEFAULT, friendsFirst), ['friends'])
+    assert.deepEqual(stackOrderMovers(friendsFirst, DEFAULT), ['friends'])
+    const topPicksLast = [...DEFAULT.slice(1), DEFAULT[0]]
+    assert.deepEqual(stackOrderMovers(DEFAULT, topPicksLast), [DEFAULT[0]])
+  })
+
+  test('a swap of neighbours places one of the two again', () => {
+    const swapped = normaliseStackOrder(['top-picks-series', 'top-picks-movies'])
+    const movers = stackOrderMovers(DEFAULT, swapped)
+    assert.equal(movers.length, 1)
+    assert.ok(movers[0] === 'top-picks-movies' || movers[0] === 'top-picks-series')
+  })
+
+  test('placing only the movers reaches the new order from the old one', () => {
+    // Every feature at one spot, stacked in the old order; then each new order
+    // is applied by moving the movers alone, the rest resting where they are.
+    const everyone = [bottom]
+    const orders = [
+      normaliseStackOrder(['friends']),
+      normaliseStackOrder(['playlists', 'friends', 'recs-series']),
+      [...DEFAULT].reverse(),
+      normaliseStackOrder(['top-picks-series', 'top-picks-movies', 'recs-series', 'recs-movies']),
+    ]
+    for (const mode of [[top], everyone, [after(MY_MEDIA)], [before(MY_MEDIA)]]) {
+      for (const next of orders) {
+        const start = planPlacement(
+          [own('smalllibrarytiles', 'userviews'), ...DEFAULT.map((feature) => ours(feature, feature))],
+          new Map(DEFAULT.map((feature) => [feature, mode]))
+        ).order
+        const screen = start.map((id) => (id === 'smalllibrarytiles' ? own(id, 'userviews') : ours(id, id as PlacementFeature)))
+        const movers = stackOrderMovers(DEFAULT, next)
+        const plan = planPlacement(screen, new Map(movers.map((feature) => [feature, mode])), {
+          stackOrder: next,
+          resting: new Map(DEFAULT.filter((feature) => !movers.includes(feature)).map((feature) => [feature, mode])),
+        })
+        assert.deepEqual(
+          plan.order.filter((id) => id !== 'smalllibrarytiles'),
+          next,
+          `${mode[0].mode}: ${next.join(' > ')}`
+        )
+      }
+    }
   })
 })

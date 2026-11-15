@@ -112,18 +112,21 @@ export async function placeViewerRows(input: PlaceViewerRowsInput): Promise<{ mo
   const present = new Set(rows.flatMap((row) => (row.feature ? [row.feature] : [])))
 
   const chains = new Map<PlacementFeature, Placement[]>()
+  const resting = new Map<PlacementFeature, Placement[]>()
   const keys = new Map<PlacementFeature, string>()
   for (const feature of present) {
     const chain = placementChain(input.defaults[feature], input.overrides?.get(feature) ?? null)
-    const key = placementKey(chain, feature, input.stackOrder)
+    const key = placementKey(chain)
     if (input.force.has(feature) || input.applied?.get(feature) !== key) {
       chains.set(feature, chain)
       keys.set(feature, key)
+    } else {
+      resting.set(feature, chain)
     }
   }
   if (chains.size === 0) return { moved: 0, placed: [] }
 
-  const plan = planPlacement(rows, chains, input.stackOrder)
+  const plan = planPlacement(rows, chains, { stackOrder: input.stackOrder, resting })
   for (const move of plan.moves) {
     await input.provider.moveHomeSections(input.apiKey, input.providerUserId, [move.id], move.index)
   }

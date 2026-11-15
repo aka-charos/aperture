@@ -35,6 +35,44 @@ const appliedTop = (...features: PlacementFeature[]) =>
 const ids = (rows: ReturnType<typeof projectHomeScreen>) => rows.map((row) => row.id)
 
 describe('projectHomeScreen', () => {
+  test('rows created at one spot follow the chosen stacking order', () => {
+    const wanted: WantedRow[] = [
+      { key: 'new:movies', feature: 'recs-movies', name: 'Recommended Movies' },
+      { key: 'new:series', feature: 'recs-series', name: 'Recommended Series' },
+    ]
+    const project = (stackOrder: readonly PlacementFeature[]) =>
+      ids(
+        projectHomeScreen({
+          sections: [own('smalllibrarytiles', 'My Media')],
+          managedTagIds: new Set(),
+          wanted,
+          defaults: DEFAULTS,
+          stackOrder,
+          overrides: undefined,
+          applied: undefined,
+        })
+      )
+    assert.deepEqual(project(PLACEMENT_FEATURES), ['pending:new:movies', 'pending:new:series', 'smalllibrarytiles'])
+    assert.deepEqual(project(['recs-series', 'recs-movies']), ['pending:new:series', 'pending:new:movies', 'smalllibrarytiles'])
+  })
+
+  test('a row whose applied placement was forgotten is placed again beside one that rests', () => {
+    // What a change of order does: the mover's applied key is gone, the other's is not.
+    const rows = projectHomeScreen({
+      sections: [tagRow('a1', '901', 'Recommended Movies'), tagRow('a2', '902', 'Recommended Series'), own('smalllibrarytiles', 'My Media')],
+      managedTagIds: new Set(['901', '902']),
+      wanted: [
+        { key: '901', feature: 'recs-movies', name: 'Recommended Movies' },
+        { key: '902', feature: 'recs-series', name: 'Recommended Series' },
+      ],
+      defaults: DEFAULTS,
+      stackOrder: ['recs-series', 'recs-movies'],
+      overrides: undefined,
+      applied: appliedTop('recs-movies'),
+    })
+    assert.deepEqual(ids(rows), ['a2', 'a1', 'smalllibrarytiles'])
+  })
+
   test('a row switched on but not there yet appears, where its placement puts it, marked pending', () => {
     const rows = projectHomeScreen({
       sections: [own('smalllibrarytiles', 'My Media'), own('resume', 'Continue Watching')],
