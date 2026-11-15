@@ -11,7 +11,7 @@ Admin console → **Operations** → **Backup & restore** (`/admin/ops/backup`).
 - **Format** — `pg_dump` **custom format**, compressed: `aperture_backup_YYYY-MM-DD_HH-MM-SS.dump` (legacy `.sql`/`.sql.gz` files are still accepted for restore)
 - **Backup Now** — run one immediately; in-progress backups can be **cancelled**
 - **Upload Backup** — bring a `.dump`, `.sql` or `.sql.gz` file from elsewhere into the list, up to 50 GB. A reverse proxy in front of the app may set a lower limit of its own. Uploads stay until you delete them; retention never removes them. An upload marked as cut off was made under the old 10 MB limit and can't be restored: upload it again and delete that copy. For a larger file, copy it into the backup folder yourself, with a name starting `aperture_uploaded_`.
-- **Automatic** — the `backup-database` job runs **daily at 2:00 AM** (editable like any job)
+- **Automatic** — the `backup-database` job runs daily at 2:00 AM by default; change it in **Jobs** like any job. The line beside **Upload Backup** shows the schedule actually set and links to the job
 - Configured on this page: **Backup Path** (default `/backups` — mount it in docker-compose) and **Backups to Retain** (1–100, default 7; older files are pruned after each backup)
 
 ## Restore

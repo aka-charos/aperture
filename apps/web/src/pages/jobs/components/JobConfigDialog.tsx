@@ -29,11 +29,11 @@ import { formatJobName } from '../constants'
 import type { UpdateJobConfigParams } from '../hooks/useJobsData'
 import {
   formatTimeOfDay,
-  isSubHourInterval,
   parseMinute,
   scheduleTakesMinute,
   scheduleTimingPayload,
 } from '../scheduleForm'
+import { describeSchedule, INTERVAL_META, WEEKDAY_KEYS } from '../scheduleText'
 
 type JobConfigSaveParams = UpdateJobConfigParams & {
   scheduleType: ScheduleType
@@ -51,16 +51,6 @@ interface JobConfigDialogProps {
   onSave: (schedule: JobConfigSaveParams) => Promise<void>
 }
 
-const WEEKDAY_KEYS = [
-  'weekdaySun',
-  'weekdayMon',
-  'weekdayTue',
-  'weekdayWed',
-  'weekdayThu',
-  'weekdayFri',
-  'weekdaySat',
-] as const
-
 /**
  * Short forms for the day toggles. Seven full names do not fit across a dialog
  * at `maxWidth="sm"`, and the group has to stay one row or it stops reading as
@@ -75,18 +65,6 @@ const WEEKDAY_SHORT_KEYS = [
   'weekdayShortFri',
   'weekdayShortSat',
 ] as const
-
-const INTERVAL_META: { value: number; labelKey: string }[] = [
-  { value: 15, labelKey: 'intervalEvery15m' },
-  { value: 30, labelKey: 'intervalEvery30m' },
-  { value: 60, labelKey: 'intervalEveryHour' },
-  { value: 120, labelKey: 'intervalEvery2h' },
-  { value: 180, labelKey: 'intervalEvery3h' },
-  { value: 240, labelKey: 'intervalEvery4h' },
-  { value: 360, labelKey: 'intervalEvery6h' },
-  { value: 480, labelKey: 'intervalEvery8h' },
-  { value: 720, labelKey: 'intervalEvery12h' },
-]
 
 export function JobConfigDialog({
   open,
@@ -184,7 +162,6 @@ export function JobConfigDialog({
   const showsTimeOfDay = showsDayOfWeek || scheduleType === 'daily'
   // The 15- and 30-minute intervals run on the quarter and half hour
   // whatever the minute says, so they get no minute field.
-  const subHour = isSubHourInterval(scheduleType, intervalMinutesTotal)
   const showsMinute = isEnabled && scheduleTakesMinute(scheduleType, intervalMinutesTotal)
 
   // Shown, edited and sent back as it is (scheduleForm.ts says why).
@@ -253,42 +230,19 @@ export function JobConfigDialog({
 
   const getPreviewText = (): string => {
     if (manualOnly) return t('admin.jobsPage.ui.configPreviewManualOnly')
-    if (!isEnabled) return t('admin.jobsPage.ui.configPreviewDisabled')
-
-    const timeLabel = formatTimeOfDay(i18n.language, hour, minute)
-    switch (scheduleType) {
-      case 'daily':
-        return t('admin.jobsPage.ui.configPreviewDaily', { time: timeLabel })
-      case 'weekly': {
-        if (daysOfWeek.length === 0) return t('admin.jobsPage.ui.configPreviewNoDays')
-        // Listed in week order regardless of the order they were clicked, so
-        // the preview reads the way the toggles look.
-        const dayLabel = [...daysOfWeek]
-          .sort((a, b) => a - b)
-          .map((d) => weekdays.find((w) => w.value === d)?.label ?? '')
-          .join(t('admin.jobsPage.ui.dayListSeparator'))
-        return t('admin.jobsPage.ui.configPreviewWeekly', { day: dayLabel, time: timeLabel })
-      }
-      case 'biweekly': {
-        const dayLabel = weekdays.find((d) => d.value === dayOfWeek)?.label ?? ''
-        return t('admin.jobsPage.ui.configPreviewBiweekly', { day: dayLabel, time: timeLabel })
-      }
-      case 'interval': {
-        const interval =
-          intervalOptions.find((i) => i.value === intervalMinutesTotal)?.label ||
-          t('admin.jobsPage.ui.intervalFallback')
-        return subHour
-          ? interval
-          : t('admin.jobsPage.ui.configPreviewIntervalAt', {
-              interval,
-              minute: String(minute).padStart(2, '0'),
-            })
-      }
-      case 'manual':
-        return t('admin.jobsPage.ui.configPreviewManualRuns')
-      default:
-        return ''
-    }
+    return describeSchedule(
+      {
+        type: scheduleType,
+        isEnabled,
+        hour,
+        minute,
+        daysOfWeek,
+        dayOfWeek,
+        intervalMinutes: intervalMinutesTotal,
+      },
+      t,
+      i18n.language
+    )
   }
 
   const minuteField = showsMinute && (

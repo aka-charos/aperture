@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link as RouterLink } from 'react-router-dom'
+import { jobConsoleLink } from '../../jobs/registry'
+import { describeSchedule, scheduleTextValues } from '../../jobs/scheduleText'
+import type { JobSchedule } from '../../jobs/types'
 import { useBackupJobProgress, type JobFinishedReason, type JobProgress } from '../hooks/useBackupJobProgress'
 import {
   Box,
@@ -30,6 +34,7 @@ import {
   Paper,
   Checkbox,
   FormControlLabel,
+  Link,
 } from '@mui/material'
 import BackupIcon from '@mui/icons-material/Backup'
 import RestoreIcon from '@mui/icons-material/Restore'
@@ -76,9 +81,22 @@ interface BackupConfig {
   lastBackupSizeFormatted: string | null
 }
 
+/** The backup job's schedule in words, or null when the jobs list did not say. */
+function backupScheduleText(
+  schedule: JobSchedule | null | undefined,
+  t: ReturnType<typeof useTranslation>['t'],
+  language: string
+): string | null {
+  if (!schedule) return null
+  if (!schedule.isEnabled || schedule.type === 'manual') return t('settingsBackup.scheduleOff')
+  return describeSchedule(scheduleTextValues(schedule), t, language)
+}
+
 export function BackupSection() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [config, setConfig] = useState<BackupConfig | null>(null)
+  // The backup job's schedule as the jobs list reports it (the job console owns it).
+  const [backupSchedule, setBackupSchedule] = useState<JobSchedule | null>(null)
   const [backups, setBackups] = useState<BackupInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -173,6 +191,7 @@ export function BackupSection() {
   // Read rather than depended on: changing language must not reload the page's data.
   const tRef = useRef(t)
   tRef.current = t
+  const scheduleText = backupScheduleText(backupSchedule, t, i18n.language)
 
   const fetchData = useCallback(async () => {
     try {
@@ -210,8 +229,9 @@ export function BackupSection() {
       if (jobsRes.ok) {
         const jobsData = await jobsRes.json()
         const backupJob = jobsData.jobs?.find(
-          (j: { name: string; currentJobId?: string }) => j.name === 'backup-database' && j.currentJobId
+          (j: { name: string; currentJobId?: string; schedule?: JobSchedule | null }) => j.name === 'backup-database'
         )
+        setBackupSchedule(backupJob?.schedule ?? null)
         if (backupJob?.currentJobId && !activeJobIdRef.current) {
           trackJob(backupJob.currentJobId)
           setCreatingBackup(true)
@@ -701,12 +721,27 @@ export function BackupSection() {
               <input type="file" hidden accept=".sql,.sql.gz,.dump" onChange={handleUploadBackup} />
             </Button>
 
-            <Box display="flex" alignItems="center" gap={0.5} ml="auto">
-              <ScheduleIcon fontSize="small" color="action" />
-              <Typography variant="body2" color="text.secondary">
-                {t('settingsBackup.scheduleNote')}
-              </Typography>
-            </Box>
+            {scheduleText && (
+              <Tooltip
+                title={
+                  backupSchedule?.timeZone
+                    ? t('admin.jobsPage.ui.configTimeZone', { timeZone: backupSchedule.timeZone })
+                    : ''
+                }
+              >
+                <Link
+                  component={RouterLink}
+                  to={jobConsoleLink('backup-database')}
+                  underline="hover"
+                  color="text.secondary"
+                  variant="body2"
+                  sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}
+                >
+                  <ScheduleIcon fontSize="small" color="action" />
+                  {scheduleText}
+                </Link>
+              </Tooltip>
+            )}
           </Box>
 
           {/* Job Progress Section */}

@@ -2918,7 +2918,7 @@
     "cancel": "Cancel",
     "uploadBackup": "Upload Backup",
     "uploading": "Uploading…",
-    "scheduleNote": "Automatic backups run daily at 2:00 AM",
+    "scheduleOff": "Automatic backups are off",
     "jobCreatingBackup": "Creating Backup",
     "jobRestoring": "Restoring Database",
     "hideLogs": "Hide Logs",
