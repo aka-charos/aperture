@@ -314,6 +314,7 @@ export async function getUserHomeScreen(userId: string): Promise<UserHomeScreen>
         managedTagIds: new Set(emby.tagIdByName.values()),
         wanted,
         defaults: config.placements,
+        stackOrder: config.stackOrder,
         overrides,
         applied: appliedByUser.get(viewer.id),
       })

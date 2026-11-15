@@ -27,6 +27,7 @@ import {
   CircularProgress,
   Divider,
   FormControlLabel,
+  IconButton,
   MenuItem,
   Stack,
   Switch,
@@ -38,6 +39,8 @@ import HomeIcon from '@mui/icons-material/Home'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import SyncIcon from '@mui/icons-material/Sync'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import { jobConsoleLink } from '@/pages/jobs/registry'
 import { PlacementFields } from '@/components/homeSections/PlacementFields'
 import {
@@ -73,6 +76,8 @@ interface HomeSectionsForm {
   sortBy: string
   recommendationsLimit: number
   placements: Record<string, FeaturePlacementValue>
+  /** Which feature's rows lead when several land on one spot; also the order the placements are listed in. */
+  stackOrder: string[]
 }
 
 interface Limits {
@@ -140,6 +145,8 @@ function toForm(config: HomeSectionsForm): HomeSectionsForm {
     sortBy: config.sortBy,
     recommendationsLimit: config.recommendationsLimit,
     placements,
+    // Absent from a server built before 0224, which stacked in the listed order.
+    stackOrder: Array.isArray(config.stackOrder) ? [...config.stackOrder] : Object.keys(placements),
   }
 }
 
@@ -212,6 +219,20 @@ export function HomeSectionsSection() {
     )
     setSuccess(null)
     if (changes.mode && isAnchorMode(changes.mode) && !anchorsRequested.current) void loadAnchors()
+  }
+
+  /** Swap a feature with its neighbour in the stacking order. */
+  const moveFeature = (feature: string, by: -1 | 1) => {
+    setForm((prev) => {
+      if (!prev) return prev
+      const from = prev.stackOrder.indexOf(feature)
+      const to = from + by
+      if (from < 0 || to < 0 || to >= prev.stackOrder.length) return prev
+      const stackOrder = [...prev.stackOrder]
+      ;[stackOrder[from], stackOrder[to]] = [stackOrder[to], stackOrder[from]]
+      return { ...prev, stackOrder }
+    })
+    setSuccess(null)
   }
 
   const handleSave = async () => {
@@ -625,8 +646,11 @@ export function HomeSectionsSection() {
               </Button>
             )}
           </Box>
-          <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 1.5 }}>
+          <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 0.5 }}>
             {t('settingsHomeSections.placementHelp')}
+          </Typography>
+          <Typography variant="caption" color={captionColor} component="p" sx={{ mb: 1.5 }}>
+            {t('settingsHomeSections.stackOrderHelp')}
           </Typography>
           {anchorsError && (
             <Alert severity="warning" sx={{ mb: 2 }}>
@@ -648,26 +672,53 @@ export function HomeSectionsSection() {
           )}
 
           <Stack spacing={2.5} divider={<Divider flexItem />}>
-            {limits.features.map((feature) => {
+            {form.stackOrder.map((feature, index) => {
               const placement = form.placements[feature]
               if (!placement) return null
               const switchedOff = !form[SWITCH_FOR[feature]]
               const disabled = inactive || switchedOff
+              const name = t(`homeScreenPlacement.features.${feature}`)
               return (
                 <Box key={feature}>
-                  <Typography
-                    variant="body2"
-                    fontWeight={500}
-                    color={disabled ? 'text.disabled' : 'text.primary'}
-                    sx={{ mb: 1 }}
-                  >
-                    {t(`homeScreenPlacement.features.${feature}`)}
-                    {switchedOff && !inactive && (
-                      <Typography component="span" variant="caption" color="text.disabled" sx={{ ml: 1 }}>
-                        {t('settingsHomeSections.featureOff')}
-                      </Typography>
-                    )}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                    <Typography
+                      variant="body2"
+                      fontWeight={500}
+                      color={disabled ? 'text.disabled' : 'text.primary'}
+                      sx={{ flex: 1 }}
+                    >
+                      {name}
+                      {switchedOff && !inactive && (
+                        <Typography component="span" variant="caption" color="text.disabled" sx={{ ml: 1 }}>
+                          {t('settingsHomeSections.featureOff')}
+                        </Typography>
+                      )}
+                    </Typography>
+                    <Tooltip title={t('settingsHomeSections.stackMoveUp')}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          aria-label={t('settingsHomeSections.stackMoveUpNamed', { name })}
+                          disabled={inactive || index === 0}
+                          onClick={() => moveFeature(feature, -1)}
+                        >
+                          <ArrowUpwardIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={t('settingsHomeSections.stackMoveDown')}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          aria-label={t('settingsHomeSections.stackMoveDownNamed', { name })}
+                          disabled={inactive || index === form.stackOrder.length - 1}
+                          onClick={() => moveFeature(feature, 1)}
+                        >
+                          <ArrowDownwardIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Box>
                   <PlacementFields
                     idPrefix={`home-sections-${feature}`}
                     value={placement}

@@ -61,6 +61,8 @@ export function projectHomeScreen(input: {
   /** The rows the viewer will have once applied. An Aperture row not here is removed. */
   wanted: readonly WantedRow[]
   defaults: Record<PlacementFeature, FeaturePlacement>
+  /** The operator's order for features that land on one spot. */
+  stackOrder: readonly PlacementFeature[]
   overrides: ReadonlyMap<PlacementFeature, Placement> | undefined
   applied: ReadonlyMap<PlacementFeature, string> | undefined
 }): ProjectedRow[] {
@@ -96,11 +98,11 @@ export function projectHomeScreen(input: {
   const chains = new Map<PlacementFeature, Placement[]>()
   for (const feature of new Set(rows.flatMap((row) => (row.feature ? [row.feature] : [])))) {
     const chain = placementChain(input.defaults[feature], input.overrides?.get(feature) ?? null)
-    if (created.has(feature) || input.applied?.get(feature) !== placementKey(chain)) chains.set(feature, chain)
+    if (created.has(feature) || input.applied?.get(feature) !== placementKey(chain, feature, input.stackOrder)) chains.set(feature, chain)
   }
 
   const byId = new Map(collapseExpandedRows(rows).map((row) => [row.id, row]))
-  return planPlacement(rows, chains).order.flatMap((id) => {
+  return planPlacement(rows, chains, input.stackOrder).order.flatMap((id) => {
     const row = byId.get(id)
     if (!row) return []
     return [

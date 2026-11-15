@@ -10,6 +10,7 @@ import {
   type HomeSectionsConfig,
   type HomeSectionsConfigUpdate,
 } from './settings.js'
+import { normaliseStackOrder } from './placement.js'
 import { getFeaturePlacements, saveFeaturePlacements } from './placementStore.js'
 
 interface HomeSectionsConfigRow {
@@ -27,6 +28,8 @@ interface HomeSectionsConfigRow {
   friends_name?: string
   sort_by: string
   recommendations_limit: number
+  /** Absent on a row read before 0224 ran; NULL until an order is chosen. */
+  stack_order?: string[] | null
   updated_at: Date | null
 }
 
@@ -46,6 +49,7 @@ const COLUMN_FOR: Record<ColumnField, string> = {
   friendsName: 'friends_name',
   sortBy: 'sort_by',
   recommendationsLimit: 'recommendations_limit',
+  stackOrder: 'stack_order',
 }
 
 export async function getHomeSectionsConfig(): Promise<HomeSectionsConfig> {
@@ -73,6 +77,7 @@ export async function getHomeSectionsConfig(): Promise<HomeSectionsConfig> {
     sortBy: isHomeSectionSort(row.sort_by) ? row.sort_by : DEFAULT_HOME_SECTIONS_CONFIG.sortBy,
     recommendationsLimit: row.recommendations_limit,
     placements,
+    stackOrder: normaliseStackOrder(row.stack_order),
     updatedAt: row.updated_at,
   }
 }

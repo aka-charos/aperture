@@ -9,6 +9,7 @@ import {
   PLACEMENT_FEATURES,
   isPlacementFeature,
   sanitizeFeaturePlacement,
+  sanitizeStackOrder,
   type FeaturePlacement,
   type PlacementFeature,
 } from './placement.js'
@@ -75,6 +76,12 @@ export interface HomeSectionsConfig {
   recommendationsLimit: number
   /** Where each feature's rows go unless a viewer chose otherwise. */
   placements: Record<PlacementFeature, FeaturePlacement>
+  /**
+   * Which feature's rows come first when several land on the same spot (0224).
+   * Every feature, once. Unset reads as the order of PLACEMENT_FEATURES, which
+   * is what every home screen got before it could be chosen.
+   */
+  stackOrder: PlacementFeature[]
   updatedAt: Date | null
 }
 
@@ -95,6 +102,7 @@ export const DEFAULT_HOME_SECTIONS_CONFIG: HomeSectionsConfig = {
   placements: Object.fromEntries(
     PLACEMENT_FEATURES.map((feature) => [feature, DEFAULT_FEATURE_PLACEMENT])
   ) as Record<PlacementFeature, FeaturePlacement>,
+  stackOrder: [...PLACEMENT_FEATURES],
   updatedAt: null,
 }
 
@@ -114,6 +122,7 @@ export type HomeSectionsConfigUpdate = Partial<
     | 'friendsName'
     | 'sortBy'
     | 'recommendationsLimit'
+    | 'stackOrder'
   >
 > & { placements?: Partial<Record<PlacementFeature, FeaturePlacement>> }
 
@@ -179,6 +188,12 @@ export function sanitizeHomeSectionsUpdate(body: unknown): {
   if (input.sortBy !== undefined) {
     if (isHomeSectionSort(input.sortBy)) update.sortBy = input.sortBy
     else errors.push(`sortBy must be one of ${HOME_SECTION_SORTS.join(', ')}`)
+  }
+
+  if (input.stackOrder !== undefined) {
+    const result = sanitizeStackOrder(input.stackOrder)
+    if (result.order) update.stackOrder = result.order
+    errors.push(...result.errors)
   }
 
   if (input.placements !== undefined) {

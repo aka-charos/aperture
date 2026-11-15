@@ -87,6 +87,8 @@ export interface PlaceViewerRowsInput {
   sections: readonly ContentSection[]
   managed: ReadonlyMap<string, ManagedTagInfo>
   defaults: Record<PlacementFeature, FeaturePlacement>
+  /** The operator's order for features that land on one spot. */
+  stackOrder: readonly PlacementFeature[]
   overrides: ReadonlyMap<PlacementFeature, Placement> | undefined
   applied: ReadonlyMap<PlacementFeature, string> | undefined
   /** Features placed whatever was applied before: a row of theirs was just created. */
@@ -113,7 +115,7 @@ export async function placeViewerRows(input: PlaceViewerRowsInput): Promise<{ mo
   const keys = new Map<PlacementFeature, string>()
   for (const feature of present) {
     const chain = placementChain(input.defaults[feature], input.overrides?.get(feature) ?? null)
-    const key = placementKey(chain)
+    const key = placementKey(chain, feature, input.stackOrder)
     if (input.force.has(feature) || input.applied?.get(feature) !== key) {
       chains.set(feature, chain)
       keys.set(feature, key)
@@ -121,7 +123,7 @@ export async function placeViewerRows(input: PlaceViewerRowsInput): Promise<{ mo
   }
   if (chains.size === 0) return { moved: 0, placed: [] }
 
-  const plan = planPlacement(rows, chains)
+  const plan = planPlacement(rows, chains, input.stackOrder)
   for (const move of plan.moves) {
     await input.provider.moveHomeSections(input.apiKey, input.providerUserId, [move.id], move.index)
   }

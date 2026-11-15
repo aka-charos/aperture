@@ -41,6 +41,7 @@ describe('projectHomeScreen', () => {
       managedTagIds: new Set(),
       wanted: [{ key: 'new:friends', feature: 'friends', name: 'Recommended by Friends' }],
       defaults: DEFAULTS,
+      stackOrder: PLACEMENT_FEATURES,
       overrides: undefined,
       applied: undefined,
     })
@@ -56,6 +57,7 @@ describe('projectHomeScreen', () => {
       managedTagIds: new Set(['901']),
       wanted: [],
       defaults: DEFAULTS,
+      stackOrder: PLACEMENT_FEATURES,
       overrides: undefined,
       applied: undefined,
     })
@@ -70,6 +72,7 @@ describe('projectHomeScreen', () => {
       managedTagIds: new Set(['901']),
       wanted,
       defaults: DEFAULTS,
+      stackOrder: PLACEMENT_FEATURES,
       overrides: undefined,
       applied: appliedTop('recs-movies'),
     })
@@ -81,6 +84,7 @@ describe('projectHomeScreen', () => {
       managedTagIds: new Set(['901']),
       wanted,
       defaults: DEFAULTS,
+      stackOrder: PLACEMENT_FEATURES,
       overrides: undefined,
       applied: undefined,
     })
@@ -93,6 +97,7 @@ describe('projectHomeScreen', () => {
       managedTagIds: new Set(),
       wanted: [{ key: 'new:recs-series', feature: 'recs-series', name: 'Recommended Series' }],
       defaults: DEFAULTS,
+      stackOrder: PLACEMENT_FEATURES,
       overrides: new Map([['recs-series', { mode: 'after', position: 0, anchor: { id: 'smalllibrarytiles', type: 'smalllibrarytiles', name: 'My Media' } }]]),
       applied: undefined,
     })
@@ -109,6 +114,7 @@ describe('projectHomeScreen', () => {
       managedTagIds: new Set(),
       wanted: [],
       defaults: DEFAULTS,
+      stackOrder: PLACEMENT_FEATURES,
       overrides: undefined,
       applied: undefined,
     })
@@ -122,6 +128,7 @@ describe('projectHomeScreen', () => {
       managedTagIds: new Set(['901']),
       wanted: [{ key: '901', feature: 'recs-movies', name: 'Recommended Movies' }],
       defaults: DEFAULTS,
+      stackOrder: PLACEMENT_FEATURES,
       overrides: undefined,
       applied: appliedTop('recs-movies'),
     })

@@ -109,6 +109,7 @@ async function placeForViewer(
     sections,
     managed,
     defaults: ctx.config.placements,
+    stackOrder: ctx.config.stackOrder,
     overrides: overrides.get(viewer.id),
     applied: applied.get(viewer.id),
     force,
@@ -244,6 +245,7 @@ export async function applyViewerRowsNow(
       managedTagIds: new Set([...idBefore.values(), ...tagIdsByName(tagsAfter).values()]),
       rows,
       defaults: config.placements,
+      stackOrder: config.stackOrder,
       overrides: overrides.get(viewer.id),
       applied: applied.get(viewer.id),
     })

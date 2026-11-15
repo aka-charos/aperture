@@ -37,7 +37,7 @@ An account disabled on the media server, or deleted from it, gets no row at all.
 
 ### Placement
 
-Each row kind goes at **Top**, **Bottom**, a **Position number** (how many rows sit above it, 0 being the top, up to 50), or **After a row** / **Before a row**. A position counts the viewer's own rows, never Aperture's. Rows sharing a spot stack in the order of the list on the page.
+Each row kind goes at **Top**, **Bottom**, a **Position number** (how many rows sit above it, 0 being the top, up to 50), or **After a row** / **Before a row**. A position counts the viewer's own rows, never Aperture's. Rows sharing a spot (two kinds both placed after the same row, say) appear in the order of the list on the page, top first. The arrows beside each row kind move it up or down that list. A row kind whose place in the list changes is placed again on every home screen when you save, including on screens where a viewer had dragged it; the others stay where they are.
 
 **After a row** and **Before a row** list the rows read live from every account, with how many accounts have each one. Built-in rows such as My Media and Continue Watching carry the same id on every account, so one choice works everywhere. Every library's "Latest" row is a single **Latest Media** group in Emby: it is offered as one row, and nothing can be placed between two of its libraries. Once you choose a row, the page says how many accounts lack it and names them, and asks what those accounts get **Instead** (Bottom by default, or Top, or a position). Accounts that did not answer are listed too. **Re-read rows** reads them again.
 

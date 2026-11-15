@@ -174,6 +174,7 @@ export async function reconcileViewerScreen(input: {
   managedTagIds: ReadonlySet<string>
   rows: ViewerDesiredRows
   defaults: Record<PlacementFeature, FeaturePlacement>
+  stackOrder: readonly PlacementFeature[]
   overrides: ReadonlyMap<PlacementFeature, Placement> | undefined
   applied: ReadonlyMap<PlacementFeature, string> | undefined
 }): Promise<ReconcileResult> {
@@ -216,6 +217,7 @@ export async function reconcileViewerScreen(input: {
       sections: current,
       managed: rows.managed,
       defaults: input.defaults,
+      stackOrder: input.stackOrder,
       overrides: input.overrides,
       applied: input.applied,
       force: created,

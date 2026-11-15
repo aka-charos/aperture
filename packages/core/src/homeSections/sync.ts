@@ -345,10 +345,10 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
     // ------------------------------------------------------ home screens
     setJobStep(jobId, 3, 'Updating home screens', viewers.length)
     // Read after the tags, so a placement saved while this run was tagging still applies.
-    const [overrides, appliedKeys, placements] = await Promise.all([
+    const [overrides, appliedKeys, { placements, stackOrder }] = await Promise.all([
       getUserPlacements(),
       getAppliedPlacementKeys(),
-      getHomeSectionsConfig().then((fresh) => fresh.placements),
+      getHomeSectionsConfig(),
     ])
 
     for (const [index, viewer] of viewers.entries()) {
@@ -397,6 +397,7 @@ export async function syncHomeSections(existingJobId?: string): Promise<HomeSect
           managedTagIds,
           rows,
           defaults: placements,
+          stackOrder,
           overrides: overrides.get(viewer.id),
           applied: appliedKeys.get(viewer.id),
         })

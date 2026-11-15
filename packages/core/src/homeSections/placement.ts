@@ -32,8 +32,9 @@ const MAX_ANCHOR_TEXT_LENGTH = 200
 const PLACEMENT_KEY_VERSION = 2
 
 /**
- * One placement per feature. The order is also the stacking order when several
- * features resolve to the same spot.
+ * One placement per feature. The order is also the DEFAULT stacking order when
+ * several features resolve to the same spot; the operator can choose another
+ * (`stackOrder`, 0224).
  */
 export const PLACEMENT_FEATURES = [
   'top-picks-movies',
@@ -50,7 +51,35 @@ export function isPlacementFeature(value: unknown): value is PlacementFeature {
   return typeof value === 'string' && (PLACEMENT_FEATURES as readonly string[]).includes(value)
 }
 
-export const PLACEMENT_MODES = ['top', 'bottom', 'position', 'after', 'before'] as const
+/**
+ * A stored stacking order as one that names every feature once: unknown names
+ * and repeats are dropped, and a feature it does not name (one added since it
+ * was saved, or everything when nothing was saved) follows in the default order.
+ */
+export function normaliseStackOrder(value: unknown): PlacementFeature[] {
+  const order: PlacementFeature[] = []
+  for (const entry of Array.isArray(value) ? value : []) {
+    if (isPlacementFeature(entry) && !order.includes(entry)) order.push(entry)
+  }
+  for (const feature of PLACEMENT_FEATURES) {
+    if (!order.includes(feature)) order.push(feature)
+  }
+  return order
+}
+
+/** A stacking order from a request body: every feature, each exactly once. */
+export function sanitizeStackOrder(input: unknown): { order: PlacementFeature[] | null; errors: string[] } {
+  const valid =
+    Array.isArray(input) &&
+    input.length === PLACEMENT_FEATURES.length &&
+    input.every(isPlacementFeature) &&
+    new Set(input).size === input.length
+  return valid
+    ? { order: [...(input as PlacementFeature[])], errors: [] }
+    : { order: null, errors: [`stackOrder must list each of ${PLACEMENT_FEATURES.join(', ')} exactly once`] }
+}
+
+export const PLACEMENT_MODES =['top', 'bottom', 'position', 'after', 'before'] as const
 export type PlacementMode = (typeof PLACEMENT_MODES)[number]
 
 export const FALLBACK_MODES = ['top', 'bottom', 'position'] as const
@@ -225,15 +254,31 @@ export function placementChain(adminDefault: FeaturePlacement, override: Placeme
 /**
  * A stable key for a chain, stored per viewer per feature as what was applied.
  * Names are left out: renaming a row somewhere else must not move anybody's.
+ *
+ * The feature's place in the stacking order is part of the key only where it
+ * differs from the default order. So a key written before the order could be
+ * chosen still matches (nobody is moved by the upgrade), and a change of order
+ * re-places exactly the features whose place in it changed. That is enough:
+ * two features that swap sides both change place or one of them does, and a
+ * feature placed alone is put on the right side of the rows already at its spot.
  */
-export function placementKey(chain: readonly Placement[]): string {
-  return JSON.stringify([
+export function placementKey(
+  chain: readonly Placement[],
+  feature?: PlacementFeature,
+  stackOrder: readonly PlacementFeature[] = PLACEMENT_FEATURES
+): string {
+  const key: unknown[] = [
     PLACEMENT_KEY_VERSION,
     chain.map((placement) => {
       const p = normalise(placement)
       return [p.mode, p.position, p.anchor?.id ?? null, p.anchor?.type ?? null]
     }),
-  ])
+  ]
+  if (feature) {
+    const rank = stackOrder.indexOf(feature)
+    if (rank >= 0 && rank !== PLACEMENT_FEATURES.indexOf(feature)) key.push(rank)
+  }
+  return JSON.stringify(key)
 }
 
 /** One row of a viewer's home screen, in the order Emby returns them. */
@@ -284,10 +329,6 @@ export function groupsAreContiguous(rows: readonly HomeScreenRow[]): boolean {
     current = group
   }
   return true
-}
-
-function featureRank(feature: PlacementFeature): number {
-  return PLACEMENT_FEATURES.indexOf(feature)
 }
 
 function findAnchor(list: readonly HomeScreenRow[], anchor: PlacementAnchor | null): number {
@@ -354,18 +395,21 @@ export interface PlacementPlan {
  * Place the rows of the features in `chains` on one viewer's home screen. Rows
  * of any other feature stay exactly where they are — that is what keeps a
  * viewer's own drag — but are still recognised as Aperture's, so they are not
- * counted by a position and features stack in PLACEMENT_FEATURES order.
+ * counted by a position and features sharing a spot stack in `stackOrder`.
  */
 export function planPlacement(
   screen: readonly HomeScreenRow[],
-  chains: ReadonlyMap<PlacementFeature, readonly Placement[]>
+  chains: ReadonlyMap<PlacementFeature, readonly Placement[]>,
+  stackOrder: readonly PlacementFeature[] = PLACEMENT_FEATURES
 ): PlacementPlan {
+  const stack = normaliseStackOrder(stackOrder)
+  const featureRank = (feature: PlacementFeature) => stack.indexOf(feature)
   const rows = collapseExpandedRows(screen)
   const moving = rows.filter((row) => row.feature !== null && chains.has(row.feature))
   const movingIds = new Set(moving.map((row) => row.id))
   const list = rows.filter((row) => !movingIds.has(row.id))
 
-  for (const feature of PLACEMENT_FEATURES) {
+  for (const feature of stack) {
     const chain = chains.get(feature)
     const group = moving.filter((row) => row.feature === feature)
     if (!chain || group.length === 0) continue
@@ -374,6 +418,13 @@ export function planPlacement(
     }
 
     let index = resolvePlacementIndex(list, chain)
+    // Before a row and Bottom resolve to the END of the rows at the spot, so a
+    // later feature that stayed there is stepped back over.
+    while (index > 0) {
+      const above = list[index - 1].feature
+      if (above === null || featureRank(above) <= featureRank(feature)) break
+      index--
+    }
     // Rows of an earlier feature already at this spot keep the lead.
     while (index < list.length) {
       const here = list[index].feature
