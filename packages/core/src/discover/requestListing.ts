@@ -97,12 +97,14 @@ export function statusGroupKey(status: DiscoveryRequestStatus | string): string 
   return status
 }
 
-/** A stored status the list itself recorded while building a page. */
+/**
+ * A stored status that moved while the list built a page, recorded by the list
+ * or found recorded by someone else. A row's `status_changed_at` moves with
+ * every status move, a restore putting an old date back included.
+ */
 export interface StatusMove {
   from: string
   to: string
-  /** Whether `status_changed_at` moved with it. */
-  stamped: boolean
 }
 
 /**
@@ -120,7 +122,7 @@ export function pageNeedsReread(
     if (move.from === move.to) return false
     if (view.status) return true
     if (view.statusGroup && statusGroupKey(move.from) !== statusGroupKey(move.to)) return true
-    return view.sort === 'recentChange' && move.stamped
+    return view.sort === 'recentChange'
   })
 }
 

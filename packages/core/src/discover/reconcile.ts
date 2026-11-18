@@ -20,9 +20,11 @@
 
 import { createChildLogger } from '../lib/logger.js'
 import { query, transaction } from '../lib/db.js'
+import { getSystemSettingRaw, setSystemSetting } from '../settings/systemSettings.js'
 import { lookupRequestStatus, seerrAnswersAtAddress } from '../seerr/index.js'
 import type { SeerrLiveRequestStatus } from '../seerr/index.js'
 import { listUnconfirmedRequests, settleUnconfirmedBatch } from '../seerr/submission.js'
+import { updateDiscoveryRequestStatus } from './storage.js'
 import type { DiscoveryRequestStatus } from './types.js'
 
 const logger = createChildLogger('discover:reconcile')
@@ -65,6 +67,12 @@ const RECONCILE_BATCH_LIMIT = 500
  */
 const FAILED_RECHECK_LIMIT = 100
 
+/** The live sweep: every request that can still change and names a Seerr request. */
+const LIVE_SWEEP_WHERE = `seerr_request_id IS NOT NULL AND status IN (${NON_TERMINAL_STATUSES.map((s) => `'${s}'`).join(', ')})`
+
+/** The re-check of failed rows that still name a Seerr request. */
+const FAILED_SWEEP_WHERE = `seerr_request_id IS NOT NULL AND status = 'failed'`
+
 export interface ReconcileResult {
   checked: number
   updated: number
@@ -102,21 +110,23 @@ export function resolveRequestStatus(
 
 /**
  * Whether restoring a row recorded as failed, while Seerr kept the request,
- * keeps the row's `status_changed_at`.
+ * puts back the date its status was reached instead of stamping now.
  *
- * Request notifications fire off that stamp (core notifications/events.ts), and
- * the trigger moves it on every status change. A row failed on a Seerr 404
- * records the status it held (`failed_from`, 0225): coming back to that same
- * status is a correction, already announced when it first happened, so it
- * keeps the stamp. Coming back to a different one is a decision made since,
- * never announced, so it is announced now. Arrival always counts as news: a
- * failed row was never available.
+ * Request notifications fire off `status_changed_at` (core
+ * notifications/events.ts), and the trigger moves it on every status change. A
+ * row failed on a Seerr 404 records the status it held (`failed_from`, 0225)
+ * and when it reached it (`failed_from_changed_at`): coming back to that same
+ * status is a correction, already announced when it first happened, so it gets
+ * that date back -- long past every notification window. Coming back to a
+ * different one is a decision made since, never announced, so it is announced
+ * now. Arrival always counts as news: a failed row was never available.
  *
  * A row failed before 0225 has no `failed_from`. For those, Seerr's own last
  * change to the request stands in: at or before the failure (the stamp of a
- * failed row) keeps the stamp. Seerr also moves that date for other edits, so
- * it can only err towards announcing, and without both dates the restore is
- * announced: a late notification is noise, a missing one loses the news.
+ * failed row) keeps the failure's date. Seerr also moves that date for other
+ * edits, so it can only err towards announcing, and without both dates the
+ * restore is announced: a late notification is noise, a missing one loses the
+ * news.
  */
 export function restoreKeepsStatusStamp(
   next: DiscoveryRequestStatus,
@@ -135,11 +145,19 @@ export interface HeldRequestRow {
   status: DiscoveryRequestStatus
   statusChangedAt: Date | null
   failedFrom: string | null
+  /** When `failedFrom` was reached (0225); null on rows failed before it. */
+  failedFromChangedAt: Date | null
 }
 
 export type LiveRecordPlan =
   | { write: false; status: DiscoveryRequestStatus }
-  | { write: true; next: DiscoveryRequestStatus; restore: boolean; keepStamp: boolean }
+  | {
+      write: true
+      next: DiscoveryRequestStatus
+      restore: boolean
+      /** Present when a restore puts a date back: the one to write. */
+      keepStampAt?: Date | null
+    }
 
 /**
  * What to write for one row, given the status the caller READ, the row as it
@@ -158,21 +176,99 @@ export function planLiveRecord(
   if (held.status !== readStatus) return { write: false, status: held.status }
   const next = resolveRequestStatus(held.status, live)
   if (next === held.status) return { write: false, status: next }
-  if (held.status !== 'failed') return { write: true, next, restore: false, keepStamp: false }
-  return {
-    write: true,
-    next,
-    restore: true,
-    keepStamp: restoreKeepsStatusStamp(next, held.failedFrom, held.statusChangedAt, live.updatedAt),
+  if (held.status !== 'failed') return { write: true, next, restore: false }
+  if (!restoreKeepsStatusStamp(next, held.failedFrom, held.statusChangedAt, live.updatedAt)) {
+    return { write: true, next, restore: true }
   }
+  // The date `failed_from` was reached; a row failed before 0225 keeps the
+  // failure's own date, as it did then.
+  const keepStampAt = held.failedFrom != null ? held.failedFromChangedAt : held.statusChangedAt
+  return { write: true, next, restore: true, keepStampAt }
 }
 
 /** What `recordLiveRequestStatus` left on the row. */
 export interface RecordedRequestStatus {
-  /** The status the row holds now. */
+  /**
+   * The status the row holds now. When it differs from the one the caller
+   * read, so does `status_changed_at` (the trigger, or a restore putting a date
+   * back), whoever wrote it.
+   */
   status: DiscoveryRequestStatus
-  /** Whether the row's `status_changed_at` moved (it sorts by it and notifies off it). */
-  stamped: boolean
+  /** Whether this call wrote it (false: unchanged, or someone else got there first). */
+  wrote: boolean
+}
+
+/** Puts a restored row's date back. A second write with the status unchanged, so the 0215 trigger leaves it. */
+export const RESTORE_STATUS_DATE_SQL = `UPDATE discovery_requests SET status_changed_at = $2 WHERE id = $1`
+
+/**
+ * Restores a row failed on a 404 that Seerr still holds. The failure message
+ * described a deletion that did not happen; `failed_from` and
+ * `failed_from_changed_at` are cleared by 0225's trigger as the row leaves
+ * failed.
+ */
+export const RESTORE_FAILED_ROW_SQL = `UPDATE discovery_requests
+          SET status = $2, status_message = NULL, seerr_unconfirmed_since = NULL
+        WHERE id = $1`
+
+/**
+ * Marks a row failed because Seerr answered that the request no longer exists,
+ * only while it still holds the status the sweep read. In a SET list a column
+ * reads the row as it was, so `failed_from` gets the status it held and
+ * `failed_from_changed_at` the date it reached it, before the trigger stamps
+ * the failure.
+ */
+export const MARK_DELETED_IN_SEERR_SQL = `UPDATE discovery_requests
+              SET status = 'failed',
+                  failed_from = status,
+                  failed_from_changed_at = status_changed_at,
+                  status_message = 'Request no longer exists in Seerr',
+                  seerr_unconfirmed_since = NULL
+            WHERE id = $1 AND status = $2`
+
+interface HeldRowRecord {
+  status: DiscoveryRequestStatus
+  status_changed_at: Date | null
+  failed_from: string | null
+  failed_from_changed_at: Date | null
+}
+
+/**
+ * `recordLiveRequestStatus` on a connection inside the caller's transaction.
+ * Exported so the statements it runs can be pinned on a recorded connection.
+ */
+export async function applyLiveRecord(
+  client: { query(sql: string, params?: unknown[]): Promise<{ rows: unknown[] }> },
+  row: { id: string; status: DiscoveryRequestStatus },
+  live: SeerrLiveRequestStatus
+): Promise<RecordedRequestStatus> {
+  const found = await client.query(
+    `SELECT status, status_changed_at, failed_from, failed_from_changed_at
+       FROM discovery_requests WHERE id = $1 FOR UPDATE`,
+    [row.id]
+  )
+  const held = found.rows[0] as HeldRowRecord | undefined
+  const plan = planLiveRecord(
+    row.status,
+    held
+      ? {
+          status: held.status,
+          statusChangedAt: held.status_changed_at,
+          failedFrom: held.failed_from,
+          failedFromChangedAt: held.failed_from_changed_at,
+        }
+      : null,
+    live
+  )
+  if (!plan.write) return { status: plan.status, wrote: false }
+  if (!plan.restore) {
+    await updateDiscoveryRequestStatus(row.id, plan.next, {}, client)
+    return { status: plan.next, wrote: true }
+  }
+  await client.query(RESTORE_FAILED_ROW_SQL, [row.id, plan.next])
+  if (plan.keepStampAt !== undefined) await client.query(RESTORE_STATUS_DATE_SQL, [row.id, plan.keepStampAt])
+  logger.info({ requestId: row.id, status: plan.next, dateKept: plan.keepStampAt !== undefined }, 'Restored a request Seerr still holds')
+  return { status: plan.next, wrote: true }
 }
 
 /**
@@ -187,83 +283,94 @@ export async function recordLiveRequestStatus(
   live: SeerrLiveRequestStatus
 ): Promise<RecordedRequestStatus> {
   // Nothing to write by the caller's own reading: no lock taken.
-  if (resolveRequestStatus(row.status, live) === row.status) return { status: row.status, stamped: false }
-  return transaction(async (client) => {
-    const found = await client.query<{
-      status: DiscoveryRequestStatus
-      status_changed_at: Date | null
-      failed_from: string | null
-    }>(`SELECT status, status_changed_at, failed_from FROM discovery_requests WHERE id = $1 FOR UPDATE`, [row.id])
-    const heldRow = found.rows[0]
-    const plan = planLiveRecord(
-      row.status,
-      heldRow
-        ? { status: heldRow.status, statusChangedAt: heldRow.status_changed_at, failedFrom: heldRow.failed_from }
-        : null,
-      live
-    )
-    if (!plan.write) return { status: plan.status, stamped: false }
-    if (!plan.restore) {
-      await client.query(
-        `UPDATE discovery_requests
-            SET status = $2,
-                seerr_unconfirmed_since = CASE WHEN $2 = 'pending' THEN seerr_unconfirmed_since ELSE NULL END
-          WHERE id = $1`,
-        [row.id, plan.next]
-      )
-      return { status: plan.next, stamped: true }
+  if (resolveRequestStatus(row.status, live) === row.status) return { status: row.status, wrote: false }
+  return transaction((client) => applyLiveRecord(client, row, live))
+}
+
+/** Where each sweep stopped, so the next pass carries on after it. */
+const SWEEP_CURSORS_KEY = 'discovery_reconcile_cursors'
+
+export type SweepName = 'live' | 'failed'
+export type SweepCursors = Partial<Record<SweepName, string>>
+
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** The stored cursors; anything not a row id is dropped (start from the beginning). Pure, pinned. */
+export function parseSweepCursors(raw: string | null): SweepCursors {
+  if (!raw) return {}
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return {}
+    const out: SweepCursors = {}
+    for (const name of ['live', 'failed'] as const) {
+      const value = (parsed as Record<string, unknown>)[name]
+      if (typeof value === 'string' && UUID_SHAPE.test(value)) out[name] = value
     }
-    // The failure message described a deletion that did not happen.
-    await client.query(
-      `UPDATE discovery_requests
-          SET status = $2, status_message = NULL, seerr_unconfirmed_since = NULL, failed_from = NULL
-        WHERE id = $1`,
-      [row.id, plan.next]
-    )
-    if (plan.keepStamp) {
-      // A second write with the status unchanged: the trigger leaves it alone.
-      await client.query(`UPDATE discovery_requests SET status_changed_at = $2 WHERE id = $1`, [
-        row.id,
-        heldRow?.status_changed_at ?? null,
-      ])
-    }
-    return { status: plan.next, stamped: !plan.keepStamp }
-  })
+    return out
+  } catch {
+    return {}
+  }
 }
 
 /**
- * Which slice of the failed-with-a-request rows tonight's pass re-checks:
- * successive nights take successive windows of `limit`, wrapping, so every row
- * comes round within ceil(total / limit) nights and nothing is written to the
- * rows to mark them checked (any write moves `updated_at`). Pure, pinned.
+ * The two statements of a keyed batch: rows after the cursor in id order, then,
+ * if that is short, rows from the start up to the cursor. Every row comes round
+ * in turn however many join or leave in between (an offset would shift), and
+ * nothing is written to a row to mark it checked (any write moves
+ * `updated_at`). `$1` is the cursor, `$2` the limit. Pure, pinned.
  */
-export function recheckWindow(total: number, limit: number, night: number): { offset: number; wrap: number } {
-  if (total <= limit || limit <= 0) return { offset: 0, wrap: 0 }
-  const windows = Math.ceil(total / limit)
-  const offset = (((night % windows) + windows) % windows) * limit
-  // The last window may be short; it continues from the start.
-  return { offset, wrap: Math.max(0, offset + limit - total) }
+export function keyedBatchSql(where: string): { after: string; wrap: string } {
+  const select = `SELECT id, seerr_request_id, status FROM discovery_requests WHERE ${where}`
+  return {
+    after: `${select} AND ($1::uuid IS NULL OR id > $1::uuid) ORDER BY id LIMIT $2`,
+    wrap: `${select} AND id <= $1::uuid ORDER BY id LIMIT $2`,
+  }
 }
 
-/** Tonight's window of failed rows that still name a Seerr request. */
-async function failedRecheckBatch(): Promise<{ id: string; seerr_request_id: number; status: DiscoveryRequestStatus }[]> {
-  const where = `seerr_request_id IS NOT NULL AND status = 'failed'`
-  const counted = await query<{ c: number }>(`SELECT COUNT(*)::int AS c FROM discovery_requests WHERE ${where}`)
-  const total = counted.rows[0]?.c ?? 0
-  if (total === 0) return []
-  const night = Math.floor(Date.now() / 86_400_000)
-  const { offset, wrap } = recheckWindow(total, FAILED_RECHECK_LIMIT, night)
-  const select = `SELECT id, seerr_request_id, status FROM discovery_requests WHERE ${where} ORDER BY id`
-  const main = await query<{ id: string; seerr_request_id: number; status: DiscoveryRequestStatus }>(
-    `${select} LIMIT $1 OFFSET $2`,
-    [FAILED_RECHECK_LIMIT, offset]
-  )
-  if (wrap === 0) return main.rows
-  const rest = await query<{ id: string; seerr_request_id: number; status: DiscoveryRequestStatus }>(
-    `${select} LIMIT $1`,
-    [wrap]
-  )
-  return [...main.rows, ...rest.rows]
+/**
+ * The next cursor: the last of the batch's rows, in the order they were read,
+ * before the first one Seerr gave no answer for (an outage, or a cancelled
+ * pass that never reached it). That row and the rest are read again next time
+ * rather than skipped for a whole round. Pure, pinned.
+ */
+export function cursorAfter(
+  batch: readonly { id: string }[],
+  answered: ReadonlySet<string>,
+  previous: string | undefined
+): string | undefined {
+  let cursor = previous
+  for (const row of batch) {
+    if (!answered.has(row.id)) break
+    cursor = row.id
+  }
+  return cursor
+}
+
+type SweepRow = { id: string; seerr_request_id: number; status: DiscoveryRequestStatus }
+
+async function keyedBatch(where: string, limit: number, after: string | undefined): Promise<SweepRow[]> {
+  const sql = keyedBatchSql(where)
+  const first = await query<SweepRow>(sql.after, [after ?? null, limit])
+  if (first.rows.length >= limit || after === undefined) return first.rows
+  const rest = await query<SweepRow>(sql.wrap, [after, limit - first.rows.length])
+  return [...first.rows, ...rest.rows]
+}
+
+async function readSweepCursors(): Promise<SweepCursors> {
+  try {
+    return parseSweepCursors(await getSystemSettingRaw(SWEEP_CURSORS_KEY))
+  } catch (err) {
+    logger.warn({ err }, 'Could not read where the last reconcile stopped; starting from the beginning')
+    return {}
+  }
+}
+
+async function saveSweepCursors(cursors: SweepCursors): Promise<void> {
+  try {
+    await setSystemSetting(SWEEP_CURSORS_KEY, JSON.stringify(cursors), 'Where the nightly request reconcile stopped')
+  } catch (err) {
+    logger.warn({ err }, 'Could not record where the reconcile stopped')
+  }
 }
 
 /**
@@ -306,85 +413,94 @@ export async function reconcileDiscoveryRequests(
     }
   }
 
-  type SweepRow = { id: string; seerr_request_id: number; status: DiscoveryRequestStatus }
-
-  const pending = await query<SweepRow>(
-    `SELECT id, seerr_request_id, status
-       FROM discovery_requests
-      WHERE seerr_request_id IS NOT NULL
-        AND status = ANY($1::text[])
-      ORDER BY updated_at ASC
-      LIMIT $2`,
-    [NON_TERMINAL_STATUSES, RECONCILE_BATCH_LIMIT]
-  )
+  // Each sweep carries on where the last pass stopped (`keyedBatch`), so a
+  // backlog larger than one batch comes round in turn: ordering by when a row
+  // last changed would check the same unchanged rows every night.
+  const cursors = await readSweepCursors()
+  const live = await keyedBatch(LIVE_SWEEP_WHERE, RECONCILE_BATCH_LIMIT, cursors.live)
 
   // Rows recorded as failed that still name a Seerr request: only a deletion
   // in Seerr fails such a row now, but an unanswered lookup used to as well, and
-  // those requests carried on in Seerr. Checked in their own small batch, a
-  // different window each night (`recheckWindow`), so they never crowd out the
-  // live ones and nothing is written to the rows that are still deleted.
-  const failedWithRequest = await failedRecheckBatch()
+  // those requests carried on in Seerr. Checked in their own small batch, so
+  // they never crowd out the live ones, and nothing is written to the rows that
+  // are still deleted.
+  const failedWithRequest = await keyedBatch(FAILED_SWEEP_WHERE, FAILED_RECHECK_LIMIT, cursors.failed)
 
+  const sweeps: { name: SweepName; rows: SweepRow[] }[] = [
+    { name: 'live', rows: live },
+    { name: 'failed', rows: failedWithRequest },
+  ]
+  // Rows Seerr gave an answer for: the cursors move past those only.
+  const answered = new Set<string>()
   // A 404 is written down only after Seerr is seen answering at its address.
   const notFound: SweepRow[] = []
 
-  for (const row of [...pending.rows, ...failedWithRequest]) {
-    if (shouldCancel?.() === true) {
-      result.cancelled = true
-      break
-    }
+  sweep: for (const { rows } of sweeps) {
+    for (const row of rows) {
+      if (shouldCancel?.() === true) {
+        result.cancelled = true
+        break sweep
+      }
 
-    result.checked++
+      result.checked++
 
-    const lookup = await lookupRequestStatus(row.seerr_request_id)
+      const lookup = await lookupRequestStatus(row.seerr_request_id)
 
-    if (lookup.kind === 'failed') {
-      // A Seerr outage must not rewrite anyone's request history. Leave the row
-      // exactly as it is and try again next run.
-      logger.debug({ requestId: row.id }, 'Could not reach Seerr for request')
-      result.unreachable++
-      continue
-    }
+      if (lookup.kind === 'failed') {
+        // A Seerr outage must not rewrite anyone's request history. Leave the row
+        // exactly as it is and try again next run.
+        logger.debug({ requestId: row.id }, 'Could not reach Seerr for request')
+        result.unreachable++
+        continue
+      }
 
-    if (lookup.kind === 'not_found') {
-      notFound.push(row)
-      continue
-    }
+      if (lookup.kind === 'not_found') {
+        notFound.push(row)
+        continue
+      }
 
-    try {
-      const recorded = await recordLiveRequestStatus(row, lookup.live)
-      if (recorded.status !== row.status) result.updated++
-    } catch (err) {
-      logger.warn({ err, requestId: row.id }, 'Could not record a request status read from Seerr')
+      answered.add(row.id)
+      try {
+        const recorded = await recordLiveRequestStatus(row, lookup.live)
+        if (recorded.wrote) result.updated++
+      } catch (err) {
+        logger.warn({ err, requestId: row.id }, 'Could not record a request status read from Seerr')
+      }
     }
   }
 
+  let seerrAtAddress = true
   if (notFound.length > 0) {
-    if (!(await seerrAnswersAtAddress())) {
+    seerrAtAddress = await seerrAnswersAtAddress()
+    if (!seerrAtAddress) {
       // Every 404 may be the address, not the requests: a wrong base path, or
       // a proxy answering for Seerr. Nothing is written until Seerr answers.
       logger.warn({ count: notFound.length }, 'Seerr answered 404 but not at its own address; no request marked deleted')
       result.unreachable += notFound.length
     } else {
       for (const row of notFound) {
+        answered.add(row.id)
         // Already recorded as deleted: nothing to write.
         if (row.status === 'failed') continue
         // Seerr answered that it has no such request any more -- deleted there.
         // That is terminal from our side, and leaving it non-terminal would
         // suppress the title forever. Only a 404 says this; no answer says nothing.
         // The status it held is kept, so a restore can tell a correction from news.
-        const marked = await query(
-          `UPDATE discovery_requests
-              SET status = 'failed',
-                  failed_from = status,
-                  status_message = 'Request no longer exists in Seerr',
-                  seerr_unconfirmed_since = NULL
-            WHERE id = $1 AND status = $2`,
-          [row.id, row.status]
-        )
+        const marked = await query(MARK_DELETED_IN_SEERR_SQL, [row.id, row.status])
         if ((marked.rowCount ?? 0) > 0) result.updated++
       }
     }
+  }
+
+  // The rows were visited in id order, so the last one answered is where each
+  // sweep stopped. While Seerr is not answering at its address nothing moves.
+  if (seerrAtAddress) {
+    const next: SweepCursors = {}
+    for (const { name, rows } of sweeps) {
+      const cursor = cursorAfter(rows, answered, cursors[name])
+      if (cursor !== undefined) next[name] = cursor
+    }
+    if (next.live !== cursors.live || next.failed !== cursors.failed) await saveSweepCursors(next)
   }
 
   logger.info(result, 'Reconciled discovery requests')

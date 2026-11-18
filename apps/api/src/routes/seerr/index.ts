@@ -643,7 +643,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         // Requests Seerr never answered for are looked up in Seerr now, a few
         // per read, so the list shows what became of them (core seerr/submission.ts).
         const settled = settle ? await settleListedRequests(rows) : rows
-        settled.forEach((r, i) => moves.push({ from: rows[i]?.status ?? r.status, to: r.status, stamped: true }))
+        settled.forEach((r, i) => moves.push({ from: rows[i]?.status ?? r.status, to: r.status }))
         const enriched = await Promise.all(
           settled.map(async (r) => {
             if (!r.seerrRequestId) return { ...withAwaiting(r), seerrLive: null }
@@ -657,7 +657,8 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
             if (stored !== r.status && mayWrite) {
               try {
                 const recorded = await recordLiveRequestStatus(r, lookup.live)
-                moves.push({ from: r.status, to: recorded.status, stamped: recorded.stamped })
+                // Theirs or ours: either way the stored status moved since the page was read.
+                moves.push({ from: r.status, to: recorded.status })
                 stored = recorded.status
               } catch (err) {
                 request.log.warn({ err, requestId: r.id }, 'Could not record a request status read from Seerr')

@@ -60,7 +60,6 @@ export {
   resolveRequestStatus,
   restoreKeepsStatusStamp,
   planLiveRecord,
-  recheckWindow,
   recordLiveRequestStatus,
   type RecordedRequestStatus,
   type ReconcileResult,

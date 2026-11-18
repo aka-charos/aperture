@@ -1,6 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { planLiveRecord, recheckWindow, resolveRequestStatus, restoreKeepsStatusStamp } from './reconcile.js'
+import { readFileSync } from 'node:fs'
+import {
+  MARK_DELETED_IN_SEERR_SQL,
+  RESTORE_STATUS_DATE_SQL,
+  applyLiveRecord,
+  cursorAfter,
+  keyedBatchSql,
+  parseSweepCursors,
+  planLiveRecord,
+  resolveRequestStatus,
+  restoreKeepsStatusStamp,
+} from './reconcile.js'
 
 /**
  * The point of reconciliation is that a request Seerr declined must reach a
@@ -112,45 +123,157 @@ test('a row failed before 0225 falls back to the dates, and announces when unsur
 const live = (status: 'pending' | 'approved' | 'declined' | 'completed', mediaStatus = 'unknown') =>
   ({ status, mediaStatus }) as Parameters<typeof planLiveRecord>[2]
 
+type Held = NonNullable<Parameters<typeof planLiveRecord>[1]>
+
+const heldRow = (status: string, extra: Partial<Held> = {}): Held => ({
+  status: status as Held['status'],
+  statusChangedAt: null,
+  failedFrom: null,
+  failedFromChangedAt: null,
+  ...extra,
+})
+
 test('the writer never writes over a status someone recorded since it was read', () => {
   // Read as submitted, an admin declined it meanwhile: the older live answer loses.
-  assert.deepEqual(
-    planLiveRecord('submitted', { status: 'declined', statusChangedAt: null, failedFrom: null }, live('approved')),
-    { write: false, status: 'declined' }
-  )
+  assert.deepEqual(planLiveRecord('submitted', heldRow('declined'), live('approved')), {
+    write: false,
+    status: 'declined',
+  })
   // Gone meanwhile: nothing to write, the caller keeps what it read.
   assert.deepEqual(planLiveRecord('submitted', null, live('approved')), { write: false, status: 'submitted' })
 })
 
 test('the writer plans an ordinary move, a restore, or nothing', () => {
+  assert.deepEqual(planLiveRecord('submitted', heldRow('submitted'), live('approved')), {
+    write: true,
+    next: 'approved',
+    restore: false,
+  })
+  assert.deepEqual(planLiveRecord('approved', heldRow('approved'), live('approved', 'processing')), {
+    write: false,
+    status: 'approved',
+  })
   assert.deepEqual(
-    planLiveRecord('submitted', { status: 'submitted', statusChangedAt: null, failedFrom: null }, live('approved')),
-    { write: true, next: 'approved', restore: false, keepStamp: false }
-  )
-  assert.deepEqual(
-    planLiveRecord('approved', { status: 'approved', statusChangedAt: null, failedFrom: null }, live('approved', 'processing')),
-    { write: false, status: 'approved' }
-  )
-  assert.deepEqual(
-    planLiveRecord('failed', { status: 'failed', statusChangedAt: null, failedFrom: 'approved' }, live('approved', 'processing')),
-    { write: true, next: 'approved', restore: true, keepStamp: true }
-  )
-  assert.deepEqual(
-    planLiveRecord('failed', { status: 'failed', statusChangedAt: null, failedFrom: 'approved' }, live('approved', 'available')),
-    { write: true, next: 'available', restore: true, keepStamp: false }
+    planLiveRecord('failed', heldRow('failed', { failedFrom: 'approved' }), live('approved', 'available')),
+    { write: true, next: 'available', restore: true }
   )
 })
 
-test('the nightly re-check window covers every row, a window per night, wrapping', () => {
-  assert.deepEqual(recheckWindow(40, 100, 7), { offset: 0, wrap: 0 })
-  const total = 250
-  const seen = new Map<number, number>()
-  for (let night = 0; night < 3; night++) {
-    const { offset, wrap } = recheckWindow(total, 100, night)
-    for (let i = offset; i < Math.min(offset + 100, total); i++) seen.set(i, (seen.get(i) ?? 0) + 1)
-    for (let i = 0; i < wrap; i++) seen.set(i, (seen.get(i) ?? 0) + 1)
+test('a restore to the status it held puts back the date that status was reached', () => {
+  const approvedAt = new Date('2026-09-01T10:00:00Z')
+  const failedAt = new Date('2026-10-20T04:30:00Z')
+  // Not the failure's date: that one can still be inside a notification window.
+  assert.deepEqual(
+    planLiveRecord(
+      'failed',
+      heldRow('failed', { failedFrom: 'approved', failedFromChangedAt: approvedAt, statusChangedAt: failedAt }),
+      live('approved', 'processing')
+    ),
+    { write: true, next: 'approved', restore: true, keepStampAt: approvedAt }
+  )
+  // Failed before 0225: the failure's own date, as before.
+  const seerrBefore = { ...live('approved', 'processing'), updatedAt: new Date('2026-10-19T00:00:00Z') }
+  assert.deepEqual(planLiveRecord('failed', heldRow('failed', { statusChangedAt: failedAt }), seerrBefore), {
+    write: true,
+    next: 'approved',
+    restore: true,
+    keepStampAt: failedAt,
+  })
+})
+
+/** A connection that answers the lock read with `held` and records every statement. */
+function recordingClient(held: Record<string, unknown> | null) {
+  const statements: { sql: string; params: unknown[] }[] = []
+  return {
+    statements,
+    async query(sql: string, params: unknown[] = []) {
+      statements.push({ sql, params })
+      return { rows: /FOR UPDATE/.test(sql) && held ? [held] : [] }
+    },
   }
-  for (let i = 0; i < total; i++) assert.ok((seen.get(i) ?? 0) >= 1, `row ${i} never checked`)
-  // Each night checks a full batch.
-  assert.deepEqual(recheckWindow(total, 100, 2), { offset: 200, wrap: 50 })
+}
+
+const unfailed = { status_changed_at: null, failed_from: null, failed_from_changed_at: null }
+
+test('a restore writes the status, then the kept date, on the locked connection', async () => {
+  const approvedAt = new Date('2026-09-01T10:00:00Z')
+  const client = recordingClient({
+    status: 'failed',
+    status_changed_at: new Date('2026-10-20T04:30:00Z'),
+    failed_from: 'approved',
+    failed_from_changed_at: approvedAt,
+  })
+  const recorded = await applyLiveRecord(client, { id: 'r1', status: 'failed' }, live('approved', 'processing'))
+  assert.deepEqual(recorded, { status: 'approved', wrote: true })
+  assert.equal(client.statements.length, 3)
+  assert.match(client.statements[0]!.sql, /FOR UPDATE/)
+  assert.match(client.statements[1]!.sql, /SET status = \$2, status_message = NULL/)
+  assert.deepEqual(client.statements[1]!.params, ['r1', 'approved'])
+  assert.equal(client.statements[2]!.sql, RESTORE_STATUS_DATE_SQL)
+  assert.deepEqual(client.statements[2]!.params, ['r1', approvedAt])
+})
+
+test('a move someone else recorded first is reported, not written', async () => {
+  const client = recordingClient({ status: 'declined', ...unfailed })
+  const recorded = await applyLiveRecord(client, { id: 'r1', status: 'submitted' }, live('approved'))
+  assert.deepEqual(recorded, { status: 'declined', wrote: false })
+  assert.equal(client.statements.length, 1)
+})
+
+test('an ordinary move goes through the shared status writer on the same connection', async () => {
+  const client = recordingClient({ status: 'submitted', ...unfailed })
+  const recorded = await applyLiveRecord(client, { id: 'r1', status: 'submitted' }, live('approved'))
+  assert.deepEqual(recorded, { status: 'approved', wrote: true })
+  assert.equal(client.statements.length, 2)
+  assert.match(client.statements[1]!.sql, /seerr_unconfirmed_since = CASE WHEN \$2 = 'pending'/)
+  assert.equal(client.statements[1]!.params[1], 'approved')
+})
+
+test('marking a deletion keeps the status it held and when, only over the status read', () => {
+  // In a SET list a column reads the row as it was, before the trigger stamps.
+  assert.match(MARK_DELETED_IN_SEERR_SQL, /failed_from = status,/)
+  assert.match(MARK_DELETED_IN_SEERR_SQL, /failed_from_changed_at = status_changed_at,/)
+  assert.match(MARK_DELETED_IN_SEERR_SQL, /WHERE id = \$1 AND status = \$2/)
+})
+
+const migration = (name: string) => readFileSync(new URL(`../../../../db/migrations/${name}`, import.meta.url), 'utf8')
+
+test('the triggers the restore relies on', () => {
+  // Putting a date back is a write with the status unchanged: the stamp trigger
+  // must move the date only when the status changes, or every kept date is lost.
+  assert.match(
+    migration('0215_notifications.sql'),
+    /IF NEW\.status IS DISTINCT FROM OLD\.status THEN\s+NEW\.status_changed_at = NOW\(\);/
+  )
+  // Leaving failed clears what the failure recorded, whichever writer moves it.
+  const failedFrom = migration('0225_discovery_request_failed_from.sql')
+  assert.match(
+    failedFrom,
+    /IF NEW\.status IS DISTINCT FROM 'failed' THEN\s+NEW\.failed_from = NULL;\s+NEW\.failed_from_changed_at = NULL;/
+  )
+  assert.match(failedFrom, /BEFORE UPDATE ON discovery_requests/)
+})
+
+test('each sweep reads on from its cursor, then wraps to the start', () => {
+  const sql = keyedBatchSql(`status = 'failed'`)
+  assert.match(sql.after, /WHERE status = 'failed' AND \(\$1::uuid IS NULL OR id > \$1::uuid\) ORDER BY id LIMIT \$2$/)
+  assert.match(sql.wrap, /WHERE status = 'failed' AND id <= \$1::uuid ORDER BY id LIMIT \$2$/)
+})
+
+test('the cursor stops before the first row Seerr did not answer for', () => {
+  const batch = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+  assert.equal(cursorAfter(batch, new Set(['a', 'b', 'c']), undefined), 'c')
+  // An outage at b: b and c are read again next time, not skipped for a round.
+  assert.equal(cursorAfter(batch, new Set(['a', 'c']), 'z'), 'a')
+  // Nothing answered: the cursor stays where it was.
+  assert.equal(cursorAfter(batch, new Set(), 'z'), 'z')
+  assert.equal(cursorAfter([], new Set(), undefined), undefined)
+})
+
+test('stored cursors are row ids or nothing', () => {
+  const id = '3f2b8c1e-9a4d-4e2f-8b7a-1c2d3e4f5a6b'
+  assert.deepEqual(parseSweepCursors(JSON.stringify({ live: id, failed: 'x; DROP' })), { live: id })
+  assert.deepEqual(parseSweepCursors('not json'), {})
+  assert.deepEqual(parseSweepCursors(null), {})
+  assert.deepEqual(parseSweepCursors('[1]'), {})
 })

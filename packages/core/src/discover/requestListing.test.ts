@@ -86,9 +86,10 @@ test('a title in several libraries resolves to the same copy every time', () => 
 })
 
 test('a page is read again only when a recorded move can change it', () => {
-  const approve = { from: 'submitted', to: 'approved', stamped: true }
-  const settle = { from: 'pending', to: 'submitted', stamped: true }
-  const quiet = { from: 'failed', to: 'approved', stamped: false }
+  const approve = { from: 'submitted', to: 'approved' }
+  const settle = { from: 'pending', to: 'submitted' }
+  // A restore that put the old date back still moved the row in that order.
+  const restore = { from: 'failed', to: 'approved' }
   // No filter, default order: nothing a move can change.
   assert.equal(pageNeedsReread([approve], {}), false)
   // A move out of the filter's group.
@@ -97,9 +98,10 @@ test('a page is read again only when a recorded move can change it', () => {
   assert.equal(pageNeedsReread([settle], { statusGroup: 'waiting' }), false)
   // An exact status filter is left by any move.
   assert.equal(pageNeedsReread([settle], { status: 'pending' }), true)
-  // Latest-change order moves only with the stamp.
+  // Latest-change order moves with every status move, whoever recorded it.
   assert.equal(pageNeedsReread([settle], { sort: 'recentChange' }), true)
-  assert.equal(pageNeedsReread([quiet], { sort: 'recentChange' }), false)
+  assert.equal(pageNeedsReread([restore], { sort: 'recentChange' }), true)
+  assert.equal(pageNeedsReread([restore], { sort: 'newest' }), false)
   // A move that records the same status is no move.
-  assert.equal(pageNeedsReread([{ from: 'approved', to: 'approved', stamped: true }], { status: 'approved' }), false)
+  assert.equal(pageNeedsReread([{ from: 'approved', to: 'approved' }], { status: 'approved' }), false)
 })

@@ -979,6 +979,11 @@ export async function createDiscoveryRequest(
   return result.id
 }
 
+/** A connection a statement can run on: the pool's client inside a transaction. */
+export interface SqlRunner {
+  query(sql: string, params?: unknown[]): Promise<unknown>
+}
+
 /**
  * Update a discovery request status
  */
@@ -989,24 +994,26 @@ export async function updateDiscoveryRequestStatus(
     seerrRequestId?: number
     seerrMediaId?: number
     statusMessage?: string
-  } = {}
+  } = {},
+  /** Run it on this connection, inside the caller's transaction (core discover/reconcile.ts). */
+  client?: SqlRunner
 ): Promise<void> {
-  await query(
-    `UPDATE discovery_requests 
+  const sql = `UPDATE discovery_requests
      SET status = $2,
          seerr_request_id = COALESCE($3, seerr_request_id),
          seerr_media_id = COALESCE($4, seerr_media_id),
          status_message = COALESCE($5, status_message),
          seerr_unconfirmed_since = CASE WHEN $2 = 'pending' THEN seerr_unconfirmed_since ELSE NULL END
-     WHERE id = $1`,
-    [
-      requestId,
-      status,
-      options.seerrRequestId ?? null,
-      options.seerrMediaId ?? null,
-      options.statusMessage ?? null,
-    ]
-  )
+     WHERE id = $1`
+  const params = [
+    requestId,
+    status,
+    options.seerrRequestId ?? null,
+    options.seerrMediaId ?? null,
+    options.statusMessage ?? null,
+  ]
+  if (client) await client.query(sql, params)
+  else await query(sql, params)
 
   logger.info({ requestId, status }, 'Updated discovery request status')
 }

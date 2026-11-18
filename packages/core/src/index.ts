@@ -1398,7 +1398,6 @@ export {
   resolveRequestStatus,
   restoreKeepsStatusStamp,
   planLiveRecord,
-  recheckWindow,
   recordLiveRequestStatus,
   type RecordedRequestStatus,
   // Requests list
