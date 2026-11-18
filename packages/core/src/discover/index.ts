@@ -58,6 +58,8 @@ export {
 export {
   reconcileDiscoveryRequests,
   resolveRequestStatus,
+  repairKeepsStatusStamp,
+  recordLiveRequestStatus,
   type ReconcileResult,
 } from './reconcile.js'
 

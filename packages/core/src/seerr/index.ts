@@ -58,6 +58,7 @@ export {
   getRequest,
   getRequestStatus,
   lookupRequestStatus,
+  seerrAnswersAtAddress,
   deleteRequest,
   // Batch Operations
   batchGetMediaStatus,

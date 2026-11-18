@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveRequestStatus } from './reconcile.js'
+import { repairKeepsStatusStamp, resolveRequestStatus } from './reconcile.js'
 
 /**
  * The point of reconciliation is that a request Seerr declined must reach a
@@ -86,4 +86,17 @@ test('a row recorded as failed follows Seerr when Seerr still holds the request'
     resolveRequestStatus('failed', { status: 'pending', mediaStatus: 'unknown' }),
     'submitted'
   )
+})
+
+test('restoring a wrongly failed row announces only an arrival', () => {
+  // The approval it lands on was announced when it happened; a second
+  // "approved" weeks later would be a stale notification.
+  assert.equal(repairKeepsStatusStamp('failed', 'approved'), true)
+  assert.equal(repairKeepsStatusStamp('failed', 'submitted'), true)
+  assert.equal(repairKeepsStatusStamp('failed', 'declined'), true)
+  // A failed row was never available, so that is news.
+  assert.equal(repairKeepsStatusStamp('failed', 'available'), false)
+  // Ordinary moves always stamp.
+  assert.equal(repairKeepsStatusStamp('approved', 'available'), false)
+  assert.equal(repairKeepsStatusStamp('submitted', 'approved'), false)
 })

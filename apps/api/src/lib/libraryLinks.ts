@@ -1,9 +1,9 @@
 /**
  * Resolve Aperture library rows for TMDb ids.
  *
- * Two surfaces need this and want slightly different halves of it: a request
- * or search result needs the UUID so an available title can link to
- * `/movies/:id`, and an issue needs the TITLE, because Seerr's issue payload
+ * Two surfaces need this and want slightly different halves of it: a search
+ * result needs the UUID so a held title can link to `/movies/:id`, and an
+ * issue needs the TITLE, because Seerr's issue payload
  * carries `media.tmdbId` and no name at all. One lookup answers both, and
  * keeping it in one place is what stops the second caller inventing a second
  * fallback for a title that is not in the library.

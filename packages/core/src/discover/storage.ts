@@ -9,11 +9,13 @@ import { query, queryOne, transaction } from '../lib/db.js'
 import { PERSONALIZED_SOURCES } from './types.js'
 import {
   DEFAULT_REQUEST_SORT,
+  requestLibraryTitleSql,
   requestOrderSql,
   requestStatusGroupSql,
   type RequestSort,
   type RequestStatusGroup,
 } from './requestListing.js'
+import { binderFor, type LibraryScope } from '../lib/libraryScope.js'
 import type {
   MediaType,
   DiscoveryRun,
@@ -1017,46 +1019,34 @@ export async function updateDiscoveryRequestStatus(
  */
 function buildRequestFilter(
   userId: string | null,
-  options: {
-    mediaType?: MediaType
-    status?: DiscoveryRequestStatus
-    statusGroup?: RequestStatusGroup
-    source?: DiscoveryRequestSource
-  }
-): { where: string; params: (string | number)[]; nextIndex: number } {
+  options: RequestListFilter,
+  params: unknown[]
+): string {
+  const bind = binderFor(params)
   const clauses: string[] = []
-  const params: (string | number)[] = []
-  let i = 1
 
-  if (userId !== null) {
-    clauses.push(`r.user_id = $${i}`)
-    params.push(userId)
-    i++
-  }
-  if (options.mediaType) {
-    clauses.push(`r.media_type = $${i}`)
-    params.push(options.mediaType)
-    i++
-  }
-  if (options.status) {
-    clauses.push(`r.status = $${i}`)
-    params.push(options.status)
-    i++
-  }
+  if (userId !== null) clauses.push(`r.user_id = ${bind(userId)}`)
+  if (options.mediaType) clauses.push(`r.media_type = ${bind(options.mediaType)}`)
+  if (options.status) clauses.push(`r.status = ${bind(options.status)}`)
   if (options.statusGroup) {
-    clauses.push(requestStatusGroupSql(options.statusGroup, 'r'))
+    clauses.push(requestStatusGroupSql(options.statusGroup, 'r', options.libraryScope ?? null, bind))
   }
-  if (options.source) {
-    clauses.push(`r.source = $${i}`)
-    params.push(options.source)
-    i++
-  }
+  if (options.source) clauses.push(`r.source = ${bind(options.source)}`)
 
-  return {
-    where: clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '',
-    params,
-    nextIndex: i,
-  }
+  return clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : ''
+}
+
+interface RequestListFilter {
+  mediaType?: MediaType
+  status?: DiscoveryRequestStatus
+  statusGroup?: RequestStatusGroup
+  source?: DiscoveryRequestSource
+  /**
+   * The viewer's library scope: decides which library rows count as "in the
+   * library" for the status groups and for `libraryMediaId`. Null or absent =
+   * every library.
+   */
+  libraryScope?: LibraryScope | null
 }
 
 /**
@@ -1066,17 +1056,13 @@ function buildRequestFilter(
  */
 export async function countDiscoveryRequests(
   userId: string | null,
-  options: {
-    mediaType?: MediaType
-    status?: DiscoveryRequestStatus
-    statusGroup?: RequestStatusGroup
-    source?: DiscoveryRequestSource
-  } = {}
+  options: RequestListFilter = {}
 ): Promise<number> {
-  const filter = buildRequestFilter(userId, options)
+  const params: unknown[] = []
+  const where = buildRequestFilter(userId, options, params)
   const row = await queryOne<{ c: number }>(
-    `SELECT COUNT(*)::int AS c FROM discovery_requests r${filter.where}`,
-    filter.params
+    `SELECT COUNT(*)::int AS c FROM discovery_requests r${where}`,
+    params
   )
   return row?.c ?? 0
 }
@@ -1090,36 +1076,28 @@ export async function countDiscoveryRequests(
  */
 export async function getDiscoveryRequests(
   userId: string | null,
-  options: {
-    mediaType?: MediaType
-    status?: DiscoveryRequestStatus
-    statusGroup?: RequestStatusGroup
-    source?: DiscoveryRequestSource
+  options: RequestListFilter & {
     sort?: RequestSort
     limit?: number
     offset?: number
   } = {}
 ): Promise<DiscoveryRequest[]> {
-  const filter = buildRequestFilter(userId, options)
-  const params = [...filter.params]
-  let paramIndex = filter.nextIndex
+  const params: unknown[] = []
+  const bind = binderFor(params)
+  // The same expression the In library / Downloaded groups test.
+  const libraryTitle = requestLibraryTitleSql('r', options.libraryScope ?? null, bind)
+  const where = buildRequestFilter(userId, options, params)
 
   let sql =
-    `SELECT r.*, u.username AS requested_by_username, u.display_name AS requested_by_display_name
+    `SELECT r.*, u.username AS requested_by_username, u.display_name AS requested_by_display_name,
+            ${libraryTitle} AS library_media_id
      FROM discovery_requests r
      LEFT JOIN users u ON u.id = r.user_id` +
-    filter.where +
+    where +
     ` ORDER BY ${requestOrderSql(options.sort ?? DEFAULT_REQUEST_SORT, 'r')}`
 
-  if (options.limit != null) {
-    sql += ` LIMIT $${paramIndex}`
-    params.push(options.limit)
-    paramIndex++
-  }
-  if (options.offset != null && options.offset > 0) {
-    sql += ` OFFSET $${paramIndex}`
-    params.push(options.offset)
-  }
+  if (options.limit != null) sql += ` LIMIT ${bind(options.limit)}`
+  if (options.offset != null && options.offset > 0) sql += ` OFFSET ${bind(options.offset)}`
 
   const result = await query<{
     id: string
@@ -1140,6 +1118,7 @@ export async function getDiscoveryRequests(
     updated_at: Date
     requested_by_username: string | null
     requested_by_display_name: string | null
+    library_media_id: string | null
   }>(sql, params)
 
   return result.rows.map(row => ({
@@ -1161,6 +1140,7 @@ export async function getDiscoveryRequests(
     updatedAt: row.updated_at,
     requestedByUsername: row.requested_by_username,
     requestedByDisplayName: row.requested_by_display_name,
+    libraryMediaId: row.library_media_id,
   }))
 }
 

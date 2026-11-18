@@ -708,11 +708,33 @@ export type SeerrRequestLookup =
   | { kind: 'failed' }
 
 export async function lookupRequestStatus(requestId: number): Promise<SeerrRequestLookup> {
-  const result = await seerrCall<SeerrRequestResponse>(`/request/${requestId}`)
-  if (!result.ok || !result.data) {
-    return result.status === 404 ? { kind: 'not_found' } : { kind: 'failed' }
+  // Never throws: `seerrCall` reads the settings outside its own try, and a
+  // sweep over hundreds of rows must not stop at one failed read.
+  try {
+    const result = await seerrCall<SeerrRequestResponse>(`/request/${requestId}`)
+    if (!result.ok || !result.data) {
+      return result.status === 404 ? { kind: 'not_found' } : { kind: 'failed' }
+    }
+    return { kind: 'ok', live: liveRequestStatus(result.data) }
+  } catch (err) {
+    logger.error({ err, requestId }, 'Seerr request lookup failed')
+    return { kind: 'failed' }
   }
-  return { kind: 'ok', live: liveRequestStatus(result.data) }
+}
+
+/**
+ * Whether Seerr answers at its configured address. A 404 on `/request/:id` is
+ * only evidence that the request is gone when this is true: a wrong base path,
+ * or a proxy in front answering 404, gives the same 404 for every request.
+ */
+export async function seerrAnswersAtAddress(): Promise<boolean> {
+  try {
+    // The endpoint the connection test reads (`testSeerrConnection`).
+    const result = await seerrCall<unknown>('/settings/public')
+    return result.ok
+  } catch {
+    return false
+  }
 }
 
 function liveRequestStatus(request: SeerrRequestResponse): SeerrLiveRequestStatus {

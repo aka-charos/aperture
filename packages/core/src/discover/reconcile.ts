@@ -19,8 +19,9 @@
  */
 
 import { createChildLogger } from '../lib/logger.js'
-import { query } from '../lib/db.js'
-import { lookupRequestStatus } from '../seerr/index.js'
+import { query, transaction } from '../lib/db.js'
+import { lookupRequestStatus, seerrAnswersAtAddress } from '../seerr/index.js'
+import type { SeerrLiveRequestStatus } from '../seerr/index.js'
 import { listUnconfirmedRequests, settleUnconfirmedBatch } from '../seerr/submission.js'
 import { updateDiscoveryRequestStatus } from './storage.js'
 import type { DiscoveryRequestStatus } from './types.js'
@@ -30,7 +31,8 @@ const logger = createChildLogger('discover:reconcile')
 /**
  * Statuses that can still change. 'declined', 'failed' and 'available' are
  * end states -- Seerr will not move them again, so re-checking them would spend
- * a request per row per run for nothing.
+ * a request per row per run for nothing. (A failed row that still names a
+ * Seerr request is the exception, checked in its own batch: FAILED_RECHECK_LIMIT.)
  */
 const NON_TERMINAL_STATUSES: DiscoveryRequestStatus[] = ['pending', 'submitted', 'approved']
 
@@ -56,6 +58,13 @@ const STRANDED_PENDING_HOURS = 24
 
 /** Requests reconciled in one pass, so a large backlog cannot stall the job. */
 const RECONCILE_BATCH_LIMIT = 500
+
+/**
+ * Failed rows with a Seerr request id re-checked per pass. These are requests
+ * deleted in Seerr, plus any an unanswered lookup once failed wrongly; a
+ * deleted one costs one lookup per night until the batch comes round again.
+ */
+const FAILED_RECHECK_LIMIT = 100
 
 export interface ReconcileResult {
   checked: number
@@ -90,6 +99,63 @@ export function resolveRequestStatus(
   // recorded as failed is the exception: Seerr holds the request, so it did not
   // fail (an unanswered lookup used to be written down as a deleted request).
   return current === 'pending' || current === 'failed' ? 'submitted' : current
+}
+
+/**
+ * Whether recording `next` over `current` keeps the row's `status_changed_at`.
+ *
+ * Request notifications fire off that stamp (core notifications/events.ts), and
+ * the trigger moves it on every status change. Restoring a row that was
+ * recorded as failed while Seerr kept the request is a correction, not news:
+ * the approval it lands on was announced when it happened (or went by long
+ * ago), so it keeps the old stamp. Arrival is the exception: a failed row was
+ * never available, so "it's available" is still the first time anyone says so.
+ */
+export function repairKeepsStatusStamp(
+  current: DiscoveryRequestStatus,
+  next: DiscoveryRequestStatus
+): boolean {
+  return current === 'failed' && next !== 'failed' && next !== 'available'
+}
+
+/**
+ * Bring one row in line with Seerr's live answer, by the sweep's rule. The one
+ * writer for a status read from Seerr: the reconcile job, the requests list and
+ * the single-request status route all record through it. Returns the status
+ * the row now holds.
+ */
+export async function recordLiveRequestStatus(
+  row: { id: string; status: DiscoveryRequestStatus },
+  live: SeerrLiveRequestStatus
+): Promise<DiscoveryRequestStatus> {
+  const next = resolveRequestStatus(row.status, live)
+  if (next === row.status) return next
+  if (row.status !== 'failed') {
+    await updateDiscoveryRequestStatus(row.id, next)
+    return next
+  }
+  const keepStamp = repairKeepsStatusStamp(row.status, next)
+  await transaction(async (client) => {
+    const before = await client.query<{ status_changed_at: Date | null }>(
+      `SELECT status_changed_at FROM discovery_requests WHERE id = $1 FOR UPDATE`,
+      [row.id]
+    )
+    // The failure message described a deletion that did not happen.
+    await client.query(
+      `UPDATE discovery_requests
+          SET status = $2, status_message = NULL, seerr_unconfirmed_since = NULL
+        WHERE id = $1 AND status = 'failed'`,
+      [row.id, next]
+    )
+    if (keepStamp) {
+      // A second write with the status unchanged: the trigger leaves it alone.
+      await client.query(`UPDATE discovery_requests SET status_changed_at = $2 WHERE id = $1`, [
+        row.id,
+        before.rows[0]?.status_changed_at ?? null,
+      ])
+    }
+  })
+  return next
 }
 
 /**
@@ -132,11 +198,9 @@ export async function reconcileDiscoveryRequests(
     }
   }
 
-  const pending = await query<{
-    id: string
-    seerr_request_id: number
-    status: DiscoveryRequestStatus
-  }>(
+  type SweepRow = { id: string; seerr_request_id: number; status: DiscoveryRequestStatus }
+
+  const pending = await query<SweepRow>(
     `SELECT id, seerr_request_id, status
        FROM discovery_requests
       WHERE seerr_request_id IS NOT NULL
@@ -146,7 +210,24 @@ export async function reconcileDiscoveryRequests(
     [NON_TERMINAL_STATUSES, RECONCILE_BATCH_LIMIT]
   )
 
-  for (const row of pending.rows) {
+  // Rows recorded as failed that still name a Seerr request: only a deletion
+  // in Seerr fails such a row now, but an unanswered lookup used to as well, and
+  // those requests carried on in Seerr. Checked in their own small batch,
+  // longest unchecked first, so they never crowd out the live ones.
+  const failedWithRequest = await query<SweepRow>(
+    `SELECT id, seerr_request_id, status
+       FROM discovery_requests
+      WHERE seerr_request_id IS NOT NULL
+        AND status = 'failed'
+      ORDER BY updated_at ASC
+      LIMIT $1`,
+    [FAILED_RECHECK_LIMIT]
+  )
+
+  // A 404 is written down only after Seerr is seen answering at its address.
+  const notFound: SweepRow[] = []
+
+  for (const row of [...pending.rows, ...failedWithRequest.rows]) {
     if (shouldCancel?.() === true) {
       result.cancelled = true
       break
@@ -165,20 +246,40 @@ export async function reconcileDiscoveryRequests(
     }
 
     if (lookup.kind === 'not_found') {
-      // Seerr answered that it has no such request any more -- deleted there.
-      // That is terminal from our side, and leaving it non-terminal would
-      // suppress the title forever. Only a 404 says this; no answer says nothing.
-      await updateDiscoveryRequestStatus(row.id, 'failed', {
-        statusMessage: 'Request no longer exists in Seerr',
-      })
-      result.updated++
+      notFound.push(row)
       continue
     }
 
-    const next = resolveRequestStatus(row.status, lookup.live)
-    if (next !== row.status) {
-      await updateDiscoveryRequestStatus(row.id, next)
-      result.updated++
+    try {
+      const next = await recordLiveRequestStatus(row, lookup.live)
+      if (next !== row.status) result.updated++
+    } catch (err) {
+      logger.warn({ err, requestId: row.id }, 'Could not record a request status read from Seerr')
+    }
+  }
+
+  if (notFound.length > 0) {
+    if (!(await seerrAnswersAtAddress())) {
+      // Every 404 may be the address, not the requests: a wrong base path, or
+      // a proxy answering for Seerr. Nothing is written until Seerr answers.
+      logger.warn({ count: notFound.length }, 'Seerr answered 404 but not at its own address; no request marked deleted')
+      result.unreachable += notFound.length
+    } else {
+      for (const row of notFound) {
+        if (row.status === 'failed') {
+          // Already recorded as deleted. Moving updated_at sends it to the back
+          // of the failed batch, so the rest get their turn.
+          await query(`UPDATE discovery_requests SET updated_at = NOW() WHERE id = $1`, [row.id])
+          continue
+        }
+        // Seerr answered that it has no such request any more -- deleted there.
+        // That is terminal from our side, and leaving it non-terminal would
+        // suppress the title forever. Only a 404 says this; no answer says nothing.
+        await updateDiscoveryRequestStatus(row.id, 'failed', {
+          statusMessage: 'Request no longer exists in Seerr',
+        })
+        result.updated++
+      }
     }
   }
 

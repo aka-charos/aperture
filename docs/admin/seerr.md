@@ -23,7 +23,7 @@ Admin console → **Integrations** → **Seerr** (`/admin/integrations/seerr`).
 | **Top Picks auto-request** | Weekly `auto-request-top-picks` job (when enabled per media type) |
 | **Gap analysis requests** | Bulk requests from [Gap analysis](gap-analysis.md) |
 
-The daily `reconcile-discovery-requests` job (04:30, ahead of the suggestions run) pulls live statuses from Seerr — which is what lets a declined title be suggested again.
+The daily `reconcile-discovery-requests` job (04:30, ahead of the suggestions run) pulls live statuses from Seerr — which is what lets a declined title be suggested again. A request is marked failed only when Seerr answers that it no longer exists, and only once Seerr is seen answering at its configured address, so a Seerr outage or a wrong address changes nothing. Failed requests that still name a Seerr request are checked again, a hundred a night, and go back to their real status if Seerr still has them.
 
 ## User Mapping
 

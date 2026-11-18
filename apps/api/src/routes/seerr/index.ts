@@ -19,6 +19,7 @@ import {
   getSeerrRequestStatus,
   lookupSeerrRequestStatus,
   resolveRequestStatus,
+  recordLiveRequestStatus,
   isRequestStatusGroup,
   isRequestSort,
   createDiscoveryRequest,
@@ -63,6 +64,7 @@ import {
   ensureSeerrUserIdForRequest,
 } from '../../lib/seerrActingUser.js'
 import { attachLibraryMediaIds } from '../../lib/libraryLinks.js'
+import { viewerScope } from '../../lib/viewerScope.js'
 
 
 const seerrRoutes: FastifyPluginAsync = async (fastify) => {
@@ -550,6 +552,9 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
             ? (source as DiscoveryRequestSource)
             : undefined,
         statusGroup: isRequestStatusGroup(statusGroup) ? statusGroup : undefined,
+        // "In library" means a library this viewer can open, for the filter and
+        // for each row's libraryMediaId (core discover/requestListing.ts).
+        libraryScope: await viewerScope(request),
       }
 
       const pageSizeRaw = limit ? parseInt(limit, 10) : 25
@@ -559,15 +564,16 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
       const offsetRaw = offset ? parseInt(offset, 10) : 0
       const offsetN = Number.isFinite(offsetRaw) && offsetRaw > 0 ? offsetRaw : 0
 
-      const [total, listed] = await Promise.all([
-        countDiscoveryRequests(scopedUserId, filter),
-        getDiscoveryRequests(scopedUserId, {
-          ...filter,
-          sort: isRequestSort(sort) ? sort : undefined,
-          limit: pageSize,
-          offset: offsetN,
-        }),
-      ])
+      const readPage = () =>
+        Promise.all([
+          countDiscoveryRequests(scopedUserId, filter),
+          getDiscoveryRequests(scopedUserId, {
+            ...filter,
+            sort: isRequestSort(sort) ? sort : undefined,
+            limit: pageSize,
+            offset: offsetN,
+          }),
+        ])
 
       const resultScope = wantsAllUsers ? 'all' : 'mine'
 
@@ -584,12 +590,13 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
           status: string
           awaitingSeerr: boolean
           seerrLive: RequestStatusInput['live']
-          libraryMediaId: string | null
+          libraryMediaId?: string | null
         },
       >(
         row: T
       ) => ({
         ...row,
+        libraryMediaId: row.libraryMediaId ?? null,
         statusKey: decideRequestStatus({
           status: row.status,
           awaitingSeerr: row.awaitingSeerr,
@@ -598,49 +605,61 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         }),
       })
 
+      let [total, listed] = await readPage()
+
       if (!(await isSeerrConfigured())) {
-        const withLibrary = await attachLibraryMediaIds(
-          listed.map((r) => ({
-            ...withAwaiting(r),
-            seerrLive: null,
-          }))
-        )
-        return reply.send({ requests: withLibrary.map(withStatusKey), total, scope: resultScope })
+        const rows = listed.map((r) => withStatusKey({ ...withAwaiting(r), seerrLive: null }))
+        return reply.send({ requests: rows, total, scope: resultScope })
       }
 
-      // Requests Seerr never answered for are looked up in Seerr now, a few per
-      // read, so the list shows what became of them (core seerr/submission.ts).
-      const requests = await settleListedRequests(listed)
-
-      const enriched = await Promise.all(
-        requests.map(async (r) => {
-          if (!r.seerrRequestId) {
-            return { ...withAwaiting(r), seerrLive: null }
-          }
-          const lookup = await lookupSeerrRequestStatus(r.seerrRequestId)
-          if (lookup.kind !== 'ok') {
-            // No answer, or a request deleted in Seerr: the stored status
-            // stands, and the reconcile job decides about a deletion.
-            return { ...withAwaiting(r), seerrLive: null }
-          }
-          // The status filter reads the stored status, so a row whose Seerr
-          // state moved since the last reconcile is brought up to date as it is
-          // seen, by the job's own rule. Not during an assumed session, which
-          // writes nothing for the person viewed.
-          const stored = resolveRequestStatus(r.status, lookup.live)
-          if (stored !== r.status && !request.impersonation) {
-            try {
-              await updateDiscoveryRequestStatus(r.id, stored)
-            } catch (err) {
-              request.log.warn({ err, requestId: r.id }, 'Could not record a request status read from Seerr')
-            }
-          }
-          return { ...withAwaiting({ ...r, status: stored }), seerrLive: lookup.live }
+      /**
+       * Each row with Seerr's live answer, and the stored status brought up to
+       * date by the sweep's own writer (`recordLiveRequestStatus`). `moved` says
+       * whether anything stored changed: the count and the page were read
+       * before, so a moved row may no longer belong to the filter.
+       */
+      const withLive = async (rows: typeof listed) => {
+        let moved = false
+        // Requests Seerr never answered for are looked up in Seerr now, a few
+        // per read, so the list shows what became of them (core seerr/submission.ts).
+        const settled = await settleListedRequests(rows)
+        settled.forEach((r, i) => {
+          if (r.status !== rows[i]?.status) moved = true
         })
-      )
+        const enriched = await Promise.all(
+          settled.map(async (r) => {
+            if (!r.seerrRequestId) return { ...withAwaiting(r), seerrLive: null }
+            const lookup = await lookupSeerrRequestStatus(r.seerrRequestId)
+            if (lookup.kind !== 'ok') {
+              // No answer, or a request deleted in Seerr: the stored status
+              // stands, and the reconcile job decides about a deletion.
+              return { ...withAwaiting(r), seerrLive: null }
+            }
+            let stored = resolveRequestStatus(r.status, lookup.live)
+            // An assumed session writes nothing for the person viewed; the
+            // row is still shown as Seerr has it.
+            if (stored !== r.status && !request.impersonation) {
+              try {
+                stored = await recordLiveRequestStatus(r, lookup.live)
+                moved = true
+              } catch (err) {
+                request.log.warn({ err, requestId: r.id }, 'Could not record a request status read from Seerr')
+              }
+            }
+            return { ...withAwaiting({ ...r, status: stored }), seerrLive: lookup.live }
+          })
+        )
+        return { rows: enriched, moved }
+      }
 
-      const withLibrary = await attachLibraryMediaIds(enriched)
-      return reply.send({ requests: withLibrary.map(withStatusKey), total, scope: resultScope })
+      let page = await withLive(listed)
+      if (page.moved && (filter.statusGroup || filter.status)) {
+        // Rows recorded just now may have left (or joined) the filter: read
+        // the count and the page again, once, so they describe the same rows.
+        ;[total, listed] = await readPage()
+        page = await withLive(listed)
+      }
+      return reply.send({ requests: page.rows.map(withStatusKey), total, scope: resultScope })
     }
   )
 
@@ -885,28 +904,23 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
 
       // If we have a Seerr request ID, get the latest status
       let seerrStatus = null
+      let apertureStatus = apertureRequest.status as DiscoveryRequestStatus
       if (apertureRequest.seerr_request_id) {
         seerrStatus = await getSeerrRequestStatus(apertureRequest.seerr_request_id)
-        
-        // Update Aperture status if Seerr status changed
-        if (seerrStatus) {
-          let newStatus = apertureRequest.status as DiscoveryRequestStatus
-          if (seerrStatus.status === 'approved' && apertureRequest.status !== 'approved') {
-            newStatus = 'approved'
-          } else if (seerrStatus.status === 'declined' && apertureRequest.status !== 'declined') {
-            newStatus = 'declined'
-          } else if (seerrStatus.mediaStatus === 'available' && apertureRequest.status !== 'available') {
-            newStatus = 'available'
-          }
-          
-          if (newStatus !== apertureRequest.status) {
-            await updateDiscoveryRequestStatus(requestId, newStatus)
-          }
+
+        // Recorded by the sweep's own writer and rule, so this route, the list
+        // and the reconcile job never disagree about what Seerr's answer means.
+        // Not during an assumed session, which writes nothing.
+        if (seerrStatus && !request.impersonation) {
+          apertureStatus = await recordLiveRequestStatus(
+            { id: apertureRequest.id, status: apertureStatus },
+            seerrStatus
+          )
         }
       }
 
       return reply.send({
-        apertureStatus: apertureRequest.status,
+        apertureStatus,
         seerrStatus,
       })
     }

@@ -1396,6 +1396,8 @@ export {
   // Reconciliation
   reconcileDiscoveryRequests,
   resolveRequestStatus,
+  repairKeepsStatusStamp,
+  recordLiveRequestStatus,
   // Requests list
   REQUEST_STATUS_GROUPS,
   REQUEST_SORTS,

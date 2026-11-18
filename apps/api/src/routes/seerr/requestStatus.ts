@@ -2,12 +2,17 @@
  * What the requests list says about one request, decided here so the page
  * renders an answer rather than re-deriving it (the web never imports core).
  *
- * Seerr's live answer wins over the stored status where there is one. An
- * available request is split by the library: Seerr reporting the file in place
- * (Radarr/Sonarr imported it) is `downloaded`; the media server holding the
- * title, as of the last library sync, is `inLibrary`. Every key falls inside one
- * filter group of core `discover/requestListing.ts`, so a filtered list shows
- * only the chips its filter names once the stored status has caught up.
+ * The chip is a REFINEMENT of the stored status, never a second opinion: the
+ * caller passes the status as `resolveRequestStatus` leaves it after Seerr's
+ * live answer, and Seerr's media state only adds detail within it (downloading,
+ * partly available). So each key falls inside the filter group of core
+ * `discover/requestListing.ts` that the stored status belongs to, including
+ * where the sweep refuses to walk a status back (an approved request Seerr
+ * calls pending again stays "approved", in the list and in the filter).
+ *
+ * An available request is split by the library: Seerr reporting the file in
+ * place is `downloaded`; a library the viewer can open holding the title, as of
+ * the last library sync, is `inLibrary`.
  *
  * Pure, no runtime imports: pinned by `requestStatus.test.ts`.
  */
@@ -26,6 +31,7 @@ export type RequestStatusKey =
   | 'failed'
 
 export interface RequestStatusInput {
+  /** The stored status, after `resolveRequestStatus` applied Seerr's live answer. */
   status: string
   awaitingSeerr: boolean
   live: {
@@ -37,24 +43,19 @@ export interface RequestStatusInput {
 
 export function decideRequestStatus(input: RequestStatusInput): RequestStatusKey | null {
   const { live } = input
-  const arrived = (): RequestStatusKey => (input.inLibrary ? 'inLibrary' : 'downloaded')
-  if (live) {
-    if (live.mediaStatus === 'available' || live.status === 'completed') return arrived()
-    if (live.status === 'declined') return 'declined'
-    if (live.status === 'pending') return 'pendingApproval'
-    if (live.mediaStatus === 'partially_available') return 'partiallyAvailable'
-    if (live.mediaStatus === 'processing') return 'processing'
-    return 'approved'
-  }
   switch (input.status) {
     case 'available':
-      return arrived()
-    case 'submitted':
-      return 'submitted'
-    case 'pending':
-      return input.awaitingSeerr ? 'awaitingSeerr' : 'pending'
+      return input.inLibrary ? 'inLibrary' : 'downloaded'
     case 'approved':
+      if (live?.mediaStatus === 'partially_available') return 'partiallyAvailable'
+      if (live?.mediaStatus === 'processing') return 'processing'
       return 'approved'
+    case 'submitted':
+      // Seerr holds it and has not decided: "Pending approval" once it says so.
+      return live ? 'pendingApproval' : 'submitted'
+    case 'pending':
+      if (live) return 'pendingApproval'
+      return input.awaitingSeerr ? 'awaitingSeerr' : 'pending'
     case 'declined':
       return 'declined'
     case 'failed':

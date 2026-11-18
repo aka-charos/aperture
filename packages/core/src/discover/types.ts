@@ -130,6 +130,11 @@ export interface DiscoveryRequest {
   /** Joined for the admin scope; absent when the row was fetched another way. */
   requestedByUsername?: string | null
   requestedByDisplayName?: string | null
+  /**
+   * From the requests list: the viewer's library row for this title, or null
+   * when no library in their scope holds it. Absent when fetched another way.
+   */
+  libraryMediaId?: string | null
 }
 
 export interface DiscoveryUser {
