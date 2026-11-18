@@ -1319,6 +1319,7 @@ export {
   createIssueComment as createSeerrIssueComment,
   getRequest as getSeerrRequest,
   getRequestStatus as getSeerrRequestStatus,
+  lookupRequestStatus as lookupSeerrRequestStatus,
   deleteRequest as deleteSeerrRequest,
   // Batch Operations
   batchGetMediaStatus as batchGetSeerrMediaStatus,
@@ -1330,6 +1331,8 @@ export {
   type SeerrConfig,
   type SeerrCallResult,
   type SeerrActAs,
+  type SeerrLiveRequestStatus,
+  type SeerrRequestLookup,
   type SeerrIssue,
   type SeerrIssueComment,
   type SeerrIssueListResponse,
@@ -1393,6 +1396,13 @@ export {
   // Reconciliation
   reconcileDiscoveryRequests,
   resolveRequestStatus,
+  // Requests list
+  REQUEST_STATUS_GROUPS,
+  REQUEST_SORTS,
+  isRequestStatusGroup,
+  isRequestSort,
+  type RequestStatusGroup,
+  type RequestSort,
   // Candidate embeddings
   getCandidateEmbeddings,
   buildCandidateCanonicalText,

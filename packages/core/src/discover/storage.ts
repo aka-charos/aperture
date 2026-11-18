@@ -7,6 +7,13 @@
 import { createChildLogger } from '../lib/logger.js'
 import { query, queryOne, transaction } from '../lib/db.js'
 import { PERSONALIZED_SOURCES } from './types.js'
+import {
+  DEFAULT_REQUEST_SORT,
+  requestOrderSql,
+  requestStatusGroupSql,
+  type RequestSort,
+  type RequestStatusGroup,
+} from './requestListing.js'
 import type {
   MediaType,
   DiscoveryRun,
@@ -1013,6 +1020,7 @@ function buildRequestFilter(
   options: {
     mediaType?: MediaType
     status?: DiscoveryRequestStatus
+    statusGroup?: RequestStatusGroup
     source?: DiscoveryRequestSource
   }
 ): { where: string; params: (string | number)[]; nextIndex: number } {
@@ -1034,6 +1042,9 @@ function buildRequestFilter(
     clauses.push(`r.status = $${i}`)
     params.push(options.status)
     i++
+  }
+  if (options.statusGroup) {
+    clauses.push(requestStatusGroupSql(options.statusGroup, 'r'))
   }
   if (options.source) {
     clauses.push(`r.source = $${i}`)
@@ -1058,6 +1069,7 @@ export async function countDiscoveryRequests(
   options: {
     mediaType?: MediaType
     status?: DiscoveryRequestStatus
+    statusGroup?: RequestStatusGroup
     source?: DiscoveryRequestSource
   } = {}
 ): Promise<number> {
@@ -1081,7 +1093,9 @@ export async function getDiscoveryRequests(
   options: {
     mediaType?: MediaType
     status?: DiscoveryRequestStatus
+    statusGroup?: RequestStatusGroup
     source?: DiscoveryRequestSource
+    sort?: RequestSort
     limit?: number
     offset?: number
   } = {}
@@ -1095,7 +1109,7 @@ export async function getDiscoveryRequests(
      FROM discovery_requests r
      LEFT JOIN users u ON u.id = r.user_id` +
     filter.where +
-    ` ORDER BY r.created_at DESC`
+    ` ORDER BY ${requestOrderSql(options.sort ?? DEFAULT_REQUEST_SORT, 'r')}`
 
   if (options.limit != null) {
     sql += ` LIMIT $${paramIndex}`

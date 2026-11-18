@@ -323,6 +323,18 @@ export const getRequestsSchema = {
       offset: { type: 'string', description: 'Rows to skip for pagination', default: '0', example: '0' },
       source: { type: 'string', enum: ['discovery', 'gap_analysis', 'direct'], description: 'Filter by origin (Discovery suggestion, admin Gap Analysis, or a direct search request)' },
       scope: { type: 'string', enum: ['mine', 'all'], description: 'Admins only: "all" returns every user’s requests. Narrowed to "mine" for non-admins.' },
+      statusGroup: {
+        type: 'string',
+        enum: ['waiting', 'approved', 'downloaded', 'inLibrary', 'declined', 'failed'],
+        description:
+          'Filter by what became of the request: waiting for approval, approved (including downloading and partly available), downloaded but not yet in the library, in the library, declined, or failed. Each row also carries a decided `statusKey`.',
+      },
+      sort: {
+        type: 'string',
+        enum: ['newest', 'oldest', 'titleAsc', 'titleDesc', 'recentChange'],
+        default: 'newest',
+        description: 'Order of the rows: by request date, by title, or by the latest status change',
+      },
     },
   },
 }

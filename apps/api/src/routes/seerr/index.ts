@@ -17,6 +17,10 @@ import {
   settleListedRequests,
   updateSeerrRequestStatus,
   getSeerrRequestStatus,
+  lookupSeerrRequestStatus,
+  resolveRequestStatus,
+  isRequestStatusGroup,
+  isRequestSort,
   createDiscoveryRequest,
   updateDiscoveryRequestStatus,
   getDiscoveryRequests,
@@ -53,6 +57,7 @@ import {
 import { resolveSearchSource } from './sources/index.js'
 import { isRequestable, summarizeMissing } from './sources/requestability.js'
 import { pickRequestOverrides, resolveRequestSource } from './requestOptions.js'
+import { decideRequestStatus, type RequestStatusInput } from './requestStatus.js'
 import {
   clearStaleSeerrUserId,
   ensureSeerrUserIdForRequest,
@@ -520,13 +525,15 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
       offset?: string
       source?: string
       scope?: string
+      statusGroup?: string
+      sort?: string
     }
   }>(
     '/api/seerr/requests',
     { preHandler: requireAuth, schema: getRequestsSchema },
     async (request, reply) => {
       const currentUser = request.user as SessionUser
-      const { mediaType, status, limit, offset, source, scope } = request.query
+      const { mediaType, status, limit, offset, source, scope, statusGroup, sort } = request.query
 
       // `scope=all` widens the list to every user's requests. Admin only, and
       // silently narrowed rather than refused for a non-admin: the toggle is
@@ -542,6 +549,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
           source === 'gap_analysis' || source === 'discovery' || source === 'direct'
             ? (source as DiscoveryRequestSource)
             : undefined,
+        statusGroup: isRequestStatusGroup(statusGroup) ? statusGroup : undefined,
       }
 
       const pageSizeRaw = limit ? parseInt(limit, 10) : 25
@@ -555,6 +563,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         countDiscoveryRequests(scopedUserId, filter),
         getDiscoveryRequests(scopedUserId, {
           ...filter,
+          sort: isRequestSort(sort) ? sort : undefined,
           limit: pageSize,
           offset: offsetN,
         }),
@@ -569,6 +578,26 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
         awaitingSeerr: row.status === 'pending' && row.unconfirmedSince != null,
       })
 
+      // Decided here too (requestStatus.ts): the chip each row shows.
+      const withStatusKey = <
+        T extends {
+          status: string
+          awaitingSeerr: boolean
+          seerrLive: RequestStatusInput['live']
+          libraryMediaId: string | null
+        },
+      >(
+        row: T
+      ) => ({
+        ...row,
+        statusKey: decideRequestStatus({
+          status: row.status,
+          awaitingSeerr: row.awaitingSeerr,
+          live: row.seerrLive,
+          inLibrary: row.libraryMediaId != null,
+        }),
+      })
+
       if (!(await isSeerrConfigured())) {
         const withLibrary = await attachLibraryMediaIds(
           listed.map((r) => ({
@@ -576,25 +605,42 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
             seerrLive: null,
           }))
         )
-        return reply.send({ requests: withLibrary, total, scope: resultScope })
+        return reply.send({ requests: withLibrary.map(withStatusKey), total, scope: resultScope })
       }
 
       // Requests Seerr never answered for are looked up in Seerr now, a few per
       // read, so the list shows what became of them (core seerr/submission.ts).
-      const requests = (await settleListedRequests(listed)).map(withAwaiting)
+      const requests = await settleListedRequests(listed)
 
       const enriched = await Promise.all(
         requests.map(async (r) => {
           if (!r.seerrRequestId) {
-            return { ...r, seerrLive: null }
+            return { ...withAwaiting(r), seerrLive: null }
           }
-          const seerrLive = await getSeerrRequestStatus(r.seerrRequestId)
-          return { ...r, seerrLive }
+          const lookup = await lookupSeerrRequestStatus(r.seerrRequestId)
+          if (lookup.kind !== 'ok') {
+            // No answer, or a request deleted in Seerr: the stored status
+            // stands, and the reconcile job decides about a deletion.
+            return { ...withAwaiting(r), seerrLive: null }
+          }
+          // The status filter reads the stored status, so a row whose Seerr
+          // state moved since the last reconcile is brought up to date as it is
+          // seen, by the job's own rule. Not during an assumed session, which
+          // writes nothing for the person viewed.
+          const stored = resolveRequestStatus(r.status, lookup.live)
+          if (stored !== r.status && !request.impersonation) {
+            try {
+              await updateDiscoveryRequestStatus(r.id, stored)
+            } catch (err) {
+              request.log.warn({ err, requestId: r.id }, 'Could not record a request status read from Seerr')
+            }
+          }
+          return { ...withAwaiting({ ...r, status: stored }), seerrLive: lookup.live }
         })
       )
 
       const withLibrary = await attachLibraryMediaIds(enriched)
-      return reply.send({ requests: withLibrary, total, scope: resultScope })
+      return reply.send({ requests: withLibrary.map(withStatusKey), total, scope: resultScope })
     }
   )
 

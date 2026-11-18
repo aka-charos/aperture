@@ -13,9 +13,9 @@ Aperture makes requests **as you**, on your own Seerr account, so Seerr's own ru
 A table of every request, yours (and everyone's, if you're an admin):
 
 - **What and where from** — each row shows the title, whether it's a movie or series, which seasons when a request named them, and the **source**: a *direct request* you made by name, a *Discovery* suggestion you accepted, or a *gap analysis* the administrator ran.
-- **Live status** — statuses are pulled from Seerr as it works, not stale copies: *Pending approval → Approved → Processing → Partially available → Available* (or *Declined*). The table also shows Seerr's own status message when there is one. *Waiting for Seerr* means Seerr did not answer when the request was sent, so it isn't known yet whether it was made. Aperture checks with Seerr again in the background and when you open the page, and the row becomes *Submitted* or *Failed* on its own. Ask again only if it fails.
-- **When it's available** — a link opens the title in your media server's library.
-- **Filters** — narrow by source and status; paginated for long histories.
+- **Live status** — statuses are pulled from Seerr as it works, not stale copies: *Pending approval → Approved → Processing → Partly available → Downloaded → In library* (or *Declined*). *Downloaded* means Seerr reports the file is in place but the title isn't in your library yet: the media server still has to scan it, and Aperture has to sync the library after that. *In library* means it's ready to watch. Hover a status for more. *Waiting for Seerr* means Seerr did not answer when the request was sent, so it isn't known yet whether it was made. Aperture checks with Seerr again in the background and when you open the page, and the row becomes *Submitted* or *Failed* on its own. Ask again only if it fails.
+- **When it's in the library** — a link opens the title in your library.
+- **Filters and order** — narrow by **Source** and by **Status** (waiting for approval, approved or downloading, downloaded but not in the library yet, in library, declined, failed), and choose the order under **Sort by**: newest or oldest first, by title, or by the latest status change. The **Title** and **Requested** column headings sort too. Long lists are split into pages.
 - **Administrators** see an **All users** switch, and can **approve or decline** requests inline for anyone.
 
 Selecting a row opens a TMDb detail modal with the full picture of what was requested.

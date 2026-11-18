@@ -613,7 +613,6 @@
     "errorLoadDetails": "Οι λεπτομέρειες δεν φορτώθηκαν",
     "tooltipLive": "Αίτημα: {{reqStatus}} · τίτλος: {{mediaStatus}}",
     "requestStatus": {
-      "available": "Διαθέσιμο",
       "declined": "Απορρίφθηκε",
       "pendingApproval": "Περιμένει έγκριση",
       "processing": "Σε εξέλιξη",
@@ -622,7 +621,10 @@
       "pending": "Σε αναμονή",
       "awaitingSeerr": "Αναμονή για το Seerr",
       "failed": "Απέτυχε",
-      "fallback": "{{status}}"
+      "fallback": "{{status}}",
+      "inLibrary": "Στη βιβλιοθήκη",
+      "downloaded": "Κατέβηκε",
+      "partiallyAvailable": "Διαθέσιμο εν μέρει"
     },
     "tableRequestedBy": "Ζητήθηκε από",
     "showAllUsers": "Όλοι οι χρήστες",
@@ -634,7 +636,30 @@
     "decisionFailed": "Το αίτημα δεν ενημερώθηκε",
     "sourceDirect": "Απευθείας αίτημα",
     "tabRequests": "Αιτήματα",
-    "tabIssues": "Προβλήματα"
+    "tabIssues": "Προβλήματα",
+    "status": "Κατάσταση",
+    "statusAll": "Όλες",
+    "statusFilter": {
+      "waiting": "Σε αναμονή έγκρισης",
+      "approved": "Εγκρίθηκε ή κατεβαίνει",
+      "downloaded": "Κατέβηκε, όχι ακόμα στη βιβλιοθήκη",
+      "inLibrary": "Στη βιβλιοθήκη",
+      "declined": "Απορρίφθηκε",
+      "failed": "Απέτυχε"
+    },
+    "sortBy": "Ταξινόμηση",
+    "sort": {
+      "newest": "Νεότερα πρώτα",
+      "oldest": "Παλαιότερα πρώτα",
+      "titleAsc": "Τίτλος Α–Ω",
+      "titleDesc": "Τίτλος Ω–Α",
+      "recentChange": "Πιο πρόσφατη αλλαγή κατάστασης"
+    },
+    "emptyFiltered": "Κανένα αίτημα δεν ταιριάζει σε αυτά τα φίλτρα.",
+    "statusHint": {
+      "downloaded": "Το Seerr αναφέρει ότι το αρχείο είναι στη θέση του. Θα εμφανιστεί στη βιβλιοθήκη μόλις ο διακομιστής πολυμέσων το σαρώσει και το {{appName}} συγχρονίσει τη βιβλιοθήκη.",
+      "inLibrary": "Στον διακομιστή πολυμέσων, σύμφωνα με τον τελευταίο συγχρονισμό της βιβλιοθήκης."
+    }
   },
   "settingsSeerr": {
     "title": "Ενσωμάτωση Seerr",

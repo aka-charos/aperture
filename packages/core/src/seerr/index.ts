@@ -6,7 +6,7 @@
 
 // Types
 export * from './types.js'
-export type { SeerrCallResult, SeerrActAs } from './provider.js'
+export type { SeerrCallResult, SeerrActAs, SeerrLiveRequestStatus, SeerrRequestLookup } from './provider.js'
 
 // Sending requests, and settling one whose answer was lost
 export {
@@ -57,6 +57,7 @@ export {
   createIssueComment,
   getRequest,
   getRequestStatus,
+  lookupRequestStatus,
   deleteRequest,
   // Batch Operations
   batchGetMediaStatus,

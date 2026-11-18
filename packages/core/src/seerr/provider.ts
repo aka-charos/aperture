@@ -682,17 +682,40 @@ export async function getRequest(requestId: number): Promise<SeerrRequestRespons
 /**
  * Get request status
  */
-export async function getRequestStatus(requestId: number): Promise<{
+export async function getRequestStatus(requestId: number): Promise<SeerrLiveRequestStatus | null> {
+  const lookup = await lookupRequestStatus(requestId)
+  return lookup.kind === 'ok' ? lookup.live : null
+}
+
+export interface SeerrLiveRequestStatus {
   /** `completed`: everything this request asked for has arrived. */
   status: 'pending' | 'approved' | 'declined' | 'completed'
   mediaStatus: 'unknown' | 'pending' | 'processing' | 'partially_available' | 'available'
-} | null> {
-  const request = await getRequest(requestId)
-  
-  if (!request) {
-    return null
-  }
+}
 
+/**
+ * A request's live status, saying WHY there is none.
+ *
+ * `not_found` is Seerr answering 404 (the request was deleted there); `failed`
+ * is everything else (unreachable, timeout, a 5xx, not configured). Only the
+ * first may be written down as the request being gone: `getRequestStatus`
+ * flattens both to null, and a sweep reading that null as "deleted" marked live
+ * requests failed whenever Seerr missed one answer.
+ */
+export type SeerrRequestLookup =
+  | { kind: 'ok'; live: SeerrLiveRequestStatus }
+  | { kind: 'not_found' }
+  | { kind: 'failed' }
+
+export async function lookupRequestStatus(requestId: number): Promise<SeerrRequestLookup> {
+  const result = await seerrCall<SeerrRequestResponse>(`/request/${requestId}`)
+  if (!result.ok || !result.data) {
+    return result.status === 404 ? { kind: 'not_found' } : { kind: 'failed' }
+  }
+  return { kind: 'ok', live: liveRequestStatus(result.data) }
+}
+
+function liveRequestStatus(request: SeerrRequestResponse): SeerrLiveRequestStatus {
   // 5 is the only word for a season request's arrival when other seasons are still
   // missing: the show's media status stays partly available.
   const requestStatusMap: Record<number, 'pending' | 'approved' | 'declined' | 'completed'> = {

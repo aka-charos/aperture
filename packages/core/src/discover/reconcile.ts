@@ -20,7 +20,7 @@
 
 import { createChildLogger } from '../lib/logger.js'
 import { query } from '../lib/db.js'
-import { getRequestStatus } from '../seerr/index.js'
+import { lookupRequestStatus } from '../seerr/index.js'
 import { listUnconfirmedRequests, settleUnconfirmedBatch } from '../seerr/submission.js'
 import { updateDiscoveryRequestStatus } from './storage.js'
 import type { DiscoveryRequestStatus } from './types.js'
@@ -86,8 +86,10 @@ export function resolveRequestStatus(
   if (live.status === 'declined') return 'declined'
   if (live.status === 'approved') return 'approved'
   // Seerr still says pending. Don't walk a request backwards from whatever we
-  // already recorded -- 'submitted' is our own word for the same state.
-  return current === 'pending' ? 'submitted' : current
+  // already recorded -- 'submitted' is our own word for the same state. A row
+  // recorded as failed is the exception: Seerr holds the request, so it did not
+  // fail (an unanswered lookup used to be written down as a deleted request).
+  return current === 'pending' || current === 'failed' ? 'submitted' : current
 }
 
 /**
@@ -152,21 +154,20 @@ export async function reconcileDiscoveryRequests(
 
     result.checked++
 
-    let live: Awaited<ReturnType<typeof getRequestStatus>>
-    try {
-      live = await getRequestStatus(row.seerr_request_id)
-    } catch (err) {
+    const lookup = await lookupRequestStatus(row.seerr_request_id)
+
+    if (lookup.kind === 'failed') {
       // A Seerr outage must not rewrite anyone's request history. Leave the row
       // exactly as it is and try again next run.
-      logger.debug({ err, requestId: row.id }, 'Could not reach Seerr for request')
+      logger.debug({ requestId: row.id }, 'Could not reach Seerr for request')
       result.unreachable++
       continue
     }
 
-    if (!live) {
-      // Seerr has no such request any more -- deleted there, most likely. That
-      // is terminal from our side, and leaving it non-terminal would suppress
-      // the title forever.
+    if (lookup.kind === 'not_found') {
+      // Seerr answered that it has no such request any more -- deleted there.
+      // That is terminal from our side, and leaving it non-terminal would
+      // suppress the title forever. Only a 404 says this; no answer says nothing.
       await updateDiscoveryRequestStatus(row.id, 'failed', {
         statusMessage: 'Request no longer exists in Seerr',
       })
@@ -174,7 +175,7 @@ export async function reconcileDiscoveryRequests(
       continue
     }
 
-    const next = resolveRequestStatus(row.status, live)
+    const next = resolveRequestStatus(row.status, lookup.live)
     if (next !== row.status) {
       await updateDiscoveryRequestStatus(row.id, next)
       result.updated++

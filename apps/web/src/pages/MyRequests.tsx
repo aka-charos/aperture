@@ -28,6 +28,7 @@ import {
   Switch,
   Tabs,
   Tab,
+  TableSortLabel,
 } from '@mui/material'
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck'
 import CheckIcon from '@mui/icons-material/Check'
@@ -68,6 +69,8 @@ interface DiscoveryRequestRow {
   seasons?: number[] | null
   /** Decided by the API: pending because Seerr never said whether it made the request. */
   awaitingSeerr?: boolean
+  /** Decided by the API. Absent from an older server: the stored status is shown as is. */
+  statusKey?: RequestStatusKey | null
   createdAt: string
   updatedAt: string
   seerrLive: SeerrLive
@@ -77,40 +80,52 @@ interface DiscoveryRequestRow {
   requestedByDisplayName?: string | null
 }
 
-function getRequestStatusKey(row: DiscoveryRequestRow): string | null {
-  const live = row.seerrLive
-  if (live) {
-    if (live.mediaStatus === 'available' || live.status === 'completed') return 'available'
-    if (live.status === 'declined') return 'declined'
-    if (live.status === 'pending') return 'pendingApproval'
-    if (live.mediaStatus === 'processing' || live.mediaStatus === 'partially_available') {
-      return 'processing'
-    }
-    if (live.status === 'approved') return 'approved'
+/** Decided by the API (routes/seerr/requestStatus.ts); the page only words and colours it. */
+type RequestStatusKey =
+  | 'inLibrary'
+  | 'downloaded'
+  | 'partiallyAvailable'
+  | 'processing'
+  | 'approved'
+  | 'pendingApproval'
+  | 'awaitingSeerr'
+  | 'submitted'
+  | 'pending'
+  | 'declined'
+  | 'failed'
+
+type ChipColor = 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning'
+
+/** Colour and fill per status. Downloaded is the success colour unfilled: arrived, not yet playable here. */
+function statusTone(key: RequestStatusKey | null | undefined): { color: ChipColor; variant: 'filled' | 'outlined' } {
+  switch (key) {
+    case 'inLibrary':
+      return { color: 'success', variant: 'filled' }
+    case 'downloaded':
+      return { color: 'success', variant: 'outlined' }
+    case 'partiallyAvailable':
+    case 'processing':
+    case 'approved':
+      return { color: 'info', variant: 'filled' }
+    case 'pendingApproval':
+    case 'pending':
+    case 'submitted':
+    case 'awaitingSeerr':
+      return { color: 'warning', variant: 'filled' }
+    case 'declined':
+    case 'failed':
+      return { color: 'error', variant: 'filled' }
+    default:
+      return { color: 'default', variant: 'outlined' }
   }
-  const s = row.status
-  if (s === 'submitted') return 'submitted'
-  if (s === 'pending' && row.awaitingSeerr === true) return 'awaitingSeerr'
-  if (s === 'pending') return 'pending'
-  if (s === 'approved') return 'approved'
-  if (s === 'declined') return 'declined'
-  if (s === 'available') return 'available'
-  if (s === 'failed') return 'failed'
-  return null
 }
 
-function isRowAvailable(row: DiscoveryRequestRow): boolean {
-  return getRequestStatusKey(row) === 'available'
-}
+/** The groups the API filters by (core discover/requestListing.ts). */
+const STATUS_FILTERS = ['waiting', 'approved', 'downloaded', 'inLibrary', 'declined', 'failed'] as const
+type StatusFilter = 'all' | (typeof STATUS_FILTERS)[number]
 
-function statusColor(row: DiscoveryRequestRow): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' {
-  const key = getRequestStatusKey(row)
-  if (key === 'available') return 'success'
-  if (key === 'declined' || key === 'failed' || row.status === 'failed') return 'error'
-  if (key === 'pendingApproval' || key === 'pending' || key === 'submitted' || key === 'awaitingSeerr') return 'warning'
-  if (key === 'approved' || key === 'processing') return 'info'
-  return 'default'
-}
+const SORTS = ['newest', 'oldest', 'titleAsc', 'titleDesc', 'recentChange'] as const
+type RequestSort = (typeof SORTS)[number]
 
 type SourceFilter = 'all' | 'discovery' | 'gap_analysis' | 'direct'
 
@@ -124,8 +139,13 @@ function sourceChip(source: string | undefined): { key: string; color: 'default'
 /** Whether an admin can still act on this row — Seerr has it and it is undecided. */
 function isActionable(row: DiscoveryRequestRow): boolean {
   if (row.seerrRequestId == null) return false
-  const key = getRequestStatusKey(row)
+  const key = row.statusKey
   return key === 'pendingApproval' || key === 'submitted' || key === 'pending'
+}
+
+/** The library holds the title, so the row opens it there. */
+function opensInLibrary(row: DiscoveryRequestRow): boolean {
+  return row.libraryMediaId != null && (row.statusKey === 'inLibrary' || row.statusKey === 'partiallyAvailable')
 }
 
 export function MyRequestsPage() {
@@ -149,6 +169,8 @@ function MyRequestsContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [sort, setSort] = useState<RequestSort>('newest')
   const [allUsers, setAllUsers] = useState(false)
   // `?tab=issues` is where an issue notification opens, so it lands on the right list.
   const [searchParams, setSearchParams] = useSearchParams()
@@ -204,6 +226,8 @@ function MyRequestsContent() {
     try {
       const u = new URL('/api/seerr/requests', window.location.origin)
       if (sourceFilter !== 'all') u.searchParams.set('source', sourceFilter)
+      if (statusFilter !== 'all') u.searchParams.set('statusGroup', statusFilter)
+      if (sort !== 'newest') u.searchParams.set('sort', sort)
       if (allUsers && isAdmin) u.searchParams.set('scope', 'all')
       u.searchParams.set('limit', String(rowsPerPage))
       u.searchParams.set('offset', String(page * rowsPerPage))
@@ -224,7 +248,7 @@ function MyRequestsContent() {
     } finally {
       setLoading(false)
     }
-  }, [sourceFilter, allUsers, isAdmin, page, rowsPerPage, t])
+  }, [sourceFilter, statusFilter, sort, allUsers, isAdmin, page, rowsPerPage, t])
 
   useEffect(() => {
     void load()
@@ -264,10 +288,26 @@ function MyRequestsContent() {
   }
 
   const formatRequestStatus = (row: DiscoveryRequestRow) => {
-    const key = getRequestStatusKey(row)
+    const key = row.statusKey
     if (key) return t(`myRequests.requestStatus.${key}`)
     return t('myRequests.requestStatus.fallback', { status: row.status })
   }
+
+  const filtersActive = sourceFilter !== 'all' || statusFilter !== 'all'
+
+  /** A column header sorts by its own two orders; a second click turns it round. */
+  const sortHeader = (label: string, asc: RequestSort, desc: RequestSort, firstClick: RequestSort) => (
+    <TableSortLabel
+      active={sort === asc || sort === desc}
+      direction={sort === asc ? 'asc' : 'desc'}
+      onClick={() => {
+        setPage(0)
+        setSort(sort === firstClick ? (firstClick === asc ? desc : asc) : firstClick)
+      }}
+    >
+      {label}
+    </TableSortLabel>
+  )
 
   const decide = async (row: DiscoveryRequestRow, decision: 'approve' | 'decline') => {
     setDeciding(row.id)
@@ -334,25 +374,25 @@ function MyRequestsContent() {
       month: 'short',
       day: 'numeric',
     })
-  const statusChip = (r: DiscoveryRequestRow) => (
-    <Tooltip
-      title={
-        r.seerrLive
-          ? t('myRequests.tooltipLive', {
-              reqStatus: r.seerrLive.status,
-              mediaStatus: r.seerrLive.mediaStatus,
-            })
-          : ''
-      }
-    >
-      <Chip
-        size="small"
-        label={formatRequestStatus(r)}
-        color={statusColor(r)}
-        variant={statusColor(r) === 'default' ? 'outlined' : 'filled'}
-      />
-    </Tooltip>
-  )
+  const statusHint = (r: DiscoveryRequestRow) => {
+    if (r.statusKey === 'downloaded') return t('myRequests.statusHint.downloaded')
+    if (r.statusKey === 'inLibrary') return t('myRequests.statusHint.inLibrary')
+    if (r.seerrLive) {
+      return t('myRequests.tooltipLive', {
+        reqStatus: r.seerrLive.status,
+        mediaStatus: r.seerrLive.mediaStatus,
+      })
+    }
+    return ''
+  }
+  const statusChip = (r: DiscoveryRequestRow) => {
+    const tone = statusTone(r.statusKey)
+    return (
+      <Tooltip title={statusHint(r)}>
+        <Chip size="small" label={formatRequestStatus(r)} color={tone.color} variant={tone.variant} />
+      </Tooltip>
+    )
+  }
   const actions = (r: DiscoveryRequestRow) => (
     <>
       {isAdmin && isActionable(r) && (
@@ -387,7 +427,7 @@ function MyRequestsContent() {
           </Tooltip>
         </>
       )}
-      {isRowAvailable(r) && r.libraryMediaId ? (
+      {opensInLibrary(r) ? (
         <Button
           size="small"
           variant="outlined"
@@ -498,6 +538,44 @@ function MyRequestsContent() {
           </Select>
         </FormControl>
 
+        <FormControl size="small" sx={{ minWidth: 240 }}>
+          <InputLabel id="req-status-filter">{t('myRequests.status')}</InputLabel>
+          <Select
+            labelId="req-status-filter"
+            label={t('myRequests.status')}
+            value={statusFilter}
+            onChange={(e) => {
+              setPage(0)
+              setStatusFilter(e.target.value as StatusFilter)
+            }}
+          >
+            <MenuItem value="all">{t('myRequests.statusAll')}</MenuItem>
+            {STATUS_FILTERS.map((f) => (
+              <MenuItem key={f} value={f}>
+                {t(`myRequests.statusFilter.${f}`)}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl size="small" sx={{ minWidth: 220 }}>
+          <InputLabel id="req-sort">{t('myRequests.sortBy')}</InputLabel>
+          <Select
+            labelId="req-sort"
+            label={t('myRequests.sortBy')}
+            value={sort}
+            onChange={(e) => {
+              setPage(0)
+              setSort(e.target.value as RequestSort)
+            }}
+          >
+            {SORTS.map((option) => (
+              <MenuItem key={option} value={option}>
+                {t(`myRequests.sort.${option}`)}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Stack>
 
       {error && (
@@ -514,7 +592,7 @@ function MyRequestsContent() {
         ) : total === 0 ? (
           <Box py={6} px={2} textAlign="center">
             <Typography color="text.secondary">
-              {t('myRequests.empty')}
+              {filtersActive ? t('myRequests.emptyFiltered') : t('myRequests.empty')}
             </Typography>
           </Box>
         ) : isPhone ? (
@@ -552,13 +630,17 @@ function MyRequestsContent() {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>{t('myRequests.tableTitle')}</TableCell>
+                  <TableCell sortDirection={sort === 'titleAsc' ? 'asc' : sort === 'titleDesc' ? 'desc' : false}>
+                    {sortHeader(t('myRequests.tableTitle'), 'titleAsc', 'titleDesc', 'titleAsc')}
+                  </TableCell>
                   <TableCell width={100}>{t('myRequests.tableType')}</TableCell>
                   {showRequesterColumn && (
                     <TableCell width={150}>{t('myRequests.tableRequestedBy')}</TableCell>
                   )}
                   <TableCell width={130}>{t('myRequests.tableSource')}</TableCell>
-                  <TableCell width={140}>{t('myRequests.tableRequested')}</TableCell>
+                  <TableCell width={140} sortDirection={sort === 'oldest' ? 'asc' : sort === 'newest' ? 'desc' : false}>
+                    {sortHeader(t('myRequests.tableRequested'), 'oldest', 'newest', 'newest')}
+                  </TableCell>
                   <TableCell width={180}>{t('myRequests.tableStatus')}</TableCell>
                   <TableCell width={isAdmin ? 340 : 180} align="right">
                     {t('myRequests.tableActions')}

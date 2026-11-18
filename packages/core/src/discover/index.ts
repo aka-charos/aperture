@@ -61,6 +61,16 @@ export {
   type ReconcileResult,
 } from './reconcile.js'
 
+// Requests list: status groups and sort orders
+export {
+  REQUEST_STATUS_GROUPS,
+  REQUEST_SORTS,
+  isRequestStatusGroup,
+  isRequestSort,
+  type RequestStatusGroup,
+  type RequestSort,
+} from './requestListing.js'
+
 // Scorer
 export {
   scoreCandidates,

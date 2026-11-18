@@ -5398,7 +5398,6 @@
     "errorLoadDetails": "Failed to load details",
     "tooltipLive": "Request: {{reqStatus}} · media: {{mediaStatus}}",
     "requestStatus": {
-      "available": "Available",
       "declined": "Declined",
       "pendingApproval": "Pending approval",
       "processing": "Processing",
@@ -5407,7 +5406,10 @@
       "pending": "Pending",
       "awaitingSeerr": "Waiting for Seerr",
       "failed": "Failed",
-      "fallback": "{{status}}"
+      "fallback": "{{status}}",
+      "inLibrary": "In library",
+      "downloaded": "Downloaded",
+      "partiallyAvailable": "Partly available"
     },
     "tableRequestedBy": "Requested by",
     "showAllUsers": "All users",
@@ -5419,7 +5421,30 @@
     "decisionFailed": "Could not update the request",
     "sourceDirect": "Direct request",
     "tabRequests": "Requests",
-    "tabIssues": "Issues"
+    "tabIssues": "Issues",
+    "status": "Status",
+    "statusAll": "All",
+    "statusFilter": {
+      "waiting": "Waiting for approval",
+      "approved": "Approved or downloading",
+      "downloaded": "Downloaded, not in library yet",
+      "inLibrary": "In library",
+      "declined": "Declined",
+      "failed": "Failed"
+    },
+    "sortBy": "Sort by",
+    "sort": {
+      "newest": "Newest first",
+      "oldest": "Oldest first",
+      "titleAsc": "Title A–Z",
+      "titleDesc": "Title Z–A",
+      "recentChange": "Latest status change"
+    },
+    "emptyFiltered": "No requests match these filters.",
+    "statusHint": {
+      "downloaded": "Seerr reports the file is in place. It shows as in library once the media server has scanned it and {{appName}} has synced the library.",
+      "inLibrary": "On the media server, as of the last library sync."
+    }
   },
   "contentSearch": {
     "heading": "Request something new",

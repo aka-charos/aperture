@@ -74,3 +74,16 @@ test('a completed request is available even while the show is only partly availa
     'available'
   )
 })
+
+test('a row recorded as failed follows Seerr when Seerr still holds the request', () => {
+  // Seerr missing one answer used to be written down as a deleted request; the
+  // request carried on in Seerr while the list called it failed.
+  assert.equal(
+    resolveRequestStatus('failed', { status: 'approved', mediaStatus: 'processing' }),
+    'approved'
+  )
+  assert.equal(
+    resolveRequestStatus('failed', { status: 'pending', mediaStatus: 'unknown' }),
+    'submitted'
+  )
+})
