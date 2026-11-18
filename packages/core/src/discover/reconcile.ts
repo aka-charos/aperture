@@ -102,60 +102,82 @@ export function resolveRequestStatus(
 }
 
 /**
- * Whether recording `next` over `current` keeps the row's `status_changed_at`.
+ * Whether restoring a row recorded as failed, while Seerr kept the request,
+ * keeps the row's `status_changed_at`.
  *
  * Request notifications fire off that stamp (core notifications/events.ts), and
- * the trigger moves it on every status change. Restoring a row that was
- * recorded as failed while Seerr kept the request is a correction, not news:
- * the approval it lands on was announced when it happened (or went by long
- * ago), so it keeps the old stamp. Arrival is the exception: a failed row was
- * never available, so "it's available" is still the first time anyone says so.
+ * the trigger moves it on every status change. On a failed row the stamp is
+ * when it was failed. A decision Seerr made BEFORE that was announced when it
+ * happened, so restoring it is a correction and keeps the stamp: no second
+ * "approved" weeks later. A decision Seerr made AFTER it (an approval given
+ * while the row read as failed) was never announced, so the restore stamps it
+ * and it is announced now. Without both dates the restore is announced: a late
+ * notification is noise, a missing one loses the news. Arrival always counts
+ * as news: a failed row was never available.
  */
 export function repairKeepsStatusStamp(
   current: DiscoveryRequestStatus,
-  next: DiscoveryRequestStatus
+  next: DiscoveryRequestStatus,
+  failedAt: Date | null,
+  seerrChangedAt: Date | null | undefined
 ): boolean {
-  return current === 'failed' && next !== 'failed' && next !== 'available'
+  if (current !== 'failed' || next === 'failed' || next === 'available') return false
+  if (failedAt == null || seerrChangedAt == null) return false
+  return seerrChangedAt.getTime() <= failedAt.getTime()
+}
+
+/** What `recordLiveRequestStatus` left on the row. */
+export interface RecordedRequestStatus {
+  /** The status the row holds now. */
+  status: DiscoveryRequestStatus
+  /** Whether the row's `status_changed_at` moved (it sorts by it and notifies off it). */
+  stamped: boolean
 }
 
 /**
  * Bring one row in line with Seerr's live answer, by the sweep's rule. The one
  * writer for a status read from Seerr: the reconcile job, the requests list and
- * the single-request status route all record through it. Returns the status
- * the row now holds.
+ * the single-request status route all record through it.
  */
 export async function recordLiveRequestStatus(
   row: { id: string; status: DiscoveryRequestStatus },
   live: SeerrLiveRequestStatus
-): Promise<DiscoveryRequestStatus> {
+): Promise<RecordedRequestStatus> {
   const next = resolveRequestStatus(row.status, live)
-  if (next === row.status) return next
+  if (next === row.status) return { status: next, stamped: false }
   if (row.status !== 'failed') {
     await updateDiscoveryRequestStatus(row.id, next)
-    return next
+    return { status: next, stamped: true }
   }
-  const keepStamp = repairKeepsStatusStamp(row.status, next)
-  await transaction(async (client) => {
-    const before = await client.query<{ status_changed_at: Date | null }>(
-      `SELECT status_changed_at FROM discovery_requests WHERE id = $1 FOR UPDATE`,
+  return transaction(async (client) => {
+    const before = await client.query<{ status: DiscoveryRequestStatus; status_changed_at: Date | null }>(
+      `SELECT status, status_changed_at FROM discovery_requests WHERE id = $1 FOR UPDATE`,
       [row.id]
     )
+    const held = before.rows[0]
+    if (!held) return { status: row.status, stamped: false }
+    if (held.status !== 'failed') {
+      // Someone recorded it since it was read (the job and a list load at
+      // once): theirs stands, and is what the row holds.
+      return { status: held.status, stamped: false }
+    }
+    const keepStamp = repairKeepsStatusStamp('failed', next, held.status_changed_at, live.updatedAt)
     // The failure message described a deletion that did not happen.
     await client.query(
       `UPDATE discovery_requests
           SET status = $2, status_message = NULL, seerr_unconfirmed_since = NULL
-        WHERE id = $1 AND status = 'failed'`,
+        WHERE id = $1`,
       [row.id, next]
     )
     if (keepStamp) {
       // A second write with the status unchanged: the trigger leaves it alone.
       await client.query(`UPDATE discovery_requests SET status_changed_at = $2 WHERE id = $1`, [
         row.id,
-        before.rows[0]?.status_changed_at ?? null,
+        held.status_changed_at,
       ])
     }
+    return { status: next, stamped: !keepStamp }
   })
-  return next
 }
 
 /**
@@ -251,8 +273,8 @@ export async function reconcileDiscoveryRequests(
     }
 
     try {
-      const next = await recordLiveRequestStatus(row, lookup.live)
-      if (next !== row.status) result.updated++
+      const recorded = await recordLiveRequestStatus(row, lookup.live)
+      if (recorded.status !== row.status) result.updated++
     } catch (err) {
       logger.warn({ err, requestId: row.id }, 'Could not record a request status read from Seerr')
     }

@@ -135,6 +135,8 @@ export interface DiscoveryRequest {
    * when no library in their scope holds it. Absent when fetched another way.
    */
   libraryMediaId?: string | null
+  /** That library row's title, beside `libraryMediaId`. */
+  libraryTitle?: string | null
 }
 
 export interface DiscoveryUser {

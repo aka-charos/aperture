@@ -183,5 +183,14 @@ test('a job reads each show season by season, and an unanswered show has no entr
 
 test('a finished request reads as completed while the show stays partly available', async () => {
   globalThis.fetch = (async () => Response.json({ id: 9, status: 5, media: { status: 4 } })) as unknown as typeof fetch
-  assert.deepEqual(await getRequestStatus(9), { status: 'completed', mediaStatus: 'partially_available' })
+  assert.deepEqual(await getRequestStatus(9), { status: 'completed', mediaStatus: 'partially_available', updatedAt: null })
+})
+
+test("a request carries Seerr's own last-change date, and none for an unreadable one", async () => {
+  globalThis.fetch = (async () =>
+    Response.json({ id: 9, status: 2, updatedAt: '2026-10-25T09:00:00.000Z', media: { status: 3 } })) as unknown as typeof fetch
+  assert.equal((await getRequestStatus(9))?.updatedAt?.toISOString(), '2026-10-25T09:00:00.000Z')
+  globalThis.fetch = (async () =>
+    Response.json({ id: 9, status: 2, updatedAt: 'not a date', media: { status: 3 } })) as unknown as typeof fetch
+  assert.equal((await getRequestStatus(9))?.updatedAt, null)
 })

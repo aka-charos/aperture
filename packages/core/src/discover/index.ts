@@ -60,6 +60,7 @@ export {
   resolveRequestStatus,
   repairKeepsStatusStamp,
   recordLiveRequestStatus,
+  type RecordedRequestStatus,
   type ReconcileResult,
 } from './reconcile.js'
 
@@ -69,6 +70,7 @@ export {
   REQUEST_SORTS,
   isRequestStatusGroup,
   isRequestSort,
+  statusGroupKey,
   type RequestStatusGroup,
   type RequestSort,
 } from './requestListing.js'

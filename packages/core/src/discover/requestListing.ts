@@ -14,15 +14,16 @@
  * place is "downloaded"; the media server having it, as of the last library
  * sync, in a library the VIEWER can open, is "in library".
  *
- * `requestLibraryTitleSql` is the one test of "the library holds it": the
- * filter uses it, and the list selects it as the row's `libraryMediaId`, which
- * is what the page's chip and its Open in library link read. One expression, so
- * the In library filter and the In library chip cannot disagree, and a title
- * only in a library the viewer cannot open is "downloaded" to them, never a
- * link that answers 404.
+ * `requestLibraryJoinSql` is the one test of "the library holds it": joined
+ * as `REQUEST_LIBRARY_ALIAS`, the filter reads its id and the page selects its
+ * id and title as the row's `libraryMediaId` / `libraryTitle`, which the chip
+ * and the Open in library link read. One join, so the In library filter and
+ * the In library chip cannot disagree, and a title only in a library the
+ * viewer cannot open is "downloaded" to them, never a link that answers 404.
  */
 
 import { libraryScopeSql, type BindParam, type LibraryScope } from '../lib/libraryScope.js'
+import type { DiscoveryRequestStatus } from './types.js'
 
 export const REQUEST_STATUS_GROUPS = [
   'waiting',
@@ -38,39 +39,58 @@ export function isRequestStatusGroup(value: unknown): value is RequestStatusGrou
   return typeof value === 'string' && (REQUEST_STATUS_GROUPS as readonly string[]).includes(value)
 }
 
+/** The alias `requestLibraryJoinSql` joins the library row under. */
+export const REQUEST_LIBRARY_ALIAS = 'lib'
+
 /**
- * The viewer's library row for the requested title (its id as text), or NULL
- * when no library in their scope holds it. A null scope restricts nothing.
+ * LEFT JOIN LATERAL of the viewer's library row for the requested title
+ * (`lib.id` as text, `lib.title`), NULL when no library in their scope holds
+ * it. A null scope restricts nothing.
  */
-export function requestLibraryTitleSql(alias: string, scope: LibraryScope | null, bind: BindParam): string {
+export function requestLibraryJoinSql(alias: string, scope: LibraryScope | null, bind: BindParam): string {
   const movieScope = scope ? ` AND ${libraryScopeSql(scope, 'lm', bind)}` : ''
   const seriesScope = scope ? ` AND ${libraryScopeSql(scope, 'ls', bind)}` : ''
-  return `(CASE WHEN ${alias}.media_type = 'movie'
-    THEN (SELECT lm.id::text FROM movies lm WHERE lm.tmdb_id = ${alias}.tmdb_id::text${movieScope} LIMIT 1)
-    ELSE (SELECT ls.id::text FROM series ls WHERE ls.tmdb_id = ${alias}.tmdb_id::text${seriesScope} LIMIT 1)
-  END)`
+  return ` LEFT JOIN LATERAL (
+      SELECT lm.id::text AS id, lm.title FROM movies lm
+       WHERE ${alias}.media_type = 'movie' AND lm.tmdb_id = ${alias}.tmdb_id::text${movieScope}
+      UNION ALL
+      SELECT ls.id::text AS id, ls.title FROM series ls
+       WHERE ${alias}.media_type <> 'movie' AND ls.tmdb_id = ${alias}.tmdb_id::text${seriesScope}
+      LIMIT 1
+    ) ${REQUEST_LIBRARY_ALIAS} ON true`
 }
 
-export function requestStatusGroupSql(
-  group: RequestStatusGroup,
-  alias: string,
-  scope: LibraryScope | null,
-  bind: BindParam
-): string {
+/** Whether a group's test reads the library join. */
+export function groupReadsLibrary(group: RequestStatusGroup): boolean {
+  return group === 'downloaded' || group === 'inLibrary'
+}
+
+/** The WHERE test of a group. `downloaded`/`inLibrary` need `requestLibraryJoinSql` in the FROM. */
+export function requestStatusGroupSql(group: RequestStatusGroup, alias: string): string {
   switch (group) {
     case 'waiting':
       return `${alias}.status IN ('pending', 'submitted')`
     case 'approved':
       return `${alias}.status = 'approved'`
     case 'downloaded':
-      return `(${alias}.status = 'available' AND ${requestLibraryTitleSql(alias, scope, bind)} IS NULL)`
+      return `(${alias}.status = 'available' AND ${REQUEST_LIBRARY_ALIAS}.id IS NULL)`
     case 'inLibrary':
-      return `(${alias}.status = 'available' AND ${requestLibraryTitleSql(alias, scope, bind)} IS NOT NULL)`
+      return `(${alias}.status = 'available' AND ${REQUEST_LIBRARY_ALIAS}.id IS NOT NULL)`
     case 'declined':
       return `${alias}.status = 'declined'`
     case 'failed':
       return `${alias}.status = 'failed'`
   }
+}
+
+/**
+ * Which groups a stored status can sit in, as one key: two statuses with the
+ * same key are in the same group. `available` is one key because the library
+ * half of its split does not move with the status.
+ */
+export function statusGroupKey(status: DiscoveryRequestStatus | string): string {
+  if (status === 'pending' || status === 'submitted') return 'waiting'
+  return status
 }
 
 export const REQUEST_SORTS = ['newest', 'oldest', 'titleAsc', 'titleDesc', 'recentChange'] as const
@@ -85,8 +105,9 @@ export function isRequestSort(value: unknown): value is RequestSort {
 /**
  * ORDER BY for a sort. Every order ends on the row id, so a page boundary never
  * shows a row twice or skips one when two rows tie. `recentChange` reads the
- * status stamp (`0215`), which older rows lack until their status next moves,
- * so it falls back to the last write.
+ * status stamp (`0215`); a row older than it that has not moved since falls
+ * back to when it was requested, never `updated_at`, which any write moves
+ * (the reconcile job touches rows it re-checks without changing them).
  */
 export function requestOrderSql(sort: RequestSort, alias: string): string {
   switch (sort) {
@@ -99,6 +120,6 @@ export function requestOrderSql(sort: RequestSort, alias: string): string {
     case 'titleDesc':
       return `lower(${alias}.title) DESC, ${alias}.created_at DESC, ${alias}.id DESC`
     case 'recentChange':
-      return `COALESCE(${alias}.status_changed_at, ${alias}.updated_at) DESC, ${alias}.id DESC`
+      return `COALESCE(${alias}.status_changed_at, ${alias}.created_at) DESC, ${alias}.id DESC`
   }
 }

@@ -1398,11 +1398,13 @@ export {
   resolveRequestStatus,
   repairKeepsStatusStamp,
   recordLiveRequestStatus,
+  type RecordedRequestStatus,
   // Requests list
   REQUEST_STATUS_GROUPS,
   REQUEST_SORTS,
   isRequestStatusGroup,
   isRequestSort,
+  statusGroupKey,
   type RequestStatusGroup,
   type RequestSort,
   // Candidate embeddings

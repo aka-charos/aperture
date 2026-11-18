@@ -88,15 +88,25 @@ test('a row recorded as failed follows Seerr when Seerr still holds the request'
   )
 })
 
-test('restoring a wrongly failed row announces only an arrival', () => {
-  // The approval it lands on was announced when it happened; a second
-  // "approved" weeks later would be a stale notification.
-  assert.equal(repairKeepsStatusStamp('failed', 'approved'), true)
-  assert.equal(repairKeepsStatusStamp('failed', 'submitted'), true)
-  assert.equal(repairKeepsStatusStamp('failed', 'declined'), true)
+test('restoring a wrongly failed row announces only what Seerr decided after the failure', () => {
+  const failedAt = new Date('2026-10-20T04:30:00Z')
+  const before = new Date('2026-10-19T12:00:00Z')
+  const after = new Date('2026-10-25T09:00:00Z')
+  // Decided before the row was failed: announced back then, so no second
+  // "approved" weeks later.
+  assert.equal(repairKeepsStatusStamp('failed', 'approved', failedAt, before), true)
+  assert.equal(repairKeepsStatusStamp('failed', 'submitted', failedAt, before), true)
+  assert.equal(repairKeepsStatusStamp('failed', 'declined', failedAt, before), true)
+  // Decided while the row read as failed: never announced, so announced now.
+  assert.equal(repairKeepsStatusStamp('failed', 'approved', failedAt, after), false)
+  assert.equal(repairKeepsStatusStamp('failed', 'declined', failedAt, after), false)
+  // Either date unknown: announce rather than lose the news.
+  assert.equal(repairKeepsStatusStamp('failed', 'approved', null, before), false)
+  assert.equal(repairKeepsStatusStamp('failed', 'approved', failedAt, null), false)
+  assert.equal(repairKeepsStatusStamp('failed', 'approved', failedAt, undefined), false)
   // A failed row was never available, so that is news.
-  assert.equal(repairKeepsStatusStamp('failed', 'available'), false)
+  assert.equal(repairKeepsStatusStamp('failed', 'available', failedAt, before), false)
   // Ordinary moves always stamp.
-  assert.equal(repairKeepsStatusStamp('approved', 'available'), false)
-  assert.equal(repairKeepsStatusStamp('submitted', 'approved'), false)
+  assert.equal(repairKeepsStatusStamp('approved', 'available', failedAt, before), false)
+  assert.equal(repairKeepsStatusStamp('submitted', 'approved', failedAt, before), false)
 })

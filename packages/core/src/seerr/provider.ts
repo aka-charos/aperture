@@ -691,6 +691,8 @@ export interface SeerrLiveRequestStatus {
   /** `completed`: everything this request asked for has arrived. */
   status: 'pending' | 'approved' | 'declined' | 'completed'
   mediaStatus: 'unknown' | 'pending' | 'processing' | 'partially_available' | 'available'
+  /** When Seerr last changed the request itself; null when it sent no readable date. */
+  updatedAt?: Date | null
 }
 
 /**
@@ -755,9 +757,11 @@ function liveRequestStatus(request: SeerrRequestResponse): SeerrLiveRequestStatu
     5: 'available',
   }
 
+  const updatedAt = request.updatedAt ? new Date(request.updatedAt) : null
   return {
     status: requestStatusMap[request.status] ?? 'pending',
     mediaStatus: mediaStatusMap[request.media.status] ?? 'unknown',
+    updatedAt: updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt : null,
   }
 }
 

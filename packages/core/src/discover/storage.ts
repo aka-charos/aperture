@@ -9,7 +9,9 @@ import { query, queryOne, transaction } from '../lib/db.js'
 import { PERSONALIZED_SOURCES } from './types.js'
 import {
   DEFAULT_REQUEST_SORT,
-  requestLibraryTitleSql,
+  REQUEST_LIBRARY_ALIAS,
+  groupReadsLibrary,
+  requestLibraryJoinSql,
   requestOrderSql,
   requestStatusGroupSql,
   type RequestSort,
@@ -1029,7 +1031,7 @@ function buildRequestFilter(
   if (options.mediaType) clauses.push(`r.media_type = ${bind(options.mediaType)}`)
   if (options.status) clauses.push(`r.status = ${bind(options.status)}`)
   if (options.statusGroup) {
-    clauses.push(requestStatusGroupSql(options.statusGroup, 'r', options.libraryScope ?? null, bind))
+    clauses.push(requestStatusGroupSql(options.statusGroup, 'r'))
   }
   if (options.source) clauses.push(`r.source = ${bind(options.source)}`)
 
@@ -1059,9 +1061,15 @@ export async function countDiscoveryRequests(
   options: RequestListFilter = {}
 ): Promise<number> {
   const params: unknown[] = []
+  // The library join only when the group reads it: a count of everything
+  // needs no per-row library lookup.
+  const join =
+    options.statusGroup && groupReadsLibrary(options.statusGroup)
+      ? requestLibraryJoinSql('r', options.libraryScope ?? null, binderFor(params))
+      : ''
   const where = buildRequestFilter(userId, options, params)
   const row = await queryOne<{ c: number }>(
-    `SELECT COUNT(*)::int AS c FROM discovery_requests r${where}`,
+    `SELECT COUNT(*)::int AS c FROM discovery_requests r${join}${where}`,
     params
   )
   return row?.c ?? 0
@@ -1084,15 +1092,16 @@ export async function getDiscoveryRequests(
 ): Promise<DiscoveryRequest[]> {
   const params: unknown[] = []
   const bind = binderFor(params)
-  // The same expression the In library / Downloaded groups test.
-  const libraryTitle = requestLibraryTitleSql('r', options.libraryScope ?? null, bind)
+  // The same join the In library / Downloaded groups test.
+  const libraryJoin = requestLibraryJoinSql('r', options.libraryScope ?? null, bind)
   const where = buildRequestFilter(userId, options, params)
 
   let sql =
     `SELECT r.*, u.username AS requested_by_username, u.display_name AS requested_by_display_name,
-            ${libraryTitle} AS library_media_id
+            ${REQUEST_LIBRARY_ALIAS}.id AS library_media_id, ${REQUEST_LIBRARY_ALIAS}.title AS library_title
      FROM discovery_requests r
      LEFT JOIN users u ON u.id = r.user_id` +
+    libraryJoin +
     where +
     ` ORDER BY ${requestOrderSql(options.sort ?? DEFAULT_REQUEST_SORT, 'r')}`
 
@@ -1119,6 +1128,7 @@ export async function getDiscoveryRequests(
     requested_by_username: string | null
     requested_by_display_name: string | null
     library_media_id: string | null
+    library_title: string | null
   }>(sql, params)
 
   return result.rows.map(row => ({
@@ -1141,6 +1151,7 @@ export async function getDiscoveryRequests(
     requestedByUsername: row.requested_by_username,
     requestedByDisplayName: row.requested_by_display_name,
     libraryMediaId: row.library_media_id,
+    libraryTitle: row.library_title,
   }))
 }
 
