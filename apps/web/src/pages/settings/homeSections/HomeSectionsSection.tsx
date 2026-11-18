@@ -40,7 +40,7 @@ import SyncIcon from '@mui/icons-material/Sync'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import { jobConsoleLink } from '@/pages/jobs/registry'
 import { PlacementFields } from '@/components/homeSections/PlacementFields'
-import { StackOrderList } from '@/components/homeSections/StackOrderList'
+import { StackOrderList } from './StackOrderList'
 import {
   isAnchorMode,
   isPlacementComplete,
