@@ -23,7 +23,6 @@ import { query, transaction } from '../lib/db.js'
 import { lookupRequestStatus, seerrAnswersAtAddress } from '../seerr/index.js'
 import type { SeerrLiveRequestStatus } from '../seerr/index.js'
 import { listUnconfirmedRequests, settleUnconfirmedBatch } from '../seerr/submission.js'
-import { updateDiscoveryRequestStatus } from './storage.js'
 import type { DiscoveryRequestStatus } from './types.js'
 
 const logger = createChildLogger('discover:reconcile')
@@ -106,24 +105,66 @@ export function resolveRequestStatus(
  * keeps the row's `status_changed_at`.
  *
  * Request notifications fire off that stamp (core notifications/events.ts), and
- * the trigger moves it on every status change. On a failed row the stamp is
- * when it was failed. A decision Seerr made BEFORE that was announced when it
- * happened, so restoring it is a correction and keeps the stamp: no second
- * "approved" weeks later. A decision Seerr made AFTER it (an approval given
- * while the row read as failed) was never announced, so the restore stamps it
- * and it is announced now. Without both dates the restore is announced: a late
- * notification is noise, a missing one loses the news. Arrival always counts
- * as news: a failed row was never available.
+ * the trigger moves it on every status change. A row failed on a Seerr 404
+ * records the status it held (`failed_from`, 0225): coming back to that same
+ * status is a correction, already announced when it first happened, so it
+ * keeps the stamp. Coming back to a different one is a decision made since,
+ * never announced, so it is announced now. Arrival always counts as news: a
+ * failed row was never available.
+ *
+ * A row failed before 0225 has no `failed_from`. For those, Seerr's own last
+ * change to the request stands in: at or before the failure (the stamp of a
+ * failed row) keeps the stamp. Seerr also moves that date for other edits, so
+ * it can only err towards announcing, and without both dates the restore is
+ * announced: a late notification is noise, a missing one loses the news.
  */
-export function repairKeepsStatusStamp(
-  current: DiscoveryRequestStatus,
+export function restoreKeepsStatusStamp(
   next: DiscoveryRequestStatus,
+  failedFrom: string | null,
   failedAt: Date | null,
   seerrChangedAt: Date | null | undefined
 ): boolean {
-  if (current !== 'failed' || next === 'failed' || next === 'available') return false
+  if (next === 'failed' || next === 'available') return false
+  if (failedFrom != null) return next === failedFrom
   if (failedAt == null || seerrChangedAt == null) return false
   return seerrChangedAt.getTime() <= failedAt.getTime()
+}
+
+/** The row as it stands under the writer's lock. */
+export interface HeldRequestRow {
+  status: DiscoveryRequestStatus
+  statusChangedAt: Date | null
+  failedFrom: string | null
+}
+
+export type LiveRecordPlan =
+  | { write: false; status: DiscoveryRequestStatus }
+  | { write: true; next: DiscoveryRequestStatus; restore: boolean; keepStamp: boolean }
+
+/**
+ * What to write for one row, given the status the caller READ, the row as it
+ * stands now (locked), and Seerr's live answer. Pure, pinned.
+ *
+ * A row whose status moved since the caller read it is left alone: someone
+ * else recorded it (an admin's approve or decline, the job and a list load at
+ * once), and a live answer fetched before that is older than their write.
+ */
+export function planLiveRecord(
+  readStatus: DiscoveryRequestStatus,
+  held: HeldRequestRow | null,
+  live: SeerrLiveRequestStatus
+): LiveRecordPlan {
+  if (!held) return { write: false, status: readStatus }
+  if (held.status !== readStatus) return { write: false, status: held.status }
+  const next = resolveRequestStatus(held.status, live)
+  if (next === held.status) return { write: false, status: next }
+  if (held.status !== 'failed') return { write: true, next, restore: false, keepStamp: false }
+  return {
+    write: true,
+    next,
+    restore: true,
+    keepStamp: restoreKeepsStatusStamp(next, held.failedFrom, held.statusChangedAt, live.updatedAt),
+  }
 }
 
 /** What `recordLiveRequestStatus` left on the row. */
@@ -137,47 +178,92 @@ export interface RecordedRequestStatus {
 /**
  * Bring one row in line with Seerr's live answer, by the sweep's rule. The one
  * writer for a status read from Seerr: the reconcile job, the requests list and
- * the single-request status route all record through it.
+ * the single-request status route all record through it. Every write happens
+ * under the row's lock and only over the status the caller read
+ * (`planLiveRecord`).
  */
 export async function recordLiveRequestStatus(
   row: { id: string; status: DiscoveryRequestStatus },
   live: SeerrLiveRequestStatus
 ): Promise<RecordedRequestStatus> {
-  const next = resolveRequestStatus(row.status, live)
-  if (next === row.status) return { status: next, stamped: false }
-  if (row.status !== 'failed') {
-    await updateDiscoveryRequestStatus(row.id, next)
-    return { status: next, stamped: true }
-  }
+  // Nothing to write by the caller's own reading: no lock taken.
+  if (resolveRequestStatus(row.status, live) === row.status) return { status: row.status, stamped: false }
   return transaction(async (client) => {
-    const before = await client.query<{ status: DiscoveryRequestStatus; status_changed_at: Date | null }>(
-      `SELECT status, status_changed_at FROM discovery_requests WHERE id = $1 FOR UPDATE`,
-      [row.id]
+    const found = await client.query<{
+      status: DiscoveryRequestStatus
+      status_changed_at: Date | null
+      failed_from: string | null
+    }>(`SELECT status, status_changed_at, failed_from FROM discovery_requests WHERE id = $1 FOR UPDATE`, [row.id])
+    const heldRow = found.rows[0]
+    const plan = planLiveRecord(
+      row.status,
+      heldRow
+        ? { status: heldRow.status, statusChangedAt: heldRow.status_changed_at, failedFrom: heldRow.failed_from }
+        : null,
+      live
     )
-    const held = before.rows[0]
-    if (!held) return { status: row.status, stamped: false }
-    if (held.status !== 'failed') {
-      // Someone recorded it since it was read (the job and a list load at
-      // once): theirs stands, and is what the row holds.
-      return { status: held.status, stamped: false }
+    if (!plan.write) return { status: plan.status, stamped: false }
+    if (!plan.restore) {
+      await client.query(
+        `UPDATE discovery_requests
+            SET status = $2,
+                seerr_unconfirmed_since = CASE WHEN $2 = 'pending' THEN seerr_unconfirmed_since ELSE NULL END
+          WHERE id = $1`,
+        [row.id, plan.next]
+      )
+      return { status: plan.next, stamped: true }
     }
-    const keepStamp = repairKeepsStatusStamp('failed', next, held.status_changed_at, live.updatedAt)
     // The failure message described a deletion that did not happen.
     await client.query(
       `UPDATE discovery_requests
-          SET status = $2, status_message = NULL, seerr_unconfirmed_since = NULL
+          SET status = $2, status_message = NULL, seerr_unconfirmed_since = NULL, failed_from = NULL
         WHERE id = $1`,
-      [row.id, next]
+      [row.id, plan.next]
     )
-    if (keepStamp) {
+    if (plan.keepStamp) {
       // A second write with the status unchanged: the trigger leaves it alone.
       await client.query(`UPDATE discovery_requests SET status_changed_at = $2 WHERE id = $1`, [
         row.id,
-        held.status_changed_at,
+        heldRow?.status_changed_at ?? null,
       ])
     }
-    return { status: next, stamped: !keepStamp }
+    return { status: plan.next, stamped: !plan.keepStamp }
   })
+}
+
+/**
+ * Which slice of the failed-with-a-request rows tonight's pass re-checks:
+ * successive nights take successive windows of `limit`, wrapping, so every row
+ * comes round within ceil(total / limit) nights and nothing is written to the
+ * rows to mark them checked (any write moves `updated_at`). Pure, pinned.
+ */
+export function recheckWindow(total: number, limit: number, night: number): { offset: number; wrap: number } {
+  if (total <= limit || limit <= 0) return { offset: 0, wrap: 0 }
+  const windows = Math.ceil(total / limit)
+  const offset = (((night % windows) + windows) % windows) * limit
+  // The last window may be short; it continues from the start.
+  return { offset, wrap: Math.max(0, offset + limit - total) }
+}
+
+/** Tonight's window of failed rows that still name a Seerr request. */
+async function failedRecheckBatch(): Promise<{ id: string; seerr_request_id: number; status: DiscoveryRequestStatus }[]> {
+  const where = `seerr_request_id IS NOT NULL AND status = 'failed'`
+  const counted = await query<{ c: number }>(`SELECT COUNT(*)::int AS c FROM discovery_requests WHERE ${where}`)
+  const total = counted.rows[0]?.c ?? 0
+  if (total === 0) return []
+  const night = Math.floor(Date.now() / 86_400_000)
+  const { offset, wrap } = recheckWindow(total, FAILED_RECHECK_LIMIT, night)
+  const select = `SELECT id, seerr_request_id, status FROM discovery_requests WHERE ${where} ORDER BY id`
+  const main = await query<{ id: string; seerr_request_id: number; status: DiscoveryRequestStatus }>(
+    `${select} LIMIT $1 OFFSET $2`,
+    [FAILED_RECHECK_LIMIT, offset]
+  )
+  if (wrap === 0) return main.rows
+  const rest = await query<{ id: string; seerr_request_id: number; status: DiscoveryRequestStatus }>(
+    `${select} LIMIT $1`,
+    [wrap]
+  )
+  return [...main.rows, ...rest.rows]
 }
 
 /**
@@ -234,22 +320,15 @@ export async function reconcileDiscoveryRequests(
 
   // Rows recorded as failed that still name a Seerr request: only a deletion
   // in Seerr fails such a row now, but an unanswered lookup used to as well, and
-  // those requests carried on in Seerr. Checked in their own small batch,
-  // longest unchecked first, so they never crowd out the live ones.
-  const failedWithRequest = await query<SweepRow>(
-    `SELECT id, seerr_request_id, status
-       FROM discovery_requests
-      WHERE seerr_request_id IS NOT NULL
-        AND status = 'failed'
-      ORDER BY updated_at ASC
-      LIMIT $1`,
-    [FAILED_RECHECK_LIMIT]
-  )
+  // those requests carried on in Seerr. Checked in their own small batch, a
+  // different window each night (`recheckWindow`), so they never crowd out the
+  // live ones and nothing is written to the rows that are still deleted.
+  const failedWithRequest = await failedRecheckBatch()
 
   // A 404 is written down only after Seerr is seen answering at its address.
   const notFound: SweepRow[] = []
 
-  for (const row of [...pending.rows, ...failedWithRequest.rows]) {
+  for (const row of [...pending.rows, ...failedWithRequest]) {
     if (shouldCancel?.() === true) {
       result.cancelled = true
       break
@@ -288,19 +367,22 @@ export async function reconcileDiscoveryRequests(
       result.unreachable += notFound.length
     } else {
       for (const row of notFound) {
-        if (row.status === 'failed') {
-          // Already recorded as deleted. Moving updated_at sends it to the back
-          // of the failed batch, so the rest get their turn.
-          await query(`UPDATE discovery_requests SET updated_at = NOW() WHERE id = $1`, [row.id])
-          continue
-        }
+        // Already recorded as deleted: nothing to write.
+        if (row.status === 'failed') continue
         // Seerr answered that it has no such request any more -- deleted there.
         // That is terminal from our side, and leaving it non-terminal would
         // suppress the title forever. Only a 404 says this; no answer says nothing.
-        await updateDiscoveryRequestStatus(row.id, 'failed', {
-          statusMessage: 'Request no longer exists in Seerr',
-        })
-        result.updated++
+        // The status it held is kept, so a restore can tell a correction from news.
+        const marked = await query(
+          `UPDATE discovery_requests
+              SET status = 'failed',
+                  failed_from = status,
+                  status_message = 'Request no longer exists in Seerr',
+                  seerr_unconfirmed_since = NULL
+            WHERE id = $1 AND status = $2`,
+          [row.id, row.status]
+        )
+        if ((marked.rowCount ?? 0) > 0) result.updated++
       }
     }
   }

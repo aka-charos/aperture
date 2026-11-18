@@ -50,13 +50,17 @@ export const REQUEST_LIBRARY_ALIAS = 'lib'
 export function requestLibraryJoinSql(alias: string, scope: LibraryScope | null, bind: BindParam): string {
   const movieScope = scope ? ` AND ${libraryScopeSql(scope, 'lm', bind)}` : ''
   const seriesScope = scope ? ` AND ${libraryScopeSql(scope, 'ls', bind)}` : ''
+  // Each branch picks its row by a fixed order, so a title held by several
+  // libraries (an HD and a 4K copy) opens the same copy on every load. The
+  // branches exclude each other by media type, so at most one row comes back.
   return ` LEFT JOIN LATERAL (
-      SELECT lm.id::text AS id, lm.title FROM movies lm
-       WHERE ${alias}.media_type = 'movie' AND lm.tmdb_id = ${alias}.tmdb_id::text${movieScope}
+      (SELECT lm.id::text AS id, lm.title FROM movies lm
+        WHERE ${alias}.media_type = 'movie' AND lm.tmdb_id = ${alias}.tmdb_id::text${movieScope}
+        ORDER BY lm.created_at, lm.id LIMIT 1)
       UNION ALL
-      SELECT ls.id::text AS id, ls.title FROM series ls
-       WHERE ${alias}.media_type <> 'movie' AND ls.tmdb_id = ${alias}.tmdb_id::text${seriesScope}
-      LIMIT 1
+      (SELECT ls.id::text AS id, ls.title FROM series ls
+        WHERE ${alias}.media_type <> 'movie' AND ls.tmdb_id = ${alias}.tmdb_id::text${seriesScope}
+        ORDER BY ls.created_at, ls.id LIMIT 1)
     ) ${REQUEST_LIBRARY_ALIAS} ON true`
 }
 
@@ -91,6 +95,33 @@ export function requestStatusGroupSql(group: RequestStatusGroup, alias: string):
 export function statusGroupKey(status: DiscoveryRequestStatus | string): string {
   if (status === 'pending' || status === 'submitted') return 'waiting'
   return status
+}
+
+/** A stored status the list itself recorded while building a page. */
+export interface StatusMove {
+  from: string
+  to: string
+  /** Whether `status_changed_at` moved with it. */
+  stamped: boolean
+}
+
+/**
+ * Whether a page must be read again because of statuses recorded while it was
+ * built: the count and the rows were read first, so a row that left (or joined)
+ * the filter, or moved in the latest-change order, makes them disagree with what
+ * is stored. A move within one filter group changes nothing on the page. An
+ * exact `status` filter (API clients) is left by any move. Pure, pinned.
+ */
+export function pageNeedsReread(
+  moves: readonly StatusMove[],
+  view: { status?: string; statusGroup?: RequestStatusGroup; sort?: RequestSort }
+): boolean {
+  return moves.some((move) => {
+    if (move.from === move.to) return false
+    if (view.status) return true
+    if (view.statusGroup && statusGroupKey(move.from) !== statusGroupKey(move.to)) return true
+    return view.sort === 'recentChange' && move.stamped
+  })
 }
 
 export const REQUEST_SORTS = ['newest', 'oldest', 'titleAsc', 'titleDesc', 'recentChange'] as const

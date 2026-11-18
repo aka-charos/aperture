@@ -1396,7 +1396,9 @@ export {
   // Reconciliation
   reconcileDiscoveryRequests,
   resolveRequestStatus,
-  repairKeepsStatusStamp,
+  restoreKeepsStatusStamp,
+  planLiveRecord,
+  recheckWindow,
   recordLiveRequestStatus,
   type RecordedRequestStatus,
   // Requests list
@@ -1405,7 +1407,9 @@ export {
   isRequestStatusGroup,
   isRequestSort,
   statusGroupKey,
+  pageNeedsReread,
   type RequestStatusGroup,
+  type StatusMove,
   type RequestSort,
   // Candidate embeddings
   getCandidateEmbeddings,

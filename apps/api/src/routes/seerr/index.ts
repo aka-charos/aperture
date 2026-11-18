@@ -22,7 +22,7 @@ import {
   recordLiveRequestStatus,
   isRequestStatusGroup,
   isRequestSort,
-  statusGroupKey,
+  pageNeedsReread,
   createDiscoveryRequest,
   updateDiscoveryRequestStatus,
   getDiscoveryRequests,
@@ -37,6 +37,7 @@ import {
   getSonarrServerDetails,
   type DiscoveryRequestStatus,
   type DiscoveryRequestSource,
+  type StatusMove,
 } from '@aperture/core'
 import {
   seerrSchemas,
@@ -59,7 +60,7 @@ import {
 import { resolveSearchSource } from './sources/index.js'
 import { isRequestable, summarizeMissing } from './sources/requestability.js'
 import { pickRequestOverrides, resolveRequestSource } from './requestOptions.js'
-import { decideRequestStatus, type RequestStatusInput } from './requestStatus.js'
+import { decideRequestStatus, liveForClient, type RequestStatusInput } from './requestStatus.js'
 import {
   clearStaleSeerrUserId,
   ensureSeerrUserIdForRequest,
@@ -634,23 +635,15 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
       /**
        * Each row with Seerr's live answer, and the stored status brought up to
        * date by the sweep's own writer (`recordLiveRequestStatus`). The count
-       * and the page were read before, so it reports whether a row it recorded
-       * may have left the filter (`leftFilter`) or moved in the latest-change
-       * order (`restamped`).
+       * and the page were read before, so it returns every status it recorded
+       * (`moves`) for `pageNeedsReread` to judge.
        */
       const withLive = async (rows: typeof listed, settle: boolean) => {
-        let leftFilter = false
-        let restamped = false
-        const note = (from: string, to: string, stamped: boolean) => {
-          if (from === to) return
-          const sameFilter = filter.status ? false : statusGroupKey(from) === statusGroupKey(to)
-          if (!sameFilter) leftFilter = true
-          if (stamped) restamped = true
-        }
+        const moves: StatusMove[] = []
         // Requests Seerr never answered for are looked up in Seerr now, a few
         // per read, so the list shows what became of them (core seerr/submission.ts).
         const settled = settle ? await settleListedRequests(rows) : rows
-        settled.forEach((r, i) => note(rows[i]?.status ?? r.status, r.status, true))
+        settled.forEach((r, i) => moves.push({ from: rows[i]?.status ?? r.status, to: r.status, stamped: true }))
         const enriched = await Promise.all(
           settled.map(async (r) => {
             if (!r.seerrRequestId) return { ...withAwaiting(r), seerrLive: null }
@@ -664,22 +657,25 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
             if (stored !== r.status && mayWrite) {
               try {
                 const recorded = await recordLiveRequestStatus(r, lookup.live)
-                note(r.status, recorded.status, recorded.stamped)
+                moves.push({ from: r.status, to: recorded.status, stamped: recorded.stamped })
                 stored = recorded.status
               } catch (err) {
                 request.log.warn({ err, requestId: r.id }, 'Could not record a request status read from Seerr')
               }
             }
-            return { ...withAwaiting({ ...r, status: stored }), seerrLive: lookup.live }
+            return { ...withAwaiting({ ...r, status: stored }), seerrLive: liveForClient(lookup.live) }
           })
         )
-        return { rows: enriched, leftFilter, restamped }
+        return { rows: enriched, moves }
       }
 
       let page = await withLive(listed, mayWrite)
-      const filtered = filter.statusGroup != null || filter.status != null
-      const byLatestChange = sort === 'recentChange'
-      if ((filtered && page.leftFilter) || (byLatestChange && page.restamped)) {
+      const view = {
+        status: filter.status,
+        statusGroup: filter.statusGroup,
+        sort: isRequestSort(sort) ? sort : undefined,
+      }
+      if (pageNeedsReread(page.moves, view)) {
         // Rows recorded just now may have left (or joined) the filter, or
         // moved in the order: read the count and the page again, once, so they
         // describe the same rows. Seerr's answers are reused, not asked again.
@@ -949,7 +945,7 @@ const seerrRoutes: FastifyPluginAsync = async (fastify) => {
 
       return reply.send({
         apertureStatus,
-        seerrStatus,
+        seerrStatus: liveForClient(seerrStatus),
       })
     }
   )

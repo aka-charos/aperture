@@ -6,6 +6,7 @@ import {
   REQUEST_STATUS_GROUPS,
   groupReadsLibrary,
   isRequestSort,
+  pageNeedsReread,
   isRequestStatusGroup,
   requestLibraryJoinSql,
   requestOrderSql,
@@ -76,4 +77,29 @@ test('unknown values are not groups or sorts', () => {
   assert.equal(isRequestSort('created_at'), false)
   assert.equal(isRequestSort('oldest'), true)
   assert.equal(isRequestSort(undefined), false)
+})
+
+test('a title in several libraries resolves to the same copy every time', () => {
+  const sql = requestLibraryJoinSql('r', null, binderFor([]))
+  assert.match(sql, /ORDER BY lm\.created_at, lm\.id LIMIT 1\)/)
+  assert.match(sql, /ORDER BY ls\.created_at, ls\.id LIMIT 1\)/)
+})
+
+test('a page is read again only when a recorded move can change it', () => {
+  const approve = { from: 'submitted', to: 'approved', stamped: true }
+  const settle = { from: 'pending', to: 'submitted', stamped: true }
+  const quiet = { from: 'failed', to: 'approved', stamped: false }
+  // No filter, default order: nothing a move can change.
+  assert.equal(pageNeedsReread([approve], {}), false)
+  // A move out of the filter's group.
+  assert.equal(pageNeedsReread([approve], { statusGroup: 'waiting' }), true)
+  // A move within it (both "waiting").
+  assert.equal(pageNeedsReread([settle], { statusGroup: 'waiting' }), false)
+  // An exact status filter is left by any move.
+  assert.equal(pageNeedsReread([settle], { status: 'pending' }), true)
+  // Latest-change order moves only with the stamp.
+  assert.equal(pageNeedsReread([settle], { sort: 'recentChange' }), true)
+  assert.equal(pageNeedsReread([quiet], { sort: 'recentChange' }), false)
+  // A move that records the same status is no move.
+  assert.equal(pageNeedsReread([{ from: 'approved', to: 'approved', stamped: true }], { status: 'approved' }), false)
 })

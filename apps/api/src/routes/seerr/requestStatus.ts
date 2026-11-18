@@ -41,6 +41,17 @@ export interface RequestStatusInput {
   inLibrary: boolean
 }
 
+/**
+ * Seerr's live answer as the routes send it: request and media status only.
+ * Core's answer also carries Seerr's last-change date, which the restore rule
+ * reads and no response documents.
+ */
+export function liveForClient(
+  live: NonNullable<RequestStatusInput['live']> | null
+): RequestStatusInput['live'] {
+  return live ? { status: live.status, mediaStatus: live.mediaStatus } : null
+}
+
 export function decideRequestStatus(input: RequestStatusInput): RequestStatusKey | null {
   const { live } = input
   switch (input.status) {

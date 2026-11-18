@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { decideRequestStatus, type RequestStatusInput } from './requestStatus.js'
+import { decideRequestStatus, liveForClient, type RequestStatusInput } from './requestStatus.js'
 
 const base: RequestStatusInput = { status: 'submitted', awaitingSeerr: false, live: null, inLibrary: false }
 
@@ -53,4 +53,10 @@ test('stored statuses without a live answer', () => {
   assert.equal(decideRequestStatus({ ...base, status: 'declined' }), 'declined')
   assert.equal(decideRequestStatus({ ...base, status: 'failed' }), 'failed')
   assert.equal(decideRequestStatus({ ...base, status: 'something-new' }), null)
+})
+
+test("responses carry Seerr's request and media status, nothing else", () => {
+  const live = { status: 'approved', mediaStatus: 'processing', updatedAt: new Date() } as const
+  assert.deepEqual(liveForClient(live), { status: 'approved', mediaStatus: 'processing' })
+  assert.equal(liveForClient(null), null)
 })

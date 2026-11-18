@@ -58,7 +58,9 @@ export {
 export {
   reconcileDiscoveryRequests,
   resolveRequestStatus,
-  repairKeepsStatusStamp,
+  restoreKeepsStatusStamp,
+  planLiveRecord,
+  recheckWindow,
   recordLiveRequestStatus,
   type RecordedRequestStatus,
   type ReconcileResult,
@@ -71,7 +73,9 @@ export {
   isRequestStatusGroup,
   isRequestSort,
   statusGroupKey,
+  pageNeedsReread,
   type RequestStatusGroup,
+  type StatusMove,
   type RequestSort,
 } from './requestListing.js'
 

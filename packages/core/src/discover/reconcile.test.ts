@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { repairKeepsStatusStamp, resolveRequestStatus } from './reconcile.js'
+import { planLiveRecord, recheckWindow, resolveRequestStatus, restoreKeepsStatusStamp } from './reconcile.js'
 
 /**
  * The point of reconciliation is that a request Seerr declined must reach a
@@ -88,25 +88,69 @@ test('a row recorded as failed follows Seerr when Seerr still holds the request'
   )
 })
 
-test('restoring a wrongly failed row announces only what Seerr decided after the failure', () => {
+test('a restore to the status the row held before failing is a correction, not news', () => {
+  // Already announced when it first happened: no second "approved".
+  assert.equal(restoreKeepsStatusStamp('approved', 'approved', null, null), true)
+  assert.equal(restoreKeepsStatusStamp('submitted', 'submitted', null, null), true)
+  // A different status is a decision made since: announced now.
+  assert.equal(restoreKeepsStatusStamp('approved', 'submitted', null, null), false)
+  assert.equal(restoreKeepsStatusStamp('declined', 'approved', null, null), false)
+  // A failed row was never available, so that is news whatever it held.
+  assert.equal(restoreKeepsStatusStamp('available', 'approved', null, null), false)
+})
+
+test('a row failed before 0225 falls back to the dates, and announces when unsure', () => {
   const failedAt = new Date('2026-10-20T04:30:00Z')
   const before = new Date('2026-10-19T12:00:00Z')
   const after = new Date('2026-10-25T09:00:00Z')
-  // Decided before the row was failed: announced back then, so no second
-  // "approved" weeks later.
-  assert.equal(repairKeepsStatusStamp('failed', 'approved', failedAt, before), true)
-  assert.equal(repairKeepsStatusStamp('failed', 'submitted', failedAt, before), true)
-  assert.equal(repairKeepsStatusStamp('failed', 'declined', failedAt, before), true)
-  // Decided while the row read as failed: never announced, so announced now.
-  assert.equal(repairKeepsStatusStamp('failed', 'approved', failedAt, after), false)
-  assert.equal(repairKeepsStatusStamp('failed', 'declined', failedAt, after), false)
-  // Either date unknown: announce rather than lose the news.
-  assert.equal(repairKeepsStatusStamp('failed', 'approved', null, before), false)
-  assert.equal(repairKeepsStatusStamp('failed', 'approved', failedAt, null), false)
-  assert.equal(repairKeepsStatusStamp('failed', 'approved', failedAt, undefined), false)
-  // A failed row was never available, so that is news.
-  assert.equal(repairKeepsStatusStamp('failed', 'available', failedAt, before), false)
-  // Ordinary moves always stamp.
-  assert.equal(repairKeepsStatusStamp('approved', 'available', failedAt, before), false)
-  assert.equal(repairKeepsStatusStamp('submitted', 'approved', failedAt, before), false)
+  assert.equal(restoreKeepsStatusStamp('approved', null, failedAt, before), true)
+  assert.equal(restoreKeepsStatusStamp('approved', null, failedAt, after), false)
+  assert.equal(restoreKeepsStatusStamp('approved', null, null, before), false)
+  assert.equal(restoreKeepsStatusStamp('approved', null, failedAt, undefined), false)
+})
+
+const live = (status: 'pending' | 'approved' | 'declined' | 'completed', mediaStatus = 'unknown') =>
+  ({ status, mediaStatus }) as Parameters<typeof planLiveRecord>[2]
+
+test('the writer never writes over a status someone recorded since it was read', () => {
+  // Read as submitted, an admin declined it meanwhile: the older live answer loses.
+  assert.deepEqual(
+    planLiveRecord('submitted', { status: 'declined', statusChangedAt: null, failedFrom: null }, live('approved')),
+    { write: false, status: 'declined' }
+  )
+  // Gone meanwhile: nothing to write, the caller keeps what it read.
+  assert.deepEqual(planLiveRecord('submitted', null, live('approved')), { write: false, status: 'submitted' })
+})
+
+test('the writer plans an ordinary move, a restore, or nothing', () => {
+  assert.deepEqual(
+    planLiveRecord('submitted', { status: 'submitted', statusChangedAt: null, failedFrom: null }, live('approved')),
+    { write: true, next: 'approved', restore: false, keepStamp: false }
+  )
+  assert.deepEqual(
+    planLiveRecord('approved', { status: 'approved', statusChangedAt: null, failedFrom: null }, live('approved', 'processing')),
+    { write: false, status: 'approved' }
+  )
+  assert.deepEqual(
+    planLiveRecord('failed', { status: 'failed', statusChangedAt: null, failedFrom: 'approved' }, live('approved', 'processing')),
+    { write: true, next: 'approved', restore: true, keepStamp: true }
+  )
+  assert.deepEqual(
+    planLiveRecord('failed', { status: 'failed', statusChangedAt: null, failedFrom: 'approved' }, live('approved', 'available')),
+    { write: true, next: 'available', restore: true, keepStamp: false }
+  )
+})
+
+test('the nightly re-check window covers every row, a window per night, wrapping', () => {
+  assert.deepEqual(recheckWindow(40, 100, 7), { offset: 0, wrap: 0 })
+  const total = 250
+  const seen = new Map<number, number>()
+  for (let night = 0; night < 3; night++) {
+    const { offset, wrap } = recheckWindow(total, 100, night)
+    for (let i = offset; i < Math.min(offset + 100, total); i++) seen.set(i, (seen.get(i) ?? 0) + 1)
+    for (let i = 0; i < wrap; i++) seen.set(i, (seen.get(i) ?? 0) + 1)
+  }
+  for (let i = 0; i < total; i++) assert.ok((seen.get(i) ?? 0) >= 1, `row ${i} never checked`)
+  // Each night checks a full batch.
+  assert.deepEqual(recheckWindow(total, 100, 2), { offset: 200, wrap: 50 })
 })
