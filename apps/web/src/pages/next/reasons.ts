@@ -27,13 +27,16 @@ export type ReasonText =
  * Every suggestion has a tie (core only suggests a neighbour or a shared
  * person), so the first reason is always one.
  */
-const ORDER: Record<NextReason['kind'], number> = { shared: 0, themes: 1, feel: 2, favourite: 3, company: 4 }
-
-/** The reasons that say how a suggestion relates to the start. */
-const TIES: ReadonlySet<NextReason['kind']> = new Set(['shared', 'themes', 'feel'])
+const KINDS: Record<NextReason['kind'], { order: number; tie: boolean }> = {
+  shared: { order: 0, tie: true },
+  themes: { order: 1, tie: true },
+  feel: { order: 2, tie: true },
+  favourite: { order: 3, tie: false },
+  company: { order: 4, tie: false },
+}
 
 export function orderReasons(reasons: readonly NextReason[]): NextReason[] {
-  return [...reasons].sort((a, b) => ORDER[a.kind] - ORDER[b.kind])
+  return [...reasons].sort((a, b) => KINDS[a.kind].order - KINDS[b.kind].order)
 }
 
 /**
@@ -41,7 +44,7 @@ export function orderReasons(reasons: readonly NextReason[]): NextReason[] {
  * it follows. Null only for a suggestion with no tie, which core never sends.
  */
 export function tieReason(reasons: readonly NextReason[]): NextReason | null {
-  return orderReasons(reasons).find((reason) => TIES.has(reason.kind)) ?? null
+  return orderReasons(reasons).find((reason) => KINDS[reason.kind].tie) ?? null
 }
 
 export function reasonText(reason: NextReason, start: string, type: 'movie' | 'series'): ReasonText {

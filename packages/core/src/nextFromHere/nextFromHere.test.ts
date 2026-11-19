@@ -599,12 +599,12 @@ test('a show by the same creator outranks the closest show that only carries a n
 })
 
 test('one shared person fills at most MAX_PER_SHARED_ENTITY places in a list; the rest move up', () => {
-  const candidate = (id: number, entity?: number): Candidate => ({
+  const candidate = (id: number, ...entities: number[]): Candidate => ({
     title: id,
-    quadrant: entity === undefined ? 'close' : 'closeLinked',
+    quadrant: entities.length === 0 ? 'close' : 'closeLinked',
     score: 1 - id / 100,
     reasons: [],
-    sharedEntities: entity === undefined ? [] : [entity],
+    sharedEntities: entities,
   })
   const ranked = [candidate(1, 7), candidate(2, 7), candidate(3, 7), candidate(4), candidate(5, 8), candidate(6, 7)]
   const taken = takeCapped(ranked, 4)
@@ -613,11 +613,21 @@ test('one shared person fills at most MAX_PER_SHARED_ENTITY places in a list; th
     [1, 2, 4, 5]
   )
   assert.equal(taken.filter((c) => c.sharedEntities[0] === 7).length, MAX_PER_SHARED_ENTITY)
+  // A person counts wherever they are shared, not only as the strongest
+  // credit: two films by director 7 starring lead 9 use up lead 9's places too.
+  const both = takeCapped([candidate(1, 7, 9), candidate(2, 7, 9), candidate(3, 9), candidate(4, 9), candidate(5)], 5)
+  assert.deepEqual(
+    both.map((c) => c.title),
+    [1, 2, 5]
+  )
   // The close list keeps the same rule.
   const director7 = Array.from({ length: CLOSE_ITEMS }, (_, i) => candidate(i + 1, 7))
   assert.equal(pickClose(director7).length, MAX_PER_SHARED_ENTITY)
 })
 
+// Guards the craft-role strength against the blend: with a shared person worth
+// as much as closeness, a cinematographer at the old 0.8 would lift a title
+// halfway down the neighbours above the closest one (0.225 + 0.36 > 0.45).
 test('a cinematographer alone does not outrank the closest title', () => {
   const start = title('Start', [cinematographer('Roger Deakins')])
   const closest = title('Closest', [])

@@ -409,9 +409,11 @@ export function pickClose(candidates: readonly Candidate[]): Candidate[] {
 }
 
 /**
- * The first `limit` candidates in order, with at most `perEntity` through the
- * same strongest shared person or franchise (`sharedEntities[0]`, the one a
- * card names). A candidate passed over leaves room for the next.
+ * The first `limit` candidates in order, with at most `perEntity` sharing any
+ * one person or franchise with the start. Every shared credit of a candidate
+ * counts, not only the one its card names: a film by the start's director
+ * that also stars its lead uses up a place for both. A candidate passed over
+ * leaves room for the next.
  */
 export function takeCapped(
   candidates: readonly Candidate[],
@@ -422,12 +424,8 @@ export function takeCapped(
   const taken = new Map<number, number>()
   for (const candidate of candidates) {
     if (out.length >= limit) break
-    const entity = candidate.sharedEntities[0]
-    if (entity !== undefined) {
-      const count = taken.get(entity) ?? 0
-      if (count >= perEntity) continue
-      taken.set(entity, count + 1)
-    }
+    if (candidate.sharedEntities.some((entity) => (taken.get(entity) ?? 0) >= perEntity)) continue
+    for (const entity of candidate.sharedEntities) taken.set(entity, (taken.get(entity) ?? 0) + 1)
     out.push(candidate)
   }
   return out

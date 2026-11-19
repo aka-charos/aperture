@@ -23,7 +23,7 @@ On a title's own page each card has room for one reason, and it is always the on
 
 ### How the list is ordered
 
-How close a title feels and who it shares with the start count equally. A title by the same director, or a show by the same creator, counts the most; a shared writer or lead less (a writer credit also names the authors of the books and comics a title adapts); a shared cinematographer or composer less again; a franchise least. Someone you keep coming back to, or a network you favour, only breaks near-ties, so a title that is merely close in feel overtakes one by the same author only when that one feels very different. No more than two titles come through the same person, so one prolific director can't fill the list; the rest of their work is in their row below.
+How close a title feels and who it shares with the start count equally. A title by the same director, or a show by the same creator, counts the most; a shared writer or lead less (a writer credit also names the authors of the books and comics a title adapts); a shared cinematographer or composer less again; a franchise least. Someone you keep coming back to, or a network you favour, only breaks near-ties, so a title that is merely close in feel overtakes one by the same author only when that one feels very different. No more than two titles share the same person with the start, whatever their part, so one prolific director can't fill the list; the rest of their work is in their row below. The same rules order the list here, choose each step of **Take me somewhere**, and pick which shared credit a line on the map names.
 
 What counts as liking a title: rating it 7 or higher, or finishing it without rating it. A title rated 4 or lower counts against the people on it.
 
@@ -31,7 +31,7 @@ What counts as liking a title: rating it 7 or higher, or finishing it without ra
 
 One row for each person who shaped the start (its director, creator, writers, cinematographer, composer and lead actors), one for its franchise, and one for a studio or network you favour. Each row shows what else of theirs is in your library: the titles you haven't seen first, best suggestion first, then the ones you have, faded.
 
-The rows are ordered by **you**, not by how famous anyone is. Someone you keep coming back to comes first, with a line saying why ("You liked 3 of their titles, rated 8.7 on average"). Then the people with the biggest part in the start: a director before a lead, a lead before the franchise. A bit part or an editor never gets a row.
+The rows are ordered by **you**, not by how famous anyone is. Someone you keep coming back to comes first, with a line saying why ("You liked 3 of their titles, rated 8.7 on average"). Then the people with the biggest part in the start: a director or creator first, then a writer or lead, then a cinematographer or composer, then the franchise. A bit part or an editor never gets a row.
 
 Turn on **Hide what I've seen** to leave the titles you've seen out of the rows. **Show all** opens a long row in place, and a row's name opens that person's, studio's or franchise's own page.
 

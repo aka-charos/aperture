@@ -2635,4 +2635,15 @@ With the old role table (writer equal to director) the not-close titles came mos
 
 **The card says the tie.** `tieReason` (web) takes the first of shared person, themes, closeness; core only suggests a neighbour or a title sharing a major-role person, so every suggestion has one. Taste notes are still shown on the Next from here page, after the ties, worded about the suggestion ("Lead actor of this one: …", "From HBO: …"). Other languages lost the old wording of those notes and fall back to English.
 
-**Evidence.** `test:next-from-here`: the role order, the cap, a cinematographer not outranking the closest title, and the Lowdown case (a same-creator show halfway down the neighbours against the closest show carrying a favoured network), which fails on the old weights. Web `next.test.ts`: tie-first order and `tieReason` on the Killers of the Flower Moon and Task reasons. Not exercised: the reordered lists in a browser; people rows now order a writer level with a lead.
+**Evidence.** `test:next-from-here`: the role order, the cap, a cinematographer not outranking the closest title, and the Lowdown case (a same-creator show halfway down the neighbours against the closest show carrying a favoured network), which fails on the old weights. Web `next.test.ts`: tie-first order and `tieReason` on the Killers of the Flower Moon and Task reasons. Not exercised: the reordered lists in a browser.
+
+**Review fixes (same entry).** (1) The cap counted only a candidate's strongest shared credit, so a lead who was the second credit on a director's films could still fill more places; every shared credit now uses up a place (`takeCapped`), pinned with a director-plus-lead case. (2) The replay above was pooled across viewers and covered only the title page; it was re-run per viewer with the deployed build (`be912e50`, old scoring) against the new one, on the title page, the Next from here close list and the walk (32 starts per viewer, 6 walks each):
+
+| viewer (films played) | author in title-page list, when one exists | items with a feel rank, of 12 | mean feel rank | most titles per person | walk steps via a person, of 5 |
+|---|---|---|---|---|---|
+| charos (245) | 14 → 23 of 23 | 12.0 → 11.4 | 5.5 → 5.3 | 11 → 2 | 3.7 → 3.5 |
+| k1a (1,588) | 11 → 20 of 20 | 11.6 → 11.1 | 6.0 → 5.7 | 11 → 2 | 3.8 → 4.0 |
+| electriclooser (309) | 18 → 27 of 28 | 12.0 → 11.6 | 5.1 → 4.9 | 7 → 2 | 3.7 → 4.3 |
+| afro (301) | 11 → 22 of 23 | 12.0 → 11.4 | 5.0 → 4.8 | 12 → 2 | 3.3 → 3.8 |
+
+The same direction for every viewer, the heaviest included. The close list keeps every title close in feel (it never admits a credit-only title) and its feel ranks do not move; what it loses is one person filling it. Walks lean slightly more on people (+0.3 of 5 steps on average) and never repeat a person (distinct links equal person steps). (3) `sharedRoleStrength` also orders the people rows and picks the credit a map line names: a writer's row now ranks with a lead's rather than the director's, and the guide says so. (4) The craft-role test passes on the old blend; it guards the role table against the new one (fails at 0.8), as its comment now says. (5) The web reason table holds order and tie together (`KINDS`).
