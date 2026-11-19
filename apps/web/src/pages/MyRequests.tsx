@@ -42,6 +42,7 @@ import {
   type ContentSearchItem,
 } from '../components/ContentSearchPanel'
 import { MyIssuesPanel } from '../components/MyIssuesPanel'
+import { DEFAULT_ISSUE_LIST_CHOICE, type IssueListChoice } from '../components/issueListChoice'
 import { MediaDetailModalProvider } from '../hooks/MediaDetailModalProvider'
 import { useMediaDetailModal } from '../hooks/useMediaDetailModal'
 import { PageHeading } from '@/components/PageHeading'
@@ -172,6 +173,8 @@ function MyRequestsContent() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [sort, setSort] = useState<RequestSort>('newest')
   const [allUsers, setAllUsers] = useState(false)
+  // Held here, not in the panel, so leaving the Issues tab and coming back keeps it.
+  const [issueChoice, setIssueChoice] = useState<IssueListChoice>(DEFAULT_ISSUE_LIST_CHOICE)
   // `?tab=issues` is where an issue notification opens, so it lands on the right list.
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
@@ -487,7 +490,13 @@ function MyRequestsContent() {
       {/* Both panels are unmounted when inactive rather than hidden: each
           owns a fetch, and a hidden one would keep refetching on every
           filter change the other made. */}
-      {tab === 'issues' && <MyIssuesPanel scope={isAdmin && allUsers ? 'all' : 'mine'} />}
+      {tab === 'issues' && (
+        <MyIssuesPanel
+          scope={isAdmin && allUsers ? 'all' : 'mine'}
+          choice={issueChoice}
+          onChoiceChange={setIssueChoice}
+        />
+      )}
 
       {tab === 'requests' && (
       <>

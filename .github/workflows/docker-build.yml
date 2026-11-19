@@ -77,6 +77,11 @@ jobs:
       - name: Assistant tools
         run: pnpm --filter @aperture/api test:assistant
 
+      # Issue mapping and the Issues tab's filter and order rules. Pure; needs
+      # no database or Seerr.
+      - name: Issues
+        run: pnpm --filter @aperture/api test:issues
+
   docker-amd64:
     name: Build Docker Image (amd64)
     needs: [detect-changes, validate]

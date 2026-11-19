@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { lastActivityAt, listIssues, readIssueListView } from './issueListing.js'
+import { lastActivityAt, listIssues, readIssueListView, readLocale, uniqueById } from './issueListing.js'
 
-type Row = Parameters<typeof listIssues>[0][number]
+type Row = Parameters<typeof listIssues>[0][number] & { state: 'open' | 'resolved' }
 
 const issue = (id: number, extra: Partial<Row> = {}): Row => ({
   id,
@@ -18,29 +18,43 @@ const issue = (id: number, extra: Partial<Row> = {}): Row => ({
 const ids = (rows: Row[]) => rows.map((r) => r.id)
 const view = (v: Partial<ReturnType<typeof readIssueListView>>) => ({ ...readIssueListView({}), ...v })
 
-test('unknown query values read as the defaults', () => {
-  assert.deepEqual(readIssueListView({}), { state: 'all', kind: 'all', sort: 'newest' })
-  assert.deepEqual(readIssueListView({ filter: 'closed', kind: 'smell', sort: 'random' }), {
-    state: 'all',
-    kind: 'all',
-    sort: 'newest',
-  })
-  assert.deepEqual(readIssueListView({ filter: 'resolved', kind: 'subtitles', sort: 'titleAsc' }), {
+test('unknown query values read as the defaults, and latest activity is the default order', () => {
+  const defaults = { state: 'all', kind: 'all', sort: 'latestActivity', locale: null }
+  assert.deepEqual(readIssueListView({}), defaults)
+  assert.deepEqual(readIssueListView({ filter: 'closed', kind: 'smell', sort: 'random', lang: '!!' }), defaults)
+  assert.deepEqual(readIssueListView({ filter: 'resolved', kind: 'subtitles', sort: 'titleAsc', lang: 'el' }), {
     state: 'resolved',
     kind: 'subtitles',
     sort: 'titleAsc',
+    locale: 'el',
   })
 })
 
-test('state and problem type both narrow the list', () => {
+test('a language tag Intl refuses reads as none, never as a throw', () => {
+  assert.equal(readLocale(undefined), null)
+  assert.equal(readLocale('en-x-'), null)
+  assert.equal(readLocale('el'), 'el')
+})
+
+test('the problem type narrows the list; the state is left to Seerr', () => {
   const rows = [
     issue(1, { kind: 'video', state: 'open' }),
     issue(2, { kind: 'subtitles', state: 'open' }),
     issue(3, { kind: 'subtitles', state: 'resolved' }),
   ]
-  assert.deepEqual(ids(listIssues(rows, view({ kind: 'subtitles' }))), [3, 2])
-  assert.deepEqual(ids(listIssues(rows, view({ kind: 'subtitles', state: 'open' }))), [2])
+  assert.deepEqual(ids(listIssues(rows, view({ kind: 'subtitles', sort: 'newest' }))), [3, 2])
+  // Not filtered again here, whatever the view's state says.
+  assert.deepEqual(ids(listIssues(rows, view({ kind: 'subtitles', state: 'open', sort: 'newest' }))), [3, 2])
   assert.deepEqual(ids(listIssues(rows, view({ kind: 'audio' }))), [])
+})
+
+test('an issue read twice across shifting pages is kept once, the first copy', () => {
+  const first = issue(2, { libraryTitle: 'first' })
+  assert.deepEqual(uniqueById([issue(3), first, issue(2, { libraryTitle: 'again' }), issue(1)]), [
+    issue(3),
+    first,
+    issue(1),
+  ])
 })
 
 test('newest and oldest go by the report date', () => {
@@ -53,6 +67,13 @@ test('latest activity counts a reply, which does not move the issue itself', () 
   const rows = [issue(5), issue(1, { comments: [{ createdAt: '2026-02-01T00:00:00Z' }] }), issue(3)]
   assert.deepEqual(ids(listIssues(rows, view({ sort: 'latestActivity' }))), [1, 5, 3])
   assert.equal(lastActivityAt(rows[1]!), Date.parse('2026-02-01T00:00:00Z'))
+})
+
+test("title order follows the viewer's language", () => {
+  // Swedish puts Å after Z; the default collation puts it beside A.
+  const rows = [issue(1, { libraryTitle: 'Zorro' }), issue(2, { libraryTitle: 'Ådalen' })]
+  assert.deepEqual(ids(listIssues(rows, view({ sort: 'titleAsc', locale: 'sv' }))), [1, 2])
+  assert.deepEqual(ids(listIssues(rows, view({ sort: 'titleAsc', locale: 'en' }))), [2, 1])
 })
 
 test('title order ignores case and accents, and an unknown title sorts last either way', () => {

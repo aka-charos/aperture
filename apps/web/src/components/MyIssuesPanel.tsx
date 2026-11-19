@@ -9,7 +9,7 @@
  * mount the same thing with `scope="all"` — the pattern the requests table
  * already uses.
  */
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link as RouterLink } from 'react-router-dom'
 import {
@@ -31,6 +31,13 @@ import {
 } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
+import {
+  DEFAULT_ISSUE_LIST_CHOICE,
+  ISSUE_KIND_FILTERS,
+  ISSUE_SORTS,
+  ISSUE_STATE_FILTERS,
+  type IssueListChoice,
+} from './issueListChoice'
 
 export interface IssueComment {
   id: number
@@ -56,17 +63,12 @@ export interface Issue {
   updatedAt: string
 }
 
-/** The server decides each one; the panel only sends the choice. */
-const STATE_FILTERS = ['all', 'open', 'resolved'] as const
-const KIND_FILTERS = ['all', 'video', 'audio', 'subtitles', 'other'] as const
-const SORTS = ['newest', 'oldest', 'latestActivity', 'titleAsc', 'titleDesc'] as const
-type StateFilter = (typeof STATE_FILTERS)[number]
-type KindFilter = (typeof KIND_FILTERS)[number]
-type IssueSort = (typeof SORTS)[number]
-
 interface MyIssuesPanelProps {
   /** 'all' asks for every user's issues; the server narrows it for non-admins. */
   scope?: 'mine' | 'all'
+  /** The filter and order, held by the page so it outlives the tab. */
+  choice?: IssueListChoice
+  onChoiceChange?: (next: IssueListChoice) => void
 }
 
 function formatDate(value: string): string {
@@ -218,21 +220,32 @@ function IssueRow({
   )
 }
 
-export function MyIssuesPanel({ scope = 'mine' }: MyIssuesPanelProps) {
-  const { t } = useTranslation()
+export function MyIssuesPanel({
+  scope = 'mine',
+  choice = DEFAULT_ISSUE_LIST_CHOICE,
+  onChoiceChange,
+}: MyIssuesPanelProps) {
+  const { t, i18n } = useTranslation()
+  const lang = i18n.resolvedLanguage ?? i18n.language
   const [issues, setIssues] = useState<Issue[]>([])
   const [loading, setLoading] = useState(true)
   const [unavailable, setUnavailable] = useState(false)
   const [unlinked, setUnlinked] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ message: string; severity: 'success' | 'error' } | null>(null)
-  const [stateFilter, setStateFilter] = useState<StateFilter>('all')
-  const [kindFilter, setKindFilter] = useState<KindFilter>('all')
-  const [sort, setSort] = useState<IssueSort>('newest')
   const [truncated, setTruncated] = useState(false)
+  const { state: stateFilter, kind: kindFilter, sort } = choice
   const filtersActive = stateFilter !== 'all' || kindFilter !== 'all'
+  const change = (patch: Partial<IssueListChoice>) => onChoiceChange?.({ ...choice, ...patch })
+  /**
+   * Each load is numbered and only the newest may write: a list asked for an
+   * earlier choice can finish after a later one and must not replace it.
+   */
+  const latestLoad = useRef(0)
 
   const load = useCallback(async () => {
+    const thisLoad = ++latestLoad.current
+    const current = () => thisLoad === latestLoad.current
     setLoading(true)
     setError(null)
     setUnavailable(false)
@@ -241,8 +254,10 @@ export function MyIssuesPanel({ scope = 'mine' }: MyIssuesPanelProps) {
       if (scope === 'all') url.searchParams.set('scope', 'all')
       if (stateFilter !== 'all') url.searchParams.set('filter', stateFilter)
       if (kindFilter !== 'all') url.searchParams.set('kind', kindFilter)
-      if (sort !== 'newest') url.searchParams.set('sort', sort)
+      if (sort !== DEFAULT_ISSUE_LIST_CHOICE.sort) url.searchParams.set('sort', sort)
+      if (lang) url.searchParams.set('lang', lang)
       const res = await fetch(url.toString(), { credentials: 'include' })
+      if (!current()) return
 
       if (res.status === 503) {
         setIssues([])
@@ -255,16 +270,18 @@ export function MyIssuesPanel({ scope = 'mine' }: MyIssuesPanelProps) {
       }
 
       const data = (await res.json()) as { issues?: Issue[]; unlinked?: boolean; truncated?: boolean }
+      if (!current()) return
       setIssues(data.issues ?? [])
       setUnlinked(data.unlinked === true)
       setTruncated(data.truncated === true)
     } catch (e) {
+      if (!current()) return
       setIssues([])
       setError(e instanceof Error ? e.message : t('myIssues.errorLoad'))
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
-  }, [scope, stateFilter, kindFilter, sort, t])
+  }, [scope, stateFilter, kindFilter, sort, lang, t])
 
   useEffect(() => {
     void load()
@@ -279,9 +296,9 @@ export function MyIssuesPanel({ scope = 'mine' }: MyIssuesPanelProps) {
           labelId="issue-state-filter"
           label={t('myIssues.filters.status')}
           value={stateFilter}
-          onChange={(e) => setStateFilter(e.target.value as StateFilter)}
+          onChange={(e) => change({ state: e.target.value as IssueListChoice['state'] })}
         >
-          {STATE_FILTERS.map((f) => (
+          {ISSUE_STATE_FILTERS.map((f) => (
             <MenuItem key={f} value={f}>
               {f === 'all' ? t('myIssues.filters.statusAll') : t(`myIssues.state.${f}`)}
             </MenuItem>
@@ -295,9 +312,9 @@ export function MyIssuesPanel({ scope = 'mine' }: MyIssuesPanelProps) {
           labelId="issue-kind-filter"
           label={t('myIssues.filters.kind')}
           value={kindFilter}
-          onChange={(e) => setKindFilter(e.target.value as KindFilter)}
+          onChange={(e) => change({ kind: e.target.value as IssueListChoice['kind'] })}
         >
-          {KIND_FILTERS.map((f) => (
+          {ISSUE_KIND_FILTERS.map((f) => (
             <MenuItem key={f} value={f}>
               {f === 'all' ? t('myIssues.filters.kindAll') : t(`reportIssue.kinds.${f}`)}
             </MenuItem>
@@ -311,9 +328,9 @@ export function MyIssuesPanel({ scope = 'mine' }: MyIssuesPanelProps) {
           labelId="issue-sort"
           label={t('myIssues.filters.sortBy')}
           value={sort}
-          onChange={(e) => setSort(e.target.value as IssueSort)}
+          onChange={(e) => change({ sort: e.target.value as IssueListChoice['sort'] })}
         >
-          {SORTS.map((option) => (
+          {ISSUE_SORTS.map((option) => (
             <MenuItem key={option} value={option}>
               {t(`myIssues.sort.${option}`)}
             </MenuItem>

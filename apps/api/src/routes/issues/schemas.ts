@@ -6,6 +6,8 @@
  * and there is nothing worth caching locally.
  */
 
+import { ISSUE_LIST_MAX } from './issueListing.js'
+
 export const issueSchemas = {
   Issue: {
     type: 'object',
@@ -52,7 +54,7 @@ export const listIssuesSchema = {
   tags: ['issues'],
   summary: 'List issues',
   description:
-    "Issues reported by the current user. Admins may pass scope=all for everyone's; a non-admin asking for it is narrowed to their own rather than refused.",
+    `Issues reported by the current user. Admins may pass scope=all for everyone's; a non-admin asking for it is narrowed to their own rather than refused. \`total\` is Seerr's count in the asked state; \`issues\` holds at most ${ISSUE_LIST_MAX} (newest reported first kept), narrowed by \`kind\`, and \`truncated\` says when some were left out.`,
   querystring: {
     type: 'object',
     properties: {
@@ -66,9 +68,14 @@ export const listIssuesSchema = {
       },
       sort: {
         type: 'string',
-        enum: ['newest', 'oldest', 'latestActivity', 'titleAsc', 'titleDesc'],
-        default: 'newest',
-        description: 'Newest or oldest report, latest activity (the issue or its newest reply), or title',
+        enum: ['latestActivity', 'newest', 'oldest', 'titleAsc', 'titleDesc'],
+        default: 'latestActivity',
+        description: 'Latest activity (the issue or its newest reply), newest or oldest report, or title',
+      },
+      lang: {
+        type: 'string',
+        maxLength: 35,
+        description: "The viewer's language, for the title order. An unknown tag falls back to the server's.",
       },
     },
   },

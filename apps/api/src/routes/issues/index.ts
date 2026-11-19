@@ -32,7 +32,7 @@ import {
 } from '../../lib/seerrActingUser.js'
 import { attachLibraryMediaIds } from '../../lib/libraryLinks.js'
 import { mapSeerrIssue, toIssueKindCode } from './issueMapping.js'
-import { ISSUE_LIST_MAX, ISSUE_PAGE_SIZE, listIssues, readIssueListView } from './issueListing.js'
+import { ISSUE_LIST_MAX, listIssues, readIssueListView, uniqueById } from './issueListing.js'
 import {
   issueSchemas,
   listIssuesSchema,
@@ -54,7 +54,7 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /api/issues
    */
-  fastify.get<{ Querystring: { scope?: string; filter?: string; kind?: string; sort?: string } }>(
+  fastify.get<{ Querystring: { scope?: string; filter?: string; kind?: string; sort?: string; lang?: string } }>(
     '/api/issues',
     { preHandler: requireAuth, schema: listIssuesSchema },
     async (request, reply) => {
@@ -88,24 +88,27 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Read whole, newest first, so the problem type and the title order are
       // decided over every issue rather than over Seerr's first page. Seerr
-      // filters the state itself. Past the cap the oldest are left out, and
-      // the answer says so.
-      const read: Parameters<typeof mapSeerrIssue>[0][] = []
+      // filters the state itself. One request asks for everything up to the
+      // cap, so nothing can shift between pages; only a Seerr that returns
+      // less than it says it holds is read on page by page, de-duplicated by
+      // id. Whatever is left out, past the cap or by a short read, is said.
+      let read: Parameters<typeof mapSeerrIssue>[0][] = []
       let seerrTotal = 0
       while (read.length < ISSUE_LIST_MAX) {
         const listed = await listSeerrIssues({
           filter: view.state,
           sort: 'added',
-          take: ISSUE_PAGE_SIZE,
+          take: ISSUE_LIST_MAX - read.length,
           skip: read.length,
           ...(actAsUserId != null ? { actAsUserId } : {}),
         })
         if (!listed) {
           return reply.status(502).send({ error: 'Failed to load issues from Seerr' })
         }
-        read.push(...listed.results)
+        const before = read.length
+        read = uniqueById([...read, ...listed.results])
         seerrTotal = listed.pageInfo?.results ?? read.length
-        if (listed.results.length < ISSUE_PAGE_SIZE || read.length >= seerrTotal) break
+        if (read.length === before || read.length >= seerrTotal) break
       }
 
       const withLibrary = await attachLibraryMediaIds(read.slice(0, ISSUE_LIST_MAX).map(mapSeerrIssue))
@@ -113,8 +116,10 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
 
       return reply.send({
         issues,
-        total: issues.length,
-        truncated: seerrTotal > ISSUE_LIST_MAX,
+        // Seerr's count of issues in this state, as before; `issues` may hold
+        // fewer (the problem filter, the cap).
+        total: seerrTotal,
+        truncated: Math.min(read.length, ISSUE_LIST_MAX) < seerrTotal,
         scope: wantsAllUsers ? 'all' : 'mine',
         unlinked: false,
       })
