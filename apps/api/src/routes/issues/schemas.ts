@@ -1,9 +1,10 @@
 /**
  * Issue reporting OpenAPI schemas.
  *
- * Issues are proxied to Seerr live rather than mirrored: `GET /issue` scopes
- * itself to the caller, so acting as the user returns their handful of rows
- * and there is nothing worth caching locally.
+ * Issues are proxied to Seerr live rather than mirrored, so there is nothing
+ * to cache locally. `GET /issue` narrows itself to the caller only for an
+ * account without Seerr's view/manage-issues permission; "mine" is narrowed by
+ * reporter in the route as well (`reportedBy`, issueListing.ts).
  */
 
 import { ISSUE_LIST_MAX } from './issueListing.js'
@@ -54,7 +55,7 @@ export const listIssuesSchema = {
   tags: ['issues'],
   summary: 'List issues',
   description:
-    `Issues reported by the current user. Admins may pass scope=all for everyone's; a non-admin asking for it is narrowed to their own rather than refused. \`total\` is Seerr's count in the asked state; \`issues\` holds at most ${ISSUE_LIST_MAX} (newest reported first kept), narrowed by \`kind\`, and \`truncated\` says when some were left out.`,
+    `Issues reported by the current user. Admins may pass scope=all for everyone's; a non-admin asking for it is narrowed to their own rather than refused. \`total\` is the count in the asked state and scope; \`issues\` holds at most ${ISSUE_LIST_MAX} (newest reported first kept), narrowed by \`kind\`, and \`truncated\` says when some were left out.`,
   querystring: {
     type: 'object',
     properties: {

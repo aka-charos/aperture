@@ -42,7 +42,7 @@ If a title misbehaves â€” wrong audio track, missing subtitles, a broken file â€
 2. For a series, optionally scope it to a season and episode.
 3. Add a message if it helps, and send.
 
-The report is filed in Seerr under your own Seerr account, where your administrator triages it. The **Issues** tab lists the problems you've reported and their current status, with the replies on each one, and you can **reply** from here; administrators see reports from all users.
+The report is filed in Seerr under your own Seerr account, where your administrator triages it. The **Issues** tab lists the problems you've reported and their current status, with the replies on each one, and you can **reply** from here. It lists only your own reports, even if your Seerr account may see everyone's; administrators turn on **All users** to see reports from everyone.
 
 Narrow the list by **Status** (open or resolved) and by **Problem** (video, audio, subtitles or something else), and choose the order under **Sort by**: latest activity first (the default; a new reply counts), newest or oldest report first, or by title in your language's alphabetical order. The choice is kept while you switch between the two tabs.
 

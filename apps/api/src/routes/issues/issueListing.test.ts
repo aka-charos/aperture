@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { lastActivityAt, listIssues, readIssueListView, readLocale, uniqueById } from './issueListing.js'
+import { lastActivityAt, listIssues, readIssueListView, readLocale, reportedBy, uniqueById } from './issueListing.js'
 
 type Row = Parameters<typeof listIssues>[0][number] & { state: 'open' | 'resolved' }
 
@@ -85,6 +85,25 @@ test('title order ignores case and accents, and an unknown title sorts last eith
   ]
   assert.deepEqual(ids(listIssues(rows, view({ sort: 'titleAsc' }))), [4, 1, 3, 2])
   assert.deepEqual(ids(listIssues(rows, view({ sort: 'titleDesc' }))), [3, 1, 4, 2])
+})
+
+test('"mine" keeps the viewer\'s own reports even when Seerr answered with everyone\'s', () => {
+  const rows = [
+    { id: 1, reportedBySeerrUserId: 7 },
+    { id: 2, reportedBySeerrUserId: 9 },
+    { id: 3, reportedBySeerrUserId: null },
+    { id: 4, reportedBySeerrUserId: 7 },
+  ]
+  // A Seerr admin acting as themselves still gets every issue back.
+  const mine = reportedBy(rows, 7, 40)
+  assert.deepEqual(
+    mine.issues.map((r) => r.id),
+    [1, 4]
+  )
+  assert.equal(mine.total, 2)
+  // Seerr had already narrowed the list: its own count stands.
+  const narrowed = reportedBy([rows[0]!, rows[3]!], 7, 12)
+  assert.equal(narrowed.total, 12)
 })
 
 test('the list it was given is left as it was', () => {

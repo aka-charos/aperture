@@ -86,6 +86,25 @@ export function uniqueById<T extends { id: number }>(issues: readonly T[]): T[] 
   return issues.filter((issue) => (seen.has(issue.id) ? false : (seen.add(issue.id), true)))
 }
 
+/**
+ * The viewer's own issues. Seerr narrows `GET /issue` to the caller only for an
+ * account that may report issues but neither view nor manage them; an account
+ * holding either (every Seerr admin) gets everyone's, even when the request
+ * acts as that account. So "mine" is decided here, by the reporter's Seerr id.
+ *
+ * `total` stays Seerr's count when nothing was dropped (Seerr had already
+ * narrowed the list, and its count is exact); otherwise it is the number kept,
+ * exact unless the read was cut short.
+ */
+export function reportedBy<T extends { reportedBySeerrUserId: number | null }>(
+  issues: readonly T[],
+  seerrUserId: number,
+  seerrTotal: number
+): { issues: T[]; total: number } {
+  const kept = issues.filter((issue) => issue.reportedBySeerrUserId === seerrUserId)
+  return { issues: kept, total: kept.length === issues.length ? seerrTotal : kept.length }
+}
+
 export function listIssues<T extends ListedIssue>(
   issues: readonly T[],
   view: Pick<IssueListView, 'kind' | 'sort' | 'locale'>

@@ -32,7 +32,7 @@ import {
 } from '../../lib/seerrActingUser.js'
 import { attachLibraryMediaIds } from '../../lib/libraryLinks.js'
 import { mapSeerrIssue, toIssueKindCode } from './issueMapping.js'
-import { ISSUE_LIST_MAX, listIssues, readIssueListView, uniqueById } from './issueListing.js'
+import { ISSUE_LIST_MAX, listIssues, readIssueListView, reportedBy, uniqueById } from './issueListing.js'
 import {
   issueSchemas,
   listIssuesSchema,
@@ -74,7 +74,9 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
       const view = readIssueListView(request.query)
 
       // Acting as nobody means acting as the API key's owner, who can see
-      // everything. Acting as the user makes Seerr scope the list for us.
+      // everything. Acting as the user narrows the list only for an account
+      // without Seerr's view/manage-issues permission, so "mine" is also
+      // narrowed by reporter below (`reportedBy`).
       const actAsUserId = wantsAllUsers
         ? undefined
         : (await ensureSeerrUserIdForRequest(currentUser.id, request.log)) ?? undefined
@@ -111,14 +113,16 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
         if (read.length === before || read.length >= seerrTotal) break
       }
 
-      const withLibrary = await attachLibraryMediaIds(read.slice(0, ISSUE_LIST_MAX).map(mapSeerrIssue))
-      const issues = listIssues(withLibrary, view)
+      const mapped = read.slice(0, ISSUE_LIST_MAX).map(mapSeerrIssue)
+      const scoped =
+        actAsUserId != null ? reportedBy(mapped, actAsUserId, seerrTotal) : { issues: mapped, total: seerrTotal }
+      const issues = listIssues(await attachLibraryMediaIds(scoped.issues), view)
 
       return reply.send({
         issues,
-        // Seerr's count of issues in this state, as before; `issues` may hold
+        // The count of issues in this state and scope; `issues` may hold
         // fewer (the problem filter, the cap).
-        total: seerrTotal,
+        total: scoped.total,
         truncated: Math.min(read.length, ISSUE_LIST_MAX) < seerrTotal,
         scope: wantsAllUsers ? 'all' : 'mine',
         unlinked: false,
