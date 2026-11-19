@@ -12,7 +12,6 @@ import { viewerScope } from '../../lib/viewerScope.js'
 import {
   getNextFromHere,
   getNextSummary,
-  getNextSummarySize,
   getTrail,
   getTrailStart,
   walkNext,
@@ -101,8 +100,7 @@ const nextFromHereRoutes: FastifyPluginAsync = async (fastify) => {
       if (!userId) return reply.status(401).send({ error: 'Not signed in' })
       const ref = parseTitleRef(request.query.title)
       if (!ref) return reply.status(400).send(BAD_TITLE)
-      const [scope, size] = await Promise.all([viewerScope(request), getNextSummarySize()])
-      const result = await getNextSummary(scope, userId, ref, size)
+      const result = await getNextSummary(await viewerScope(request), userId, ref)
       if (!result) return reply.status(404).send(NOT_FOUND)
       return result
     }

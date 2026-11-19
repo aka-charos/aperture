@@ -9,6 +9,7 @@ import { NextMap } from '../../next/NextMap'
 import { nextPath, orderReasons, reasonText, writeNextUrl } from '../../next/reasons'
 import { useReasonText } from '../../next/useReasonText'
 import type { TrailTitle } from '../../next/types'
+import { useWatchedRevision } from '@/hooks/useWatchedRevision'
 import { useNextSummary } from '../hooks/useNextSummary'
 import { useNextMap } from '../hooks/useNextMap'
 import { useGridColumns } from '../hooks/useGridColumns'
@@ -42,8 +43,10 @@ export function NextFromHerePanel({ titleRef, mediaTitle, onOpen }: NextFromHere
   const say = useReasonText()
   const ids = useId()
   const [view, setView] = useState<View>('list')
-  const summary = useNextSummary(titleRef)
-  const map = useNextMap(titleRef, view === 'map')
+  // A title marked watched anywhere in the app leaves the suggestions.
+  const watchRevision = useWatchedRevision()
+  const summary = useNextSummary(titleRef, watchRevision)
+  const map = useNextMap(titleRef, view === 'map', watchRevision)
   const [gridRef, columns] = useGridColumns()
 
   const items = summary.items ?? []

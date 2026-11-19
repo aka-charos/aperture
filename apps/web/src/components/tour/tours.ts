@@ -152,7 +152,7 @@ export const TOURS: Record<TourId, Tour> = {
       { id: 'actions', icon: 'play', anchor: 'title-actions', placement: 'bottom', doc: { slug: 'ratings' } },
       { id: 'insights', icon: 'sparkle', anchor: 'title-insights', placement: 'top', doc: { slug: 'recommendations' } },
       { id: 'analysis', icon: 'article', anchor: 'title-analysis', placement: 'top', doc: { slug: 'title-analysis' } },
-      { id: 'similar', icon: 'graph', anchor: 'title-similar', placement: 'top', doc: { slug: 'similarity-graphs' } },
+      { id: 'similar', icon: 'compass', anchor: 'title-similar', placement: 'top', doc: { slug: 'next-from-here' } },
     ],
   },
   recommendations: {

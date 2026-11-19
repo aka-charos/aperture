@@ -23,8 +23,9 @@ interface SummarySize {
 
 /**
  * How many suggestions Next from here shows on a title's page. The limits come
- * with the value, so the console states and checks exactly what the API
- * accepts; the API still refuses anything else.
+ * with the value and are stated and offered as the field's range, but whether a
+ * value is accepted is the API's decision alone (core `summarySize.ts`): the
+ * card sends what was typed and reports a refusal.
  */
 export function NextFromHereSettingsSection() {
   const { t } = useTranslation()
@@ -33,6 +34,7 @@ export function NextFromHereSettingsSection() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [refused, setRefused] = useState(false)
   const [success, setSuccess] = useState(false)
 
   const apply = (data: SummarySize) => {
@@ -58,23 +60,27 @@ export function NextFromHereSettingsSection() {
     void load()
   }, [load])
 
-  const parsed = Number(draft)
-  const valid =
-    setting != null && draft.trim() !== '' && Number.isInteger(parsed) && parsed >= setting.min && parsed <= setting.max
-  const dirty = setting != null && valid && parsed !== setting.value
+  const dirty = setting != null && draft.trim() !== '' && draft.trim() !== String(setting.value)
 
   const save = async () => {
-    if (!valid) return
+    if (!dirty) return
     setSaving(true)
     setError(null)
+    setRefused(false)
     setSuccess(false)
     try {
       const res = await fetch('/api/settings/next-from-here', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ summarySize: parsed }),
+        // Sent as typed: a value that is not a whole number in range is the
+        // API's to refuse, so the two can never disagree about what is allowed.
+        body: JSON.stringify({ summarySize: Number(draft) }),
       })
+      if (res.status === 400) {
+        setRefused(true)
+        return
+      }
       if (!res.ok) throw new Error(String(res.status))
       apply((await res.json()) as SummarySize)
       setSuccess(true)
@@ -127,9 +133,10 @@ export function NextFromHereSettingsSection() {
               onChange={(event) => {
                 setDraft(event.target.value)
                 setSuccess(false)
+                setRefused(false)
               }}
-              error={draft.trim() !== '' && !valid}
-              helperText={t('settingsNextFromHere.sizeHelp', {
+              error={refused}
+              helperText={t(refused ? 'settingsNextFromHere.refused' : 'settingsNextFromHere.sizeHelp', {
                 min: setting.min,
                 max: setting.max,
                 default: setting.default,

@@ -80,39 +80,67 @@ async function loadIndex(): Promise<IndexCache> {
   return { index, builtAt: Date.now(), views: new Map() }
 }
 
+/**
+ * Bumped when the tables the index is read from were replaced wholesale (a
+ * restore). A build that started before the bump read the old data, so it is
+ * followed by another as soon as it ends; joining it would keep the old
+ * titles for up to INDEX_MAX_AGE_MS.
+ */
+let dataGeneration = 0
+
+function startBuild(): Promise<IndexCache> {
+  const generation = dataGeneration
+  const promise = loadIndex().then((built) => {
+    cache = built
+    return built
+  })
+  building = promise
+  // A stale index answers while this builds, so nothing may await it — and
+  // an unawaited rejection is fatal here (the API exits on one). Handled
+  // once at the source; a caller that does await still gets the error.
+  promise.catch((err) => logger.warn({ err }, 'Trails index rebuild failed; the previous index stays in use'))
+  void promise
+    .then(
+      () => undefined,
+      () => undefined
+    )
+    .then(() => {
+      if (building === promise) building = null
+      if (dataGeneration !== generation) startBuild()
+    })
+  return promise
+}
+
 async function currentIndex(forceRebuild = false): Promise<IndexCache> {
   const fresh = cache && !forceRebuild && Date.now() - cache.builtAt < INDEX_MAX_AGE_MS
   if (fresh && cache) return cache
-  if (!building) {
-    building = loadIndex()
-      .then((built) => {
-        cache = built
-        return built
-      })
-      .finally(() => {
-        building = null
-      })
-    // A stale index answers while this builds, so nothing may await it — and
-    // an unawaited rejection is fatal here (the API exits on one). Handled
-    // once at the source; a caller that does await still gets the error.
-    building.catch((err) => logger.warn({ err }, 'Trails index rebuild failed; the previous index stays in use'))
-  }
+  const pending = building ?? startBuild()
   // A stale index still answers while its replacement builds; only the first
   // build, or a forced one, is waited for.
   if (cache && !forceRebuild) return cache
-  return building
+  return pending
 }
 
 /**
  * Builds the index before a request needs it: at API boot, since the first
- * build takes seconds and a title page asks for Next from here as it opens,
- * and again (`force`) after a restore replaced the titles it was built from.
- * Never rejects; a failed build is logged and the next request tries again.
+ * build takes seconds and a title page asks for Next from here as it opens.
+ * With `dataReplaced` (after a restore) the index is rebuilt from the new
+ * tables, even when a build is already running: that one read the old data,
+ * so another follows it (`dataGeneration`). Never rejects; a failed build is
+ * logged and the next request tries again.
  */
-export async function warmTrailsIndex(force = false): Promise<void> {
-  await currentIndex(force).then(
+export async function warmTrailsIndex({ dataReplaced = false }: { dataReplaced?: boolean } = {}): Promise<void> {
+  let pending: Promise<IndexCache>
+  if (dataReplaced) {
+    dataGeneration += 1
+    // A build in flight starts another when it ends; otherwise start one now.
+    pending = building ?? startBuild()
+  } else {
+    pending = currentIndex()
+  }
+  await pending.then(
     () => undefined,
-    () => undefined // logged where the build is started (currentIndex)
+    () => undefined // logged where the build is started (startBuild)
   )
 }
 

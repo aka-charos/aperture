@@ -8,8 +8,10 @@
  * asked of the embedding; past them the list could only go on with titles
  * linked by credits alone, ordered by another signal, so a longer list would
  * stop being "closest first" without saying so. The pool is fixed rather than
- * raised with the setting because any nearest-neighbour query past
- * `ef_search` (40) pays for an iterative scan (CLAUDE.md, HNSW invariant).
+ * raised with the setting because closeness is a rank scaled by how many
+ * neighbours came back (taste.ts `closenessFromRank`): a bigger pool would
+ * move every closeness score against the credit and taste terms, on the
+ * Next from here page and in the walk as well as here.
  *
  * The floor is one: no setting turns the panel off, since an empty panel on
  * every title page would only read as broken.

@@ -16,7 +16,7 @@ The page lays its posters out in whole rows, so it can show a few fewer than you
 
 ## Why It Stops at 50
 
-Suggestions are ranked mostly by how close they feel to the title, and that closeness comes from a search of the 50 nearest titles in your library. Beyond those 50, the list could only go on with titles linked by their makers alone, ranked a different way, so a longer list would stop being "closest first" without saying so. A larger search isn't offered either: past 40 results, each search needs a slower kind of database scan.
+Suggestions are ranked mostly by how close they feel to the title, and that closeness comes from a search of the 50 nearest titles in your library. Beyond those 50, the list could only go on with titles linked by their makers alone, ranked a different way, so a longer list would stop being "closest first" without saying so. The search isn't widened with the setting either: how close a title counts as is its place among those 50, so a bigger search would change every suggestion's score, on the full Next from here page and in "Take me somewhere" too, not only on title pages.
 
 At least one suggestion is always shown. No value turns the column off.
 

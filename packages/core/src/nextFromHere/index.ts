@@ -39,15 +39,9 @@ import {
   type ViewerTitle,
 } from './taste.js'
 import { walkSteps } from './walk.js'
-import { SUMMARY_SIZE_DEFAULT, summarySizeProblem } from './summarySize.js'
+import { getNextSummarySize } from './settings.js'
 
-export {
-  SUMMARY_SIZE_DEFAULT as NEXT_SUMMARY_SIZE_DEFAULT,
-  SUMMARY_SIZE_MAX as NEXT_SUMMARY_SIZE_MAX,
-  SUMMARY_SIZE_MIN as NEXT_SUMMARY_SIZE_MIN,
-  type SummarySizeLimits as NextSummarySizeLimits,
-} from './summarySize.js'
-export { getNextSummarySize, getNextSummarySizeLimits, setNextSummarySize } from './settings.js'
+export { getNextSummarySizeLimits, setNextSummarySize } from './settings.js'
 
 export {
   CLOSE_ITEMS as NEXT_CLOSE_ITEMS,
@@ -521,25 +515,25 @@ export async function getNextFromHere(
 /**
  * The best suggestions after a title, for its own page: the strongest
  * candidates whatever their kind (close in feel or the same people), so a
- * title with no embedding still gets an answer. `size` is the admin's
- * setting (summarySize.ts, which also says why it has a ceiling); a size
- * that setting would refuse falls back to the default. Null when the title
- * is not in scope.
+ * title with no embedding still gets an answer. How many is the admin's
+ * setting, read here so no caller decides it (summarySize.ts holds the rule
+ * and says why it has a ceiling). Null when the title is not in scope.
  */
 export async function getNextSummary(
   scope: LibraryScope,
   userId: string,
-  ref: TitleRef,
-  size: number = SUMMARY_SIZE_DEFAULT
+  ref: TitleRef
 ): Promise<{ start: TrailTitle; items: NextItem[] } | null> {
-  const count = summarySizeProblem(size) == null ? size : SUMMARY_SIZE_DEFAULT
   let early: Promise<number[]> | null = null
-  const prepared = await prepare(scope, userId, ref, [], {
-    early: (view, start) => {
-      early = neighboursOf(view, scope, start)
-    },
-    withStarts: false,
-  })
+  const [prepared, count] = await Promise.all([
+    prepare(scope, userId, ref, [], {
+      early: (view, start) => {
+        early = neighboursOf(view, scope, start)
+      },
+      withStarts: false,
+    }),
+    getNextSummarySize(),
+  ])
   if (!prepared || prepared.start == null) return null
   const { view, start } = prepared
   const neighbours = await (early ?? neighboursOf(view, scope, start))

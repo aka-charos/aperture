@@ -3793,6 +3793,7 @@
     "description": "Every title's page shows Next from here in its right column: the titles closest to it in feel that the viewer hasn't seen, with the reason for each. Set how many it shows. The page draws whole rows, so it may show a few fewer than this.",
     "sizeLabel": "Suggestions on a title page",
     "sizeHelp": "Between {{min}} and {{max}}; the default is {{default}}.",
+    "refused": "Not saved: enter a whole number from {{min}} to {{max}}.",
     "save": "Save",
     "saved": "Saved.",
     "loadError": "Couldn't load this setting.",

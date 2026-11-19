@@ -18,8 +18,11 @@ type Entry = { ref: string; status: 'loading' | 'failed' } | { ref: string; stat
  * The request belongs to the title, not to the view: switching back to the
  * list while it is on its way must not cancel it, or switching to the map
  * again would find it "loading" with nothing behind it.
+ *
+ * Once asked, it is asked again when `revision` moves, as the list is; the
+ * map already drawn stays up meanwhile, and a failed refresh keeps it.
  */
-export function useNextMap(titleRef: string | null, wanted: boolean): NextMapState {
+export function useNextMap(titleRef: string | null, wanted: boolean, revision = 0): NextMapState {
   const [entry, setEntry] = useState<Entry | null>(null)
   const [askedFor, setAskedFor] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -31,7 +34,8 @@ export function useNextMap(titleRef: string | null, wanted: boolean): NextMapSta
   useEffect(() => {
     if (!askedFor) return
     const controller = new AbortController()
-    setEntry({ ref: askedFor, status: 'loading' })
+    const keepShown = (entry: Entry | null): entry is Entry => entry?.ref === askedFor && entry.status === 'ready'
+    setEntry((current) => (keepShown(current) ? current : { ref: askedFor, status: 'loading' }))
     fetch(`/api/next-from-here${nextQuery([askedFor])}`, { credentials: 'include', signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error(`Next from here failed (${response.status})`)
@@ -39,10 +43,12 @@ export function useNextMap(titleRef: string | null, wanted: boolean): NextMapSta
         if (!controller.signal.aborted) setEntry({ ref: askedFor, status: 'ready', data })
       })
       .catch(() => {
-        if (!controller.signal.aborted) setEntry({ ref: askedFor, status: 'failed' })
+        if (!controller.signal.aborted) {
+          setEntry((current) => (keepShown(current) ? current : { ref: askedFor, status: 'failed' }))
+        }
       })
     return () => controller.abort()
-  }, [askedFor, attempt])
+  }, [askedFor, attempt, revision])
 
   const retry = useCallback(() => setAttempt((n) => n + 1), [])
   const current = entry != null && entry.ref === titleRef ? entry : null

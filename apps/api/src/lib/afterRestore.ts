@@ -77,7 +77,7 @@ export async function afterDatabaseRestored(): Promise<void> {
     [
       'credits index',
       async () => {
-        void warmTrailsIndex(true)
+        void warmTrailsIndex({ dataReplaced: true })
       },
     ],
   ]
