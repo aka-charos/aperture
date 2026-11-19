@@ -26,7 +26,7 @@ docker compose -f docker-compose.crw.yml up -d
 docker compose -f docker-compose.crw.yml ps
 ```
 
-`ps` should list four running services, with `camofox` healthy. The first start pulls several images and takes a few minutes.
+`ps` should list four running services, with `camofox` and `lightpanda` healthy. The first start pulls several images and takes a few minutes.
 
 Then set the **Service URL** in Aperture. Aperture runs in its own container, so the address is the one *that container* uses to reach the host, never `localhost`:
 
@@ -44,6 +44,7 @@ What the file changes from the image's defaults, and why:
 - **A Firefox user agent** on the plain HTTP tier, which otherwise announces itself as `CRW/0.0.1` and is blocked by simple CDN rules.
 - **Two render tabs** and the **10 requests per second cap** restored, so one title's pages do not arrive as a burst.
 - **Memory limits and a restart policy** on every service. Byparr and Camofox are real browsers; an exit code of 137 in `docker compose ps` means a limit killed one, so raise it.
+- **LightPanda told its own name** (`--advertise-host lightpanda`). Since version 1.0.4 it refuses requests addressed to any other name, and the service reaches it as `lightpanda`. Its health check makes a real request under that name, so a refusal shows as `unhealthy` instead of passing unnoticed.
 
 Keep these in mind:
 
@@ -78,6 +79,13 @@ The cascade self-heals: **five consecutive empty answers park an engine at the b
 ## How Title Analysis Uses It
 
 The `generate-title-analysis` job (manual by default, schedulable, with a configurable titles-per-run limit) refuses to start when the mode isn't ready. Per title: engines are tried in health order, the first with results wins, and the criticism search runs beside it. Before anything reaches the prompt, pages that are bot walls, empty fetches, listings with no prose, pages that never name the title, and repeats of a page already kept are dropped, at most one page per site is kept, and navigation menus and plot sections are stripped from what is left. Optionally, the [decision model](decision-model.md#weeding-title-analysis-sources) then drops pages that carry no writing about the title. The remaining text is budgeted to the configured character cap. The retrieval mode and the sources are recorded per analysis so results are comparable. A grounded call that returns **zero** grounding citations is thrown away — the model answered from memory, which is exactly what this feature exists to prevent.
+
+## When Title Analysis Stops on Timeouts
+
+The job stops after five failures in a row and says the problem is the retrieval service or the Title Analysis model. When its last error reads `Retrieval service returned 504` with `Timeout after 15000ms`, the service's search did not answer within its own 15 seconds, so the model is not involved. The search runs through Camofox, so read the logs of the stack's services:
+
+- **LightPanda refusing the service.** `rejected request host` in LightPanda's log, and `CDP discovery parse error` or `circuit breaker open, skipping renderer renderer="lightpanda"` in the service's. Every page that needs a browser then goes to Camofox, which carries the whole load alone. The compose file's `--advertise-host lightpanda` prevents this; a compose file of your own needs the same flag.
+- **Camofox stuck.** Its log shows `POST /tabs` requests with no answer for minutes, after a run of `navigate timed out after 30000ms`. Its own health check keeps passing. Restart it (`docker compose -f docker-compose.crw.yml restart camofox`) and run the job again; the titles that failed are still pending.
 
 ## The Assistant's Web Search
 
