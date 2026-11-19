@@ -2,7 +2,6 @@
  * GraphExplorer - Reusable full-screen graph exploration component
  * 
  * Used by:
- * - SimilarMedia (fullscreen mode) - for exploring similar content
  * - ExplorePage - main exploration interface with search
  */
 import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react'

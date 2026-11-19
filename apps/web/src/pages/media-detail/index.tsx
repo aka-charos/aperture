@@ -14,7 +14,7 @@ import {
   MediaInfoCard,
   SeasonsList,
   MissingSeasonsCard,
-  RelatedPanel,
+  NextFromHerePanel,
   MovieInsights,
   TitleAnalysis,
   RecommendToDialog,
@@ -65,8 +65,6 @@ export function MediaDetailPage({
 
   const {
     media,
-    similar,
-    similarLoading,
     insights,
     mediaServer,
     watchStatus,
@@ -93,7 +91,7 @@ export function MediaDetailPage({
   const onRefreshExplanation = user?.isAdmin ? refreshExplanation : undefined
 
   // Next from here, from this title: the hero's Next from here button and the
-  // tab beside Related.
+  // panel in the right column.
   const titleRef = id ? titleRefFor(mediaType, id) : null
   const nextPath = titleRef ? nextPathFor(titleRef) : null
 
@@ -273,25 +271,22 @@ export function MediaDetailPage({
             </Box>
           </Grid>
 
-          {/* Right Column - Related titles and Next from here, as two tabs.
-              Keyed by title, so each title opens on Related as a list. */}
-          <Grid item xs={12} md={6} data-tour="title-similar">
-            <RelatedPanel
-              key={id}
-              mediaType={mediaType}
-              mediaId={id}
-              mediaTitle={media.title}
-              similar={similar}
-              similarLoading={similarLoading}
-              onOpenMedia={onOpenMedia}
-              nextPath={nextPath}
-              onOpenNext={(title) =>
-                onOpenMedia
-                  ? onOpenMedia(title.type, title.id)
-                  : navigate(`/${title.type === 'movie' ? 'movies' : 'series'}/${title.id}`)
-              }
-            />
-          </Grid>
+          {/* Right Column - Next from here: what to watch after this title.
+              Keyed by title, so each title opens as a list. */}
+          {titleRef && (
+            <Grid item xs={12} md={6} data-tour="title-similar">
+              <NextFromHerePanel
+                key={titleRef}
+                titleRef={titleRef}
+                mediaTitle={media.title}
+                onOpen={(title) =>
+                  onOpenMedia
+                    ? onOpenMedia(title.type, title.id)
+                    : navigate(`/${title.type === 'movie' ? 'movies' : 'series'}/${title.id}`)
+                }
+              />
+            </Grid>
+          )}
         </Grid>
       </Box>
 

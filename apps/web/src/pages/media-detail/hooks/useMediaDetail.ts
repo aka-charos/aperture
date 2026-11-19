@@ -4,7 +4,6 @@ import type {
   Media,
   MediaType,
   Episode,
-  SimilarItem,
   RecommendationInsights,
   MediaServerInfo,
   WatchStatus,
@@ -12,7 +11,6 @@ import type {
   SeriesWatchStats,
   SeasonAvailability,
 } from '../types'
-import { DEFAULT_SIMILAR_MEDIA_LIMIT } from '../constants'
 import { useUserRatings } from '@/hooks/useUserRatings'
 import { onMovieWatched } from '@/lib/watchStatusEvents'
 import { readJsonWithRetry, type MediaLoadError } from '../loadFailure'
@@ -47,9 +45,6 @@ const NO_SEERR_STATUS: SeerrTitleStatus = { canRequest: false, canReportIssue: f
 export interface UseMediaDetailReturn {
   media: Media | null
   mediaType: MediaType
-  similar: SimilarItem[]
-  /** True while the similar-titles search is still running (it is the slowest part of the page). */
-  similarLoading: boolean
   insights: RecommendationInsights | null
   mediaServer: MediaServerInfo | null
   watchStatus: WatchStatus | null
@@ -95,8 +90,6 @@ export function useMediaDetail(
   const { i18n } = useTranslation()
   const displayLanguage = i18n.resolvedLanguage ?? i18n.language
   const [media, setMedia] = useState<Media | null>(null)
-  const [similar, setSimilar] = useState<SimilarItem[]>([])
-  const [similarLoading, setSimilarLoading] = useState(true)
   const [insights, setInsights] = useState<RecommendationInsights | null>(null)
   const [mediaServer, setMediaServer] = useState<MediaServerInfo | null>(null)
   const [watchStatus, setWatchStatus] = useState<WatchStatus | null>(null)
@@ -131,7 +124,7 @@ export function useMediaDetail(
   // Two effects, split by what each answer depends on. Only the title itself
   // (its translated synopsis) depends on the display language; the rest
   // depends on the title and the viewer. Kept in one effect, a language switch
-  // threw away and re-ran the similar-titles search for an identical answer.
+  // threw away and re-ran every other request for an identical answer.
   //
   // `cancelled` in each matters more than it did: with the spinner gone early,
   // a late answer for the title just left would land on the one now open (the
@@ -211,8 +204,6 @@ export function useMediaDetail(
     const base = mediaType === 'movie' ? `/api/movies/${id}` : `/api/series/${id}`
 
     // Last title's answers must not show under this one while its own load.
-    setSimilar([])
-    setSimilarLoading(true)
     setWatchStats(null)
     setInsights(null)
     setWatchStatus(null)
@@ -223,15 +214,6 @@ export function useMediaDetail(
       const result = await readJsonWithRetry<T>(url, { isLive: live })
       return result?.ok ? result.data : null
     }
-
-    getJson<{ similar?: SimilarItem[] }>(`${base}/similar?limit=${DEFAULT_SIMILAR_MEDIA_LIMIT}`)
-      .then((data) => {
-        if (live() && data) setSimilar(data.similar || [])
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (live()) setSimilarLoading(false)
-      })
 
     getJson<WatchStats>(`${base}/watch-stats`)
       .then((data) => {
@@ -421,8 +403,6 @@ export function useMediaDetail(
   return {
     media,
     mediaType,
-    similar,
-    similarLoading,
     insights,
     refreshExplanation,
     mediaServer,

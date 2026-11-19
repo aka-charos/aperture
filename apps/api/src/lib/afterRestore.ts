@@ -17,6 +17,7 @@ import {
   closeInterruptedSeriesGapRuns,
   closeInterruptedGapRuns,
   runMigrations,
+  warmTrailsIndex,
 } from '@aperture/core'
 import { getDatabaseUrl, getEnv } from '../config/env.js'
 import { refreshQuietPollState } from '../config/logging.js'
@@ -70,6 +71,15 @@ export async function afterDatabaseRestored(): Promise<void> {
     ['trusted proxies', refreshProxyTrust],
     ['quiet poll logs', refreshQuietPollState],
     ['log masking', refreshLogMaskingState],
+    // The credits index Next from here reads was built from the old titles.
+    // Started, not awaited: the build takes seconds, the old index answers
+    // until it is done, and the API stays at 503 for as long as this list runs.
+    [
+      'credits index',
+      async () => {
+        void warmTrailsIndex(true)
+      },
+    ],
   ]
   for (const [name, repair] of repairs) {
     await repair().catch((err) => logger.warn({ err }, `Could not refresh ${name} after the restore`))

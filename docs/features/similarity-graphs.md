@@ -1,72 +1,36 @@
-# Related-Content Graphs
+# Similar Titles
 
-Every movie and series detail page shows **Related Movies / Related Series** — the same relationships drawn two ways: a **List** of posters and an interactive **Graph**.
+Two places show you the titles in your library that are closest to one another, and they answer two different questions.
 
-## List and Graph
+| | Where | Answers |
+|---|---|---|
+| **[Next from here](next-from-here.md)** | The right column of every movie and series page, and its own page | "What should I watch after this?" |
+| **[Media Graph](explore.md)** | Its own page in the sidebar | "What's around this, and how does it connect?" |
 
-| Tab | Display |
-|-----|---------|
-| **List** | Poster cards with watch badges, your ratings, and **connection-reason chips** naming why each one relates |
-| **Graph** | The same items as a poster network you can drag, zoom, and refocus |
+## On a title's page
 
-The section shows a fixed set of the strongest connections (10 docked; the fullscreen graph reaches 12).
+The right column shows **Next from here**: the titles closest to this one in feel that you haven't finished, started or rated, films and shows together, each with the reason it is there ("Director of both", "Shares themes", "#2 closest in feel", and so on). Your admin decides how many it shows; the posters are laid out in whole rows.
 
----
+- **List / Map** switches between posters and a map of the same suggestions, where every line is a reason two titles share.
+- **See more** opens the full [Next from here](next-from-here.md) page from this title, with the people behind it, its themes and studios, and a trail you can follow.
+- On the map, click a poster for its details. **Shift+click**, its corner button or a long press steps on to it on the Next from here page.
 
-## The Graph
+Title pages used to have a **Related Movies / Related Series** tab here too. It showed the same nearest titles, but without the reasons, with titles you'd already seen, and only of one kind, so it was folded into Next from here.
 
-### Nodes and edges
+## The graph
 
-- Nodes are posters; the item you're viewing and its primary relations render larger — size reflects role, not similarity
-- Edge **width** scales with similarity; hover an edge for the exact percentage ("71% similar")
-- Hover a node for title, year, type, and **"Connected via:"** reason chips
-- **Click a node** to open its details; **Shift+click it**, or click its corner button, to refocus the graph on it (breadcrumbs appear; **Start over** resets). On a touch screen, tap for details and long-press to refocus
-- **Fullscreen** expands the graph to more items ("Expanded view • N items") — with its own create-playlist button
-
-### Connection colors
-
-One edge, one color — the strongest reason wins. The legend under the graph also highlights: hover a type to preview its lines, click it to keep them highlighted, and everything else dims without moving (the same as on [Explore](explore.md)):
-
-| Color | Connection |
-|-------|-----------|
-| **Blue** | Same director |
-| **Teal** | Shared actor |
-| **Gold** | Same collection |
-| **Purple** | Genre match |
-| **Pink** | Theme match |
-| **Orange** | Same studio |
-| **Green** | Same network |
-| **Gray** | AI similar (embedding similarity) |
-| **Emerald** | AI discovery |
-
----
+To wander the library as a graph (posters joined by what they share, coloured by director, cast, collection, theme, studio or AI similarity), open the [Media Graph](explore.md). **Shift+click** a poster there to re-centre on it, as many times as you like. The colours and controls are described on that page.
 
 ## Settings
 
-Two preferences live under [Display](user-settings/display.md#similarity-graph) → Similarity Graph:
+Two preferences under [Display](user-settings/display.md#similarity-graph) → Similarity Graph shape the Media Graph when you re-centre it on a title:
 
 | Setting | Effect |
 |---------|--------|
-| **Hide Watched Content** | Related items you've seen don't appear |
+| **Hide Watched Content** | Titles you've seen don't appear |
 | **Full Franchise Mode** | Keeps whole collections together instead of trimming to a representative few |
 
-The section always opens on the List tab; your graph position resets per visit.
-
----
-
-## From the Graph to a Playlist
-
-In the fullscreen view, **Create playlist** opens the playlist dialog with the graph's items pre-filled — a quick way to turn "everything connected to this" into something your media server can play. See [Playlists](playlists.md).
-
----
-
-## Related Graphs vs Media Graph
-
-| | Related-content graph | [Media Graph](explore.md) |
-|---|---|---|
-| **Scope** | One title's connections | Your whole library, seeded by a description or list |
-| **Depth** | One hop (refocus to hop again) | Unlimited wandering |
-| **Best for** | "What's like this?" | Discovery sessions |
+Next from here never suggests what you've seen, so neither setting changes it.
 
 ---
 

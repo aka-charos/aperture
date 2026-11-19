@@ -64,16 +64,14 @@ Many titles also carry a **Film Analysis** — a grounded critical essay about t
 
 ---
 
-## Related Movies
+## Next from here
 
-The right column has two tabs. **Related Movies** lists similar titles from your library, shown two ways:
+The right column shows what to watch after this one: the titles closest to it in feel that you haven't seen, films and shows together, each with the reason it was chosen. Your admin decides how many.
 
-- **List** — poster cards with watch-state badges, your ratings, and chips naming the connection (shared cast, genre, theme...)
-- **Graph** — the same relationships drawn as an explorable graph; open it fullscreen to go deeper
+- **List** — poster cards, each with its reason underneath
+- **Map** — the same suggestions drawn around this title, every line a reason they share
 
-See [Related-Content Graphs](similarity-graphs.md).
-
-**Next from here** shows the best few titles to watch after this one, each with the reason it was chosen, and a link to the full [Next from here](next-from-here.md) page for more.
+**See more** opens the full [Next from here](next-from-here.md) page from this title. See [Similar Titles](similarity-graphs.md) for how this relates to the Media Graph.
 
 ---
 

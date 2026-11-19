@@ -120,8 +120,6 @@ export const ROW_WEIGHTS = { affinity: 0.6, role: 0.4 } as const
 export const THEME_ROWS = 6
 /** Studio and network rows below the people, rarest first. */
 export const STUDIO_ROWS = 3
-/** Suggestions on a title's own page (the "What next" card). */
-export const SUMMARY_ITEMS = 3
 /** Steps the guided walk takes, each to the best suggestion from the step before. */
 export const WALK_STEPS = 5
 /**

@@ -20,7 +20,7 @@ Turn it off if your library artwork already carries a rating (many custom covers
 
 ## Similarity Graph
 
-Two switches for the related-content graphs on detail pages and in the full-screen graph (see [Related-Content Graphs](../similarity-graphs.md)):
+Two switches for the [Media Graph](../explore.md) when you re-centre it on a title (see [Similar Titles](../similarity-graphs.md)):
 
 | Setting | Effect | Use it when |
 |---------|--------|-------------|

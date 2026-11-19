@@ -69,14 +69,16 @@ The header's **Create playlist** button takes the graph's current items and open
 
 ---
 
-## Media Graph vs Related-Content Graphs
+## Media Graph vs Next from here
 
-| | Media Graph | [Related-content graphs](similarity-graphs.md) |
+| | Media Graph | [Next from here](next-from-here.md) |
 |---|---|---|
-| **Where** | Its own page | Each detail page's Graph tab |
+| **Where** | Its own page | Each title's page, and its own page |
 | **Seed** | A description or one of your lists | The title you're viewing |
-| **Best for** | Open-ended discovery sessions | "What's connected to this one?" |
+| **Best for** | Open-ended discovery sessions | "What should I watch after this?" |
+
+See [Similar Titles](similarity-graphs.md) for both side by side.
 
 ---
 
-**Next:** [Related-Content Graphs](similarity-graphs.md)
+**Next:** [Similar Titles](similarity-graphs.md)

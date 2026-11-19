@@ -1,6 +1,7 @@
 import { lazy, type ComponentType, type ReactElement } from 'react'
 import AccountTreeIcon from '@mui/icons-material/AccountTree'
 import AddToQueueIcon from '@mui/icons-material/AddToQueue'
+import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined'
 import ArticleIcon from '@mui/icons-material/Article'
 import BackupIcon from '@mui/icons-material/Backup'
 import BadgeIcon from '@mui/icons-material/Badge'
@@ -294,6 +295,13 @@ export const ADMIN_ELEMENTS: Record<string, AdminElement> = {
     Component: section(
       () => import('@/pages/settings/components/WatchingSection'),
       'WatchingSection'
+    ),
+  },
+  'next-from-here': {
+    icon: <SkipNextOutlinedIcon />,
+    Component: section(
+      () => import('@/pages/settings/components/NextFromHereSettingsSection'),
+      'NextFromHereSettingsSection'
     ),
   },
   'discovery-tuning': {

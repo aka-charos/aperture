@@ -32,6 +32,7 @@ import {
   registerLanguageDefaultsHandlers,
   registerStreamingDiscoverySettingsHandlers,
   registerChannelsWebExpandSettingsHandlers,
+  registerNextFromHereSettingsHandlers,
   registerDiscoveryGenreStripsSettingsHandlers,
   registerN8nHandlers,
   registerTavilyHandlers,
@@ -49,6 +50,7 @@ const settingsRoutes: FastifyPluginAsync = async (fastify) => {
   // Register all settings handlers
   registerStreamingDiscoverySettingsHandlers(fastify)
   registerChannelsWebExpandSettingsHandlers(fastify)
+  registerNextFromHereSettingsHandlers(fastify)
   registerDiscoveryGenreStripsSettingsHandlers(fastify)
   registerLanguageDefaultsHandlers(fastify)
   registerMediaServerHandlers(fastify)

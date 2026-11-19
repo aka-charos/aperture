@@ -120,6 +120,7 @@ export const ADMIN_ONLY_NAMESPACES: readonly string[] = [
   'settingsMdblist',
   'settingsMdblistSelector',
   'settingsMediaServer',
+  'settingsNextFromHere',
   'settingsOmdb',
   'settingsOutputFormat',
   'settingsPage',

@@ -11,6 +11,7 @@ import {
   checkEvidenceThresholdProvenance,
   getAllJobConfigs,
   checkDatabaseClientCompatibility,
+  warmTrailsIndex,
 } from '@aperture/core'
 import { closePool } from './lib/db.js'
 import { initializeScheduler, stopScheduler } from './lib/scheduler.js'
@@ -168,6 +169,11 @@ async function main() {
       console.error('⚠️ Failed to initialize scheduler:', err)
       // Don't exit - scheduler failure shouldn't prevent server from running
     }
+
+    // Every title page asks Next from here for its suggestions as it opens,
+    // and the first request after boot would otherwise wait seconds for the
+    // credits index to be built. Not awaited: the server is already serving.
+    void warmTrailsIndex()
   } catch (err) {
     server.log.error(err)
     process.exit(1)

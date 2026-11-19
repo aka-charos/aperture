@@ -2581,3 +2581,34 @@ Not measured: whether one-at-a-time stretches the hour enough that the hourly wa
 **Evidence.** Live database: the six movies' stored cast lengths and Rena Owen's absence from three; the cached TMDb credits joined to the library list the four titles the name match misses. `personTmdbCredits.test.ts` pins title merging, the agreement rule, the details reader and that a 60-actor cast is kept. Not exercised: the route against a running server (the local dev server does not start here) and a re-sync.
 
 **Review follow-ups (same change).** (1) A longer stored cast changed Watch Stats' "Most watched actors": it counted every cast entry of every watched film, so a prolific bit-part actor could outrank leads. The ranking and its drill-in now read `topBilledActorsSql` (the first `TOP_BILLED_ACTORS` = 20, the old stored length, through `jsonb_path_query_array` behind a `jsonb_typeof` check, since an object input returns `[{}]`), one SQL text for both; the similarity loaders select the same slice, so a graph build no longer parses whole casts, and `REASON_BILLED_ACTORS` is gone. On the live library the top three top-billed counts are Samuel L. Jackson 96, Michael Caine 79, Robert De Niro 78. (2) `resolveTmdbPersonProfileImageUrl` stored `not_found` whenever `searchPersonByName` returned null, which `tmdbRequest` also does for a timeout or an error status, and never re-asked: one outage switched a person's TMDb portrait, credits and biography off for good. The search now goes through `lookupPersonByName` (`tmdbLookup`): a failure stores nothing, and a stored not-found is re-asked after `PERSON_NOT_FOUND_RECHECK_MS`, which also heals rows written before. (3) TMDb credits added titles for any credit kind: "Thanks" crew credits, talk-show appearances as Self, archive footage. `addsTitle` limits it to a role played or directing, producing, writing or creating. Producer was added to the page's credit kinds, and once TMDb agrees every title takes TMDb's roles server-side, so the web's join with credits-gap (whose in-library list stops at 100) no longer decides a title's group. (4) The page's own request and credits-gap ask for the same combined credits at the same moment; concurrent calls now share one read. TMDb details are asked only after agreement, so a namesake costs no extra request; a missing death date now also triggers the fill. (5) The added-titles query trims the stored id as the agreement check does, and both lists are always sorted in JS, so the order no longer depends on whether TMDb added a title.
+
+## F-199
+
+**A title's page had two tabs, Related and Next from here, and the second already contained the first.** Related was `getSimilarMovies`/`getSimilarSeries` with `limit=12`: same media type only, no viewer, every title the viewer had seen included, reasons as chips (director, actor, genre, keyword, studio, "similarity"). Next from here's summary reads the same two functions (`NEIGHBOUR_POOL` = 50, films and shows together), drops what the viewer finished, started or rated, adds titles linked by major-role credits, scores by closeness rank, shared credit and the viewer's own record, and gives each title a sentence. It showed three titles, loaded when the tab was pointed at.
+
+**Measured before merging** (read-only, on the live library, inside the app container against `packages/core/dist`): 4 viewers (about 1,600 / 300 / 300 / 20 films played; 7 / 0 / 3 / 0 star ratings), 24 titles each (8 recently played films, 4 recently played shows, 8 random films, 4 random shows), 96 pairs. Next's ranking was rebuilt from its exported pieces (`resolve`, `scoreCandidates`, `tasteContext` and a copy of `loadRecord`) to take its top 12; its top 3 matched the real `getNextSummary` on all 96 pairs.
+
+| | Result |
+|---|---|
+| Next top 12, same media type as the title | 8.2 |
+| of those, in Related's 12 | 7.6 (92%; series 98%) |
+| same-type titles Next adds that Related lacks | 0.6 |
+| other media type in Next's 12 | 3.8 |
+| Next's 12 with a taste reason (favourite person or company) | 4.2 |
+| "same people, different feel" in Next's 12 | 0.1 |
+| Related titles already seen | 10% overall, 24% for the heaviest viewer, 16% on series |
+| seen titles in Next's 12 if seen titles were let back in | 1.4 (3.9 heaviest viewer) |
+| title with no embedding (Related empty) | none in the sample |
+| `getSimilar*` limit 12, ms p50 / p90 | 88 / 183 |
+| `getNextSummary`, ms p50 / p90 / max | 202 / 312 / 651 |
+| Trails index, first build in a fresh process | 8.7 s |
+
+So on a title page Next from here is Related's unseen same-type list in nearly the same order, with about 3 of those titles giving way to about 4 of the other media type, a reason on every card, and no seen titles. Folding Related into it loses almost nothing; the "same people" side lives on the `/next` page (people rows), never in the top 12. The taste side ran mostly on finished titles (the household barely rates), so it may reorder more for someone who rates a lot.
+
+**Rejected.** An "include seen" switch on the merged list (to keep Related's "what is this like" use): letting seen titles back changed 1.4 of 12 titles, a control nobody would notice. Keeping the title page's embedding graph and its fullscreen depth-3 explorer: it was Explore in a dialog; the panel's map is Next's own (`NextMap`, lines are reasons), and the multi-hop graph stays on Explore. Loading the summary on hover: at about 200 ms it loads with the page.
+
+**The count is an admin setting with a ceiling.** `system_settings.next_summary_size`, default 12 (what Related showed), 1 to `NEIGHBOUR_POOL`. Past the pool the list can only go on with titles linked by credits alone, ranked another way, so it would stop being closest first without saying so; the pool is not raised with the setting, because an ANN query past `ef_search` (40) needs the iterative scan (HNSW invariant). The floor is 1: no value turns the column off. The page draws whole rows (`wholeRowCount`), so the setting is a ceiling.
+
+**The index is warmed.** With every title page asking as it opens, the first request after a boot would have waited for the credits index. `warmTrailsIndex` starts the build after the server listens, and `afterDatabaseRestored` starts a forced rebuild without awaiting it (the old index answers until the new one is ready; the API is still at 503 while that list runs).
+
+**Evidence.** The measurement above (script and per-pair results kept outside the repo). `test:next-from-here` pins the size rule. Not exercised: the panel and the admin card in a browser (the local dev server does not start here); verify on the deployed image.

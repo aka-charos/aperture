@@ -1249,6 +1249,10 @@
       "title": "Shows You Watch",
       "blurb": "The continue-watching feature and its library"
     },
+    "nextFromHere": {
+      "title": "Next from here",
+      "blurb": "How many suggestions a title's page shows"
+    },
     "discoveryTuning": {
       "title": "Discovery tuning",
       "blurb": "How much Discover fetches, how hard it filters, and what it ranks by"
@@ -1781,19 +1785,6 @@
       "requestNamed": "Request availability on {{serverName}}",
       "requestSuccess": "Request submitted",
       "requestFailed": "Failed to submit request"
-    },
-    "similar": {
-      "titleMovies": "Related Movies",
-      "titleSeries": "Related Series",
-      "tabList": "List",
-      "tabGraph": "Graph",
-      "sectionsLabel": "Related titles and what to watch next",
-      "viewLabel": "Show related titles as",
-      "tooltipFullscreen": "Fullscreen",
-      "tooltipStartOver": "Start over",
-      "graphHintOpen": "Click a poster for details • Shift+click to explore from it",
-      "expandedSubtitle": "Expanded view • {{count}} items",
-      "fallbackCenterTitle": "Media"
     },
     "recommendDialog": {
       "title": "Recommend {{title}}",
@@ -3796,6 +3787,16 @@
     "saved": "Web expansion setting saved.",
     "loadError": "Failed to load web expansion setting",
     "saveError": "Failed to save web expansion setting"
+  },
+  "settingsNextFromHere": {
+    "title": "Suggestions on a title's page",
+    "description": "Every title's page shows Next from here in its right column: the titles closest to it in feel that the viewer hasn't seen, with the reason for each. Set how many it shows. The page draws whole rows, so it may show a few fewer than this.",
+    "sizeLabel": "Suggestions on a title page",
+    "sizeHelp": "Between {{min}} and {{max}}; the default is {{default}}.",
+    "save": "Save",
+    "saved": "Saved.",
+    "loadError": "Couldn't load this setting.",
+    "saveError": "Couldn't save this setting."
   },
   "settingsDiscoveryGenreStrips": {
     "title": "Discovery — genre strips (TMDb)",
@@ -7062,8 +7063,8 @@
           "body": "A short essay on the work itself: where it comes from, what it does, how it was made and how it was received. It's closed until you open it."
         },
         "similar": {
-          "title": "More like this",
-          "body": "The titles in your library closest to this one. Switch to the graph to see how they connect, or open Next from here for what to watch after it."
+          "title": "What to watch next",
+          "body": "The titles closest to this one that you haven't seen, films and shows together, each with the reason it's here. Switch to the map to see how they connect, or open Next from here for more."
         }
       },
       "recommendations": {
@@ -7319,7 +7320,11 @@
       "whatNext": "Next from here",
       "whatNextTooltip": "What to watch after this: what feels closest to it, and the people behind it",
       "title": "Next from here",
-      "description": "The best of what to watch next, from how close it feels and who made it.",
+      "description": "What to watch after this, closest in feel first, each with the reason it is here.",
+      "viewLabel": "Show suggestions as",
+      "viewList": "List",
+      "viewMap": "Map",
+      "fullMap": "Open the full map",
       "seeAll": "See more",
       "retry": "Try again",
       "empty": "Nothing to suggest after this title yet.",

@@ -65,7 +65,7 @@ Find content that isn't in your library yet, and get it in.
 17. [Discover](features/discovery.md) - AI-surfaced suggestions from outside your library, requestable in one click
 18. [My Requests](features/my-requests.md) - Track your requests, request anything by name, and report playback problems
 19. [Media Graph](features/explore.md) - Explore your library as a visual similarity graph
-20. [Related-Content Graphs](features/similarity-graphs.md) - See what connects a title to its neighbours
+20. [Similar Titles](features/similarity-graphs.md) - Where the closest titles to one another show up
 21. [Next from here](features/next-from-here.md) - What to watch after a title, with the reasons each one is there
 
 ---

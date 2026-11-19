@@ -1211,17 +1211,6 @@
       "watchersUnnamedFooter_many": "Mais {{count}} pessoas também assistiram.",
       "watchersUnnamed_many": "e mais {{count}} pessoas fora das suas conexões"
     },
-    "similar": {
-      "titleMovies": "Filmes relacionados",
-      "titleSeries": "Séries relacionadas",
-      "tabList": "Lista",
-      "tabGraph": "Gráfico",
-      "tooltipFullscreen": "Tela cheia",
-      "tooltipStartOver": "Recomeçar",
-      "expandedSubtitle": "Visualização expandida • {{count}} itens",
-      "fallbackCenterTitle": "Mídia",
-      "graphHintOpen": "Click a poster for details • Shift+click to explore from it"
-    },
     "missingSeasons": {
       "title": "Not on your server",
       "titleNamed": "Not on {{serverName}}",
@@ -6858,10 +6847,6 @@
         "analysis": {
           "title": "Title analysis",
           "body": "A short essay on the work itself: where it comes from, what it does, how it was made and how it was received. It's closed until you open it."
-        },
-        "similar": {
-          "title": "More like this",
-          "body": "The titles in your library closest to this one. Switch to the graph to see how they connect, or open Next from here for what to watch after it."
         }
       },
       "recommendations": {
@@ -7117,7 +7102,6 @@
       "whatNext": "Next from here",
       "whatNextTooltip": "What to watch after this: what feels closest to it, and the people behind it",
       "title": "Next from here",
-      "description": "The best of what to watch next, from how close it feels and who made it.",
       "seeAll": "See more"
     },
     "roles": {

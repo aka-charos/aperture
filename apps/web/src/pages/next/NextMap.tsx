@@ -12,6 +12,8 @@ interface NextMapProps {
   onOpen: (title: TrailTitle) => void
   onStepItem: (item: NextItem) => void
   onStepRow: (row: NextPeopleRow, member: NextRowMember) => void
+  /** Drawn in a title page's half-width column rather than across the Next from here page. */
+  compact?: boolean
 }
 
 /**
@@ -20,7 +22,7 @@ interface NextMapProps {
  * (Shift+click, the node's corner button, a long press) steps on to it, as
  * the corner button on a list poster does.
  */
-export function NextMap({ data, onOpen, onStepItem, onStepRow }: NextMapProps) {
+export function NextMap({ data, onOpen, onStepItem, onStepRow, compact = false }: NextMapProps) {
   const { t, i18n } = useTranslation()
 
   const labels = useMemo<MapLabels>(
@@ -78,11 +80,11 @@ export function NextMap({ data, onOpen, onStepItem, onStepRow }: NextMapProps) {
     return <Alert severity="info">{t('next.map.empty')}</Alert>
   }
   return (
-    <Box component="section" sx={{ mb: 4 }}>
+    <Box component="section" sx={{ mb: compact ? 2 : 4 }}>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         {t('next.map.description')}
       </Typography>
-      <Box sx={{ height: { xs: 480, md: 640 }, borderRadius: 2, overflow: 'hidden' }}>
+      <Box sx={{ height: compact ? { xs: 420, md: 480 } : { xs: 480, md: 640 }, borderRadius: 2, overflow: 'hidden' }}>
         <SimilarityGraph data={graph} onNodeOpen={onNodeOpen} onNodeExplore={onNodeExplore} />
       </Box>
       <GraphLegend edges={graph.edges} />

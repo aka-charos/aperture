@@ -12,6 +12,7 @@ import { viewerScope } from '../../lib/viewerScope.js'
 import {
   getNextFromHere,
   getNextSummary,
+  getNextSummarySize,
   getTrail,
   getTrailStart,
   walkNext,
@@ -82,8 +83,9 @@ const nextFromHereRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   /**
-   * GET /api/next-from-here/summary?title=movie:<id> — the few best
-   * suggestions after one title, for the card on its own page.
+   * GET /api/next-from-here/summary?title=movie:<id> — the best suggestions
+   * after one title, for the panel on its own page. How many is the admin's
+   * setting (`/api/settings/next-from-here`), never the caller's.
    */
   fastify.get<{ Querystring: { title?: string } }>(
     '/api/next-from-here/summary',
@@ -99,7 +101,8 @@ const nextFromHereRoutes: FastifyPluginAsync = async (fastify) => {
       if (!userId) return reply.status(401).send({ error: 'Not signed in' })
       const ref = parseTitleRef(request.query.title)
       if (!ref) return reply.status(400).send(BAD_TITLE)
-      const result = await getNextSummary(await viewerScope(request), userId, ref)
+      const [scope, size] = await Promise.all([viewerScope(request), getNextSummarySize()])
+      const result = await getNextSummary(scope, userId, ref, size)
       if (!result) return reply.status(404).send(NOT_FOUND)
       return result
     }

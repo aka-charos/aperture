@@ -25,7 +25,6 @@ import {
   MAP_PER_ROW,
   NEIGHBOUR_POOL,
   STARTS_OFFERED,
-  SUMMARY_ITEMS,
   WALK_BUDGET_MS,
   WALK_STEPS,
   titleWeight,
@@ -40,6 +39,15 @@ import {
   type ViewerTitle,
 } from './taste.js'
 import { walkSteps } from './walk.js'
+import { SUMMARY_SIZE_DEFAULT, summarySizeProblem } from './summarySize.js'
+
+export {
+  SUMMARY_SIZE_DEFAULT as NEXT_SUMMARY_SIZE_DEFAULT,
+  SUMMARY_SIZE_MAX as NEXT_SUMMARY_SIZE_MAX,
+  SUMMARY_SIZE_MIN as NEXT_SUMMARY_SIZE_MIN,
+  type SummarySizeLimits as NextSummarySizeLimits,
+} from './summarySize.js'
+export { getNextSummarySize, getNextSummarySizeLimits, setNextSummarySize } from './settings.js'
 
 export {
   CLOSE_ITEMS as NEXT_CLOSE_ITEMS,
@@ -511,16 +519,20 @@ export async function getNextFromHere(
 }
 
 /**
- * The few best suggestions after a title, for its own page: the strongest
+ * The best suggestions after a title, for its own page: the strongest
  * candidates whatever their kind (close in feel or the same people), so a
- * title with no embedding still gets an answer. Null when the title is not
- * in scope.
+ * title with no embedding still gets an answer. `size` is the admin's
+ * setting (summarySize.ts, which also says why it has a ceiling); a size
+ * that setting would refuse falls back to the default. Null when the title
+ * is not in scope.
  */
 export async function getNextSummary(
   scope: LibraryScope,
   userId: string,
-  ref: TitleRef
+  ref: TitleRef,
+  size: number = SUMMARY_SIZE_DEFAULT
 ): Promise<{ start: TrailTitle; items: NextItem[] } | null> {
+  const count = summarySizeProblem(size) == null ? size : SUMMARY_SIZE_DEFAULT
   let early: Promise<number[]> | null = null
   const prepared = await prepare(scope, userId, ref, [], {
     early: (view, start) => {
@@ -534,7 +546,7 @@ export async function getNextSummary(
   const candidates = candidatesFor(prepared, start, neighbours)
   return {
     start: titleView(view.index.titles[start]),
-    items: candidates.slice(0, SUMMARY_ITEMS).map((candidate) => itemView(view, candidate)),
+    items: candidates.slice(0, count).map((candidate) => itemView(view, candidate)),
   }
 }
 

@@ -24,7 +24,14 @@ import {
 import { moreRows, peopleRows } from './people.js'
 import { mapLinks } from './map.js'
 import { chooseWalkStep, walkSteps } from './walk.js'
-import { STUDIO_ROWS, THEME_ROWS } from './rules.js'
+import { NEIGHBOUR_POOL, STUDIO_ROWS, THEME_ROWS } from './rules.js'
+import {
+  SUMMARY_SIZE_DEFAULT,
+  SUMMARY_SIZE_MAX,
+  SUMMARY_SIZE_MIN,
+  readSummarySize,
+  summarySizeProblem,
+} from './summarySize.js'
 
 let counter = 0
 function uuid(): string {
@@ -538,4 +545,25 @@ test('a walk never revisits a title, stops when nothing is left, and does not fo
   // Past its budget a walk keeps the steps it took; the first is always taken.
   const stopped = await walkSteps(0, 5, async (titleId) => from[titleId] ?? [], [], () => true)
   assert.equal(stopped.length, 1)
+})
+
+test("a title page's suggestion count: refused out of range, never clamped, and capped by the neighbour pool", () => {
+  // The ceiling follows the pool: a longer list could not stay closest-first.
+  assert.equal(SUMMARY_SIZE_MAX, NEIGHBOUR_POOL)
+  assert.equal(SUMMARY_SIZE_MIN, 1)
+  assert.ok(SUMMARY_SIZE_DEFAULT >= SUMMARY_SIZE_MIN && SUMMARY_SIZE_DEFAULT <= SUMMARY_SIZE_MAX)
+  assert.equal(summarySizeProblem(SUMMARY_SIZE_MIN), null)
+  assert.equal(summarySizeProblem(SUMMARY_SIZE_MAX), null)
+  assert.notEqual(summarySizeProblem(0), null)
+  assert.notEqual(summarySizeProblem(SUMMARY_SIZE_MAX + 1), null)
+  assert.notEqual(summarySizeProblem(6.5), null)
+  assert.notEqual(summarySizeProblem('12'), null)
+  assert.notEqual(summarySizeProblem(null), null)
+  // A stored value reads back as itself; anything unusable as the default.
+  assert.equal(readSummarySize('24'), 24)
+  assert.equal(readSummarySize(null), SUMMARY_SIZE_DEFAULT)
+  assert.equal(readSummarySize(''), SUMMARY_SIZE_DEFAULT)
+  assert.equal(readSummarySize('0'), SUMMARY_SIZE_DEFAULT)
+  assert.equal(readSummarySize(String(SUMMARY_SIZE_MAX + 1)), SUMMARY_SIZE_DEFAULT)
+  assert.equal(readSummarySize('twelve'), SUMMARY_SIZE_DEFAULT)
 })

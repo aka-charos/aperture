@@ -2197,6 +2197,7 @@ export * from './onboarding/index.js'
 export {
   getTrail,
   getTrailStart,
+  warmTrailsIndex,
   MAX_TRAIL_TITLES,
   LINK_ROLES,
   parseTitleRef,
@@ -2215,7 +2216,14 @@ export {
 export {
   getNextFromHere,
   getNextSummary,
+  getNextSummarySize,
+  getNextSummarySizeLimits,
+  setNextSummarySize,
   walkNext,
+  NEXT_SUMMARY_SIZE_DEFAULT,
+  NEXT_SUMMARY_SIZE_MAX,
+  NEXT_SUMMARY_SIZE_MIN,
+  type NextSummarySizeLimits,
   NEXT_CLOSE_ITEMS,
   NEXT_MAX_AVOID,
   NEXT_PEOPLE_ROWS,

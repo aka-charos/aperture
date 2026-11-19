@@ -1,6 +1,5 @@
 // Unified types for both Movies and Series
 
-import type { ConnectionReason } from '../../components/SimilarityGraph/types'
 import type { StudioLogoData } from '../../components/StudioLogo'
 
 export type MediaType = 'movie' | 'series'
@@ -183,17 +182,6 @@ export interface WatchStatus {
   isWatched: boolean
   playCount: number
   lastWatched: string | null
-}
-
-export interface SimilarItem {
-  id: string
-  title: string
-  year: number | null
-  poster_url: string | null
-  genres?: string[]
-  network?: string | null
-  similarity: number
-  reasons?: ConnectionReason[]
 }
 
 export interface RecommendationInsights {

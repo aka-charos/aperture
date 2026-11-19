@@ -17,7 +17,7 @@ Most catalog pages offer two display modes — **Grid View** (posters) and **Lis
 
 The toggle sits in each page's header (grid ▦ / list ≡ icons, the current one highlighted). Each page and tab keeps its own mode; it's saved to your account (with a local cache for instant load), so every device shows the same layout.
 
-Detail pages have a related preference of their own — the **Related Movies / Series** section's **List / Graph** switch.
+Detail pages have a switch of their own: the **List / Map** switch on **Next from here**, which always opens as a list.
 
 ---
 

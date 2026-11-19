@@ -103,6 +103,19 @@ async function currentIndex(forceRebuild = false): Promise<IndexCache> {
   return building
 }
 
+/**
+ * Builds the index before a request needs it: at API boot, since the first
+ * build takes seconds and a title page asks for Next from here as it opens,
+ * and again (`force`) after a restore replaced the titles it was built from.
+ * Never rejects; a failed build is logged and the next request tries again.
+ */
+export async function warmTrailsIndex(force = false): Promise<void> {
+  await currentIndex(force).then(
+    () => undefined,
+    () => undefined // logged where the build is started (currentIndex)
+  )
+}
+
 function scopeKey(scope: LibraryScope): string {
   return JSON.stringify([scope.libraryIds ? [...scope.libraryIds].sort() : null, scope.maxParentalRating])
 }

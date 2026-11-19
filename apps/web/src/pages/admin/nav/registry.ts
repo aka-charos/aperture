@@ -645,6 +645,22 @@ export const ADMIN_ENTRIES: readonly AdminEntry[] = [
     aliases: ['watching', 'shows you watch', 'upcoming episodes', 'continue'],
   },
   {
+    id: 'next-from-here',
+    group: 'recommendations',
+    segment: 'next-from-here',
+    titleKey: 'adminNav.nextFromHere.title',
+    blurbKey: 'adminNav.nextFromHere.blurb',
+    docs: ['next-from-here'],
+    aliases: ['next from here', 'related', 'similar', 'more like this', 'title page', 'suggestions'],
+    fields: [
+      {
+        anchor: 'next-summary-size',
+        labelKey: 'settingsNextFromHere.sizeLabel',
+        aliases: ['count', 'how many', 'related items', 'limit'],
+      },
+    ],
+  },
+  {
     id: 'discovery-tuning',
     group: 'recommendations',
     segment: 'discovery',
