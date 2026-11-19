@@ -28,23 +28,15 @@ import { requireAuth, requireAdmin } from '../../plugins/auth.js'
 import { scopeClause, viewerScope } from '../../lib/viewerScope.js'
 import { discoverSchemas, getPeopleListSchema } from './schemas.js'
 import { registerTmdbExternalDetailRoutes } from './tmdbExternalDetail.js'
-
-interface ContentItem {
-  id: string
-  title: string
-  year: number | null
-  posterUrl: string | null
-  backdropUrl: string | null
-  genres: string[]
-  communityRating: number | null
-  role?: string // For actors - their role in this content
-  /** Person page only: the TMDb id, so TMDb's credit roles can join the media server's. */
-  tmdbId?: string | null
-  /** Person page only: how the person is credited on this title, from the media server. */
-  credits?: PersonCreditKind[]
-}
-
-type PersonCreditKind = 'actor' | 'director' | 'writer' | 'creator'
+import {
+  personCreditItem,
+  personCreditStats,
+  sortPersonCredits,
+  tmdbIdsThatAddTitles,
+  type ContentItem,
+  type PersonCreditRow,
+  type PersonCreditStats,
+} from './personCredits.js'
 
 interface PersonResponse {
   name: string
@@ -58,12 +50,7 @@ interface PersonResponse {
   birthPlace: string | null
   movies: ContentItem[]
   series: ContentItem[]
-  stats: {
-    totalMovies: number
-    totalSeries: number
-    asActor: number
-    asDirector: number
-  }
+  stats: PersonCreditStats
 }
 
 interface StudioResponse {
@@ -282,35 +269,17 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
           ${alias === 's' ? `OR $1 = ANY(COALESCE(s.tmdb_creators, '{}'))` : ''}
         )`
 
-      type CreditRow = {
-        id: string
-        tmdb_id: string | null
-        title: string
-        year: number | null
-        poster_url: string | null
-        backdrop_url: string | null
-        genres: string[]
-        community_rating: number | null
-        is_actor: boolean
-        is_director: boolean
-        is_writer: boolean
-        is_creator: boolean
-        role: string | null
-      }
-
       const [movieResults, seriesResults, tmdbProfile, personDetails] = await Promise.all([
-        query<CreditRow>(
+        query<PersonCreditRow>(
           `SELECT ${creditColumns('m')}
            FROM movies m
-           WHERE ${creditedWhere('m')} AND ${moviesInScope}
-           ORDER BY m.year DESC NULLS LAST, m.title ASC`,
+           WHERE ${creditedWhere('m')} AND ${moviesInScope}`,
           movieParams
         ),
-        query<CreditRow>(
+        query<PersonCreditRow>(
           `SELECT ${creditColumns('s')}
            FROM series s
-           WHERE ${creditedWhere('s')} AND ${seriesInScope}
-           ORDER BY s.year DESC NULLS LAST, s.title ASC`,
+           WHERE ${creditedWhere('s')} AND ${seriesInScope}`,
           seriesParams
         ),
         resolveTmdbPersonProfileImageUrl(decodedName),
@@ -323,40 +292,30 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
       // once TMDb's person agrees with the library on a title the media server
       // already credits by name (core discover/personTmdbCredits.ts).
       const tmdbPersonId = tmdbProfile.tmdbPersonId
-      const needsTmdbDetails =
-        !personDetails?.overview?.trim() ||
-        !personDetails?.birthDate ||
-        !personDetails?.birthPlace?.trim()
-      const [tmdbCredits, tmdbDetails] =
+      const tmdbCredits =
         tmdbPersonId != null
-          ? await Promise.all([
-              getCachedOrFetchCombinedCredits(decodedName, tmdbPersonId).catch((err: unknown) => {
-                request.log.warn({ err, tmdbPersonId }, 'TMDb person credits lookup failed')
-                return null
-              }),
-              needsTmdbDetails
-                ? getCachedOrFetchPersonDetails(decodedName, tmdbPersonId).catch((err: unknown) => {
-                    request.log.warn({ err, tmdbPersonId }, 'TMDb person details lookup failed')
-                    return null
-                  })
-                : Promise.resolve(null),
-            ])
-          : [null, null]
+          ? await getCachedOrFetchCombinedCredits(decodedName, tmdbPersonId).catch((err: unknown) => {
+              request.log.warn({ err, tmdbPersonId }, 'TMDb person credits lookup failed')
+              return null
+            })
+          : null
       const creditsByTitle = tmdbCredits ? tmdbCreditsByTitle(tmdbCredits) : null
-      const tmdbAgrees =
+      const agreedCredits =
         creditsByTitle != null &&
         tmdbPersonAgreesWithLibrary(creditsByTitle, [
           ...movieResults.rows.map((r) => ({ media: 'movie' as const, tmdbId: r.tmdb_id })),
           ...seriesResults.rows.map((r) => ({ media: 'tv' as const, tmdbId: r.tmdb_id })),
         ])
+          ? creditsByTitle
+          : null
 
       // Library titles TMDb credits the person on that the name match missed.
-      const tmdbOnlyRows = async (alias: 'm' | 's', found: CreditRow[]): Promise<CreditRow[]> => {
-        if (!creditsByTitle || !tmdbAgrees) return []
-        const media = alias === 'm' ? 'movie' : 'tv'
-        const tmdbIds = [...creditsByTitle.values()]
-          .filter((credit) => credit.media === media)
-          .map((credit) => credit.tmdbId)
+      const tmdbOnlyRows = async (
+        alias: 'm' | 's',
+        found: PersonCreditRow[]
+      ): Promise<PersonCreditRow[]> => {
+        if (!agreedCredits) return []
+        const tmdbIds = tmdbIdsThatAddTitles(agreedCredits, alias === 'm' ? 'movie' : 'tv')
         if (tmdbIds.length === 0) return []
         const params: unknown[] = [decodedName]
         const inScope = scopeClause(scope, alias, params)
@@ -364,80 +323,49 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
         const idsParam = `$${params.length}`
         params.push(found.map((r) => r.id))
         const foundParam = `$${params.length}`
-        const result = await query<CreditRow>(
+        // Trimmed as the agreement check and the "Not in your library" list
+        // read a stored id, so a title counted as held is also found.
+        const result = await query<PersonCreditRow>(
           `SELECT ${creditColumns(alias)}
            FROM ${alias === 'm' ? 'movies' : 'series'} ${alias}
-           WHERE ${alias}.tmdb_id = ANY(${idsParam}::text[])
+           WHERE trim(${alias}.tmdb_id) = ANY(${idsParam}::text[])
              AND NOT (${alias}.id = ANY(${foundParam}::uuid[]))
              AND ${inScope}`,
           params
         )
         return result.rows
       }
-      const [extraMovies, extraSeries] = await Promise.all([
+
+      // TMDb's details are asked for only for the person the library agreed
+      // on, and only when the media server leaves a field empty.
+      const needsTmdbDetails =
+        !personDetails?.overview?.trim() ||
+        !personDetails?.birthDate ||
+        !personDetails?.deathDate ||
+        !personDetails?.birthPlace?.trim()
+      const [extraMovies, extraSeries, tmdbBio] = await Promise.all([
         tmdbOnlyRows('m', movieResults.rows),
         tmdbOnlyRows('s', seriesResults.rows),
+        agreedCredits && tmdbPersonId != null && needsTmdbDetails
+          ? getCachedOrFetchPersonDetails(decodedName, tmdbPersonId).catch((err: unknown) => {
+              request.log.warn({ err, tmdbPersonId }, 'TMDb person details lookup failed')
+              return null
+            })
+          : Promise.resolve(null),
       ])
 
-      const tmdbCreditOf = (media: 'movie' | 'tv', r: CreditRow) =>
-        r.tmdb_id ? creditsByTitle?.get(tmdbTitleKey(media, r.tmdb_id)) : undefined
-      const creditsOf = (
-        media: 'movie' | 'tv',
-        r: CreditRow,
-        fromTmdb: boolean
-      ): PersonCreditKind[] => {
-        const kinds = new Set<PersonCreditKind>([
-          ...(r.is_actor ? (['actor'] as const) : []),
-          ...(r.is_director ? (['director'] as const) : []),
-          ...(r.is_writer ? (['writer'] as const) : []),
-          ...(r.is_creator ? (['creator'] as const) : []),
-        ])
-        if (fromTmdb) {
-          for (const role of tmdbCreditOf(media, r)?.roles ?? []) {
-            if (role === 'actor' || role === 'director' || role === 'writer' || role === 'creator') {
-              kinds.add(role)
-            }
-          }
-        }
-        return [...kinds]
-      }
-      const toItem =
-        (media: 'movie' | 'tv', fromTmdb: boolean) =>
-        (r: CreditRow): ContentItem => ({
-          id: r.id,
-          tmdbId: r.tmdb_id,
-          title: r.title,
-          year: r.year,
-          posterUrl: r.poster_url,
-          backdropUrl: r.backdrop_url,
-          genres: r.genres || [],
-          communityRating: r.community_rating,
-          role: r.role || (fromTmdb ? tmdbCreditOf(media, r)?.character : null) || undefined,
-          credits: creditsOf(media, r, fromTmdb),
-        })
-      // Newest first, undated last, then by title: the SQL order, kept once
-      // TMDb's titles join.
-      const byYearThenTitle = (a: ContentItem, b: ContentItem) =>
-        (b.year ?? -Infinity) - (a.year ?? -Infinity) || a.title.localeCompare(b.title)
-      const movies = [
-        ...movieResults.rows.map(toItem('movie', false)),
-        ...extraMovies.map(toItem('movie', true)),
-      ]
-      const series = [
-        ...seriesResults.rows.map(toItem('tv', false)),
-        ...extraSeries.map(toItem('tv', true)),
-      ]
-      if (extraMovies.length > 0) movies.sort(byYearThenTitle)
-      if (extraSeries.length > 0) series.sort(byYearThenTitle)
+      const itemFor = (media: 'movie' | 'tv') => (r: PersonCreditRow) =>
+        personCreditItem(
+          r,
+          r.tmdb_id ? agreedCredits?.get(tmdbTitleKey(media, r.tmdb_id)) : undefined
+        )
+      const movies = sortPersonCredits([...movieResults.rows, ...extraMovies].map(itemFor('movie')))
+      const series = sortPersonCredits([...seriesResults.rows, ...extraSeries].map(itemFor('tv')))
 
       // Build person image URL through our proxy
       const imageUrl = `/api/media/images/Persons/${encodeURIComponent(decodedName)}/Images/Primary`
 
-      const credited = (items: ContentItem[], kind: PersonCreditKind) =>
-        items.filter((item) => item.credits?.includes(kind)).length
-
       // A field the media server leaves empty takes TMDb's, field by field.
-      const tmdbBio = tmdbAgrees ? tmdbDetails : null
       const response: PersonResponse = {
         name: decodedName,
         imageUrl,
@@ -448,12 +376,7 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
         birthPlace: personDetails?.birthPlace?.trim() || tmdbBio?.placeOfBirth || null,
         movies,
         series,
-        stats: {
-          totalMovies: movies.length,
-          totalSeries: series.length,
-          asActor: credited(movies, 'actor') + credited(series, 'actor'),
-          asDirector: credited(movies, 'director'),
-        },
+        stats: personCreditStats(movies, series),
       }
 
       return reply.send(response)

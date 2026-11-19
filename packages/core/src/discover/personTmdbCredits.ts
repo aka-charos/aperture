@@ -30,7 +30,20 @@ export interface TmdbTitleCredit {
   roles: CreditsRoleKind[]
   /** The character played, when TMDb lists one; the first cast credit's. */
   character: string | null
+  /**
+   * Whether this credit may put the title on the person's page when the media
+   * server does not credit them: a role played, or directing, producing,
+   * writing or creating it. Never a "Thanks" or other crew credit, and never
+   * an appearance as themselves or in archive footage (a talk show, a
+   * documentary about someone else).
+   */
+  addsTitle: boolean
 }
+
+/** A cast credit that is an appearance, not a role: as themselves, or archive footage. */
+const NOT_A_ROLE = /\b(?:self|himself|herself|themselves|archive footage)\b/i
+
+const TITLE_ROLES: ReadonlySet<CreditsRoleKind> = new Set(['director', 'producer', 'writer', 'creator'])
 
 export function tmdbTitleKey(media: TmdbCreditMedia, tmdbId: string | number): string {
   return `${media}:${String(tmdbId).trim()}`
@@ -46,13 +59,16 @@ export function tmdbCreditsByTitle(
     const key = tmdbTitleKey(media, entry.id)
     let credit = byTitle.get(key)
     if (!credit) {
-      credit = { media, tmdbId: String(entry.id), roles: [], character: null }
+      credit = { media, tmdbId: String(entry.id), roles: [], character: null, addsTitle: false }
       byTitle.set(key, credit)
     }
     const role = creditsRoleKindFromEntry(entry, fromCast)
     if (!credit.roles.includes(role)) credit.roles.push(role)
     const character = fromCast ? entry.character?.trim() : undefined
     if (character && credit.character == null) credit.character = character
+    if (fromCast ? !NOT_A_ROLE.test(entry.character ?? '') : TITLE_ROLES.has(role)) {
+      credit.addsTitle = true
+    }
   }
   return byTitle
 }

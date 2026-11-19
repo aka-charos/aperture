@@ -2236,3 +2236,6 @@ export { seerrDisplayName } from './seerr/displayName.js'
 
 // Notifications (email and the Android app)
 export * from './notifications/index.js'
+
+// How much of a cast is stored, and how much counts as top-billed
+export { MAX_STORED_ACTORS, TOP_BILLED_ACTORS, topBilledActorsSql } from './media/castLimits.js'

@@ -16,6 +16,17 @@ const logger = createChildLogger('tmdb-person')
 /** Combined credits JSON TTL (24h). */
 export const COMBINED_CREDITS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
+/** How long "TMDb knows nobody by this name" is believed before asking again (7 days). */
+export const PERSON_NOT_FOUND_RECHECK_MS = 7 * 24 * 60 * 60 * 1000
+
+/** A stored "nobody by this name" still within its recheck window. */
+function notFoundStillTrusted(row: { not_found: boolean; updated_at: Date } | null): boolean {
+  return (
+    row?.not_found === true &&
+    Date.now() - new Date(row.updated_at).getTime() < PERSON_NOT_FOUND_RECHECK_MS
+  )
+}
+
 export function normalizePersonNameKey(decodedName: string): string {
   return decodedName.trim().toLowerCase()
 }
@@ -27,38 +38,53 @@ export interface TmdbPersonSearchResult {
   popularity: number
 }
 
+interface PersonSearchResponse {
+  results?: TmdbPersonSearchResult[]
+}
+
+/** Case-insensitive exact name match, else the most popular result; null when there are none. */
+function choosePerson(name: string, results: TmdbPersonSearchResult[] | undefined): TmdbPersonSearchResult | null {
+  if (!results?.length) {
+    return null
+  }
+  const trimmed = name.trim().toLowerCase()
+  const exactMatch = results.find((p) => p.name.toLowerCase() === trimmed)
+  if (exactMatch) {
+    return exactMatch
+  }
+  return [...results].sort((a, b) => b.popularity - a.popularity)[0]
+}
+
 /**
  * Search TMDb for a person by name; prefers case-insensitive exact name match, else highest popularity.
+ * Null both when nobody matches and when TMDb could not be asked: anything that
+ * keeps the answer uses {@link lookupPersonByName}.
  */
 export async function searchPersonByName(
   name: string,
   options: { onLog?: ApiLogCallback } = {}
 ): Promise<TmdbPersonSearchResult | null> {
-  interface SearchResponse {
-    results?: Array<{
-      id: number
-      name: string
-      profile_path: string | null
-      popularity: number
-    }>
-  }
-
-  const result = await tmdbRequest<SearchResponse>(
+  const result = await tmdbRequest<PersonSearchResponse>(
     `/search/person?query=${encodeURIComponent(name)}`,
     options
   )
+  return choosePerson(name, result?.results)
+}
 
-  if (!result?.results?.length) {
-    return null
+/**
+ * Search TMDb for a person by name, telling "nobody by that name" (`ok` with
+ * null) from a request that failed (`failed`).
+ */
+export async function lookupPersonByName(
+  name: string
+): Promise<{ status: 'ok'; person: TmdbPersonSearchResult | null } | { status: 'failed' }> {
+  const answer = await tmdbLookup<PersonSearchResponse>(
+    `/search/person?query=${encodeURIComponent(name)}`
+  )
+  if (answer.status === 'failed') {
+    return { status: 'failed' }
   }
-
-  const trimmed = name.trim()
-  const exactMatch = result.results.find((p) => p.name.toLowerCase() === trimmed.toLowerCase())
-  if (exactMatch) {
-    return exactMatch
-  }
-
-  return [...result.results].sort((a, b) => b.popularity - a.popularity)[0]
+  return { status: 'ok', person: answer.status === 'ok' ? choosePerson(name, answer.data.results) : null }
 }
 
 /** Raw combined credits from TMDb (movie + TV cast and crew). */
@@ -168,16 +194,22 @@ export async function resolveTmdbPersonProfileImageUrl(
   const nameKey = normalizePersonNameKey(decodedName)
   const cached = await getPersonTmdbCacheRow(nameKey)
 
-  if (cached?.not_found) {
+  if (notFoundStillTrusted(cached)) {
     return { imageUrl: null, tmdbPersonId: null }
   }
 
-  if (cached?.tmdb_person_id != null) {
+  if (cached?.tmdb_person_id != null && !cached.not_found) {
     const url = getImageUrl(cached.profile_path, 'w185')
     return { imageUrl: url, tmdbPersonId: cached.tmdb_person_id }
   }
 
-  const found = await searchPersonByName(decodedName)
+  // A failed request is not "nobody by that name": nothing is stored, and the
+  // next visit asks again.
+  const lookup = await lookupPersonByName(decodedName)
+  if (lookup.status === 'failed') {
+    return { imageUrl: null, tmdbPersonId: null }
+  }
+  const found = lookup.person
   if (!found) {
     await upsertPersonTmdbCache({
       nameKey,
@@ -206,10 +238,10 @@ export async function resolveTmdbPersonId(decodedName: string): Promise<number |
   const nameKey = normalizePersonNameKey(decodedName)
   const cached = await getPersonTmdbCacheRow(nameKey)
 
-  if (cached?.not_found) {
+  if (notFoundStillTrusted(cached)) {
     return null
   }
-  if (cached?.tmdb_person_id != null) {
+  if (cached?.tmdb_person_id != null && !cached.not_found) {
     return cached.tmdb_person_id
   }
 
@@ -307,7 +339,26 @@ export async function getCachedOrFetchPersonDetails(
 /**
  * Combined credits with optional 24h DB cache keyed by normalized name.
  */
-export async function getCachedOrFetchCombinedCredits(
+export function getCachedOrFetchCombinedCredits(
+  decodedName: string,
+  tmdbPersonId: number
+): Promise<TmdbCombinedCreditsResponse | null> {
+  // The person page asks for these twice at once (its own request and the
+  // credits-gap one): concurrent callers share one read, so a first visit
+  // makes one TMDb request, not two.
+  const key = `${normalizePersonNameKey(decodedName)}#${tmdbPersonId}`
+  const pending = combinedCreditsInFlight.get(key)
+  if (pending) return pending
+  const read = readOrFetchCombinedCredits(decodedName, tmdbPersonId).finally(() => {
+    combinedCreditsInFlight.delete(key)
+  })
+  combinedCreditsInFlight.set(key, read)
+  return read
+}
+
+const combinedCreditsInFlight = new Map<string, Promise<TmdbCombinedCreditsResponse | null>>()
+
+async function readOrFetchCombinedCredits(
   decodedName: string,
   tmdbPersonId: number
 ): Promise<TmdbCombinedCreditsResponse | null> {

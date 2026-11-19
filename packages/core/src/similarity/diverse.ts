@@ -4,6 +4,7 @@ import { getExplorationModelInstance } from '../lib/ai-provider.js'
 import { generateText } from 'ai'
 import type { SimilarityItem } from './index.js'
 import type { ConnectionReason } from './reasons.js'
+import { topBilledActorsSql } from '../media/castLimits.js'
 import { binderFor, libraryScopeSql, type LibraryScope } from '../lib/libraryScope.js'
 
 const logger = createChildLogger('similarity:diverse')
@@ -495,7 +496,7 @@ async function matchTitlesToLibrary(
     `SELECT m.*
      FROM unnest($1::text[]) WITH ORDINALITY AS c(title, i)
      CROSS JOIN LATERAL (
-       SELECT t.id, t.title, t.year, t.poster_url, t.genres, t.directors, t.actors,
+       SELECT t.id, t.title, t.year, t.poster_url, t.genres, t.directors, ${topBilledActorsSql('t.actors')} AS actors,
               ${type === 'movie' ? 't.collection_name' : 'NULL::text AS collection_name'},
               ${type === 'series' ? 't.network' : 'NULL::text AS network'},
               t.keywords, t.studios

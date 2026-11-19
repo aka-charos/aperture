@@ -1,5 +1,10 @@
 import type { FastifyInstance } from 'fastify'
-import { resolveStudioLogo, studioLogoColumns, type StudioLogoRow } from '@aperture/core'
+import {
+  resolveStudioLogo,
+  studioLogoColumns,
+  topBilledActorsSql,
+  type StudioLogoRow,
+} from '@aperture/core'
 import { query, queryOne } from '../../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
 import { requireSelfOrAdmin } from './shared.js'
@@ -207,7 +212,7 @@ export function registerWatchStatsHandlers(fastify: FastifyInstance) {
                AND (NOT EXISTS (SELECT 1 FROM library_config) OR lc.is_enabled = true)
            )
            SELECT actor->>'name' as name, COUNT(*) as count
-           FROM watched_movies wm, jsonb_array_elements(wm.actors) as actor
+           FROM watched_movies wm, jsonb_array_elements(${topBilledActorsSql('wm.actors')}) as actor
            WHERE actor->>'name' IS NOT NULL AND actor->>'name' != ''
            GROUP BY actor->>'name'
            ORDER BY count DESC

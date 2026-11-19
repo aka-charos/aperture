@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { tmdbCreditsByTitle, tmdbPersonAgreesWithLibrary, tmdbTitleKey } from './personTmdbCredits.js'
 import { readTmdbPersonDetails, tmdbDate } from '../tmdb/personDetails.js'
-import { MAX_STORED_ACTORS } from '../media/castLimits.js'
+import { MAX_STORED_ACTORS, TOP_BILLED_ACTORS, topBilledActorsSql } from '../media/castLimits.js'
 import { mapEmbyActors } from '../media/emby/mapperHelpers.js'
 
 describe('tmdbCreditsByTitle', () => {
@@ -19,6 +19,7 @@ describe('tmdbCreditsByTitle', () => {
       tmdbId: '1895',
       roles: ['actor', 'director', 'writer'],
       character: 'Nee Alavar',
+      addsTitle: true,
     })
   })
 
@@ -44,17 +45,42 @@ describe('tmdbCreditsByTitle', () => {
     assert.equal(byTitle.size, 0)
   })
 
-  it('takes the character from a cast credit only, and the first one TMDb lists', () => {
+  it('takes a character only from a cast credit, and a blank one counts as none', () => {
     const byTitle = tmdbCreditsByTitle({
-      cast: [
-        { id: 5, media_type: 'tv', character: '  ' },
-        { id: 5, media_type: 'tv', character: 'Second' },
+      cast: [{ id: 5, media_type: 'tv', character: '  ' }],
+      crew: [
+        { id: 5, media_type: 'tv', job: 'Writer' },
+        { id: 9, media_type: 'movie', job: 'Producer', character: 'not a role' },
       ],
-      crew: [{ id: 9, media_type: 'movie', job: 'Producer', character: 'not a role' }],
     })
-    // The duplicate cast row is dropped by the flattener: one character per title.
     assert.equal(byTitle.get('tv:5')?.character, null)
     assert.equal(byTitle.get('movie:9')?.character, null)
+  })
+
+  it('lets only a role, or directing, producing, writing or creating, add a title', () => {
+    const byTitle = tmdbCreditsByTitle({
+      cast: [
+        { id: 1, media_type: 'movie', character: 'Beth Heke' },
+        { id: 2, media_type: 'tv', character: 'Self - Guest' },
+        { id: 3, media_type: 'movie', character: 'Herself (archive footage)' },
+        { id: 4, media_type: 'movie', character: '' },
+        { id: 8, media_type: 'movie', character: 'Selfridge' },
+      ],
+      crew: [
+        { id: 5, media_type: 'movie', job: 'Thanks' },
+        { id: 6, media_type: 'tv', job: 'Executive Producer' },
+        { id: 7, media_type: 'movie', job: 'Assistant Director' },
+      ],
+    })
+    const adds = (key: string) => byTitle.get(key)?.addsTitle
+    assert.equal(adds('movie:1'), true)
+    assert.equal(adds('tv:2'), false)
+    assert.equal(adds('movie:3'), false)
+    assert.equal(adds('movie:4'), true)
+    assert.equal(adds('movie:8'), true)
+    assert.equal(adds('movie:5'), false)
+    assert.equal(adds('tv:6'), true)
+    assert.equal(adds('movie:7'), false)
   })
 })
 
@@ -147,5 +173,18 @@ describe('stored cast length', () => {
       Type: 'Actor',
     }))
     assert.equal(mapEmbyActors(people, 'http://emby').length, MAX_STORED_ACTORS)
+  })
+})
+
+describe('topBilledActorsSql', () => {
+  it('slices the first TOP_BILLED_ACTORS entries of an array column', () => {
+    const sql = topBilledActorsSql('m.actors')
+    assert.match(sql, /jsonb_typeof\(m\.actors\) = 'array'/)
+    assert.ok(sql.includes(`'$[0 to ${TOP_BILLED_ACTORS - 1}]'`))
+  })
+
+  it('refuses anything but a column reference', () => {
+    assert.throws(() => topBilledActorsSql("m.actors); DROP TABLE movies; --"))
+    assert.doesNotThrow(() => topBilledActorsSql('actors'))
   })
 })

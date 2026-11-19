@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { topBilledActorsSql } from '@aperture/core'
 import { query } from '../../../../lib/db.js'
 import { requireAuth, type SessionUser } from '../../../../plugins/auth.js'
 import { requireSelfOrAdmin } from './shared.js'
@@ -79,7 +80,7 @@ function resolve(dimension: string, value: string, value2: string): Resolved | n
     case 'actor':
       return {
         movieWhere:
-          "EXISTS (SELECT 1 FROM jsonb_array_elements(m.actors) a WHERE a->>'name' = $2)",
+          `EXISTS (SELECT 1 FROM jsonb_array_elements(${topBilledActorsSql('m.actors')}) a WHERE a->>'name' = $2)`,
         seriesWhere: null,
         params: [value],
       }

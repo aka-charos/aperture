@@ -8,6 +8,7 @@ import {
 import { WATCH_HISTORY_PLAYED_SQL } from '../recommender/watchedExclusion.js'
 import { computeConnectionReasons, type ConnectionReason } from './reasons.js'
 import { selectWithCrossMediaSlots } from './crossMedia.js'
+import { topBilledActorsSql } from '../media/castLimits.js'
 import { getTopMovies, getTopSeries } from '../topPicks/popularity.js'
 
 const logger = createChildLogger('similarity')
@@ -253,10 +254,10 @@ type MovieRow = Omit<MovieSimilarityRow, 'similarity'>
 type SeriesRow = Omit<SeriesSimilarityRow, 'similarity'>
 
 const MOVIE_SIMILARITY_COLUMNS = `m.id, m.title, m.year, m.poster_url, m.genres, m.directors,
-            m.actors, m.collection_name, m.keywords, m.studios`
+            ${topBilledActorsSql('m.actors')} AS actors, m.collection_name, m.keywords, m.studios`
 
 const SERIES_SIMILARITY_COLUMNS = `s.id, s.title, s.year, s.poster_url, s.genres, s.directors,
-            s.actors, s.network, s.keywords, s.studios`
+            ${topBilledActorsSql('s.actors')} AS actors, s.network, s.keywords, s.studios`
 
 function movieRowToItem(row: MovieRow): SimilarityItem {
   return {
@@ -343,7 +344,7 @@ export async function getSimilarMovies(
     keywords: string[]
     studios: unknown
   }>(
-    `SELECT id, title, year, poster_url, genres, directors, actors, 
+    `SELECT id, title, year, poster_url, genres, directors, ${topBilledActorsSql('actors')} AS actors, 
             collection_name, keywords, studios
      FROM movies WHERE id = $1`,
     [movieId]
@@ -472,7 +473,7 @@ export async function getSimilarSeries(
     keywords: string[]
     studios: unknown
   }>(
-    `SELECT id, title, year, poster_url, genres, directors, actors, 
+    `SELECT id, title, year, poster_url, genres, directors, ${topBilledActorsSql('actors')} AS actors, 
             network, keywords, studios
      FROM series WHERE id = $1`,
     [seriesId]
@@ -1214,7 +1215,7 @@ export async function semanticSearch(
       similarity: number
     }>(
       (inScope) => `SELECT m.id, m.title, m.year, m.poster_url, m.genres, m.directors, 
-              m.actors, m.collection_name, m.keywords, m.studios,
+              ${topBilledActorsSql('m.actors')} AS actors, m.collection_name, m.keywords, m.studios,
               1 - (e.embedding <=> $1::halfvec) as similarity
        FROM ${movieTableName} e
        JOIN movies m ON m.id = e.movie_id
@@ -1284,7 +1285,7 @@ export async function semanticSearch(
       similarity: number
     }>(
       (inScope) => `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.directors, 
-              s.actors, s.network, s.keywords, s.studios,
+              ${topBilledActorsSql('s.actors')} AS actors, s.network, s.keywords, s.studios,
               1 - (e.embedding <=> $1::halfvec) as similarity
        FROM ${seriesTableName} e
        JOIN series s ON s.id = e.series_id
@@ -1633,7 +1634,7 @@ async function getUserWatchingSeries(userId: string, limit: number, scope: Libra
     studios: unknown
   }>(
     `SELECT s.id, s.title, s.year, s.poster_url, s.genres, s.directors, 
-            s.actors, s.network, s.keywords, s.studios
+            ${topBilledActorsSql('s.actors')} AS actors, s.network, s.keywords, s.studios
      FROM user_watching_series uws
      JOIN series s ON uws.series_id = s.id
      WHERE uws.user_id = $1 AND ${inScope}
