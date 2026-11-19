@@ -144,12 +144,30 @@ services:
     environment:
       # It sends usage telemetry to a third party by default.
       - LIGHTPANDA_DISABLE_TELEMETRY=true
+    # The image's own command plus `--advertise-host lightpanda`. Images from
+    # 2026-11-13 accept only their advertised name (default: the --host value,
+    # 0.0.0.0), IP literals and localhost as the Host header, so without it
+    # every request crw sends to `lightpanda:9222` is refused ("rejected
+    # request host" in this container's log), crw's breaker stays open and
+    # Camofox takes every JS page.
+    command:
+      - "/bin/lightpanda"
+      - "serve"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "9222"
+      - "--advertise-host"
+      - "lightpanda"
+      - "--log_level"
+      - "info"
     # OPTIONAL hardening, off here: crw-camofox ships a `command:` that makes
     # LightPanda refuse private/internal addresses itself (the engine already
     # checks every request, but cannot see websockets or workers). It needs a
     # RECENT image: a stale cached `latest` exits on the flags and restart-loops,
-    # which takes the tier down. To enable, take the `command:` block for
-    # lightpanda from the crw-camofox release's docker-compose.yml, then
+    # which takes the tier down. To enable, replace the command above with the
+    # `command:` block for lightpanda from the crw-camofox release's
+    # docker-compose.yml, keeping `--advertise-host lightpanda` in it, then
     #   docker compose -f docker-compose.crw.yml pull lightpanda
     #   docker compose -f docker-compose.crw.yml up -d
     # and check that lightpanda stays "running" in `docker compose ps`.
