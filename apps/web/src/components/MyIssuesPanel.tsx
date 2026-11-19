@@ -20,7 +20,11 @@ import {
   CircularProgress,
   Collapse,
   Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   TextField,
   Typography,
@@ -51,6 +55,14 @@ export interface Issue {
   createdAt: string
   updatedAt: string
 }
+
+/** The server decides each one; the panel only sends the choice. */
+const STATE_FILTERS = ['all', 'open', 'resolved'] as const
+const KIND_FILTERS = ['all', 'video', 'audio', 'subtitles', 'other'] as const
+const SORTS = ['newest', 'oldest', 'latestActivity', 'titleAsc', 'titleDesc'] as const
+type StateFilter = (typeof STATE_FILTERS)[number]
+type KindFilter = (typeof KIND_FILTERS)[number]
+type IssueSort = (typeof SORTS)[number]
 
 interface MyIssuesPanelProps {
   /** 'all' asks for every user's issues; the server narrows it for non-admins. */
@@ -214,6 +226,11 @@ export function MyIssuesPanel({ scope = 'mine' }: MyIssuesPanelProps) {
   const [unlinked, setUnlinked] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ message: string; severity: 'success' | 'error' } | null>(null)
+  const [stateFilter, setStateFilter] = useState<StateFilter>('all')
+  const [kindFilter, setKindFilter] = useState<KindFilter>('all')
+  const [sort, setSort] = useState<IssueSort>('newest')
+  const [truncated, setTruncated] = useState(false)
+  const filtersActive = stateFilter !== 'all' || kindFilter !== 'all'
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -222,6 +239,9 @@ export function MyIssuesPanel({ scope = 'mine' }: MyIssuesPanelProps) {
     try {
       const url = new URL('/api/issues', window.location.origin)
       if (scope === 'all') url.searchParams.set('scope', 'all')
+      if (stateFilter !== 'all') url.searchParams.set('filter', stateFilter)
+      if (kindFilter !== 'all') url.searchParams.set('kind', kindFilter)
+      if (sort !== 'newest') url.searchParams.set('sort', sort)
       const res = await fetch(url.toString(), { credentials: 'include' })
 
       if (res.status === 503) {
@@ -234,31 +254,90 @@ export function MyIssuesPanel({ scope = 'mine' }: MyIssuesPanelProps) {
         throw new Error(body.message || body.error || t('myIssues.errorLoad'))
       }
 
-      const data = (await res.json()) as { issues?: Issue[]; unlinked?: boolean }
+      const data = (await res.json()) as { issues?: Issue[]; unlinked?: boolean; truncated?: boolean }
       setIssues(data.issues ?? [])
       setUnlinked(data.unlinked === true)
+      setTruncated(data.truncated === true)
     } catch (e) {
       setIssues([])
       setError(e instanceof Error ? e.message : t('myIssues.errorLoad'))
     } finally {
       setLoading(false)
     }
-  }, [scope, t])
+  }, [scope, stateFilter, kindFilter, sort, t])
 
   useEffect(() => {
     void load()
   }, [load])
 
+  // Kept up while loading, so changing a filter does not make the controls jump away.
+  const controls = !unavailable && !unlinked && (
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
+      <FormControl size="small" sx={{ minWidth: 180 }}>
+        <InputLabel id="issue-state-filter">{t('myIssues.filters.status')}</InputLabel>
+        <Select
+          labelId="issue-state-filter"
+          label={t('myIssues.filters.status')}
+          value={stateFilter}
+          onChange={(e) => setStateFilter(e.target.value as StateFilter)}
+        >
+          {STATE_FILTERS.map((f) => (
+            <MenuItem key={f} value={f}>
+              {f === 'all' ? t('myIssues.filters.statusAll') : t(`myIssues.state.${f}`)}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <FormControl size="small" sx={{ minWidth: 180 }}>
+        <InputLabel id="issue-kind-filter">{t('myIssues.filters.kind')}</InputLabel>
+        <Select
+          labelId="issue-kind-filter"
+          label={t('myIssues.filters.kind')}
+          value={kindFilter}
+          onChange={(e) => setKindFilter(e.target.value as KindFilter)}
+        >
+          {KIND_FILTERS.map((f) => (
+            <MenuItem key={f} value={f}>
+              {f === 'all' ? t('myIssues.filters.kindAll') : t(`reportIssue.kinds.${f}`)}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <FormControl size="small" sx={{ minWidth: 200 }}>
+        <InputLabel id="issue-sort">{t('myIssues.filters.sortBy')}</InputLabel>
+        <Select
+          labelId="issue-sort"
+          label={t('myIssues.filters.sortBy')}
+          value={sort}
+          onChange={(e) => setSort(e.target.value as IssueSort)}
+        >
+          {SORTS.map((option) => (
+            <MenuItem key={option} value={option}>
+              {t(`myIssues.sort.${option}`)}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </Stack>
+  )
+
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" py={6}>
-        <CircularProgress />
-      </Box>
+      <Stack spacing={2}>
+        {controls}
+        <Box display="flex" justifyContent="center" py={6}>
+          <CircularProgress />
+        </Box>
+      </Stack>
     )
   }
 
   return (
     <Stack spacing={2}>
+      {controls}
+
       {notice && (
         <Alert severity={notice.severity} onClose={() => setNotice(null)}>
           {notice.message}
@@ -280,7 +359,13 @@ export function MyIssuesPanel({ scope = 'mine' }: MyIssuesPanelProps) {
 
       {!unavailable && !unlinked && !error && issues.length === 0 && (
         <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-          {t('myIssues.empty')}
+          {filtersActive ? t('myIssues.emptyFiltered') : t('myIssues.empty')}
+        </Typography>
+      )}
+
+      {truncated && (
+        <Typography variant="caption" color="text.secondary">
+          {t('myIssues.truncated')}
         </Typography>
       )}
 

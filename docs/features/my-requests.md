@@ -44,4 +44,6 @@ If a title misbehaves — wrong audio track, missing subtitles, a broken file �
 
 The report is filed in Seerr under your own Seerr account, where your administrator triages it. The **Issues** tab lists the problems you've reported and their current status, with the replies on each one, and you can **reply** from here; administrators see reports from all users.
 
+Narrow the list by **Status** (open or resolved) and by **Problem** (video, audio, subtitles or something else), and choose the order under **Sort by**: newest or oldest report first, latest activity (a new reply counts), or by title.
+
 Reporting needs your Aperture account to be linked to a Seerr account. If it isn't, the tab says so — ask an admin to link it — rather than filing the report under someone else's name.

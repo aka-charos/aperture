@@ -32,6 +32,7 @@ import {
 } from '../../lib/seerrActingUser.js'
 import { attachLibraryMediaIds } from '../../lib/libraryLinks.js'
 import { mapSeerrIssue, toIssueKindCode } from './issueMapping.js'
+import { ISSUE_LIST_MAX, ISSUE_PAGE_SIZE, listIssues, readIssueListView } from './issueListing.js'
 import {
   issueSchemas,
   listIssuesSchema,
@@ -53,7 +54,7 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /api/issues
    */
-  fastify.get<{ Querystring: { scope?: string; filter?: string } }>(
+  fastify.get<{ Querystring: { scope?: string; filter?: string; kind?: string; sort?: string } }>(
     '/api/issues',
     { preHandler: requireAuth, schema: listIssuesSchema },
     async (request, reply) => {
@@ -70,10 +71,7 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const wantsAllUsers = request.query.scope === 'all' && currentUser.isAdmin
-      const filter =
-        request.query.filter === 'open' || request.query.filter === 'resolved'
-          ? request.query.filter
-          : 'all'
+      const view = readIssueListView(request.query)
 
       // Acting as nobody means acting as the API key's owner, who can see
       // everything. Acting as the user makes Seerr scope the list for us.
@@ -81,28 +79,42 @@ const issueRoutes: FastifyPluginAsync = async (fastify) => {
         ? undefined
         : (await ensureSeerrUserIdForRequest(currentUser.id, request.log)) ?? undefined
 
-      const listed = await listSeerrIssues({
-        filter,
-        ...(actAsUserId != null ? { actAsUserId } : {}),
-      })
-
-      if (!listed) {
-        return reply.status(502).send({ error: 'Failed to load issues from Seerr' })
-      }
-
       // An unmapped user has no Seerr identity, so the unscoped call would
       // return the API key owner's view — everyone's issues — to someone who
       // is not an admin. Empty is the honest answer for them.
       if (!wantsAllUsers && actAsUserId == null) {
-        return reply.send({ issues: [], total: 0, scope: 'mine', unlinked: true })
+        return reply.send({ issues: [], total: 0, truncated: false, scope: 'mine', unlinked: true })
       }
 
-      const mapped = listed.results.map(mapSeerrIssue)
-      const withLibrary = await attachLibraryMediaIds(mapped)
+      // Read whole, newest first, so the problem type and the title order are
+      // decided over every issue rather than over Seerr's first page. Seerr
+      // filters the state itself. Past the cap the oldest are left out, and
+      // the answer says so.
+      const read: Parameters<typeof mapSeerrIssue>[0][] = []
+      let seerrTotal = 0
+      while (read.length < ISSUE_LIST_MAX) {
+        const listed = await listSeerrIssues({
+          filter: view.state,
+          sort: 'added',
+          take: ISSUE_PAGE_SIZE,
+          skip: read.length,
+          ...(actAsUserId != null ? { actAsUserId } : {}),
+        })
+        if (!listed) {
+          return reply.status(502).send({ error: 'Failed to load issues from Seerr' })
+        }
+        read.push(...listed.results)
+        seerrTotal = listed.pageInfo?.results ?? read.length
+        if (listed.results.length < ISSUE_PAGE_SIZE || read.length >= seerrTotal) break
+      }
+
+      const withLibrary = await attachLibraryMediaIds(read.slice(0, ISSUE_LIST_MAX).map(mapSeerrIssue))
+      const issues = listIssues(withLibrary, view)
 
       return reply.send({
-        issues: withLibrary,
-        total: listed.pageInfo?.results ?? withLibrary.length,
+        issues,
+        total: issues.length,
+        truncated: seerrTotal > ISSUE_LIST_MAX,
         scope: wantsAllUsers ? 'all' : 'mine',
         unlinked: false,
       })

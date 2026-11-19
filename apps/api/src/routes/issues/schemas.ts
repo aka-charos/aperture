@@ -57,7 +57,19 @@ export const listIssuesSchema = {
     type: 'object',
     properties: {
       scope: { type: 'string', enum: ['mine', 'all'] },
-      filter: { type: 'string', enum: ['all', 'open', 'resolved'], default: 'all' },
+      filter: { type: 'string', enum: ['all', 'open', 'resolved'], default: 'all', description: 'Issue state' },
+      kind: {
+        type: 'string',
+        enum: ['all', 'video', 'audio', 'subtitles', 'other'],
+        default: 'all',
+        description: 'Problem type',
+      },
+      sort: {
+        type: 'string',
+        enum: ['newest', 'oldest', 'latestActivity', 'titleAsc', 'titleDesc'],
+        default: 'newest',
+        description: 'Newest or oldest report, latest activity (the issue or its newest reply), or title',
+      },
     },
   },
 }

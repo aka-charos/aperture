@@ -5528,7 +5528,23 @@
     "replyPlaceholder": "Add a reply…",
     "replyPosted": "Reply posted.",
     "errorLoad": "Could not load issues",
-    "errorReply": "Could not post the reply"
+    "errorReply": "Could not post the reply",
+    "emptyFiltered": "No issues match these filters.",
+    "truncated": "Only the most recently reported issues are listed; older ones are left out.",
+    "filters": {
+      "status": "Status",
+      "statusAll": "All statuses",
+      "kind": "Problem",
+      "kindAll": "All problems",
+      "sortBy": "Sort by"
+    },
+    "sort": {
+      "newest": "Newest first",
+      "oldest": "Oldest first",
+      "latestActivity": "Latest activity",
+      "titleAsc": "Title A–Z",
+      "titleDesc": "Title Z–A"
+    }
   },
   "watchHistoryPage": {
     "title": "Watch History",
