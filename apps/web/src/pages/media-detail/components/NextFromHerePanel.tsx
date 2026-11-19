@@ -6,7 +6,7 @@ import GridViewIcon from '@mui/icons-material/GridView'
 import BubbleChartIcon from '@mui/icons-material/BubbleChart'
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined'
 import { NextMap } from '../../next/NextMap'
-import { nextPath, orderReasons, reasonText, writeNextUrl } from '../../next/reasons'
+import { nextPath, reasonText, tieReason, writeNextUrl } from '../../next/reasons'
 import { useReasonText } from '../../next/useReasonText'
 import type { TrailTitle } from '../../next/types'
 import { useWatchedRevision } from '@/hooks/useWatchedRevision'
@@ -116,7 +116,10 @@ export function NextFromHerePanel({ titleRef, mediaTitle, onOpen }: NextFromHere
             <>
               <Box ref={gridRef} sx={{ ...TITLE_POSTER_GRID_SX, mb: 2 }}>
                 {shown.map((item) => {
-                  const reason = orderReasons(item.reasons)[0]
+                  // What ties it to this title, never a note about the viewer's
+                  // taste alone: under this title's name, that reads as a claim
+                  // about this title.
+                  const reason = tieReason(item.reasons)
                   const sentence = reason ? say(reasonText(reason, mediaTitle, item.title.type)) : null
                   return (
                     <TitlePosterCard

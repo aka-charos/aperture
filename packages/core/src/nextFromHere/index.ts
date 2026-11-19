@@ -32,6 +32,7 @@ import {
 import {
   pickClose,
   scoreCandidates,
+  takeCapped,
   tasteContext,
   type Candidate,
   type Reason,
@@ -540,7 +541,7 @@ export async function getNextSummary(
   const candidates = candidatesFor(prepared, start, neighbours)
   return {
     start: titleView(view.index.titles[start]),
-    items: candidates.slice(0, count).map((candidate) => itemView(view, candidate)),
+    items: takeCapped(candidates, count).map((candidate) => itemView(view, candidate)),
   }
 }
 

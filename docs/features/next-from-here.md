@@ -8,13 +8,22 @@ Next from here (sidebar: **Next from here**) answers one question: having watche
 
 The titles nearest the start in tone and subject: the same similarity the [Media Graph](explore.md) draws. Only titles you haven't finished, started or rated are suggested (a film counts as started once it is played a little way in), and only from the libraries you can open.
 
-Each title shows up to three reasons, the most telling first:
+Each title shows up to three reasons. First come the ones that tie it to the start, most specific first:
 
 - **Someone on both**: "Director of both: Hal Hartley", or, when the roles differ, "Clint Eastwood: Lead actor on *Dirty Harry*, Director here". Only roles that shape a title count. An editor, a bit part or a studio never links two titles here.
-- **Someone you keep coming back to**: a person with a major role on the suggestion whose titles you have liked at least twice (see below for what counts). The reason says how many you liked and, when you rated some, what your ratings of their titles average (all of them, low ones included).
 - **Themes they share**: the TMDb keywords on both titles that are specific enough to mean something in your library, rarest first ("Shares themes: abandoned asylum, psychiatric hospital"). A keyword on a large part of your library is never named.
-- **A network or studio you favour**: one whose titles you finish far more often than its share of your library would suggest ("you finish 3.2× as many of its shows as your library would suggest"). It is measured the same way as the networks in your [Watcher Identity](watch-stats.md). A studio or network that is simply everywhere in your library scores nothing, however much of it you watch.
 - **Close in feel**: where it ranks among the films, or among the shows, closest to the start (#1 is the closest of its kind in your library, counting titles you have already seen). Films and shows are ranked apart because their distances are not comparable.
+
+Then the ones about you, which say why the suggestion suits you but not why it follows the start:
+
+- **Someone you keep coming back to**: a person with a major role on the suggestion whose titles you have liked at least twice (see below for what counts), worded "Lead actor of this one: …". The reason says how many you liked and, when you rated some, what your ratings of their titles average (all of them, low ones included).
+- **A network or studio you favour**: one whose titles you finish far more often than its share of your library would suggest ("From HBO: you finish 3.2× as many of its shows as your library would suggest"). It is measured the same way as the networks in your [Watcher Identity](watch-stats.md). A studio or network that is simply everywhere in your library scores nothing, however much of it you watch.
+
+On a title's own page each card has room for one reason, and it is always the one that ties it to that title.
+
+### How the list is ordered
+
+How close a title feels and who it shares with the start count equally. A title by the same director, or a show by the same creator, counts the most; a shared writer or lead less (a writer credit also names the authors of the books and comics a title adapts); a shared cinematographer or composer less again; a franchise least. Someone you keep coming back to, or a network you favour, only breaks near-ties, so a title that is merely close in feel overtakes one by the same author only when that one feels very different. No more than two titles come through the same person, so one prolific director can't fill the list; the rest of their work is in their row below.
 
 What counts as liking a title: rating it 7 or higher, or finishing it without rating it. A title rated 4 or lower counts against the people on it.
 
@@ -51,7 +60,7 @@ The **corner button** on any suggestion's poster (in the list, a row or the map)
 
 - **Start from** lets you pick any title in your library. **Recently watched** offers your latest finished titles as one-click starts.
 - **Surprise me** starts from a title chosen for you, one with plenty of people linking it to the rest of your library.
-- Every title's page shows Next from here in its right column (as many suggestions as your admin set, each with its reason, as a list or a map), and a button of the same name at the top. **See more** and the button open this page from that title.
+- Every title's page shows Next from here in its right column (as many suggestions as your admin set, each with how it ties to that title, as a list or a map), and a button of the same name at the top. **See more** and the button open this page from that title.
 - Links to the old Trails page open here, on the same trail.
 - The start, your trail and the view are kept in the page's address, so **Back** and a shared link return to the same page.
 

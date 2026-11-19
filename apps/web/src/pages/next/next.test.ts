@@ -5,6 +5,7 @@ import {
   itemLink,
   nextQuery,
   orderReasons,
+  tieReason,
   nextPath,
   nextPathFromTrails,
   readNextUrl,
@@ -56,17 +57,34 @@ function row(entity: TrailEntity, members: Array<{ title: TrailTitle; seen: bool
   }
 }
 
-test('the most telling reason leads, themes before a company, and closeness in feel comes last', () => {
+test('what ties a suggestion to the start leads; notes about the viewer alone come last', () => {
   const reasons: NextReason[] = [
     { kind: 'feel', rank: 3 },
     { kind: 'company', entity: { ...person('A24'), kind: 'company' }, finished: 4, ratio: 3.2 },
+    { kind: 'favourite', entity: person('Leonardo DiCaprio'), rolesHere: ['lead'], liked: 2, averageRating: 7 },
     { kind: 'themes', entities: [keyword('asylum')] },
     { kind: 'shared', entity: person('Hal Hartley'), rolesThere: ['director'], rolesHere: ['director'] },
   ]
   assert.deepEqual(
     orderReasons(reasons).map((r) => r.kind),
-    ['shared', 'themes', 'company', 'feel']
+    ['shared', 'themes', 'feel', 'favourite', 'company']
   )
+})
+
+test("a card's one reason is its tie to the start, never a taste note (the DiCaprio case)", () => {
+  // Killers of the Flower Moon after The Lowdown: closest film in feel, and
+  // a lead the viewer likes. The card must say the first.
+  const flowerMoon: NextReason[] = [
+    { kind: 'favourite', entity: person('Leonardo DiCaprio'), rolesHere: ['lead'], liked: 2, averageRating: 7 },
+    { kind: 'feel', rank: 1 },
+  ]
+  assert.deepEqual(tieReason(flowerMoon), { kind: 'feel', rank: 1 })
+  const task: NextReason[] = [
+    { kind: 'company', entity: { ...person('HBO'), kind: 'company' }, finished: 8, ratio: 4.1 },
+    { kind: 'feel', rank: 4 },
+  ]
+  assert.equal(tieReason(task)?.kind, 'feel')
+  assert.equal(tieReason([{ kind: 'company', entity: { ...person('HBO'), kind: 'company' }, finished: 8, ratio: 4.1 }]), null)
 })
 
 test('a shared person names one role when both titles give the same one, else both', () => {

@@ -14,6 +14,7 @@ import {
   LIKED_WEIGHT,
   LINKED_PER_ENTITY,
   MAJOR_MASK,
+  MAX_PER_SHARED_ENTITY,
   MIN_PERSON_TITLES,
   NETWORK_AFFINITY_SHARE,
   THEMES_SHOWN,
@@ -401,5 +402,33 @@ export function sharedThemes(view: TrailView, title: number, startThemes: Readon
  * work is read as theirs rather than scattered two at a time.
  */
 export function pickClose(candidates: readonly Candidate[]): Candidate[] {
-  return candidates.filter((c) => c.quadrant !== 'linkedDifferent').slice(0, CLOSE_ITEMS)
+  return takeCapped(
+    candidates.filter((c) => c.quadrant !== 'linkedDifferent'),
+    CLOSE_ITEMS
+  )
+}
+
+/**
+ * The first `limit` candidates in order, with at most `perEntity` through the
+ * same strongest shared person or franchise (`sharedEntities[0]`, the one a
+ * card names). A candidate passed over leaves room for the next.
+ */
+export function takeCapped(
+  candidates: readonly Candidate[],
+  limit: number,
+  perEntity: number = MAX_PER_SHARED_ENTITY
+): Candidate[] {
+  const out: Candidate[] = []
+  const taken = new Map<number, number>()
+  for (const candidate of candidates) {
+    if (out.length >= limit) break
+    const entity = candidate.sharedEntities[0]
+    if (entity !== undefined) {
+      const count = taken.get(entity) ?? 0
+      if (count >= perEntity) continue
+      taken.set(entity, count + 1)
+    }
+    out.push(candidate)
+  }
+  return out
 }

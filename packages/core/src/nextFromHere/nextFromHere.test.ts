@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildTrailIndex, createView, type CreditSource, type TitleSource, type TrailView } from '../trails/graph.js'
 import { roleBit, formatTitleRef } from '../trails/rules.js'
-import { LINKED_PER_ENTITY } from './rules.js'
+import { LINKED_PER_ENTITY, MAX_PER_SHARED_ENTITY } from './rules.js'
 import {
   CLOSE_ITEMS,
   PEOPLE_ROWS,
@@ -18,6 +18,7 @@ import {
   personAffinity,
   pickClose,
   scoreCandidates,
+  takeCapped,
   type Candidate,
   type ViewerTitle,
 } from './taste.js'
@@ -51,6 +52,8 @@ const network = (name: string): CreditSource => ({ role: 'network', name })
 const studio = (name: string): CreditSource => ({ role: 'studio', name })
 const keyword = (name: string): CreditSource => ({ role: 'keyword', name })
 const writer = (name: string): CreditSource => ({ role: 'writer', name })
+const creator = (name: string): CreditSource => ({ role: 'creator', name })
+const cinematographer = (name: string): CreditSource => ({ role: 'cinematographer', name })
 
 function build(sources: TitleSource[]): { view: TrailView; at: (s: TitleSource) => number; entity: (key: string) => number } {
   const index = buildTrailIndex(sources)
@@ -91,6 +94,12 @@ test('closeness is a rank, and a franchise is the weakest shared reason', () => 
   assert.equal(closenessFromRank(3, 0), 0)
   assert.ok(sharedRoleStrength(roleBit('director')) > sharedRoleStrength(roleBit('lead')))
   assert.ok(sharedRoleStrength(roleBit('lead')) > sharedRoleStrength(roleBit('franchise')))
+  // The author of a title (its director, a show's creator) is the strongest
+  // link; a writer credit, which also names source-material authors, is not.
+  assert.equal(sharedRoleStrength(roleBit('creator')), sharedRoleStrength(roleBit('director')))
+  assert.ok(sharedRoleStrength(roleBit('director')) > sharedRoleStrength(roleBit('writer')))
+  assert.ok(sharedRoleStrength(roleBit('lead')) > sharedRoleStrength(roleBit('cinematographer')))
+  assert.ok(sharedRoleStrength(roleBit('cinematographer')) > sharedRoleStrength(roleBit('franchise')))
   assert.equal(sharedRoleStrength(roleBit('actor')), 0)
   assert.equal(sharedRoleStrength(roleBit('editor')), 0)
 })
@@ -566,4 +575,58 @@ test("a title page's suggestion count: refused out of range, never clamped, and 
   assert.equal(readSummarySize('0'), SUMMARY_SIZE_DEFAULT)
   assert.equal(readSummarySize(String(SUMMARY_SIZE_MAX + 1)), SUMMARY_SIZE_DEFAULT)
   assert.equal(readSummarySize('twelve'), SUMMARY_SIZE_DEFAULT)
+})
+
+test('a show by the same creator outranks the closest show that only carries a network the viewer favours', () => {
+  // The Lowdown case: the closest show in feel shares nothing with the start
+  // but comes from a network the viewer finishes far more of than its share;
+  // the creator's other show is only middling in feel. The shared author wins.
+  const start = title('Start', [creator('Sterlin Harjo'), network('Start Net')], 'series')
+  const favoured = Array.from({ length: 4 }, (_, i) => title(`Fav ${i}`, [network('Fav Net')], 'series'))
+  const others = Array.from({ length: 30 }, (_, i) => title(`Other ${i}`, [network(`Net ${i}`)], 'series'))
+  const closest = title('Closest', [network('Fav Net')], 'series')
+  const sameCreator = title('Same Creator', [creator('Sterlin Harjo')], 'series')
+  const { view, at } = build([start, ...favoured, ...others, closest, sameCreator])
+  const record = new Map<number, ViewerTitle>(favoured.slice(0, 3).map((t) => [at(t), liked(null)]))
+  for (const t of others.slice(0, 6)) record.set(at(t), liked(null))
+  // Closest first; the creator's show halfway down a ten-show neighbour list.
+  const neighbours = [closest, ...others.slice(10, 14), sameCreator, ...others.slice(14, 18)].map(at)
+  const candidates = scoreCandidates({ view, start: at(start), neighbours, record, exclude: (t) => record.has(t) })
+  const order = candidates.map((c) => view.index.titles[c.title].title)
+  const closestCandidate = candidates.find((c) => view.index.titles[c.title].title === 'Closest')!
+  assert.ok(closestCandidate.reasons.some((r) => r.kind === 'company'), 'the network is a favourite here')
+  assert.ok(order.indexOf('Same Creator') < order.indexOf('Closest'), order.join(', '))
+})
+
+test('one shared person fills at most MAX_PER_SHARED_ENTITY places in a list; the rest move up', () => {
+  const candidate = (id: number, entity?: number): Candidate => ({
+    title: id,
+    quadrant: entity === undefined ? 'close' : 'closeLinked',
+    score: 1 - id / 100,
+    reasons: [],
+    sharedEntities: entity === undefined ? [] : [entity],
+  })
+  const ranked = [candidate(1, 7), candidate(2, 7), candidate(3, 7), candidate(4), candidate(5, 8), candidate(6, 7)]
+  const taken = takeCapped(ranked, 4)
+  assert.deepEqual(
+    taken.map((c) => c.title),
+    [1, 2, 4, 5]
+  )
+  assert.equal(taken.filter((c) => c.sharedEntities[0] === 7).length, MAX_PER_SHARED_ENTITY)
+  // The close list keeps the same rule.
+  const director7 = Array.from({ length: CLOSE_ITEMS }, (_, i) => candidate(i + 1, 7))
+  assert.equal(pickClose(director7).length, MAX_PER_SHARED_ENTITY)
+})
+
+test('a cinematographer alone does not outrank the closest title', () => {
+  const start = title('Start', [cinematographer('Roger Deakins')])
+  const closest = title('Closest', [])
+  const shot = title('Shot', [cinematographer('Roger Deakins')])
+  const fillers = Array.from({ length: 8 }, (_, i) => title(`F ${i}`, []))
+  const { view, at } = build([start, closest, shot, ...fillers])
+  const neighbours = [closest, ...fillers.slice(0, 4), shot, ...fillers.slice(4)].map(at)
+  const order = scoreCandidates({ view, start: at(start), neighbours, record: new Map(), exclude: () => false }).map(
+    (c) => view.index.titles[c.title].title
+  )
+  assert.ok(order.indexOf('Closest') < order.indexOf('Shot'), order.join(', '))
 })

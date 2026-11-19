@@ -19,15 +19,29 @@ export type ReasonText =
   | { key: 'next.reason.themes'; names: string[] }
 
 /**
- * Most telling first: a named person or franchise shared with the start,
- * then a favourite, then the themes the two share, then a studio or network,
- * and "close in feel" last — true of every title in the close list, so it
- * says the least about any one.
+ * What ties the suggestion to the start comes first, most specific first: a
+ * person or franchise on both, the themes they share, how close it feels.
+ * Then what the viewer's own record says about the suggestion alone (a person
+ * they keep coming back to, a studio or network they favour), which explains
+ * why it suits them but never why it follows the start, so it never leads.
+ * Every suggestion has a tie (core only suggests a neighbour or a shared
+ * person), so the first reason is always one.
  */
-const ORDER: Record<NextReason['kind'], number> = { shared: 0, favourite: 1, themes: 2, company: 3, feel: 4 }
+const ORDER: Record<NextReason['kind'], number> = { shared: 0, themes: 1, feel: 2, favourite: 3, company: 4 }
+
+/** The reasons that say how a suggestion relates to the start. */
+const TIES: ReadonlySet<NextReason['kind']> = new Set(['shared', 'themes', 'feel'])
 
 export function orderReasons(reasons: readonly NextReason[]): NextReason[] {
   return [...reasons].sort((a, b) => ORDER[a.kind] - ORDER[b.kind])
+}
+
+/**
+ * The one reason a card has room for: what ties the suggestion to the title
+ * it follows. Null only for a suggestion with no tie, which core never sends.
+ */
+export function tieReason(reasons: readonly NextReason[]): NextReason | null {
+  return orderReasons(reasons).find((reason) => TIES.has(reason.kind)) ?? null
 }
 
 export function reasonText(reason: NextReason, start: string, type: 'movie' | 'series'): ReasonText {

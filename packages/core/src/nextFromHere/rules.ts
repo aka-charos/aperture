@@ -75,19 +75,42 @@ export function closenessFromRank(rank: number, poolSize: number): number {
 
 /**
  * How strong a reason sharing someone with the start is, by the role they
- * have here. A franchise is the weakest: the next part of a series is the
- * one recommendation nobody needs.
+ * have here. The author of a title (its director, or a show's creator) is the
+ * strongest link there is: "more from whoever made this" is the plainest
+ * answer to what to watch next. A writer credit counts less, because it also
+ * names source-material authors and story credits (one novelist or comics
+ * creator across a dozen unrelated adaptations); measured, writers were the
+ * largest source of suggestions unlike the start in feel (F-200). A lead
+ * counts the same, and craft roles less. A franchise is the weakest: the
+ * next part of a series is the one recommendation nobody needs.
  */
 export function sharedRoleStrength(mask: number): number {
-  if (mask & (roleBit('director') | roleBit('creator') | roleBit('writer'))) return 1
-  if (mask & (roleBit('cinematographer') | roleBit('composer'))) return 0.8
-  if (mask & roleBit('lead')) return 0.7
+  if (mask & (roleBit('director') | roleBit('creator'))) return 1
+  if (mask & (roleBit('writer') | roleBit('lead'))) return 0.6
+  if (mask & (roleBit('cinematographer') | roleBit('composer'))) return 0.4
   if (mask & roleBit('franchise')) return 0.3
   return 0
 }
 
-/** The blend; provisional, and the reasons beside each item are what to read. */
-export const SCORE_WEIGHTS = { closeness: 0.5, sharedWithStart: 0.25, affinity: 0.25 } as const
+/**
+ * The blend. Closeness and a shared person are what tie a suggestion to the
+ * start, and weigh the same, so a title by the same author ranks with the
+ * closest title in feel. Affinity (a person or company the viewer favours on
+ * the suggestion) says nothing about the start, so it only nudges: it adds at
+ * most `affinity`, so it reorders titles whose ties to the start are within
+ * that of each other, and cannot lift a merely close title over a same-author
+ * title that is itself reasonably close. Measured on 128 starts across four
+ * viewers (F-200). Provisional.
+ */
+export const SCORE_WEIGHTS = { closeness: 0.45, sharedWithStart: 0.45, affinity: 0.1 } as const
+
+/**
+ * At most this many titles in one list through the same shared person (or
+ * franchise): with a shared author weighed as much as closeness, a prolific
+ * director would otherwise fill it. The rest of their work is their row on
+ * the Next from here page.
+ */
+export const MAX_PER_SHARED_ENTITY = 2
 
 /** How strongly a favourite network counts against a favourite person. */
 export const NETWORK_AFFINITY_SHARE = 0.7
