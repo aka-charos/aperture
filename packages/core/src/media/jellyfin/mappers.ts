@@ -10,6 +10,7 @@ import { episodeNumberEnd } from '../episodeRange.js'
 import type { Movie, Series, Episode } from '../types.js'
 import type { JellyfinItem, JellyfinEpisode } from './types.js'
 import { mapVideoQuality } from '../videoQuality.js'
+import { MAX_STORED_ACTORS } from '../castLimits.js'
 
 export function mapJellyfinItemToMovie(item: JellyfinItem, baseUrl: string): Movie {
   const directors =
@@ -17,7 +18,7 @@ export function mapJellyfinItemToMovie(item: JellyfinItem, baseUrl: string): Mov
   const writers = item.People?.filter((p) => p.Type === 'Writer').map((p) => p.Name) || []
   const actors =
     item.People?.filter((p) => p.Type === 'Actor')
-      .slice(0, 20)
+      .slice(0, MAX_STORED_ACTORS)
       .map((p) => ({
         name: p.Name,
         role: p.Role,
@@ -88,7 +89,7 @@ export function mapJellyfinItemToSeries(item: JellyfinItem, baseUrl: string): Se
   const writers = item.People?.filter((p) => p.Type === 'Writer').map((p) => p.Name) || []
   const actors =
     item.People?.filter((p) => p.Type === 'Actor')
-      .slice(0, 20)
+      .slice(0, MAX_STORED_ACTORS)
       .map((p) => ({
         name: p.Name,
         role: p.Role,

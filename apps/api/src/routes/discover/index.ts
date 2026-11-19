@@ -8,6 +8,11 @@ import {
   displayRatingSql,
   listPeopleForBrowse,
   resolveTmdbPersonProfileImageUrl,
+  getCachedOrFetchCombinedCredits,
+  getCachedOrFetchPersonDetails,
+  tmdbCreditsByTitle,
+  tmdbPersonAgreesWithLibrary,
+  tmdbTitleKey,
   getPersonCreditsGap,
   getPersonMediaServerDetails,
   findPersonMediaServerItemIdForName,
@@ -293,7 +298,7 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
         role: string | null
       }
 
-      const [movieResults, seriesResults] = await Promise.all([
+      const [movieResults, seriesResults, tmdbProfile, personDetails] = await Promise.all([
         query<CreditRow>(
           `SELECT ${creditColumns('m')}
            FROM movies m
@@ -308,56 +313,146 @@ const discoverRoutes: FastifyPluginAsync = async (fastify) => {
            ORDER BY s.year DESC NULLS LAST, s.title ASC`,
           seriesParams
         ),
-      ])
-
-      const creditsOf = (r: CreditRow): PersonCreditKind[] => [
-        ...(r.is_actor ? (['actor'] as const) : []),
-        ...(r.is_director ? (['director'] as const) : []),
-        ...(r.is_writer ? (['writer'] as const) : []),
-        ...(r.is_creator ? (['creator'] as const) : []),
-      ]
-      const toItem = (r: CreditRow): ContentItem => ({
-        id: r.id,
-        tmdbId: r.tmdb_id,
-        title: r.title,
-        year: r.year,
-        posterUrl: r.poster_url,
-        backdropUrl: r.backdrop_url,
-        genres: r.genres || [],
-        communityRating: r.community_rating,
-        role: r.role || undefined,
-        credits: creditsOf(r),
-      })
-
-      // Build person image URL through our proxy
-      const imageUrl = `/api/media/images/Persons/${encodeURIComponent(decodedName)}/Images/Primary`
-
-      // Count stats
-      const asActorMovies = movieResults.rows.filter(r => r.is_actor).length
-      const asDirectorMovies = movieResults.rows.filter(r => r.is_director).length
-      const asActorSeries = seriesResults.rows.filter(r => r.is_actor).length
-      const asDirectorSeries = seriesResults.rows.filter(r => r.is_director).length
-
-      const [tmdbProfile, personDetails] = await Promise.all([
         resolveTmdbPersonProfileImageUrl(decodedName),
         getPersonMediaServerDetails(decodedName),
       ])
 
+      // TMDb's credits fill in library titles the media server credits the
+      // person on under another spelling or not at all, and TMDb's biography
+      // fills what the media server's Person metadata leaves empty: both only
+      // once TMDb's person agrees with the library on a title the media server
+      // already credits by name (core discover/personTmdbCredits.ts).
+      const tmdbPersonId = tmdbProfile.tmdbPersonId
+      const needsTmdbDetails =
+        !personDetails?.overview?.trim() ||
+        !personDetails?.birthDate ||
+        !personDetails?.birthPlace?.trim()
+      const [tmdbCredits, tmdbDetails] =
+        tmdbPersonId != null
+          ? await Promise.all([
+              getCachedOrFetchCombinedCredits(decodedName, tmdbPersonId).catch((err: unknown) => {
+                request.log.warn({ err, tmdbPersonId }, 'TMDb person credits lookup failed')
+                return null
+              }),
+              needsTmdbDetails
+                ? getCachedOrFetchPersonDetails(decodedName, tmdbPersonId).catch((err: unknown) => {
+                    request.log.warn({ err, tmdbPersonId }, 'TMDb person details lookup failed')
+                    return null
+                  })
+                : Promise.resolve(null),
+            ])
+          : [null, null]
+      const creditsByTitle = tmdbCredits ? tmdbCreditsByTitle(tmdbCredits) : null
+      const tmdbAgrees =
+        creditsByTitle != null &&
+        tmdbPersonAgreesWithLibrary(creditsByTitle, [
+          ...movieResults.rows.map((r) => ({ media: 'movie' as const, tmdbId: r.tmdb_id })),
+          ...seriesResults.rows.map((r) => ({ media: 'tv' as const, tmdbId: r.tmdb_id })),
+        ])
+
+      // Library titles TMDb credits the person on that the name match missed.
+      const tmdbOnlyRows = async (alias: 'm' | 's', found: CreditRow[]): Promise<CreditRow[]> => {
+        if (!creditsByTitle || !tmdbAgrees) return []
+        const media = alias === 'm' ? 'movie' : 'tv'
+        const tmdbIds = [...creditsByTitle.values()]
+          .filter((credit) => credit.media === media)
+          .map((credit) => credit.tmdbId)
+        if (tmdbIds.length === 0) return []
+        const params: unknown[] = [decodedName]
+        const inScope = scopeClause(scope, alias, params)
+        params.push(tmdbIds)
+        const idsParam = `$${params.length}`
+        params.push(found.map((r) => r.id))
+        const foundParam = `$${params.length}`
+        const result = await query<CreditRow>(
+          `SELECT ${creditColumns(alias)}
+           FROM ${alias === 'm' ? 'movies' : 'series'} ${alias}
+           WHERE ${alias}.tmdb_id = ANY(${idsParam}::text[])
+             AND NOT (${alias}.id = ANY(${foundParam}::uuid[]))
+             AND ${inScope}`,
+          params
+        )
+        return result.rows
+      }
+      const [extraMovies, extraSeries] = await Promise.all([
+        tmdbOnlyRows('m', movieResults.rows),
+        tmdbOnlyRows('s', seriesResults.rows),
+      ])
+
+      const tmdbCreditOf = (media: 'movie' | 'tv', r: CreditRow) =>
+        r.tmdb_id ? creditsByTitle?.get(tmdbTitleKey(media, r.tmdb_id)) : undefined
+      const creditsOf = (
+        media: 'movie' | 'tv',
+        r: CreditRow,
+        fromTmdb: boolean
+      ): PersonCreditKind[] => {
+        const kinds = new Set<PersonCreditKind>([
+          ...(r.is_actor ? (['actor'] as const) : []),
+          ...(r.is_director ? (['director'] as const) : []),
+          ...(r.is_writer ? (['writer'] as const) : []),
+          ...(r.is_creator ? (['creator'] as const) : []),
+        ])
+        if (fromTmdb) {
+          for (const role of tmdbCreditOf(media, r)?.roles ?? []) {
+            if (role === 'actor' || role === 'director' || role === 'writer' || role === 'creator') {
+              kinds.add(role)
+            }
+          }
+        }
+        return [...kinds]
+      }
+      const toItem =
+        (media: 'movie' | 'tv', fromTmdb: boolean) =>
+        (r: CreditRow): ContentItem => ({
+          id: r.id,
+          tmdbId: r.tmdb_id,
+          title: r.title,
+          year: r.year,
+          posterUrl: r.poster_url,
+          backdropUrl: r.backdrop_url,
+          genres: r.genres || [],
+          communityRating: r.community_rating,
+          role: r.role || (fromTmdb ? tmdbCreditOf(media, r)?.character : null) || undefined,
+          credits: creditsOf(media, r, fromTmdb),
+        })
+      // Newest first, undated last, then by title: the SQL order, kept once
+      // TMDb's titles join.
+      const byYearThenTitle = (a: ContentItem, b: ContentItem) =>
+        (b.year ?? -Infinity) - (a.year ?? -Infinity) || a.title.localeCompare(b.title)
+      const movies = [
+        ...movieResults.rows.map(toItem('movie', false)),
+        ...extraMovies.map(toItem('movie', true)),
+      ]
+      const series = [
+        ...seriesResults.rows.map(toItem('tv', false)),
+        ...extraSeries.map(toItem('tv', true)),
+      ]
+      if (extraMovies.length > 0) movies.sort(byYearThenTitle)
+      if (extraSeries.length > 0) series.sort(byYearThenTitle)
+
+      // Build person image URL through our proxy
+      const imageUrl = `/api/media/images/Persons/${encodeURIComponent(decodedName)}/Images/Primary`
+
+      const credited = (items: ContentItem[], kind: PersonCreditKind) =>
+        items.filter((item) => item.credits?.includes(kind)).length
+
+      // A field the media server leaves empty takes TMDb's, field by field.
+      const tmdbBio = tmdbAgrees ? tmdbDetails : null
       const response: PersonResponse = {
         name: decodedName,
         imageUrl,
         tmdbFallbackImageUrl: tmdbProfile.imageUrl,
-        overview: personDetails?.overview ?? null,
-        birthDate: personDetails?.birthDate ?? null,
-        deathDate: personDetails?.deathDate ?? null,
-        birthPlace: personDetails?.birthPlace ?? null,
-        movies: movieResults.rows.map(toItem),
-        series: seriesResults.rows.map(toItem),
+        overview: personDetails?.overview?.trim() || tmdbBio?.biography || null,
+        birthDate: personDetails?.birthDate || tmdbBio?.birthday || null,
+        deathDate: personDetails?.deathDate || tmdbBio?.deathday || null,
+        birthPlace: personDetails?.birthPlace?.trim() || tmdbBio?.placeOfBirth || null,
+        movies,
+        series,
         stats: {
-          totalMovies: movieResults.rows.length,
-          totalSeries: seriesResults.rows.length,
-          asActor: asActorMovies + asActorSeries,
-          asDirector: asDirectorMovies + asDirectorSeries,
+          totalMovies: movies.length,
+          totalSeries: series.length,
+          asActor: credited(movies, 'actor') + credited(series, 'actor'),
+          asDirector: credited(movies, 'director'),
         },
       }
 

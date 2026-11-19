@@ -146,6 +146,16 @@ export {
   type CreditsRoleKind,
 } from './personCreditsGap.js'
 
+// TMDb credits by title, and whether TMDb's person is the library's
+export {
+  tmdbCreditsByTitle,
+  tmdbPersonAgreesWithLibrary,
+  tmdbTitleKey,
+  type TmdbTitleCredit,
+  type TmdbCreditMedia,
+  type LibraryTitleRef,
+} from './personTmdbCredits.js'
+
 // Person portrait push (media server item id from sync)
 export { findPersonMediaServerItemIdForName } from './personPortraitPush.js'
 

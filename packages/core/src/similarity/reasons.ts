@@ -15,6 +15,9 @@ export type ConnectionType =
   | 'similarity'
   | 'ai_diverse' // AI suggested as thematically related but from different franchise
 
+/** How far down each title's billing a shared actor still counts as a reason. */
+export const REASON_BILLED_ACTORS = 20
+
 export interface ConnectionReason {
   type: ConnectionType
   value?: string
@@ -55,9 +58,10 @@ export function computeConnectionReasons(
     })
   }
 
-  // Check for shared actors (by name)
-  const sourceActorNames = source.actors.map((a) => a.name)
-  const targetActorNames = target.actors.map((a) => a.name)
+  // Check for shared actors (by name), among the top-billed only: the library
+  // keeps a title's whole cast now, and a shared bit part is not a reason.
+  const sourceActorNames = source.actors.slice(0, REASON_BILLED_ACTORS).map((a) => a.name)
+  const targetActorNames = target.actors.slice(0, REASON_BILLED_ACTORS).map((a) => a.name)
   const sharedActorNames = findIntersection(sourceActorNames, targetActorNames)
   if (sharedActorNames.length > 0) {
     // Get the first shared actor with photo if available

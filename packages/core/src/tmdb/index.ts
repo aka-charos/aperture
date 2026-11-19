@@ -33,11 +33,19 @@ export {
   resolveTmdbPersonId,
   getCachedOrFetchCombinedCredits,
   COMBINED_CREDITS_CACHE_TTL_MS,
+  getCachedOrFetchPersonDetails,
+  PERSON_DETAILS_CACHE_TTL_MS,
   type TmdbPersonSearchResult,
   type TmdbCombinedCreditsResponse,
   type TmdbCombinedCreditEntry,
   type ResolveTmdbPersonProfileResult,
 } from './person.js'
+export {
+  readTmdbPersonDetails,
+  tmdbDate,
+  type TmdbPersonDetails,
+  type TmdbPersonResponse,
+} from './personDetails.js'
 
 // Client types
 export type { ApiLogCallback } from './client.js'

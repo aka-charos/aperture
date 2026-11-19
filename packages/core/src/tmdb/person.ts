@@ -4,7 +4,12 @@
 
 import { query, queryOne } from '../lib/db.js'
 import { createChildLogger } from '../lib/logger.js'
-import { getImageUrl, tmdbRequest, type ApiLogCallback } from './client.js'
+import { getImageUrl, tmdbLookup, tmdbRequest, type ApiLogCallback } from './client.js'
+import {
+  readTmdbPersonDetails,
+  type TmdbPersonDetails,
+  type TmdbPersonResponse,
+} from './personDetails.js'
 
 const logger = createChildLogger('tmdb-person')
 
@@ -210,6 +215,93 @@ export async function resolveTmdbPersonId(decodedName: string): Promise<number |
 
   const r = await resolveTmdbPersonProfileImageUrl(decodedName)
   return r.tmdbPersonId
+}
+
+/** How long a TMDb answer about a person's biography and dates is kept (7 days). */
+export const PERSON_DETAILS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+interface PersonDetailsRow {
+  details_tmdb_person_id: number | null
+  biography: string | null
+  birthday: string | null
+  deathday: string | null
+  place_of_birth: string | null
+  details_cached_at: Date | null
+}
+
+/**
+ * TMDb's biography, dates and birthplace for a person, cached per name.
+ * Null when TMDb could not be asked and nothing is stored for this person;
+ * a person TMDb does not know answers with every field null.
+ */
+export async function getCachedOrFetchPersonDetails(
+  decodedName: string,
+  tmdbPersonId: number
+): Promise<TmdbPersonDetails | null> {
+  const nameKey = normalizePersonNameKey(decodedName)
+  const row = await queryOne<PersonDetailsRow>(
+    `SELECT details_tmdb_person_id, biography,
+            to_char(birthday, 'YYYY-MM-DD') AS birthday,
+            to_char(deathday, 'YYYY-MM-DD') AS deathday,
+            place_of_birth, details_cached_at
+     FROM person_tmdb_profile_cache WHERE name_key = $1`,
+    [nameKey]
+  )
+  const stored =
+    row?.details_cached_at != null && row.details_tmdb_person_id === tmdbPersonId
+      ? {
+          biography: row.biography,
+          birthday: row.birthday,
+          deathday: row.deathday,
+          placeOfBirth: row.place_of_birth,
+        }
+      : null
+  if (
+    stored &&
+    row?.details_cached_at &&
+    Date.now() - new Date(row.details_cached_at).getTime() < PERSON_DETAILS_CACHE_TTL_MS
+  ) {
+    return stored
+  }
+
+  const answer = await tmdbLookup<TmdbPersonResponse>(`/person/${tmdbPersonId}`, {
+    language: 'en-US',
+  })
+  if (answer.status === 'failed') {
+    return stored
+  }
+  const details: TmdbPersonDetails =
+    answer.status === 'ok'
+      ? readTmdbPersonDetails(answer.data)
+      : { biography: null, birthday: null, deathday: null, placeOfBirth: null }
+
+  try {
+    await query(
+      `INSERT INTO person_tmdb_profile_cache (
+         name_key, tmdb_person_id, not_found, details_tmdb_person_id,
+         biography, birthday, deathday, place_of_birth, details_cached_at, updated_at
+       ) VALUES ($1, $2, FALSE, $2, $3, $4::date, $5::date, $6, NOW(), NOW())
+       ON CONFLICT (name_key) DO UPDATE SET
+         details_tmdb_person_id = EXCLUDED.details_tmdb_person_id,
+         biography = EXCLUDED.biography,
+         birthday = EXCLUDED.birthday,
+         deathday = EXCLUDED.deathday,
+         place_of_birth = EXCLUDED.place_of_birth,
+         details_cached_at = EXCLUDED.details_cached_at,
+         updated_at = NOW()`,
+      [
+        nameKey,
+        tmdbPersonId,
+        details.biography,
+        details.birthday,
+        details.deathday,
+        details.placeOfBirth,
+      ]
+    )
+  } catch (err) {
+    logger.warn({ err, nameKey }, 'Failed to persist TMDb person details cache')
+  }
+  return details
 }
 
 /**

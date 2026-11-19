@@ -4,6 +4,7 @@
 
 import type { EmbyItem, EmbyEpisode } from './types.js'
 import type { WatchedItem, WatchedEpisode } from '../types.js'
+import { MAX_STORED_ACTORS } from '../castLimits.js'
 
 type EmbyPerson = {
   Name: string
@@ -42,7 +43,11 @@ export function extractPeopleNames(people: EmbyPerson[] | undefined, types: stri
   return people?.filter((p) => types.includes(p.Type)).map((p) => p.Name) || []
 }
 
-export function mapEmbyActors(people: EmbyPerson[] | undefined, baseUrl: string, limit = 20) {
+export function mapEmbyActors(
+  people: EmbyPerson[] | undefined,
+  baseUrl: string,
+  limit = MAX_STORED_ACTORS
+) {
   return (
     people
       ?.filter((p) => p.Type === 'Actor')

@@ -18,13 +18,15 @@ Person pages cover anyone in your library's credits — actors, directors, write
 - Name, plus **Born** (with current age) and, where applicable, **Died** (with age at death)
 - A **Biography**, clamped with **More / Less** when it runs long
 
+The biography, dates and birthplace come from your media server's record of the person. Emby and Jellyfin often leave that record empty, so any part it lacks is filled in from TMDb (in English).
+
 Header chips summarize the person's footprint in your library: **"12 as Actor"**, **"3 as Director"**, **"20 Movies"**, **"4 Series"**.
 
 ### Filmography From Your Library
 
 Everything of theirs your library holds, in poster carousels **grouped by media type and role** — the same grouping as the TMDb section below: *Movies · Acting*, *Movies · Director*, *TV Series · Creator*, and so on. A title they both acted in and directed appears in both rows.
 
-Roles come from your media server's credits (cast, directors, writers) plus a show's creators, and TMDb adds the rest — producing and other crew — for titles it can match. Cards carry the standard overlays:
+Roles come from your media server's credits (cast, directors, writers) plus a show's creators, and TMDb adds the rest — producing and other crew — for titles it can match. A title in your library that TMDb credits the person on also appears when your media server's cast list leaves them out, as it can for someone billed far down. Cards carry the standard overlays:
 
 - Watched tick, or an **episode-progress badge** (8/24) for series
 - Your **star rating**, hover-rateable
